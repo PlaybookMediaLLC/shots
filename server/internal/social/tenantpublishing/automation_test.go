@@ -128,6 +128,19 @@ func TestAutomateRunsEachFollowUpOnTheProvider(t *testing.T) {
 	}
 }
 
+func TestFirstCommentWithoutReceiptNeedsReconciliation(t *testing.T) {
+	p, _, provider, _ := directFixture()
+	provider.missingCommentReceipt = true
+	result, err := p.Automate(context.Background(), socialapi.AutomationInput{
+		DestinationID: "destination", OrganizationID: "product-org", Platform: "linkedin", SecretReference: "SOCIAL_API_KEY",
+		RemotePostID: "remote-post-1", Kind: "first_comment", Text: "Link in the comments",
+	})
+	var outcome *socialapi.Error
+	if result.Done || !errors.As(publicationOutcome(err), &outcome) || !outcome.UnknownDelivery || len(provider.replies) != 1 {
+		t.Fatalf("missing receipt = %+v, %v, calls=%d", result, err, len(provider.replies))
+	}
+}
+
 // An image's description goes to the provider with the image.
 func TestSignedMediaCarriesAltText(t *testing.T) {
 	p, _, _, _ := directFixture()

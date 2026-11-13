@@ -90,7 +90,7 @@ type automationStore interface {
 	// RecordAutomation settles a pending receipt, or counts a try when
 	// status is pending. It reports false when the receipt was no longer
 	// pending (cancelled meanwhile), so the step's result is not recorded.
-	RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode string) (bool, error)
+	RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode, providerMessage string) (bool, error)
 }
 
 // automator runs a step against the platform.
@@ -209,8 +209,9 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 	if status != ReceiptPending {
 		return AutomationResult{Settled: true}, nil
 	}
+	message := ""
 	settle := func(status, remoteID, code string) (AutomationResult, error) {
-		_, err := store.RecordAutomation(ctx, postID, step.Key, status, remoteID, code)
+		_, err := store.RecordAutomation(ctx, postID, step.Key, status, remoteID, code, message)
 		return AutomationResult{Settled: status != ReceiptPending}, err
 	}
 	if !hasActor {
@@ -258,6 +259,7 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 		if errors.Is(err, socialapi.ErrUnsupported) {
 			return settle(ReceiptSkipped, "", "unsupported")
 		}
+		message = providerMessage(err)
 		return settle(ReceiptFailed, "", automationFailureCode(err))
 	}
 	if !result.Done {

@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	entgo "entgo.io/ent"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticsaccount"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticspost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticssnapshot"
@@ -650,4 +653,242 @@ func TestSocialSetsPlatform(t *testing.T) {
 			t.Fatal("a publisher sees orphaned sets")
 		}
 	})
+}
+
+func TestMoveConnectedAccountBetweenProfiles(t *testing.T) {
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo, w.owner
+	subscribe(t, ctx, repo, w.org, "business")
+	source, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Source"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	destination, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Destination"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := "move_" + w.id
+	w.exec(t, `INSERT INTO channel_connection(id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId","updatedAt",platform,"socialSetId",status)
+ VALUES($1,$2,'social',$1,'test-only',$3,now(),'linkedin',$4,'ACTIVE')`, account, w.org, owner.UserID, source.ID)
+	w.exec(t, `UPDATE social_set SET "defaultPlatforms"='["linkedin"]', "primaryPlatform"='linkedin' WHERE id=$1`, source.ID)
+	draft, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "Stays here", PlainText: "Post", SocialSetID: source.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := "post_" + w.id
+	w.exec(t, `INSERT INTO scheduled_post(id,"organizationId","contentDraftId","channelConnectionId","socialSetId","scheduledFor",status,caption,"idempotencyKey","updatedAt")
+ VALUES($1,$2,$3,$4,$5,now(),'PUBLISHED','Post',$1,now())`, post, w.org, draft.ID, account, source.ID)
+	move := func(actor Actor, to string) error {
+		_, err := repo.MoveSocialSetAccount(ctx, actor, source.ID, account, to)
+		return err
+	}
+	w.addMember(t, "publisher", "publisher")
+	if err := move(w.actor("publisher"), destination.ID); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("publisher=%v", err)
+	}
+	if err := move(owner, "missing-profile"); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("foreign profile=%v", err)
+	}
+	other := newTestWorkspace(t)
+	subscribe(t, ctx, other.repo, other.org, "business")
+	foreign, err := other.repo.CreateSocialSet(ctx, other.owner, SocialSetInput{Name: "Another workspace"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := move(owner, foreign.ID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("cross-tenant move=%v", err)
+	}
+	occupied := "occupied_" + w.id
+	w.exec(t, `INSERT INTO channel_connection(id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId","updatedAt",platform,"socialSetId",status)
+ VALUES($1,$2,'social',$1,'test-only',$3,now(),'linkedin',$4,'ACTIVE')`, occupied, w.org, owner.UserID, destination.ID)
+	if err := move(owner, destination.ID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("occupied platform=%v", err)
+	}
+	w.exec(t, `DELETE FROM channel_connection WHERE id=$1`, occupied)
+	private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Private", Visibility: "PRIVATE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := move(owner, private.ID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("visibility widened=%v", err)
+	}
+	for _, revocation := range []struct {
+		name, statement string
+	}{
+		{"demotion", `UPDATE member SET role='viewer' WHERE "userId"=$1`},
+		{"ban", `UPDATE "user" SET banned=true WHERE id=$1`},
+	} {
+		t.Run("a concurrent "+revocation.name+" fences the move", func(t *testing.T) {
+			name := "move-admin-" + revocation.name
+			w.addMember(t, name, "admin")
+			admin := w.actor(name)
+			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			tx, err := w.db.SQL.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+			var blocker int
+			if err := tx.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&blocker); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tx.ExecContext(ctx, revocation.statement, admin.UserID); err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan error, 1)
+			go func() {
+				_, err := repo.MoveSocialSetAccount(ctx, admin, source.ID, account, destination.ID)
+				done <- err
+			}()
+			for {
+				var blocked bool
+				if err := w.db.SQL.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)))`, blocker).Scan(&blocked); err != nil {
+					t.Fatal(err)
+				}
+				if blocked {
+					break
+				}
+				select {
+				case err := <-done:
+					t.Fatalf("move did not wait for authority: %v", err)
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				case <-time.After(5 * time.Millisecond):
+				}
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			if err := <-done; !errors.Is(err, publishing.ErrForbidden) {
+				t.Fatalf("revoked admin moved the account: %v", err)
+			}
+			connection := w.db.Client.ChannelConnection.GetX(ctx, account)
+			unchanged, err := repo.GetSocialSet(ctx, owner, source.ID)
+			if err != nil || *connection.SocialSetID != source.ID || !slices.Contains(unchanged.DefaultPlatforms, "linkedin") {
+				t.Fatalf("denied move changed defaults: %+v %v", unchanged, err)
+			}
+		})
+	}
+	for _, status := range []string{"DRAFT", "SCHEDULED", "PROCESSING", "UNKNOWN_DELIVERY"} {
+		w.exec(t, `UPDATE scheduled_post SET status=$2 WHERE id=$1`, post, status)
+		if err := move(owner, destination.ID); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("%s=%v", status, err)
+		}
+	}
+	w.exec(t, `UPDATE scheduled_post SET status='PUBLISHED' WHERE id=$1`, post)
+	run := "automation_" + w.id
+	w.exec(t, `INSERT INTO post_automation_run(id,"organizationId","scheduledPostId",key,kind,status,"dueAt","updatedAt") VALUES($1,$2,$3,'first-comment','first_comment','pending',now(),now())`, run, w.org, post)
+	if err := move(owner, destination.ID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("pending followup=%v", err)
+	}
+	w.exec(t, `UPDATE post_automation_run SET status='failed',"failureCode"='UNKNOWN_DELIVERY' WHERE id=$1`, run)
+	if err := move(owner, destination.ID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("uncertain followup=%v", err)
+	}
+	w.exec(t, `UPDATE post_automation_run SET "failureCode"='http_403' WHERE id=$1`, run)
+	// A normal refusal is settled. The existing credentials and all old history survive the move.
+	// Pause a real move while it holds the connection lock. A late automation
+	// plan must wait, then observe the new profile instead of creating old work.
+	moveLocked, releaseMove := make(chan int, 1), make(chan struct{})
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(releaseMove) })
+	w.db.Client.ChannelConnection.Use(func(next entgo.Mutator) entgo.Mutator {
+		return entgo.MutateFunc(func(ctx context.Context, mutation entgo.Mutation) (entgo.Value, error) {
+			value, err := next.Mutate(ctx, mutation)
+			m := mutation.(*ent.ChannelConnectionMutation)
+			if setID, changed := m.SocialSetID(); err == nil && changed && setID == destination.ID {
+				var pid int
+				if err := m.Client().PlatformQuery(ctx, `SELECT pg_backend_pid()`, nil, func(row entsql.ColumnScanner) error { return row.Scan(&pid) }); err != nil {
+					return nil, err
+				}
+				moveLocked <- pid
+				select {
+				case <-releaseMove:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
+			return value, err
+		})
+	})
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	type moveResult struct {
+		saved *SocialSetRecord
+		err   error
+	}
+	moved := make(chan moveResult, 1)
+	go func() {
+		saved, err := repo.MoveSocialSetAccount(ctx, owner, source.ID, account, destination.ID)
+		moved <- moveResult{saved, err}
+	}()
+	var blocker int
+	select {
+	case blocker = <-moveLocked:
+	case result := <-moved:
+		t.Fatalf("move did not reach connection update: %v", result.err)
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	store := publishing.NewRepository(w.db.Client)
+	planned := make(chan error, 1)
+	go func() {
+		statuses, err := store.PlanAutomations(ctx, w.org, post, []publishing.AutomationReceipt{{DueAt: time.Now(), Key: "late-plan", Kind: "first_comment"}})
+		if err == nil && len(statuses) != 0 {
+			err = errors.New("a moved account acquired old follow-ups")
+		}
+		planned <- err
+	}()
+	for {
+		var blocked bool
+		if err := w.db.SQL.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)))`, blocker).Scan(&blocked); err != nil {
+			t.Fatal(err)
+		}
+		if blocked {
+			break
+		}
+		select {
+		case err := <-planned:
+			t.Fatalf("planning did not wait for move: %v", err)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	releaseOnce.Do(func() { close(releaseMove) })
+	result := <-moved
+	saved, err := result.saved, result.err
+	if err != nil || len(saved.Accounts) != 1 || saved.Accounts[0].ID != account || !slices.Contains(saved.DefaultPlatforms, "linkedin") {
+		t.Fatalf("moved=%+v err=%v", saved, err)
+	}
+	if err := <-planned; err != nil {
+		t.Fatal(err)
+	}
+	if status, _, err := store.AutomationReceipt(ctx, post, "late-plan"); err != nil || status != "skipped" {
+		t.Fatalf("late plan=%s %v", status, err)
+	}
+	if err := move(owner, destination.ID); err != nil {
+		t.Fatalf("replay=%v", err)
+	}
+	connection, err := w.db.Client.ChannelConnection.Get(ctx, account)
+	if err != nil || connection.Status != channelconnection.StatusACTIVE || connection.SecretReference != "test-only" || *connection.SocialSetID != destination.ID {
+		t.Fatalf("connection=%+v err=%v", connection, err)
+	}
+	old, err := repo.GetSocialSet(ctx, owner, source.ID)
+	if err != nil || len(old.Accounts) != 0 || len(old.DefaultPlatforms) != 0 || old.PrimaryPlatform != nil {
+		t.Fatalf("source=%+v err=%v", old, err)
+	}
+	stored, err := repo.GetContentDraft(ctx, owner, draft.ID)
+	if err != nil || stored.SocialSetID == nil || *stored.SocialSetID != source.ID {
+		t.Fatalf("draft=%+v err=%v", stored, err)
+	}
+	published, err := w.db.Client.ScheduledPost.Get(ctx, post)
+	if err != nil || *published.SocialSetID != source.ID || published.Status != scheduledpost.StatusPUBLISHED {
+		t.Fatalf("post=%+v err=%v", published, err)
+	}
+	audits, err := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.social_set_account_moved")).Count(ctx)
+	if err != nil || audits != 1 {
+		t.Fatalf("audit count=%d err=%v", audits, err)
+	}
 }

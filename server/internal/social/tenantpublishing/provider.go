@@ -210,6 +210,10 @@ func publicationOutcome(err error) *socialapi.Error {
 		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureProviderDailyLimit, "The account reached the platform's daily posting limit; nothing was created.")
 	case temporalx.TypePublicationRejected:
 		mapped = socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
+		var status interface{ HTTPStatus() int }
+		if errors.As(err, &status) && status.HTTPStatus() >= 400 && status.HTTPStatus() < 500 {
+			mapped.Status = status.HTTPStatus()
+		}
 	case temporalx.TypeAppAccess:
 		return appAccessRefused(err)
 	case temporalx.TypeRefreshToken, temporalx.TypeDisconnect:

@@ -32,6 +32,7 @@ func (PostAutomationRun) Fields() []ent.Field {
 		field.String("remote_id").StorageKey("remoteId").Optional().Nillable(),
 		field.Int("attempts").StorageKey("attempts").Default(0),
 		field.String("failure_code").StorageKey("failureCode").Optional().Nillable(),
+		field.String("provider_message").StorageKey("providerMessage").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

@@ -92,9 +92,12 @@ expiration cleanup remains outstanding; this record does not claim it ran.
   was not retained. Community Management permission is a possible cause, not a
   verified provider refusal. No mention resolved and no post was sent.
 - **Check 7 / TF-035 — Blocked:** X and LinkedIn are assigned to separate
-  profiles. A draft belongs to one profile; moving a connection disables it and
-  requires a reconnect. This run does not authorize that account change. Separate
-  successful publications do not prove the requested single-draft cross-post.
+  profiles. A draft belongs to one profile. The owner subsequently authorized
+  fixing this blocker. This branch adds a normal account-move control that keeps
+  the existing connection active, with the same visibility and owner, and refuses
+  unfinished publishing work. It has not moved either live account. Deployment
+  to the connected local stack and the one-draft live check remain outstanding.
+  Separate successful publications do not prove the requested cross-post.
 - **Check 26 / TF-066 — Approved, blocked locally:** the owner explicitly
   approved the default caption and `shots-x-10min.mp4`: 600 seconds, 1280×720,
   30 fps, moving test pattern with a 440 Hz tone, 160,252,211 bytes. Metadata

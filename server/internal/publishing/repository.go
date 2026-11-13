@@ -1105,28 +1105,51 @@ func IsSecretReference(value string) bool {
 // recorded and returns every one's status by key; a replayed plan keeps the
 // receipts it finds.
 func (r *Repository) PlanAutomations(ctx context.Context, organizationID, postID string, receipts []AutomationReceipt) (map[string]string, error) {
-	seen := map[string]bool{}
-	for _, receipt := range receipts {
-		if seen[receipt.Key] {
-			continue
-		}
-		seen[receipt.Key] = true
-		err := r.client.PostAutomationRun.Create().
-			SetID(cuid.New()).SetOrganizationID(organizationID).SetScheduledPostID(postID).
-			SetKey(receipt.Key).SetKind(postautomationrun.Kind(receipt.Kind)).SetDueAt(receipt.DueAt).
-			Exec(ctx)
-		// A receipt that exists already (a replayed plan) keeps its state.
-		if err != nil && !ent.IsConstraintError(err) {
-			return nil, err
-		}
-	}
-	rows, err := r.client.PostAutomationRun.Query().Where(postautomationrun.ScheduledPostID(postID)).All(ctx)
+	tx, err := r.client.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	statuses := make(map[string]string, len(rows))
+	defer tx.Rollback()
+	// A move either sees these pending receipts, or finishes before this plan.
+	if _, err := tx.PlatformExec(ctx, `SELECT c.id FROM channel_connection c JOIN scheduled_post p ON p."channelConnectionId"=c.id AND p."organizationId"=c."organizationId" WHERE p.id=$1 AND p."organizationId"=$2 FOR UPDATE OF c`, postID, organizationID); err != nil {
+		return nil, err
+	}
+	post, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(postID), scheduledpost.OrganizationID(organizationID)).WithChannelConnection().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	connection := post.Edges.ChannelConnection
+	if connection == nil {
+		return nil, ErrNotFound
+	}
+	sameProfile := post.SocialSetID == nil && connection.SocialSetID == nil ||
+		post.SocialSetID != nil && connection.SocialSetID != nil && *post.SocialSetID == *connection.SocialSetID
+	if !sameProfile {
+		// A moved account must not acquire new work from its former profile.
+		return map[string]string{}, nil
+	}
+	rows, err := tx.PostAutomationRun.Query().Where(postautomationrun.ScheduledPostID(postID), postautomationrun.OrganizationID(organizationID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	statuses := make(map[string]string, len(rows)+len(receipts))
 	for _, row := range rows {
 		statuses[row.Key] = string(row.Status)
+	}
+	for _, receipt := range receipts {
+		if _, exists := statuses[receipt.Key]; exists {
+			continue
+		}
+		if err := tx.PostAutomationRun.Create().
+			SetID(cuid.New()).SetOrganizationID(organizationID).SetScheduledPostID(postID).
+			SetKey(receipt.Key).SetKind(postautomationrun.Kind(receipt.Kind)).SetDueAt(receipt.DueAt).
+			Exec(ctx); err != nil {
+			return nil, err
+		}
+		statuses[receipt.Key] = string(postautomationrun.StatusPending)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return statuses, nil
 }
@@ -1154,7 +1177,7 @@ func (r *Repository) AutomationReceipt(ctx context.Context, postID, key string) 
 // settled meanwhile, nothing changed), except that a step that acted is
 // recorded done even if it was cancelled while in flight: the receipt says
 // what is on the platform.
-func (r *Repository) RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode string) (bool, error) {
+func (r *Repository) RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode, providerMessage string) (bool, error) {
 	open := []postautomationrun.Status{postautomationrun.StatusPending}
 	if status == string(postautomationrun.StatusDone) {
 		open = append(open, postautomationrun.StatusCancelled)
@@ -1167,6 +1190,9 @@ func (r *Repository) RecordAutomation(ctx context.Context, postID, key, status, 
 	}
 	if failureCode != "" {
 		update.SetFailureCode(failureCode)
+	}
+	if providerMessage != "" {
+		update.SetProviderMessage(RedactProviderMessage(providerMessage))
 	}
 	changed, err := update.Save(ctx)
 	return changed > 0, err

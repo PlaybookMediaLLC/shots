@@ -3017,6 +3017,7 @@ var (
 		{Name: "remoteId", Type: field.TypeString, Nullable: true},
 		{Name: "attempts", Type: field.TypeInt, Default: 0},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "providerMessage", Type: field.TypeString, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}

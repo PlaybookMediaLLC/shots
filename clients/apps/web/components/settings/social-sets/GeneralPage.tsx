@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { Group, Pill, Row } from '@/components/platform-ui'
@@ -17,16 +18,18 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { socialSetRemovalSchema, socialSetSchema } from '@/lib/api/contracts/social-sets'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { settingsErrorMessage } from '@/lib/settings/client'
-import { useSocialSetScope } from './scope'
+import { socialSetKey, useSocialSetScope } from './scope'
 import {
   hasDefaultProfileName,
   HEALTH_GUIDANCE,
   providerFor,
   type SocialSetRecord,
   useSaveSocialSet,
+  useSocialSets,
   useStoreSocialSet,
 } from './api'
 import { SET_COLORS } from './colors'
@@ -173,6 +176,7 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
               </span>
               {canManage ? (
                 <span className="flex flex-wrap gap-2">
+                  <MoveAccount account={account} set={set} />
                   {provider.success ? (
                     <ConnectionLauncher
                       intent={{
@@ -225,6 +229,64 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
         </div>
       ) : null}
     </Row>
+  )
+}
+
+function MoveAccount({ account, set }: { account: SocialSetRecord['accounts'][number]; set: SocialSetRecord }) {
+  const { data } = useSocialSets()
+  const scope = useSocialSetScope()
+  const store = useStoreSocialSet()
+  const cache = useQueryClient()
+  const [destinationId, setDestinationId] = useState('')
+  const destinations = (data?.items ?? []).filter(
+    (candidate) => candidate.id !== set.id && candidate.visibility === set.visibility &&
+      !candidate.accounts.some((existing) =>
+        (channelForPlatform(existing.platform) ?? existing.platform) ===
+        (channelForPlatform(account.platform) ?? account.platform)
+      )
+  )
+  const destination = destinations.find((candidate) => candidate.id === destinationId)
+  const name = account.handle ?? account.displayName ?? account.platform
+  if (destinations.length === 0) return null
+  return (
+    <>
+      <Select value="" onValueChange={setDestinationId}>
+        <SelectTrigger aria-label={`Move ${name} to another profile`} className="w-44" size="sm">
+          <SelectValue placeholder="Move to profile…" />
+        </SelectTrigger>
+        <SelectContent>
+          {destinations.map((candidate) => (
+            <SelectItem key={candidate.id} value={candidate.id}>{candidate.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ConfirmDialog
+        confirmLabel="Move account"
+        description={<>
+          <p>{name} stays connected and becomes available for drafts in {destination?.name}.</p>
+          <p>Existing drafts and publishing history stay in {set.name}. Finish or cancel queued posts and follow-ups before moving.</p>
+        </>}
+        disabled={!destination}
+        onConfirm={async () => {
+          try {
+            const saved = await scope.request(
+              `/api/v1/social-sets/${encodeURIComponent(set.id)}/accounts/${encodeURIComponent(account.id)}/move`,
+              socialSetSchema,
+              { method: 'POST', body: { destinationSocialSetId: destinationId } }
+            )
+            await store(saved)
+            await cache.invalidateQueries({ queryKey: socialSetKey(scope, set.id) })
+            scope.assertCurrent()
+            return null
+          } catch (error) {
+            return settingsErrorMessage(error)
+          }
+        }}
+        onOpenChange={(open) => { if (!open) setDestinationId('') }}
+        open={Boolean(destinationId)}
+        title={`Move ${name} to ${destination?.name ?? 'another profile'}?`}
+      />
+    </>
   )
 }
 

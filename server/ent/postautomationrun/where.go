@@ -99,6 +99,11 @@ func FailureCode(v string) predicate.PostAutomationRun {
 	return predicate.PostAutomationRun(sql.FieldEQ(FieldFailureCode, v))
 }
 
+// ProviderMessage applies equality check predicate on the "provider_message" field. It's identical to ProviderMessageEQ.
+func ProviderMessage(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldEQ(FieldProviderMessage, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.PostAutomationRun {
 	return predicate.PostAutomationRun(sql.FieldEQ(FieldCreatedAt, v))
@@ -572,6 +577,81 @@ func FailureCodeEqualFold(v string) predicate.PostAutomationRun {
 // FailureCodeContainsFold applies the ContainsFold predicate on the "failure_code" field.
 func FailureCodeContainsFold(v string) predicate.PostAutomationRun {
 	return predicate.PostAutomationRun(sql.FieldContainsFold(FieldFailureCode, v))
+}
+
+// ProviderMessageEQ applies the EQ predicate on the "provider_message" field.
+func ProviderMessageEQ(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldEQ(FieldProviderMessage, v))
+}
+
+// ProviderMessageNEQ applies the NEQ predicate on the "provider_message" field.
+func ProviderMessageNEQ(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldNEQ(FieldProviderMessage, v))
+}
+
+// ProviderMessageIn applies the In predicate on the "provider_message" field.
+func ProviderMessageIn(vs ...string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldIn(FieldProviderMessage, vs...))
+}
+
+// ProviderMessageNotIn applies the NotIn predicate on the "provider_message" field.
+func ProviderMessageNotIn(vs ...string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldNotIn(FieldProviderMessage, vs...))
+}
+
+// ProviderMessageGT applies the GT predicate on the "provider_message" field.
+func ProviderMessageGT(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldGT(FieldProviderMessage, v))
+}
+
+// ProviderMessageGTE applies the GTE predicate on the "provider_message" field.
+func ProviderMessageGTE(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldGTE(FieldProviderMessage, v))
+}
+
+// ProviderMessageLT applies the LT predicate on the "provider_message" field.
+func ProviderMessageLT(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldLT(FieldProviderMessage, v))
+}
+
+// ProviderMessageLTE applies the LTE predicate on the "provider_message" field.
+func ProviderMessageLTE(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldLTE(FieldProviderMessage, v))
+}
+
+// ProviderMessageContains applies the Contains predicate on the "provider_message" field.
+func ProviderMessageContains(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldContains(FieldProviderMessage, v))
+}
+
+// ProviderMessageHasPrefix applies the HasPrefix predicate on the "provider_message" field.
+func ProviderMessageHasPrefix(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldHasPrefix(FieldProviderMessage, v))
+}
+
+// ProviderMessageHasSuffix applies the HasSuffix predicate on the "provider_message" field.
+func ProviderMessageHasSuffix(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldHasSuffix(FieldProviderMessage, v))
+}
+
+// ProviderMessageIsNil applies the IsNil predicate on the "provider_message" field.
+func ProviderMessageIsNil() predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldIsNull(FieldProviderMessage))
+}
+
+// ProviderMessageNotNil applies the NotNil predicate on the "provider_message" field.
+func ProviderMessageNotNil() predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldNotNull(FieldProviderMessage))
+}
+
+// ProviderMessageEqualFold applies the EqualFold predicate on the "provider_message" field.
+func ProviderMessageEqualFold(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldEqualFold(FieldProviderMessage, v))
+}
+
+// ProviderMessageContainsFold applies the ContainsFold predicate on the "provider_message" field.
+func ProviderMessageContainsFold(v string) predicate.PostAutomationRun {
+	return predicate.PostAutomationRun(sql.FieldContainsFold(FieldProviderMessage, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

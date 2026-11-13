@@ -848,6 +848,13 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR SHARE`, actor.OrganizationID); err != nil {
 		return nil, err
 	}
+	// Account moves lock the profile before its connections. Keep this schedule
+	// on the same membership snapshot until its posts are committed.
+	if loadedDraft.SocialSetID != nil {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM social_set WHERE id=$1 AND "organizationId"=$2 FOR SHARE`, *loadedDraft.SocialSetID, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	// One schedule of a draft at a time: a concurrent double submit waits, then replays.
 	if _, err := tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext('content-draft-schedule:' || $1))`, draftID); err != nil {
 		return nil, err

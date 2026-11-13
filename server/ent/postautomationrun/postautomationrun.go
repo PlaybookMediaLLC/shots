@@ -32,6 +32,8 @@ const (
 	FieldAttempts = "attempts"
 	// FieldFailureCode holds the string denoting the failure_code field in the database.
 	FieldFailureCode = "failureCode"
+	// FieldProviderMessage holds the string denoting the provider_message field in the database.
+	FieldProviderMessage = "providerMessage"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -52,6 +54,7 @@ var Columns = []string{
 	FieldRemoteID,
 	FieldAttempts,
 	FieldFailureCode,
+	FieldProviderMessage,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -186,6 +189,11 @@ func ByAttempts(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureCode orders the results by the failure_code field.
 func ByFailureCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureCode, opts...).ToFunc()
+}
+
+// ByProviderMessage orders the results by the provider_message field.
+func ByProviderMessage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProviderMessage, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.
