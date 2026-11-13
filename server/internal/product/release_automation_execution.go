@@ -513,7 +513,7 @@ func (c *Configuration) CollectAutomationChange(ctx context.Context, org, id str
 		return "", err
 	}
 	e := event.Snapshot
-	if e.Family == automation.Deployed && productionDeployment(e) {
+	if e.Family == automation.Deployed && (event.Mode == "automation" || productionDeployment(e)) {
 		sha := eventString(e, "deployment.sha")
 		result, err := c.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: event.SourceAppID, RequestID: event.DeliveryID}, IngestDeploymentInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, ExternalID: e.ObjectID, Environment: eventString(e, "deployment.environment"), SHA: &sha, URL: nonEmptyPointer(e.URL), DeployedAt: e.OccurredAt})
 		if err != nil {

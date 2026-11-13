@@ -129,6 +129,39 @@ func TestAutomationPRAndDeploymentCreateReviewableReleases(t *testing.T) {
 	}
 }
 
+func TestAutomationLegacyDeploymentsRemainProductionOnly(t *testing.T) {
+	for _, environment := range []string{"production", "staging"} {
+		t.Run(environment, func(t *testing.T) {
+			f := newAutomationFixture(t)
+			body, err := json.Marshal(map[string]any{"installation": map[string]any{"id": f.installation}, "repository": map[string]any{"id": 1001, "full_name": "acme/app"},
+				"deployment": map[string]any{"id": 902, "environment": environment, "sha": deployedSHA}, "deployment_status": map[string]any{"id": 1902, "state": "success", "created_at": time.Now().Format(time.RFC3339Nano)}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{EventName: "deployment_status", DeliveryID: "legacy-deployment", Body: body}); err != nil {
+				t.Fatal(err)
+			}
+			event := f.db.Client.ReleaseSourceEvent.Query().Where(releasesourceevent.OrganizationID(f.org)).OnlyX(f.ctx)
+			if event.Mode != "legacy" {
+				t.Fatalf("mode=%s", event.Mode)
+			}
+			if environment == "staging" {
+				if event.Disposition != "skipped" || f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org)).CountX(f.ctx) != 0 {
+					t.Fatal("unconfigured staging deployment was not skipped")
+				}
+				return
+			}
+			run := f.db.Client.ReleaseAutomationRun.Query().Where(releaseautomationrun.EventID(event.ID)).OnlyX(f.ctx)
+			if err := f.repo.RunLegacyReleaseEvent(f.ctx, f.org, run.ID, 0); err != nil {
+				t.Fatal(err)
+			}
+			if n := f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org), deploymentevent.Environment(environment)).CountX(f.ctx); n != 1 {
+				t.Fatalf("production deployments=%d", n)
+			}
+		})
+	}
+}
+
 func newAutomationFixture(t *testing.T) *automationFixture {
 	t.Helper()
 	w := newTestWorkspace(t)

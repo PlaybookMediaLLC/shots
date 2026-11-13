@@ -576,7 +576,7 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		return skip("deployment_url_refused")
 	}
 	candidates, err := c.client.ProductSurface.Query().Where(productsurface.OrganizationID(organizationID),
-		productsurface.Environment("production")).Order(ent.Asc(productsurface.FieldName)).All(ctx)
+		productsurface.Environment(row.Environment)).Order(ent.Asc(productsurface.FieldName)).All(ctx)
 	if err != nil {
 		return err
 	}

@@ -1014,8 +1014,20 @@ func TestAutomationCaptureProductLabelsCurrentStateAndRefusesWhatItCannotShow(t 
 	})
 	t.Run("a deployment that was not recorded has nothing to bind to", func(t *testing.T) {
 		f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
-		if _, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 740, "staging"), "capture", nil, 0); !errors.Is(err, ErrCaptureRefused) {
-			t.Fatalf("staging deployment: %v", err)
+		runID := f.deploy(t, 740, "production")
+		f.db.Client.DeploymentEvent.Delete().Where(deploymentevent.OrganizationID(f.org)).ExecX(f.ctx)
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0); !errors.Is(err, ErrCaptureRefused) {
+			t.Fatalf("missing deployment: %v", err)
+		}
+	})
+	t.Run("a deployment cannot capture a surface in another environment", func(t *testing.T) {
+		f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+		f.db.Client.ProductSurface.UpdateOneID(f.surface).SetEnvironment("staging").ExecX(f.ctx)
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 742, "production"), "capture", nil, 0); !errors.Is(err, ErrCaptureRefused) {
+			t.Fatalf("environment mismatch: %v", err)
+		}
+		if n := f.db.Client.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(f.surface)).CountX(f.ctx); n != 0 || f.capturer.calls.Load() != 0 {
+			t.Fatalf("captures=%d calls=%d", n, f.capturer.calls.Load())
 		}
 	})
 	t.Run("another workspace's surface cannot be activated", func(t *testing.T) {
@@ -1036,6 +1048,75 @@ func TestAutomationCaptureProductLabelsCurrentStateAndRefusesWhatItCannotShow(t 
 			t.Fatal("activated a workflow that captures another workspace's surface")
 		}
 	})
+}
+
+func TestAutomationStagingCaptureRetainsDeploymentAttribution(t *testing.T) {
+	f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+	f.db.Client.ProductSurface.UpdateOneID(f.surface).SetEnvironment("staging").ExecX(f.ctx)
+	f.graph.Qualification.Values = []string{"staging"}
+	draft, err := f.repo.SaveReleaseAutomation(f.ctx, f.owner, SaveAutomationInput{ID: f.active.ID, SourceAppID: f.source.ID, Name: "Staging", ExpectedRevision: f.active.Revision, Graph: f.graph, Layout: map[string]automation.Position{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.active, err = f.repo.ActivateReleaseAutomation(f.ctx, f.owner, draft.ID, draft.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runID := f.deploy(t, 741, "staging")
+	outputs, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0)
+	if err != nil {
+		t.Fatalf("configured staging capture: %v", err)
+	}
+	deployment := f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org)).OnlyX(f.ctx)
+	receipt := f.db.Client.SurfaceCapture.GetX(f.ctx, outputs.CaptureID)
+	if deployment.Environment != "staging" || deployment.SourceAppID != f.source.ID || deployment.Sha == nil || *deployment.Sha != deployedSHA || receipt.SourceID == nil || *receipt.SourceID != deployment.ID || receipt.OrganizationID != f.org || outputs.CaptureAssetID != receipt.AssetID {
+		t.Fatalf("wrong attribution: deployment=%+v receipt=%+v outputs=%+v", deployment, receipt, outputs)
+	}
+	// Activity replay reuses the recorded deployment and capture.
+	if kind, err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil || kind != "new" {
+		t.Fatalf("replayed collection: kind=%s err=%v", kind, err)
+	}
+	if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	if f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org)).CountX(f.ctx) != 1 || f.capturer.calls.Load() != 1 {
+		t.Fatal("activity replay duplicated the staging deployment or capture")
+	}
+}
+
+func TestAutomationPublishedCaptureSelectsSurfaceEnvironment(t *testing.T) {
+	for _, environment := range []string{"production", "staging"} {
+		t.Run(environment, func(t *testing.T) {
+			f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+			runID := f.deploy(t, 743, "production")
+			production := f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org)).OnlyX(f.ctx)
+			sha := deployedSHA
+			staging, err := f.repo.IngestDeployment(f.ctx, Actor{OrganizationID: f.org, Kind: "webhook", Display: f.source.ID}, IngestDeploymentInput{
+				Environment: "staging", EventID: "staging-release", ExternalID: "744", SourceAppID: f.source.ID, SHA: &sha,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.db.Client.ProductSurface.UpdateOneID(f.surface).SetEnvironment(environment).ExecX(f.ctx)
+			f.repo.WithGitHubApp(fakeReader{commits: map[string]string{"v1": deployedSHA}})
+			event := f.db.Client.ReleaseSourceEvent.Query().Where(releasesourceevent.OrganizationID(f.org)).OnlyX(f.ctx)
+			event.Snapshot.Family = automation.Published
+			event.Snapshot.Fields["release.tag"] = automation.StringValue("v1")
+			input := f.db.Client.ReleaseAutomationRun.GetX(f.ctx, runID).Outputs
+			outputs, err := f.repo.automationCaptureProduct(f.ctx, f.org, event, input, automation.FindNode(f.graph, "capture").Action)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := production.ID
+			if environment == "staging" {
+				want = staging.DeploymentID
+			}
+			receipt := f.db.Client.SurfaceCapture.GetX(f.ctx, outputs.CaptureID)
+			if receipt.SourceID == nil || *receipt.SourceID != want {
+				t.Fatalf("%s capture bound to the wrong deployment: %+v", environment, receipt)
+			}
+		})
+	}
 }
 
 func TestAutomationCaptureProductNeedsACapableWorker(t *testing.T) {

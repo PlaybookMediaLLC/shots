@@ -59,9 +59,12 @@ func (c *Configuration) automationCaptureProduct(ctx context.Context, org string
 	if err != nil {
 		return automation.Outputs{}, err
 	}
-	deployment, err := c.automationDeployment(ctx, org, event, "")
+	deployment, err := c.automationDeployment(ctx, org, event, surface.Environment)
 	if err != nil {
 		return automation.Outputs{}, err
+	}
+	if deployment.Environment != surface.Environment {
+		return automation.Outputs{}, ErrCaptureRefused
 	}
 	var revision *string
 	proof := automation.CaptureProofCurrentState
