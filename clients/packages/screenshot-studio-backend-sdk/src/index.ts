@@ -1151,6 +1151,8 @@ export type BackendDraftActivity = {
   entityId: string
   id: string
   metadata: Record<string, unknown>
+  /** Who or what made the change. */
+  source: 'person' | 'api' | 'mcp' | 'workflow' | 'callback' | 'support' | 'automation'
 }
 
 /** A workspace's drafts settings: its queue's weekly slots and approvals. */
@@ -1735,6 +1737,8 @@ export type BackendCreativeApproval = {
 }
 
 export type BackendEntitlementSummary = {
+  /** Each monthly quota the plan includes; 0 while the plan does not stand. An older backend omits it. */
+  allowances?: Record<string, number>
   /** What is left of the workspace's purchased credit packs. */
   creditBalance: number
   features: Record<string, boolean>
@@ -3640,9 +3644,10 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
-  async listContentDraftActivity(id: string) {
-    return this.request<{ items: BackendDraftActivity[] }>(
-      `v1/content-drafts/${encodeURIComponent(id)}/activity`
+  async listContentDraftActivity(id: string, cursor?: string) {
+    const parameters = new URLSearchParams(cursor ? { cursor } : {})
+    return this.request<{ items: BackendDraftActivity[]; nextCursor: string | null }>(
+      `v1/content-drafts/${encodeURIComponent(id)}/activity?${parameters}`
     )
   }
 
@@ -4037,6 +4042,32 @@ export class ScreenshotStudioBackendSDK {
       body: { confirmation },
       method: 'DELETE',
     })
+  }
+
+  /** Where a set can move and what the move changes; changes nothing. */
+  async previewSocialSetTransfer(id: string) {
+    return this.request<{
+      accounts: string[]
+      blocked: string
+      destinations: { name: string; organizationId: string }[]
+      drafts: number
+      mediaBytes: number
+      mediaFiles: number
+      noDestination: string
+      publishedPosts: number
+      queuedPosts: number
+      version: number
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`)
+  }
+
+  /** Moves a set, at the previewed version, to a workspace the person manages. */
+  async transferSocialSet(id: string, input: { destinationOrganizationId: string; version: number }) {
+    return this.request<{
+      cancelledPostIds: string[]
+      movedDrafts: number
+      organizationId: string
+      socialSetId: string
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`, { body: input, method: 'POST' })
   }
 
   /** Shares a private set with the workspace; only its owner can. */

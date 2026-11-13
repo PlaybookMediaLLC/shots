@@ -118,7 +118,10 @@ export const writeApi = {
     call<DraftCopyWire>(`${draft(id)}/revisions/${encodeURIComponent(revisionId)}/recover`, {
       method: 'POST',
     }),
-  activity: (id: string) => call<{ items: DraftActivityWire[] }>(`${draft(id)}/activity`),
+  activity: (id: string, cursor?: string) =>
+    call<{ items: DraftActivityWire[]; nextCursor: string | null }>(
+      `${draft(id)}/activity${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+    ),
   retryPost: (id: string) => call<{ post: DraftPostWire }>(`${post(id)}/retry`, { method: 'POST' }),
   cancelAutomations: (id: string) =>
     call<{ post: DraftPostWire }>(`${post(id)}/automations/cancel`, { method: 'POST' }),

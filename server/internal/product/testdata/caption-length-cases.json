@@ -556,6 +556,91 @@
         "x": 29,
         "youtube": 29
       }
+    },
+    {
+      "label": "İ is not the letter i in a link's query",
+      "text": "https://tr.wikipedia.org/w/index.php?search=İstanbul",
+      "lengths": {
+        "bluesky": 52,
+        "facebook": 52,
+        "gmb": 52,
+        "instagram": 52,
+        "linkedin": 52,
+        "mastodon": 31,
+        "pinterest": 52,
+        "threads": 52,
+        "tiktok": 52,
+        "x": 31,
+        "youtube": 52
+      }
+    },
+    {
+      "label": "İ before a protocol is not the letter i",
+      "text": "İhttps://example.com/a/long/path",
+      "lengths": {
+        "bluesky": 32,
+        "facebook": 32,
+        "gmb": 32,
+        "instagram": 32,
+        "linkedin": 32,
+        "mastodon": 24,
+        "pinterest": 32,
+        "threads": 32,
+        "tiktok": 32,
+        "x": 24,
+        "youtube": 32
+      }
+    },
+    {
+      "label": "the Kelvin sign before a protocol is not the letter k on Mastodon (X reads it as K)",
+      "text": "a \u212ahttps://example.com/path b",
+      "lengths": {
+        "bluesky": 29,
+        "facebook": 29,
+        "gmb": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 28,
+        "pinterest": 29,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    },
+    {
+      "label": "a Greek capital iota continues a link's path",
+      "text": "https://el.wikipedia.org/wiki/Ιστορία",
+      "lengths": {
+        "bluesky": 37,
+        "facebook": 37,
+        "gmb": 37,
+        "instagram": 37,
+        "linkedin": 37,
+        "mastodon": 29,
+        "pinterest": 37,
+        "threads": 37,
+        "tiktok": 37,
+        "x": 29,
+        "youtube": 37
+      }
+    },
+    {
+      "label": "40 combining marks after a letter count 40 on X, with no U+034F",
+      "text": "a\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 41,
+        "gmb": 41,
+        "instagram": 41,
+        "linkedin": 41,
+        "mastodon": 1,
+        "pinterest": 41,
+        "threads": 41,
+        "tiktok": 41,
+        "x": 40,
+        "youtube": 41
+      }
     }
   ]
 }

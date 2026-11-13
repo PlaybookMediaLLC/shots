@@ -6,12 +6,12 @@ import { listContentDraftActivity } from '@/lib/tenant/write'
 
 const notFound = () => errorResponse(404, 'Content draft not found.')
 
-/** A draft's history, newest first. Viewing is never recorded. */
+/** A page of a draft's history, newest first. Viewing is never recorded. */
 export const GET = route(contentDraftActivityContract, {
   auth: tenantAccess(contentDraftActivityContract.access),
-  handler: async ({ access, params }) => {
+  handler: async ({ access, params, query }) => {
     if (!contentDraftsEnabled()) return notFound()
-    const items = await listContentDraftActivity(access, params.id)
-    return items ? { items } : notFound()
+    const page = await listContentDraftActivity(access, params.id, query.cursor)
+    return page ?? notFound()
   },
 })

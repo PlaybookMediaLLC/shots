@@ -131,10 +131,20 @@ for (const [h, allowed] of [
 const texts = ['', 'hello', '日本語テキスト', '😀', '👨‍👩‍👧‍👦 family', '🇺🇸🇫🇷', '1️⃣ #️⃣', '❤️ ☺ ✔', 'https://example.com/very/long/path?x=1', 'visit sample.com today',
   'email me@sample.com', 'a.b', 't.co/abc', 'https://t.co/abcdef?x=1', 'é café', 'see example.co.uk/path and http://localhost:3000', 'x'.repeat(300),
   'Hello﻿world', '“smart” — dash…', 'www.google.com, foo.bar', 'Ünicode.com and xn--bcher-kva.com', 'a b', 'http://' + 'a'.repeat(70) + '.com', '#hashtag @mention $CASH',
-  'mixed 日本 and emoji 🎉 and https://a.io'];
+  'mixed 日本 and emoji 🎉 and https://a.io',
+  // JavaScript's /i folds case unlike Unicode lowercasing: İ, Ⱦ, Ʀ, Ι, ι, and Cyrillic and Greek variant forms in a TLD.
+  'https://tr.wikipedia.org/w/index.php?search=\u0130stanbul', '\u0130https://example.com/a/long/path', 'https://example.com/path\u023E',
+  'https://example.com/a\u01A6b', 'https://el.wikipedia.org/wiki/\u0399\u03C3\u03C4\u03BF\u03C1\u03AF\u03B1', 'https://пример.\u1C83айт/x',
+  'https://el.wikipedia.org/wiki/\u03B9\u03C3\u03C4\u03BF\u03C1\u03AF\u03B1', 'https://παράδειγμα.\u03F5λ/a/long/path',
+  // Punycode and the bare-domain search use the domain as written, not its stand-ins.
+  'https://\u0399' + 'a'.repeat(55) + '.com/x', 'see \u00C0a.comx\u0436\u2C65a.com now',
+  // NFC past 30 combining marks in a row: no U+034F, and a mark of a higher class still composes.
+  'a' + '\u0301'.repeat(40), 'a' + '\u0316'.repeat(30) + '\u0301', 'x' + '\u0301'.repeat(31) + '\u1100\u1161\u11A8',
+  'a\u030D' + '\u0316\u0301'.repeat(15)];
 for (const t of texts) out.weighted.push({ text: t, want: weightedLength(t) });
 for (const [type, end, t] of [['x', 280, 'a'.repeat(300)], ['x', 10, '日本語日本語日本語'], ['x', 280, 'short'], ['linkedin', 3000, 'a'.repeat(4000)],
-  ['x', 25, 'see https://example.com/a/b/c and more text here'], ['x', 5, '😀😀😀😀'], ['x', 4, 'ééééé'], ['x', 280, '']])
+  ['x', 25, 'see https://example.com/a/b/c and more text here'], ['x', 5, '😀😀😀😀'], ['x', 4, 'ééééé'], ['x', 280, ''],
+  ['x', 30, 'a' + '\u0301'.repeat(40) + 'bc']])
   out.slicer.push({ type, end, text: t, want: textSlicer(type, end, t).end });
 for (const [type, t] of [['threads', 'héllo😀'], ['linkedin', 'héllo😀'], ['x', 'héllo😀 https://a.com'], ['bluesky', '日本']]) out.count.push({ type, text: t, want: countLength(type, t) });
 

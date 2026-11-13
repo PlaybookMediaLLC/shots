@@ -1,5 +1,6 @@
 // Package socialplatform maps adapter identifiers to a publishing platform slot.
-// Adapter identifiers remain intact on connections and OAuth receipts.
+// Distinct adapters stay intact on connections and OAuth receipts; a legacy
+// name is renamed to its adapter when the account reconnects.
 package socialplatform
 
 // Canonical is the editor/default/slot key, independent of the OAuth adapter.
@@ -15,6 +16,20 @@ func Canonical(provider string) string {
 		return "mastodon"
 	default:
 		return provider
+	}
+}
+
+// Adapter is the OAuth adapter a stored platform connects through. Legacy
+// names of one adapter collapse; distinct adapters that share a slot, such as
+// linkedin and linkedin-page, stay distinct.
+func Adapter(platform string) string {
+	switch platform {
+	case "twitter":
+		return "x"
+	case "mastodoncustom":
+		return "mastodon-custom"
+	default:
+		return platform
 	}
 }
 

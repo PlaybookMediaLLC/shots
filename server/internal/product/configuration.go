@@ -33,6 +33,9 @@ type Actor struct {
 	KeyID   string
 	GrantID string
 	Display string
+	// Source labels an automated change in histories: mcp for a key used
+	// through the MCP server, callback for a provider's notice. A key is api.
+	Source string
 }
 
 // IsSession reports whether a signed-in user, rather than a credential or a
@@ -40,14 +43,18 @@ type Actor struct {
 func (a Actor) IsSession() bool { return a.Kind == "" || a.Kind == "session" }
 
 func (a Actor) auditActor() publishing.Actor {
-	actor := publishing.Actor{Display: a.Display, Organization: a.OrganizationID, RequestID: a.RequestID, Type: "SERVICE"}
+	actor := publishing.Actor{Display: a.Display, Organization: a.OrganizationID, RequestID: a.RequestID, Source: a.Source, Type: "SERVICE"}
 	switch a.Kind {
 	case "", "session":
-		actor.Type, actor.UserID = "USER", a.UserID
+		actor.Type, actor.UserID, actor.Source = "USER", a.UserID, ""
 	case "support":
-		actor.Type, actor.UserID = "SUPPORT", a.UserID
+		actor.Type, actor.UserID, actor.Source = "SUPPORT", a.UserID, ""
 	case "webhook":
-		actor.Type = "WEBHOOK"
+		actor.Type, actor.Source = "WEBHOOK", ""
+	case "api_key":
+		if actor.Source == "" {
+			actor.Source = "api"
+		}
 	}
 	return actor
 }

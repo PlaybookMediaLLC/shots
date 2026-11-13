@@ -167,6 +167,8 @@ test('invalid OAuth callbacks make no backend request', async () => {
   for (const [url, provider] of [
     ['http://localhost/integrations/social/x?oauth_token=a&oauth_verifier=b&state=c', 'x'],
     ['http://localhost/integrations/social/x?denied=a', 'x'],
+    ['http://localhost/integrations/social/linkedin?error=access_denied&state=s', 'linkedin'],
+    ['http://localhost/integrations/social/threads?error=access_denied&code=c&state=s', 'threads'],
     ['http://localhost/integrations/social/instagram?code=c', 'instagram'],
     ['http://localhost/integrations/social/linkedin?code=c', 'linkedin'],
     ['http://localhost/integrations/social/unknown?code=c&state=s', 'unknown'],
@@ -178,6 +180,8 @@ test('invalid OAuth callbacks make no backend request', async () => {
       },
     })
     assert.ok(response.status >= 400)
+    if (url.includes('denied') || url.includes('error='))
+      assert.match(await response.text(), /Nothing was changed/)
   }
   assert.equal(exchanges, 0)
 })
