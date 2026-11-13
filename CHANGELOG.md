@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.50.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.50.0...v2.50.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **publish:** calendar-day filters, post-management metric, destination limits at intake ([#530](https://github.com/PlaybookMediaLLC/shots/issues/530)) ([0e0ebd2](https://github.com/PlaybookMediaLLC/shots/commit/0e0ebd2ecce173d1b49fb8aca21652993dda3327))
+
 ## [2.50.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.49.0...v2.50.0) (2026-11-12)
 
 
