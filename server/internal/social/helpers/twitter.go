@@ -41,10 +41,10 @@ const surrogateShift = 0xf0000
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 
 // The link scan is linear, but a long text makes many regexp2 calls: so one
-// call of the URL regex gets linkScanBudget, and one text's scan
-// linkScanBudget plus linkScanPerUnit for each of its UTF-16 units up to
-// linkScanMaxUnits, the longest caption (an X Article); ordinary text uses a
-// small fraction of either.
+// call of the URL regex gets linkScanBudget, and one text's link and emoji
+// scans together linkScanBudget plus linkScanPerUnit for each of its UTF-16
+// units up to linkScanMaxUnits, the longest caption (an X Article); ordinary
+// text uses a small fraction of either.
 const (
 	linkScanBudget   = 200 * time.Millisecond
 	linkScanMaxUnits = 100_000
@@ -55,9 +55,9 @@ const (
 // a fraction of it unloaded.
 var linkScanPerUnit = 20 * time.Microsecond
 
-// ErrTextTooComplex is a text whose links the URL scan could not find within
-// its budget. Callers refuse it, since any count would be a guess. It replaces
-// regexp2's timeout error, which quotes the whole text.
+// ErrTextTooComplex is a text whose links or emoji the scans could not find
+// within its budget. Callers refuse it, since any count would be a guess. It
+// replaces regexp2's timeout error, which quotes the whole text.
 var ErrTextTooComplex = errors.New("the text is too long or too complex to count")
 
 // scanDeadline is when the scans of a text of n UTF-16 units must end: its
@@ -240,13 +240,13 @@ func CountLength(integrationType, text string) (int, error) {
 	return jsLength(text), nil
 }
 
-// parseTweet is twitter-text parseTweet, finding links by deadline when it is set.
+// parseTweet is twitter-text parseTweet, finding links and emoji by deadline when it is set.
 func parseTweet(text string, maxWeightedTweetLength int, deadline time.Time) (weightedLength int, valid bool, validRangeEnd int, err error) {
 	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
-	// Hash all entities by their startIndex for fast lookup
 	deadline = scanDeadline(len(shifted), deadline)
+	// Hash all entities by their startIndex for fast lookup
 	urls, err := extractURLsWithIndices(shifted, true, deadline)
 	if err != nil {
 		return 0, false, 0, err
@@ -436,7 +436,8 @@ func linkSpans(text string, deadline time.Time) ([][2]int, error) {
 		}
 	}
 	offsets = append(offsets, len(text))
-	urls, err := extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false, deadline)
+	units := shiftSurrogates(utf16Units(text))
+	urls, err := extractURLsWithIndices(units, false, scanDeadline(len(units), deadline))
 	if err != nil {
 		return nil, err
 	}
@@ -453,11 +454,9 @@ func linkSpans(text string, deadline time.Time) ([][2]int, error) {
 // scan runs word by word, each with the space before it, and skips the words
 // with no dot, or, when only links with a protocol count, with no "://": one
 // regexp2 call never sees more than one word. It fails with
-// ErrTextTooComplex once the text's budget, or limit when it is set and
-// sooner, runs out; each call is bounded, but a text of many slow words makes
-// many calls.
-func extractURLsWithIndices(text []rune, withoutProtocol bool, limit time.Time) ([]*urlEntity, error) {
-	deadline := scanDeadline(len(text), limit)
+// ErrTextTooComplex past deadline; each call is bounded, but a text of many
+// slow words makes many calls.
+func extractURLsWithIndices(text []rune, withoutProtocol bool, deadline time.Time) ([]*urlEntity, error) {
 	var urls []*urlEntity
 	for start, end := 0, 0; start < len(text); start = end {
 		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {
