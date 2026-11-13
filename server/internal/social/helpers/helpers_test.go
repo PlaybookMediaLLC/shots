@@ -102,6 +102,18 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 	}
 
 	full := jsRegexp(extractURLSource, regexp2.IgnoreCase)
+	asciiDomainAt := jsRegexp(`\G(?:`+validASCIIDomainSource+`)`, regexp2.IgnoreCase)
+	if !strings.HasSuffix(validASCIIDomainSource, validTLDSource()) {
+		t.Fatal("validAsciiDomain's TLDs are not validDomain's")
+	}
+	// matchEnd is where group of re's match at s ends, or -1.
+	matchEnd := func(re *regexp2.Regexp, text []rune, s, group int) int {
+		m, _ := re.FindRunesMatchStartingAt(text, s)
+		if m == nil {
+			return -1
+		}
+		return m.GroupByNumber(group).Index + m.GroupByNumber(group).Length
+	}
 	describe := func(m *regexp2.Match) string {
 		var b strings.Builder
 		for _, g := range m.Groups() {
@@ -135,9 +147,14 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
 		}
 		// A start the regex rejects would be skipped, so check every index.
-		for s, start := range urlStarts(text) {
-			if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); start != (m != nil) {
-				t.Errorf("urlStarts(%q)[%d] = %v", raw, s, start)
+		for s, end := range urlEnds(text) {
+			if want := matchEnd(extractURLAtRe, text, s, 5); end != want {
+				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
+		for s, end := range asciiDomainEnds(text) {
+			if want := matchEnd(asciiDomainAt, text, s, 0); end != want {
+				t.Errorf("asciiDomainEnds(%q)[%d] = %d, want %d", raw, s, end, want)
 			}
 		}
 		found += len(want)
@@ -151,12 +168,22 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 func TestWeightedLengthOfLongText(t *testing.T) {
 	prose := strings.Repeat("日本語の文章です。", 5556)
 	japanese := prose + "3.5 https://sample.com/a " + prose
+	var distinct strings.Builder // punycode's cost grows with distinct characters
+	for c := rune(0x4e00); c < 0x4e00+20000; c++ {
+		distinct.WriteRune(c)
+	}
 	for _, c := range []struct {
 		text string
 		want int
 	}{
 		{japanese, 2*2*utf8.RuneCountInString(prose) + len("3.5 ") + 23 + len(" ")},
 		{strings.Repeat("a.", 5000), 10000},
+		// Each "_b.co" matches, and is no link after "_", in one long chain.
+		{"a.com." + strings.Repeat("a_b.co.", 2000), 24 + 7*2000},
+		// A bare domain without an ASCII-only domain inside, plain and punycode.
+		{strings.Repeat("a.", 2000) + "日本.com", 2*2000 + 8},
+		{"xn--a." + strings.Repeat("a.", 2000) + "日本.com", 6 + 2*2000 + 8},
+		{distinct.String() + ".com", 2*20000 + 4},
 	} {
 		start := time.Now()
 		if got := WeightedLength(c.text); got != c.want {

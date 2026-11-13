@@ -70,9 +70,10 @@ func unshiftSurrogates(runes []rune) []rune {
 
 var (
 	// \G makes an attempt match only at the index it is given.
-	extractURLAtRe           = jsRegexp(`\G(?:`+extractURLSource+`)`, regexp2.IgnoreCase)
-	validTLDAtRe             = jsRegexp(`\G`+validTLDSource(), regexp2.IgnoreCase)
-	validASCIIDomainRe       = jsRegexp(validASCIIDomainSource, regexp2.IgnoreCase)
+	extractURLAtRe = jsRegexp(`\G(?:`+extractURLSource+`)`, regexp2.IgnoreCase)
+	validTLDAtRe   = jsRegexp(`\G`+validTLDSource(), regexp2.IgnoreCase)
+	// validAsciiDomain's label character, cut from its source.
+	asciiLabelCharRe         = jsRegexp(`^`+validASCIIDomainSource[len(`(?:(?:`):strings.Index(validASCIIDomainSource, `+)\.)+`)]+`$`, regexp2.IgnoreCase)
 	validTcoURLRe            = jsRegexp(validTcoURLSource, regexp2.IgnoreCase)
 	invalidURLWithoutProtoRe = jsRegexp(invalidURLWithoutProtocolPrecedingCharsSource, 0)
 	invalidCharsRe           = jsRegexp(invalidCharsSource, 0)
@@ -243,8 +244,13 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 
 			var lastURL *urlEntity
 			asciiEndPosition := 0
-			for am, _ := validASCIIDomainRe.FindRunesMatch(domain); am != nil; am, _ = validASCIIDomainRe.FindNextMatch(am) {
-				asciiDomain := am.Runes()
+			asciiEnds := asciiDomainEnds(domain)
+			for ai := 0; ai < len(domain); ai++ {
+				if asciiEnds[ai] < 0 {
+					continue
+				}
+				asciiDomain := domain[ai:asciiEnds[ai]]
+				ai = asciiEnds[ai] - 1
 				asciiStartPosition := indexRunes(domain, asciiDomain, asciiEndPosition)
 				asciiEndPosition = asciiStartPosition + len(asciiDomain)
 				lastURL = &urlEntity{
@@ -284,17 +290,24 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 }
 
 // urlMatches is extractUrl's matches as its scan from index 0 finds them, but
-// tries the regex only where urlStarts says one starts. Scanning from every
+// tries the regex only where urlEnds says one starts. Scanning from every
 // index is quadratic on long runs of letters, which is any CJK text, because
 // each start rescans the run.
 func urlMatches(text []rune) []*regexp2.Match {
-	starts := urlStarts(text)
+	ends := urlEnds(text)
 	var matches []*regexp2.Match
 	for s := 0; s < len(text); s++ {
-		if !starts[s] {
+		end := ends[s]
+		if end < 0 {
 			continue
 		}
-		if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); m != nil {
+		// Only a port, path or query runs past the domain. Without one the
+		// regex need not see the labels after it, which its greedy subdomain
+		// loop would otherwise reread for every match in a long chain.
+		if end == len(text) || strings.ContainsRune(":/?", text[end]) {
+			end = len(text)
+		}
+		if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text[:end], s); m != nil {
 			matches = append(matches, m)
 			s = m.Index + m.Length - 1
 		}
@@ -302,42 +315,87 @@ func urlMatches(text []rune) []*regexp2.Match {
 	return matches
 }
 
-// urlStarts reports at each index whether extractUrl matches from there.
-func urlStarts(text []rune) []bool {
-	domains := domainStarts(text)
-	domainAt := func(i int) bool { return domains[i] || domains[i+protocolLength(text, i)] }
-	starts := make([]bool, len(text))
+// urlEnds is, at each index, where the domain of extractUrl's match from
+// there ends, or -1.
+func urlEnds(text []rune) []int {
+	domains := domainEnds(text)
+	domainAt := func(i int) int {
+		if p := protocolLength(text, i); p > 0 && domains[i+p] >= 0 {
+			return domains[i+p]
+		}
+		return domains[i]
+	}
+	ends := make([]int, len(text))
 	for s, c := range text {
 		// validUrlPrecedingChars is one character or the start of text.
-		starts[s] = urlPrecedingChar(c) && domainAt(s+1) || s == 0 && domainAt(0)
+		ends[s] = -1
+		if urlPrecedingChar(c) {
+			ends[s] = domainAt(s + 1)
+		}
+		if ends[s] < 0 && s == 0 {
+			ends[s] = domainAt(0)
+		}
 	}
-	return starts
+	return ends
 }
 
-// domainStarts reports at each index whether validDomain matches there:
-// labels of domain characters, - and _ that each end in a dot, then a TLD.
-// What follows a label's dot does not depend on where the label starts, so
-// one right-to-left pass settles each dot once.
-func domainStarts(text []rune) []bool {
-	starts := make([]bool, len(text)+1)
+// domainEnds is, at each index, where validDomain's match from there ends,
+// or -1: labels of domain characters, - and _ that each end in a dot, then a
+// TLD. What follows a label's dot does not depend on where the label starts,
+// so one right-to-left pass settles each dot once.
+func domainEnds(text []rune) []int {
+	ends := slices.Repeat([]int{-1}, len(text)+1)
 	for dot := len(text) - 1; dot > 0; dot-- {
 		if text[dot] != '.' || !domainChar(text[dot-1]) {
 			continue
 		}
-		// The label is a subdomain when a domain follows, or the domain name,
-		// which has no _, when a TLD follows.
-		subdomain, name := starts[dot+1], false
-		if !subdomain {
-			m, _ := validTLDAtRe.FindRunesMatchStartingAt(text, dot+1)
-			name = m != nil
+		// The greedy regex takes the label as a subdomain when a domain
+		// follows, else as the domain name, which has no _, before a TLD.
+		subdomain, name := ends[dot+1], -1
+		if subdomain < 0 {
+			name = tldEnd(text, dot+1)
 		}
 		underscore := false
 		for x := dot - 1; x >= 0 && (text[x] == '-' || text[x] == '_' || domainChar(text[x])); x-- {
 			underscore = underscore || text[x] == '_'
-			starts[x] = domainChar(text[x]) && (subdomain || name && !underscore)
+			switch {
+			case !domainChar(text[x]):
+			case subdomain >= 0:
+				ends[x] = subdomain
+			case !underscore:
+				ends[x] = name
+			}
 		}
 	}
-	return starts
+	return ends
+}
+
+// asciiDomainEnds is domainEnds for validAsciiDomain, whose labels are any
+// run of asciiLabelCharRe characters before a dot, then the same TLDs.
+func asciiDomainEnds(text []rune) []int {
+	ends := slices.Repeat([]int{-1}, len(text)+1)
+	asciiLabelChar := func(c rune) bool { ok, _ := asciiLabelCharRe.MatchRunes([]rune{c}); return ok }
+	for dot := len(text) - 1; dot > 0; dot-- {
+		if text[dot] != '.' || !asciiLabelChar(text[dot-1]) {
+			continue
+		}
+		end := ends[dot+1]
+		if end < 0 {
+			end = tldEnd(text, dot+1)
+		}
+		for x := dot - 1; x >= 0 && asciiLabelChar(text[x]); x-- {
+			ends[x] = end
+		}
+	}
+	return ends
+}
+
+// tldEnd is where validDomain's TLD from i ends, or -1.
+func tldEnd(text []rune, i int) int {
+	if m, _ := validTLDAtRe.FindRunesMatchStartingAt(text, i); m != nil {
+		return m.Index + m.Length
+	}
+	return -1
 }
 
 // notDomainChars is what validDomainChars excludes: ASCII punctuation but
@@ -398,11 +456,16 @@ func indexRunes(s, sub []rune, from int) int {
 func isValidTweetURL(url []rune, protocolLen int, domain []rune) bool {
 	if len(domain) >= 4 && string(domain[:4]) == "xn--" {
 		// Punycode encoded url cannot contain non ASCII characters
-		if ok, _ := validASCIIDomainRe.MatchRunes(domain); !ok {
+		if !slices.ContainsFunc(asciiDomainEnds(domain), func(end int) bool { return end >= 0 }) {
 			return false
 		}
 	}
 	for _, label := range splitRunes(domain, func(r rune) bool { return r == '.' }) {
+		// Over 2×63 units are over 63 code points, and punycode spends at
+		// least one character on each: don't encode a long CJK run to see.
+		if len(label) > 2*63 {
+			return false
+		}
 		if n := punycodeToASCIILength(unshiftSurrogates(label)); n < 1 || n > 63 {
 			return false
 		}
