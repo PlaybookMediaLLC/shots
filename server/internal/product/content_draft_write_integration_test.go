@@ -456,6 +456,7 @@ func TestWriteWorkspace(t *testing.T) {
 			FROM generate_series(1,55) g`, w.org, draft.ID, owner.UserID)
 		seen := map[string]bool{}
 		var last time.Time
+		lastID := ""
 		cursor, pages := "", 0
 		for {
 			page, err := repo.ListContentDraftActivity(ctx, writer, draft.ID, cursor)
@@ -464,10 +465,10 @@ func TestWriteWorkspace(t *testing.T) {
 			}
 			pages++
 			for _, item := range page.Items {
-				if seen[item.ID] || (!last.IsZero() && item.At.After(last)) {
+				if seen[item.ID] || (!last.IsZero() && (item.At.After(last) || item.At.Equal(last) && item.ID > lastID)) {
 					t.Fatalf("event %s repeated or out of order", item.ID)
 				}
-				seen[item.ID], last = true, item.At
+				seen[item.ID], last, lastID = true, item.At, item.ID
 			}
 			if page.NextCursor == nil {
 				break

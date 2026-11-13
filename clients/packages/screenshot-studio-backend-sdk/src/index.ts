@@ -3607,8 +3607,7 @@ export class ScreenshotStudioBackendSDK {
   }
 
   async listContentDraftActivity(id: string, cursor?: string) {
-    const parameters = new URLSearchParams()
-    if (cursor) parameters.set('cursor', cursor)
+    const parameters = new URLSearchParams(cursor ? { cursor } : {})
     return this.request<{ items: BackendDraftActivity[]; nextCursor: string | null }>(
       `v1/content-drafts/${encodeURIComponent(id)}/activity?${parameters}`
     )

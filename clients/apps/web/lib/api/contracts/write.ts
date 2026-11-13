@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { defineContract, timestampSchema } from '@/lib/api/contract'
+import type { BackendDraftActivity } from 'screenshot-studio-backend-sdk'
+import { defineContract, mirrors, timestampSchema } from '@/lib/api/contract'
 import {
   contentDraftIdSchema,
   contentDraftParamsSchema,
@@ -168,15 +169,9 @@ export const recoverContentDraftRevisionContract = defineContract({
  * the MCP server, a publishing workflow, a provider or source callback, Shots
  * support, or any other Shots service.
  */
-export const draftActivitySourceSchema = z.enum([
-  'person',
-  'api',
-  'mcp',
-  'workflow',
-  'callback',
-  'support',
-  'automation',
-])
+export const draftActivitySourceSchema = mirrors<BackendDraftActivity['source']>()(
+  z.enum(['person', 'api', 'mcp', 'workflow', 'callback', 'support', 'automation'])
+)
 
 /** One of {@link draftActivitySourceSchema}. */
 export type DraftActivitySource = z.infer<typeof draftActivitySourceSchema>

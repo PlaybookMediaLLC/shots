@@ -535,7 +535,7 @@ func TestSocialSetsPlatform(t *testing.T) {
 			}
 		}
 		logged, err := db.Client.AuditLog.Query().Where(auditlog.Action("product.channel_account_revoked"), auditlog.EntityID(connection.ID)).Only(ctx)
-		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" {
+		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" || logged.Metadata["actorSource"] != "callback" {
 			t.Fatalf("audit=%+v err=%v", logged, err)
 		}
 		if again, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "SECOND"); err != nil || len(again) != 0 {

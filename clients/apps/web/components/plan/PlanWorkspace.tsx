@@ -2227,7 +2227,9 @@ function PlanDetail({
             <AccordionItem value="activity">
               <AccordionTrigger>Activity and revisions ({revisionCount ?? '…'})</AccordionTrigger>
               <AccordionContent>
-                <DraftHistory draftId={item.draftId} version={draft?.version} />
+                {draft?.id === item.draftId ? (
+                  <DraftHistory draftId={draft.id} key={draft.id} version={draft.version} />
+                ) : null}
                 <Button asChild className="h-auto p-0" size={null} variant="link">
                   <Link href={`/publish/${item.draftId}?panel=backups`}>
                     Browse revisions in editor

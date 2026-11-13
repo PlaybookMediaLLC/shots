@@ -310,7 +310,7 @@ export function PropertiesPanel({
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Activity
         </h3>
-        <DraftHistory draftId={draft.id} version={draft.version} />
+        <DraftHistory draftId={draft.id} key={draft.id} version={draft.version} />
       </section>
       {managing && setId ? <TagManager onClose={() => setManaging(false)} setId={setId} /> : null}
     </div>

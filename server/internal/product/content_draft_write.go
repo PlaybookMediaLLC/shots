@@ -16,6 +16,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdrafttag"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
@@ -596,13 +597,22 @@ func activitySource(row *ent.AuditLog) string {
 	if source, _ := row.Metadata["actorSource"].(string); slices.Contains([]string{"api", "mcp", "workflow", "callback"}, source) {
 		return source
 	}
+	// Rows written before sources were recorded name these writers.
+	if row.ActorDisplay != nil {
+		switch *row.ActorDisplay {
+		case "publishing-orchestrator":
+			return "workflow"
+		case "provider callback":
+			return "callback"
+		}
+	}
 	return "automation"
 }
 
 // activityMetadataKeys are the metadata a timeline may show.
 var activityMetadataKeys = []string{"action", "cancelledPostIds", "changed", "cleared", "fields", "from", "kind", "newDraftId",
 	"plannedFor", "posted", "reason", "revisionId", "scheduledFor", "scheduledPostIds", "socialSetId", "sourceDraftId",
-	"timeZone", "version", "enabled", "contentDraftId", "failureCode", "outcome"}
+	"timeZone", "version", "enabled", "contentDraftId", "failureCode", "outcome", "resolved"}
 
 // ListContentDraftActivity reads a page of a draft's history from the audit
 // log: the draft's own events and those of the posts scheduled from it, newest
@@ -620,20 +630,37 @@ func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Acto
 	if err != nil {
 		return nil, err
 	}
-	query := c.client.AuditLog.Query().Where(auditlog.OrganizationID(actor.OrganizationID), auditlog.Or(
-		auditlog.And(auditlog.EntityType("content_draft"), auditlog.EntityID(draftID)),
-		auditlog.And(auditlog.EntityType("scheduled_post"), auditlog.EntityIDIn(postIDs...))))
+	var after []predicate.AuditLog
 	if cursor != "" {
 		at, id, err := decodeTimeCursor(cursor)
 		if err != nil {
 			return nil, err
 		}
-		query.Where(auditlog.Or(auditlog.CreatedAtLT(at), auditlog.And(auditlog.CreatedAt(at), auditlog.IDLT(id))))
+		// The upper bound lets the entity index stop the scan at the cursor.
+		after = []predicate.AuditLog{auditlog.CreatedAtLTE(at), auditlog.Or(auditlog.CreatedAtLT(at), auditlog.IDLT(id))}
 	}
-	rows, err := query.Order(ent.Desc(auditlog.FieldCreatedAt), ent.Desc(auditlog.FieldID)).
-		Limit(contentDraftActivityPageSize + 1).All(ctx)
+	// The draft's events and its posts' are read apart, each on its entity
+	// index, and merged: one OR query walks the workspace's whole log instead.
+	branch := func(entity predicate.AuditLog) ([]*ent.AuditLog, error) {
+		return c.client.AuditLog.Query().Where(append(after, auditlog.OrganizationID(actor.OrganizationID), entity)...).
+			Order(ent.Desc(auditlog.FieldCreatedAt), ent.Desc(auditlog.FieldID)).Limit(contentDraftActivityPageSize + 1).All(ctx)
+	}
+	rows, err := branch(auditlog.And(auditlog.EntityType("content_draft"), auditlog.EntityID(draftID)))
 	if err != nil {
 		return nil, err
+	}
+	if len(postIDs) > 0 {
+		posts, err := branch(auditlog.And(auditlog.EntityType("scheduled_post"), auditlog.EntityIDIn(postIDs...)))
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, posts...)
+		slices.SortFunc(rows, func(a, b *ent.AuditLog) int {
+			if order := b.CreatedAt.Compare(a.CreatedAt); order != 0 {
+				return order
+			}
+			return strings.Compare(b.ID, a.ID)
+		})
 	}
 	page := &ContentDraftActivityPage{}
 	if len(rows) > contentDraftActivityPageSize {

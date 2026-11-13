@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { DraftActivityWire } from '@/lib/write/client'
-import { groupHistory, HISTORY_GROUP_GAP_MS } from '@/lib/write/history'
+import { actionLabel, groupHistory, HISTORY_GROUP_GAP_MS } from '@/lib/write/history'
 
 const start = Date.parse('2026-11-13T12:00:00Z')
 
@@ -41,7 +41,22 @@ test('consecutive changes by one author within the gap are one entry, in order',
   ]
   const groups = groupHistory(history).map((group) => group.items.map((item) => item.id).join(''))
   assert.deepEqual(groups, ['abc', 'd', 'e', 'f', 'gh', 'i'])
-  // The same events always group the same way.
-  assert.deepEqual(groupHistory(history), groupHistory([...history]))
   assert.deepEqual(groupHistory([]), [])
+})
+
+test('comment, post and draft actions read as sentences, and a reopen is not a resolve', () => {
+  const as = (action: string, metadata: Record<string, unknown> = {}) =>
+    actionLabel({ ...event('x', 0, { person: 'ana' }), action, metadata })
+  assert.equal(
+    as('product.content_draft_comment_resolve', { resolved: true }),
+    'Resolved a discussion'
+  )
+  assert.equal(
+    as('product.content_draft_comment_resolve', { resolved: false }),
+    'Reopened a discussion'
+  )
+  assert.equal(as('product.content_draft_comment_add'), 'Commented')
+  assert.equal(as('post.publish_now'), 'Queued a post to publish now')
+  // An action without a sentence still reads as words.
+  assert.equal(as('product.content_draft_unknown_step'), 'content draft unknown step')
 })

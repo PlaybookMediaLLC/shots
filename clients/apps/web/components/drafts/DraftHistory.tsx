@@ -7,38 +7,7 @@ import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { relativeTime } from '@/components/workflows/workflow-ui'
 import type { DraftActivitySource } from '@/lib/api/contracts/write'
 import { type DraftActivityWire, writeApi } from '@/lib/write/client'
-import { groupHistory } from '@/lib/write/history'
-
-/** An activity event's action as a person reads it. */
-const ACTIONS: Record<string, string> = {
-  'post.automations_cancelled': 'Cancelled a post’s follow-ups',
-  'post.cancelled': 'Cancelled a post',
-  'post.moved': 'Moved a post',
-  'post.publish_failed': 'A post failed',
-  'post.publish_now': 'Published a post now',
-  'post.publish_recovery_required': 'A post’s outcome is unknown',
-  'post.publish_requeued': 'Queued a post again',
-  'post.published': 'Published a post',
-  'post.reconciled_live': 'Marked a post as live',
-  'post.reconciled_not_live': 'Marked a post as not published',
-  'post.retried': 'Retried a destination',
-  'post.scheduled': 'Queued a post',
-  'post.thread_resumed': 'Posted the rest of a thread',
-  'product.content_draft_comment_add': 'Commented',
-  'product.content_draft_comment_delete': 'Deleted a comment',
-  'product.content_draft_comment_delete_thread': 'Deleted a discussion',
-  'product.content_draft_comment_edit': 'Edited a comment',
-  'product.content_draft_comment_resolve': 'Resolved a discussion',
-  'product.content_draft_created': 'Created the draft',
-  'product.content_draft_deleted': 'Deleted the draft',
-  'product.content_draft_planned': 'Changed the plan',
-  'product.content_draft_properties_updated': 'Organized the draft',
-  'product.content_draft_recovered': 'Recovered a backup as a new draft',
-  'product.content_draft_review': 'Review step',
-  'product.content_draft_scheduled': 'Scheduled',
-  'product.content_draft_shared': 'Changed sharing',
-  'product.content_draft_updated': 'Edited',
-}
+import { actionLabel, groupHistory } from '@/lib/write/history'
 
 /** Who made a change when no person did. */
 const SOURCES: Record<DraftActivitySource, string> = {
@@ -49,11 +18,6 @@ const SOURCES: Record<DraftActivitySource, string> = {
   person: 'A former member',
   support: 'Shots support',
   workflow: 'Publishing',
-}
-
-/** The action as a person reads it. */
-function actionLabel(item: DraftActivityWire): string {
-  return ACTIONS[item.action] ?? item.action.replace(/^product\./, '').replaceAll('_', ' ')
 }
 
 /** What an event changed, from its references. */
@@ -73,20 +37,28 @@ function detail(item: DraftActivityWire): string {
 
 /** One change: what happened and what it touched. */
 function Change({ item }: { item: DraftActivityWire }) {
+  const touched = detail(item)
   return (
     <p className="text-foreground">
       {actionLabel(item)}
-      {detail(item) ? <span className="text-muted-foreground"> · {detail(item)}</span> : null}
+      {touched ? <span className="text-muted-foreground"> · {touched}</span> : null}
     </p>
   )
 }
 
-/** When a change happened: how long ago, and the moment itself. */
+const WEEK_MS = 7 * 86_400_000
+
+/**
+ * When a change happened: how long ago within a week, and the moment itself.
+ * A server clock ahead of the reader's still reads as now, not the future.
+ */
 function When({ at }: { at: string }) {
+  const age = Date.now() - new Date(at).getTime()
   return (
-    <>
-      {relativeTime(at)} · <LocalTime value={at} />
-    </>
+    <span data-testid="activity-when">
+      {age < WEEK_MS ? `${relativeTime(age > 0 ? at : new Date().toISOString())} · ` : null}
+      <LocalTime value={at} />
+    </span>
   )
 }
 
@@ -100,34 +72,37 @@ export function DraftHistory({ draftId, version }: { draftId: string; version?: 
   const [next, setNext] = React.useState<string | null>(null)
   const [failed, setFailed] = React.useState(false)
   const [loadingOlder, setLoadingOlder] = React.useState(false)
+  // Each reload starts a new generation; an older page from a previous one is dropped.
+  const generation = React.useRef(0)
   React.useEffect(() => {
-    let active = true
+    const current = ++generation.current
     setFailed(false)
     void writeApi
       .activity(draftId)
       .then((page) => {
-        if (!active) return
+        if (generation.current !== current) return
         setItems(page.items)
         setNext(page.nextCursor)
       })
       .catch(() => {
-        if (!active) return
+        if (generation.current !== current) return
         setItems([])
+        setNext(null)
         setFailed(true)
       })
-    return () => {
-      active = false
-    }
   }, [draftId, version])
   const older = async () => {
     if (!next) return
+    const current = generation.current
     setLoadingOlder(true)
+    setFailed(false)
     try {
       const page = await writeApi.activity(draftId, next)
-      setItems((current) => [...(current ?? []), ...page.items])
+      if (generation.current !== current) return
+      setItems((loaded) => [...(loaded ?? []), ...page.items])
       setNext(page.nextCursor)
     } catch {
-      setFailed(true)
+      if (generation.current === current) setFailed(true)
     } finally {
       setLoadingOlder(false)
     }
