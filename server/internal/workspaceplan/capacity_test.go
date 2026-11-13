@@ -37,3 +37,22 @@ func TestResolveSubscriptionStanding(t *testing.T) {
 		})
 	}
 }
+
+// Plans limit seats and social channels only. A team is a workspace with its
+// own subscription; no plan limits how many teams a person creates or joins,
+// and there is no Agency plan or team quota (Teams spec §8).
+func TestPlansLimitOnlySeatsAndChannels(t *testing.T) {
+	if len(limits) != 4 {
+		t.Fatalf("plans=%v", limits)
+	}
+	for plan, named := range limits {
+		if len(named) != 2 || named[Seats] == 0 && plan != "free" {
+			t.Fatalf("%s limits %v", plan, named)
+		}
+		for name := range named {
+			if name != Seats && name != Channels {
+				t.Fatalf("%s limits %s", plan, name)
+			}
+		}
+	}
+}

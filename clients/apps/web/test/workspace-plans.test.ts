@@ -8,6 +8,7 @@ import {
   hasWorkspaceFeature,
   planPriceSummary,
   workspaceFeatureSchema,
+  workspacePlanSchema,
   workspaceQuotaSchema,
 } from '@/lib/billing/plans'
 
@@ -144,4 +145,46 @@ test('the static llm.txt quotes the current plan prices', () => {
       `public/llm.txt lacks ${planPriceSummary(plan)}`
     )
   }
+})
+
+test('each feature needs the plan the Go backend requires, and plans grant by that rank', () => {
+  const product = '../../../server/internal/product/'
+  const go = readFileSync(`${product}entitlements.go`, 'utf8')
+  const block = go.match(/minimumFeaturePlan = map\[string\]string\{([\s\S]*?)\n\}/)?.[1]
+  assert.ok(block, 'entitlements.go has no minimumFeaturePlan')
+  const constants = new Map<string, string>()
+  for (const file of [
+    'onboarding.go',
+    'creative_set_validation.go',
+    'whitelabel.go',
+    'permission_groups.go',
+  ]) {
+    for (const [, name, value] of readFileSync(`${product}${file}`, 'utf8').matchAll(
+      /const (\w+Feature) = "([^"]+)"/g
+    ))
+      if (name && value) constants.set(name, value)
+  }
+  const required = new Map<string, string>()
+  for (const [, literal, constant, plan] of block.matchAll(
+    /(?:"([^"]+)"|(\w+Feature)): "(\w+)"/g
+  )) {
+    const feature = literal ?? constants.get(constant ?? '')
+    assert.ok(feature && plan, `unresolved feature ${constant}`)
+    required.set(feature, plan)
+  }
+  const rank = workspacePlanSchema.options
+  for (const feature of workspaceFeatureSchema.options) {
+    assert.equal(getMinimumPlan(feature), required.get(feature), feature)
+    for (const plan of rank)
+      assert.equal(
+        hasWorkspaceFeature(plan, feature),
+        plan !== 'free' && rank.indexOf(plan) >= rank.indexOf(getMinimumPlan(feature)),
+        `${plan} ${feature}`
+      )
+  }
+  // The web does not offer creative sets, which an environment switch gates.
+  const unmodeled = [...required.keys()].filter(
+    (feature) => !workspaceFeatureSchema.safeParse(feature).success
+  )
+  assert.deepEqual(unmodeled, ['creative-sets:create'])
 })
