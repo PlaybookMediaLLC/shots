@@ -52,6 +52,13 @@ func TestVideoOptionsRequireExplicitPlatformChoices(t *testing.T) {
 		{"missing audience", "youtube", &YouTubeOptions{Title: "Local canary", Privacy: "private"}, nil, true, false},
 		{"missing consent", "tiktok", nil, &TikTokOptions{Privacy: "SELF_ONLY"}, true, false},
 		{"private sponsorship", "tiktok", nil, &TikTokOptions{Privacy: "SELF_ONLY", Consent: true, BrandedContent: true}, true, false},
+		// An app draft is finished in TikTok: it needs no privacy or consent here,
+		// and takes none of the controls TikTok would ignore.
+		{"app draft", "tiktok", nil, &TikTokOptions{SendToApp: true}, true, true},
+		{"app draft with privacy", "tiktok", nil, &TikTokOptions{SendToApp: true, Privacy: "SELF_ONLY"}, false, false},
+		{"app draft with comments", "tiktok", nil, &TikTokOptions{SendToApp: true, AllowComments: true}, false, false},
+		{"app draft with disclosure", "tiktok", nil, &TikTokOptions{SendToApp: true, CommercialContent: true, BrandOrganic: true}, true, false},
+		{"app draft with consent", "tiktok", nil, &TikTokOptions{SendToApp: true, Consent: true}, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := ValidateVideoOptions(tc.channel, tc.youtube, tc.tiktok, tc.complete); (err == nil) != tc.valid {
@@ -83,6 +90,14 @@ func TestTikTokCreatorRechecksAccountRestrictions(t *testing.T) {
 	var missing *TikTokCreator
 	if missing.Check(o, 5000) == nil {
 		t.Fatal("missing creator accepted")
+	}
+	// An app draft's privacy is chosen in TikTok, but its length still counts.
+	draft := &TikTokOptions{SendToApp: true}
+	if err := c.Check(draft, 5000); err != nil {
+		t.Fatalf("app draft refused: %v", err)
+	}
+	if !errors.Is(c.Check(draft, 11000), ErrVideoTooLong) || missing.Check(draft, 5000) == nil {
+		t.Fatal("app draft skipped the account's allowance")
 	}
 }
 

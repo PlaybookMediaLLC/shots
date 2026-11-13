@@ -342,6 +342,12 @@ export function DraftPosts({
                   ) : null}
                 </div>
               ) : null}
+              {post.status === 'SENT_TO_APP' ? (
+                <p className="text-xs text-muted-foreground" role="status">
+                  Sent to the {label} app as a draft. Finish and post it there: Shots does not see
+                  when it goes live.
+                </p>
+              ) : null}
               {post.status === 'UNKNOWN_DELIVERY' ? (
                 <div
                   className="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-300"

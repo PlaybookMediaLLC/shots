@@ -30,6 +30,19 @@ const TIKTOK_PRIVACY_LABELS: Record<string, string> = {
   SELF_ONLY: 'Only me',
 }
 
+/** A TikTok version's settings before any is chosen. */
+const TIKTOK_DEFAULTS: NonNullable<VersionOptions['tiktok']> = {
+  privacy: '',
+  allowComments: false,
+  allowDuet: false,
+  allowStitch: false,
+  commercialContent: false,
+  brandOrganic: false,
+  brandedContent: false,
+  madeWithAi: false,
+  consent: false,
+}
+
 const YOUTUBE_PRIVACY_LABELS: Record<string, string> = {
   private: 'Private',
   public: 'Public',
@@ -44,6 +57,7 @@ const YOUTUBE_PRIVACY_LABELS: Record<string, string> = {
 export function optionsSummary(channel: string, options: VersionOptions): string {
   if (channel === 'tiktok') {
     const value = options.tiktok
+    if (value?.sendToApp) return 'Draft in the TikTok app'
     if (!value?.privacy) return 'Choose privacy'
     const parts = [
       TIKTOK_PRIVACY_LABELS[value.privacy] ?? value.privacy,
@@ -315,19 +329,60 @@ export function VideoOptions({
       </div>
     )
   }
-  const value = options.tiktok ?? {
-    privacy: '',
-    allowComments: false,
-    allowDuet: false,
-    allowStitch: false,
-    commercialContent: false,
-    brandOrganic: false,
-    brandedContent: false,
-    madeWithAi: false,
-    consent: false,
-  }
+  const value = options.tiktok ?? TIKTOK_DEFAULTS
   const change = (next: Partial<NonNullable<VersionOptions['tiktok']>>) =>
     onChange({ ...options, tiktok: { ...value, ...next } })
+  return (
+    <div
+      data-option-rows
+      className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
+    >
+      <p>
+        {creator
+          ? `Posting to ${creator.nickname}. Maximum video length: ${durationLabel(creator.maxDurationSeconds)}.`
+          : 'TikTok permissions are unavailable. Refresh the account before scheduling.'}
+      </p>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          checked={value.sendToApp ?? false}
+          disabled={disabled}
+          id="tiktok-send-to-app"
+          // TikTok takes only the caption with an app draft, so every other setting resets.
+          onCheckedChange={(checked) =>
+            onChange({
+              ...options,
+              tiktok: checked === true ? { ...TIKTOK_DEFAULTS, sendToApp: true } : TIKTOK_DEFAULTS,
+            })
+          }
+        />
+        <div className="grid gap-0.5">
+          <Label htmlFor="tiktok-send-to-app">Send to the TikTok app as a draft</Label>
+          <p>
+            At the scheduled time the video and caption go to your TikTok inbox, where you choose
+            who sees it and post it. It is not a Shots draft, and Shots does not see when it goes
+            live.
+          </p>
+        </div>
+      </div>
+      {value.sendToApp ? null : (
+        <TikTokDirectPost change={change} creator={creator} disabled={disabled} value={value} />
+      )}
+    </div>
+  )
+}
+
+/** The settings TikTok applies when Shots posts the video itself. */
+function TikTokDirectPost({
+  change,
+  creator,
+  disabled,
+  value,
+}: {
+  change: (next: Partial<NonNullable<VersionOptions['tiktok']>>) => void
+  creator?: AccountStanding['tiktokCreator']
+  disabled: boolean
+  value: NonNullable<VersionOptions['tiktok']>
+}) {
   const controls = [
     { key: 'allowComments', label: 'Allow comments', unavailable: creator?.commentDisabled },
     { key: 'allowDuet', label: 'Allow Duet', unavailable: creator?.duetDisabled },
@@ -341,15 +396,7 @@ export function VideoOptions({
     { key: 'madeWithAi', label: 'AI-generated video', unavailable: false },
   ] as const
   return (
-    <div
-      data-option-rows
-      className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
-    >
-      <p>
-        {creator
-          ? `Posting to ${creator.nickname}. Maximum video length: ${durationLabel(creator.maxDurationSeconds)}.`
-          : 'TikTok permissions are unavailable. Refresh the account before scheduling.'}
-      </p>
+    <>
       <div>
         <Select
           disabled={disabled || !creator}
@@ -467,6 +514,6 @@ export function VideoOptions({
       {value.privacy === 'SELF_ONLY' && value.commercialContent ? (
         <p>Branded content visibility cannot be private.</p>
       ) : null}
-    </div>
+    </>
   )
 }

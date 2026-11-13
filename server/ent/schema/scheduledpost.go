@@ -53,7 +53,7 @@ func (ScheduledPost) Fields() []ent.Field {
 		field.JSON("publish_options", postoptions.PublishOptions{}).StorageKey("publishOptions").Optional().Immutable(),
 		field.String("channel_connection_id").StorageKey("channelConnectionId").Immutable(),
 		field.Time("scheduled_for").StorageKey("scheduledFor"),
-		field.Enum("status").StorageKey("status").Values("DRAFT", "SCHEDULED", "PROCESSING", "PUBLISHED", "FAILED", "CANCELLED", "UNKNOWN_DELIVERY").Default("DRAFT"),
+		field.Enum("status").StorageKey("status").Values("DRAFT", "SCHEDULED", "PROCESSING", "PUBLISHED", "FAILED", "CANCELLED", "UNKNOWN_DELIVERY", "SENT_TO_APP").Default("DRAFT"),
 		field.String("caption").StorageKey("caption"),
 		field.String("idempotency_key").StorageKey("idempotencyKey").NotEmpty().Immutable(),
 		field.String("trigger_run_id").StorageKey("triggerRunId").Optional().Nillable(),

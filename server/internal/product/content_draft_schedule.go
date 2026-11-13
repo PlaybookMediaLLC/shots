@@ -148,8 +148,9 @@ func recentDuplicates(ctx context.Context, tx *ent.Tx, organizationID string, at
 	// A post publishes at most an hour after its time (the late window), so one
 	// range on scheduledFor finds every candidate through the tenant's index.
 	rows, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID), scheduledpost.ChannelConnectionIDIn(ids...),
-		// UNKNOWN_DELIVERY may be live: the likeliest double post of all.
-		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusPUBLISHED, scheduledpost.StatusUNKNOWN_DELIVERY),
+		// UNKNOWN_DELIVERY may be live: the likeliest double post of all. A post
+		// sent to an app may be posted there.
+		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP, scheduledpost.StatusUNKNOWN_DELIVERY),
 		scheduledpost.ScheduledForGT(from.Add(-time.Hour)), scheduledpost.ScheduledForLT(to)).
 		Select(scheduledpost.FieldID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldCaption, scheduledpost.FieldAssetIds,
 			scheduledpost.FieldScheduledFor, scheduledpost.FieldPublishedAt, scheduledpost.FieldStatus).
@@ -769,7 +770,7 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID,
 func liveDraftChannels(ctx context.Context, tx *ent.Tx, draftID string, targets []ContentDraftScheduleTarget) ([]string, error) {
 	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(draftID), scheduledpost.StatusIn(
 		scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING,
-		scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED)).All(ctx)
+		scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +781,7 @@ func liveDraftChannels(ctx context.Context, tx *ent.Tx, draftID string, targets 
 				return nil, conflict("This draft already has a post on a selected account. Reschedule that post instead of adding another.")
 			}
 		}
-		if post.Status != scheduledpost.StatusPUBLISHED && !slices.Contains(kept, post.ChannelConnectionID) {
+		if post.Status != scheduledpost.StatusPUBLISHED && post.Status != scheduledpost.StatusSENT_TO_APP && !slices.Contains(kept, post.ChannelConnectionID) {
 			kept = append(kept, post.ChannelConnectionID)
 		}
 	}

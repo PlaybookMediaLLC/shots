@@ -329,11 +329,14 @@ export function buildPublication(
     optionProblems.push("A pin's link is a web address starting with https:// or http://.")
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
+    // An app draft is finished in TikTok: its privacy, interactions, disclosures
+    // and consent are chosen there (postoptions.ValidateVideoOptions).
+    const direct = !options.tiktok?.sendToApp
     if (!creator)
       accountProblems.push(
         'TikTok account permissions are unavailable. Refresh the account before scheduling.'
       )
-    else if (options.tiktok) {
+    else if (options.tiktok && direct) {
       const choice = options.tiktok
       if (!creator.privacyLevels.some((privacy) => privacy === choice.privacy))
         optionProblems.push('Choose a privacy setting permitted by this TikTok account.')
@@ -345,6 +348,7 @@ export function buildPublication(
         optionProblems.push('TikTok account settings do not permit the selected interactions.')
     }
     if (
+      direct &&
       options.tiktok?.commercialContent &&
       !options.tiktok.brandOrganic &&
       !options.tiktok.brandedContent
@@ -353,17 +357,18 @@ export function buildPublication(
         'Indicate whether this TikTok content promotes your brand or another brand.'
       )
     if (
+      direct &&
       (options.tiktok?.brandOrganic || options.tiktok?.brandedContent) &&
       !options.tiktok.commercialContent
     )
       optionProblems.push('Enable commercial content disclosure for promotional content.')
-    if (!options.tiktok?.privacy)
+    if (direct && !options.tiktok?.privacy)
       optionProblems.push('Choose who can see this TikTok post in its options before scheduling.')
-    if (!options.tiktok?.consent)
+    if (direct && !options.tiktok?.consent)
       optionProblems.push(
         'Confirm consent to send this video to TikTok in its options before scheduling.'
       )
-    if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
+    if (direct && options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
   // Go refuses X video until the account's video length is verified (socialidentity.CheckXMedia).

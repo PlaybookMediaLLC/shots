@@ -72,6 +72,7 @@ export function libraryDraft(draft: DraftWire) {
     plannedFor: draft.plannedFor,
     publishedPosts: draft.publishedPosts,
     queuedPosts: draft.queuedPosts,
+    sentToAppPosts: draft.sentToAppPosts,
     reviewStatus: draft.reviewStatus,
     shared: draft.shareToken !== null,
     status: draft.status,

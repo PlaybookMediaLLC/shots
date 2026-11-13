@@ -47,6 +47,7 @@ const ACTIONS: Record<string, string> = {
   'post.reconciled_not_live': 'Marked a post as not published',
   'post.retried': 'Retried a destination',
   'post.scheduled': 'Queued a post',
+  'post.sent_to_app': 'Sent a post to the app to finish there',
   'post.thread_resumed': 'Posted the rest of a thread',
   'product.content_draft_comment_add': 'Commented',
   'product.content_draft_comment_delete': 'Deleted a comment',

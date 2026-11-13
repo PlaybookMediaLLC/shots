@@ -4708,7 +4708,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -9192,7 +9193,8 @@
                                       "PUBLISHED",
                                       "FAILED",
                                       "CANCELLED",
-                                      "UNKNOWN_DELIVERY"
+                                      "UNKNOWN_DELIVERY",
+                                      "SENT_TO_APP"
                                     ]
                                   },
                                   {
@@ -9740,7 +9742,8 @@
                                       "PUBLISHED",
                                       "FAILED",
                                       "CANCELLED",
-                                      "UNKNOWN_DELIVERY"
+                                      "UNKNOWN_DELIVERY",
+                                      "SENT_TO_APP"
                                     ]
                                   },
                                   {
@@ -10826,7 +10829,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         {
@@ -11163,7 +11167,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -11262,7 +11267,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -11467,7 +11473,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -12838,6 +12845,9 @@
                                       "tiktok": {
                                         "type": "object",
                                         "properties": {
+                                          "sendToApp": {
+                                            "type": "boolean"
+                                          },
                                           "privacy": {
                                             "type": "string",
                                             "enum": [
@@ -13249,6 +13259,12 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
+                        "sentToAppPosts": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "scratchpad": {
                           "type": "string"
                         },
@@ -13360,6 +13376,7 @@
                         "planTimeZone",
                         "platformVersions",
                         "queuedPosts",
+                        "sentToAppPosts",
                         "scratchpad",
                         "sourceDraftId",
                         "tagIds",
@@ -13399,7 +13416,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -14154,6 +14172,9 @@
                                       "tiktok": {
                                         "type": "object",
                                         "properties": {
+                                          "sendToApp": {
+                                            "type": "boolean"
+                                          },
                                           "privacy": {
                                             "type": "string",
                                             "enum": [
@@ -14565,6 +14586,12 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
+                        "sentToAppPosts": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "scratchpad": {
                           "type": "string"
                         },
@@ -14676,6 +14703,7 @@
                         "planTimeZone",
                         "platformVersions",
                         "queuedPosts",
+                        "sentToAppPosts",
                         "scratchpad",
                         "sourceDraftId",
                         "tagIds",
@@ -14715,7 +14743,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -22828,6 +22857,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -23239,6 +23271,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -23350,6 +23388,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -23390,7 +23429,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "metrics": {
@@ -26775,7 +26815,8 @@
                         "PUBLISHED",
                         "FAILED",
                         "CANCELLED",
-                        "UNKNOWN_DELIVERY"
+                        "UNKNOWN_DELIVERY",
+                        "SENT_TO_APP"
                       ]
                     },
                     {
@@ -27130,7 +27171,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         {
@@ -27364,7 +27406,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "contentDraftId": {
@@ -27930,6 +27973,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -28341,6 +28387,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -28452,6 +28504,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -28934,6 +28987,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -29345,6 +29401,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -29456,6 +29518,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -29590,6 +29653,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -30626,6 +30692,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -31037,6 +31106,12 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "sentToAppPosts": {
+            "default": 0,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "scratchpad": {
             "type": "string"
           },
@@ -31148,6 +31223,7 @@
           "planTimeZone",
           "platformVersions",
           "queuedPosts",
+          "sentToAppPosts",
           "scratchpad",
           "sourceDraftId",
           "tagIds",
@@ -31273,6 +31349,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -31887,7 +31966,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "metrics": {
@@ -32241,6 +32321,9 @@
                     "tiktok": {
                       "type": "object",
                       "properties": {
+                        "sendToApp": {
+                          "type": "boolean"
+                        },
                         "privacy": {
                           "type": "string",
                           "enum": [
@@ -32883,6 +32966,9 @@
                             "tiktok": {
                               "type": "object",
                               "properties": {
+                                "sendToApp": {
+                                  "type": "boolean"
+                                },
                                 "privacy": {
                                   "type": "string",
                                   "enum": [
@@ -33294,6 +33380,12 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "sentToAppPosts": {
+                "default": 0,
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
               "scratchpad": {
                 "type": "string"
               },
@@ -33405,6 +33497,7 @@
               "planTimeZone",
               "platformVersions",
               "queuedPosts",
+              "sentToAppPosts",
               "scratchpad",
               "sourceDraftId",
               "tagIds",
