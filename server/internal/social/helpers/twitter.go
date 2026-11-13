@@ -186,7 +186,7 @@ func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, va
 // keeps the marks after it from reordering or composing with the letter
 // before; JavaScript does neither, so such text gets NFC by the book.
 func nfcLikeJS(text string) string {
-	if out := norm.NFC.String(text); strings.Count(out, "\u034f") == strings.Count(text, "\u034f") {
+	if out := norm.NFC.String(text); strings.Count(out, norm.GraphemeJoiner) == strings.Count(text, norm.GraphemeJoiner) {
 		return out
 	}
 	ccc := func(r rune) uint8 { return norm.NFD.PropertiesString(string(r)).CCC() }
@@ -205,7 +205,7 @@ func nfcLikeJS(text string) string {
 	}
 	// Canonical composition: a character joins the last starter unless a
 	// character of class 0, or of its class or higher, stands between them.
-	out := runes[:0]
+	out := runes[:0] // in place: out never passes the rune being read
 	starter := -1
 	for _, r := range runes {
 		class := ccc(r)
