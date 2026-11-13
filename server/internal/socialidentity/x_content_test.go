@@ -45,4 +45,13 @@ func TestXContentUsesVerifiedLimitsWithoutChangingContent(t *testing.T) {
 		CheckXMedia(twenty, []XMedia{{MIME: "video/mp4", Bytes: 1, DurationMs: 1_200_001}}) == nil {
 		t.Fatal("video length was not checked against the account allowance")
 	}
+	// The composer repeats these words (clients/apps/web/lib/write/batch.ts, publication.ts).
+	if err := CheckXMedia(twenty, []XMedia{{MIME: "video/mp4", Bytes: 1, DurationMs: 1_200_999}}); err == nil ||
+		err.Error() != "This X account takes videos up to 20 minutes; this one is 20:01. Trim it before scheduling." {
+		t.Fatalf("over-length wording: %v", err)
+	}
+	if err := CheckXMedia(XStandardPostLimits("read-write", nil), []XMedia{{MIME: "video/mp4", Bytes: 1}}); err == nil ||
+		err.Error() != "Reconnect X to verify this account's video limits." {
+		t.Fatalf("unverified wording: %v", err)
+	}
 }
