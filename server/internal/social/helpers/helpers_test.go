@@ -91,6 +91,8 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
 		"(a)":        "https://a.co/" + strings.Repeat("(a)", 8000),
 		"((a))":      "https://a.co/" + strings.Repeat("((a))", 19000),
+		// Too long to be a link: its ASCII domains, a TLD regex per dot, are not read.
+		"xn--": "xn--a." + strings.Repeat("日a.", 50000) + "com",
 	}
 	for name, text := range texts {
 		for scan, run := range scans {
@@ -116,6 +118,24 @@ func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > 4*time.Second {
 		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	}
+}
+
+// Within one word the scan checks its budget before each dot's TLD regex and
+// before each match's ASCII domains, a TLD regex per dot again: a long dotted
+// word, or a word of many bare domains, took over a second whatever the budget.
+func TestLinkScanStopsWithinAWord(t *testing.T) {
+	for name, text := range map[string]string{
+		"dotted word":  strings.Repeat("a.", 50000),
+		"bare domains": strings.Repeat(strings.Repeat("日a.", 1300)+"com(", 25),
+	} {
+		start := time.Now()
+		if _, _, err := NewScanBudget(100*time.Millisecond).ParseTweet(text, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Errorf("%s: error = %v", name, err)
+		}
+		if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+			t.Errorf("%s took %v of a 100 ms budget", name, elapsed)
+		}
 	}
 }
 
@@ -267,7 +287,11 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
 		}
 		// A start the regex rejects would be skipped, so check every index.
-		for s, end := range urlEnds(text) {
+		ends, err := urlEnds(text, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for s, end := range ends {
 			if want := matchEnd(extractURLAtRe, text, s, 5); end != want {
 				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
 			}
