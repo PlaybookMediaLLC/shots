@@ -1,8 +1,9 @@
 # L2 provider evidence — 2026-11-13
 
-These are the original local-stack screenshots from `.context/typefully-l2`,
-preserved with the outcomes already recorded in PR #545. They are not a new
-publishing run or production evidence. Only X `@yoanyombax` and LinkedIn member
+This index lists the evidence for the outcomes already recorded in PR #545. The
+screenshots stay outside the repository, in the owner's private evidence folder,
+because they show signed-in account pages. They are not a new publishing run or
+production evidence. Only X `@yoanyombax` and LinkedIn member
 `yoanyomba` were used. Times below are UTC; screenshots may display local time.
 
 On 2026-11-13, a read-only query of the same local stack rechecked the canonical
@@ -18,22 +19,22 @@ content appear below. Original URLs no longer resolve after deletion.
 
 | Check | Canonical post / native receipt | Content and native proof | Removal proof |
 | --- | --- | --- | --- |
-| 1 / TF-036 | `cmwebbjax000801qkbgok1y9l` / `2121056706041925765` | 01:45:00; question/body as above, **Option A**, **Option B**, 5 minutes. [Native poll](x-poll-live.jpg). | [Deleted](x-poll-deleted.jpg), verified by 01:47:33. |
-| 2 / TF-107 | `cmwebk4em000j01qk5pnfzz9e` / `2121057905294090370` | 01:49:46; [post](x-replies-live.jpg), [Accounts you follow selected](x-replies-following.jpg). Other restricted reply modes were not tested. | [Deleted](x-replies-deleted.jpg), verified by 01:51:04. |
-| 3 / TF-097 | `cmwebnqki000v01qkibny3bcf` / `2121058611589722292` | 01:52:35; [Made with AI and Paid partnership](x-disclosures-live.jpg). | [Deleted](x-disclosures-deleted.jpg), verified by 01:53:32. |
-| 4 / TF-069, TF-068, TF-092, TF-007 | `cmwedpp29000o01o8oankmcp7` / `2121073120832311594` | 02:50:14; Publish now replaced the 16:15 schedule. [Noise image first, blue image second](x-media-live.jpg), [ALT description](x-media-alt.jpg). Exact assets and alt text are below. | [Deleted](x-media-deleted.jpg), verified by 02:51:40; all three assets `DELETED`. |
-| 5 / TF-011, TF-027, TF-064 | `cmwedu5gy001001o8o9g6jtan` / `2121073956824183158` | 02:53:33; [main post](x-automation-live.jpg), [plug after the owner's like](x-plug-live.jpg), [repost](x-repost-live.jpg). Plug: **Shots live test reply, please ignore**, native ID `2121081510233010373`. | [Repost undone](x-repost-undone.jpg), [reply deleted](x-plug-deleted.jpg), [main deleted](x-automation-deleted.jpg), [33-post baseline restored](x-profile-baseline.jpg), by 03:56:01. |
-| 13 / TF-071 | `cmwedxiw0001h01o83rao349e` / `urn:li:share:7526840307548594176` | 02:56:11; [main post](linkedin-first-comment-post-live.jpg). Requested first comment: **Shots live test first comment, please ignore**. Comment failed; see Blocked outcomes. | [Deleted](linkedin-first-comment-post-deleted.jpg), by 03:01:06, after check 17. |
-| 17 / TF-098 | `cmwee1llf001x01o840qntg3m` / `urn:li:share:7526841103610929152` | 02:59:21; **Shots live test repost, please ignore**; [original embedded under commentary](linkedin-repost-live.jpg). | [Deleted](linkedin-repost-deleted.jpg), by 03:01:06. |
-| 16 / TF-109 | `cmwee99aj002i01o8zzatye9g` / `urn:li:ugcPost:7526842603464720385` | 03:05:19; default body; question **Shots live test poll, please ignore**, **Option A**, **Option B**, 1 day. [Native poll](linkedin-poll-live.jpg). | [Deleted](linkedin-poll-deleted.jpg), by 03:06:23. |
-| 15 / TF-083 | `cmweecuzh002x01o883j23lne` / `urn:li:ugcPost:7526843401661661184` | 03:08:29; **Shots live test PDF**, two pages: **Shots live test - page 1** and **Shots live test - page 2**. [Page 1](linkedin-pdf-page1.jpg), [page 2](linkedin-pdf-page2.jpg). | [Deleted](linkedin-pdf-deleted.jpg), by 03:09:38; PDF asset `DELETED`. |
+| 1 / TF-036 | `cmwebbjax000801qkbgok1y9l` / `2121056706041925765` | 01:45:00; question/body as above, **Option A**, **Option B**, 5 minutes. Native poll. | Deleted, verified by 01:47:33. |
+| 2 / TF-107 | `cmwebk4em000j01qk5pnfzz9e` / `2121057905294090370` | 01:49:46; post, Accounts you follow selected. Other restricted reply modes were not tested. | Deleted, verified by 01:51:04. |
+| 3 / TF-097 | `cmwebnqki000v01qkibny3bcf` / `2121058611589722292` | 01:52:35; Made with AI and Paid partnership. | Deleted, verified by 01:53:32. |
+| 4 / TF-069, TF-068, TF-092, TF-007 | `cmwedpp29000o01o8oankmcp7` / `2121073120832311594` | 02:50:14; Publish now replaced the 16:15 schedule. Noise image first, blue image second, ALT description. Exact assets and alt text are below. | Deleted, verified by 02:51:40; all three assets `DELETED`. |
+| 5 / TF-011, TF-027, TF-064 | `cmwedu5gy001001o8o9g6jtan` / `2121073956824183158` | 02:53:33; main post, plug after the owner's like, repost. Plug: **Shots live test reply, please ignore**, native ID `2121081510233010373`. | Repost undone, reply deleted, main deleted, 33-post baseline restored, by 03:56:01. |
+| 13 / TF-071 | `cmwedxiw0001h01o83rao349e` / `urn:li:share:7526840307548594176` | 02:56:11; main post. Requested first comment: **Shots live test first comment, please ignore**. Comment failed; see Blocked outcomes. | Deleted, by 03:01:06, after check 17. |
+| 17 / TF-098 | `cmwee1llf001x01o840qntg3m` / `urn:li:share:7526841103610929152` | 02:59:21; **Shots live test repost, please ignore**; original embedded under commentary. | Deleted, by 03:01:06. |
+| 16 / TF-109 | `cmwee99aj002i01o8zzatye9g` / `urn:li:ugcPost:7526842603464720385` | 03:05:19; default body; question **Shots live test poll, please ignore**, **Option A**, **Option B**, 1 day. Native poll. | Deleted, by 03:06:23. |
+| 15 / TF-083 | `cmweecuzh002x01o883j23lne` / `urn:li:ugcPost:7526843401661661184` | 03:08:29; **Shots live test PDF**, two pages: **Shots live test - page 1** and **Shots live test - page 2**. Page 1, page 2. | Deleted, by 03:09:38; PDF asset `DELETED`. |
 
 ## Reads and automation
 
-- Check 6 / TF-001: [live X mention suggestion](x-mention-suggestion.png) for
+- Check 6 / TF-001: live X mention suggestion for
   `@getsol` returned **Lysol (@getsol)**. This is an exact-handle lookup, not
   prefix search. The scratch draft was archived; nothing was published.
-- Check 6 / TF-003: [Analyze observation](x-poll-analyze-observation.jpg) for
+- Check 6 / TF-003: Analyze observation for
   `cmwebbjax000801qkbgok1y9l` was stored at `2026-11-13T01:45:02.004306Z`,
   `kind=post`, `status=available`, before the poll was deleted. Likes, quotes,
   replies, reposts, bookmarks, impressions and profile clicks were all zero.
@@ -75,7 +76,7 @@ expiration cleanup remains outstanding; this record does not claim it ran.
 
 - **Check 4, first media draft:** `cmwebuylx001v01qkudcazh1d` recorded
   `UNKNOWN_DELIVERY`, **The X media source is unavailable**, before any X create
-  call. [Profile check](x-media-unknown-profile-check.jpg) found no delivery.
+  call. Profile check found no delivery.
   A later check at 03:22 preceded the normal **It is not there** reconciliation
   at 03:23:17. The canonical post is now `FAILED` / `NOT_LIVE`; its one failed
   attempt still retains `UNKNOWN_DELIVERY`. It was not automatically retried.
@@ -86,7 +87,7 @@ expiration cleanup remains outstanding; this record does not claim it ran.
   **LinkedIn rejected this request. Check permissions, content and account
   limits before retrying.** The provider HTTP status and body were discarded;
   this is not evidence of a specific 403 or permission scope. No retry was sent.
-- **Check 14 / TF-077 — Blocked:** [company lookup error](linkedin-mention-lookup-error.png)
+- **Check 14 / TF-077 — Blocked:** company lookup error
   for Solomon AI / `getsolomonai`, Page `106498803`. Web HTTP 503 wrapped backend
   HTTP 500 `{"error":"internal server error"}`. The exact LinkedIn status/body
   was not retained. Community Management permission is a possible cause, not a
