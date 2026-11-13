@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { PreviewLinkCard } from './preview-link-card'
-import { LinkPreviewCard, NO_LINK_CARDS, PLAIN_LINKS } from './link-cards'
+import { LinkPreviewCard, NO_LINK_CARDS } from './link-cards'
 import {
   Avatar as AccountAvatar,
   AvatarFallback,
@@ -617,7 +617,6 @@ function ThreadPreview({ item, target }: { item: PreviewCard; target: DraftTarge
               !settings.poll &&
               target?.kind !== 'quote' &&
               !NO_LINK_CARDS.includes(channel) &&
-              !PLAIN_LINKS.includes(channel) &&
               !publication.target.options?.linkPreview ? (
                 <PreviewLinkCard text={post.caption} />
               ) : null}

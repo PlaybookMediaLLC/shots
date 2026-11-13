@@ -16,12 +16,6 @@ import { linkPreviewSchema, type DraftChannel, type LinkPreview } from '@/lib/wr
 /** Platforms whose posts show no link card, where looking one up would mislead. */
 export const NO_LINK_CARDS: readonly DraftChannel[] = ['instagram', 'tiktok', 'youtube']
 
-/**
- * Platforms that show a link without a card: LinkedIn makes none from the
- * text, and Shots sends none (Posts API, TF-029). Links still open quote drafts.
- */
-export const PLAIN_LINKS: readonly DraftChannel[] = ['linkedin']
-
 /** HTTPS links in the visible platform version, in document order. */
 export function previewLinks(text: string): string[] {
   return [
@@ -105,7 +99,9 @@ export function LinkCards({
   const [checks, setChecks] = React.useState<Record<string, string>>({})
   const checked = React.useEffectEvent((url: string) => url in checks)
   const noCards = NO_LINK_CARDS.includes(channel)
-  const plain = PLAIN_LINKS.includes(channel)
+  // LinkedIn makes no card from the text and Shots sends none (Posts API, TF-029);
+  // its links still open quote drafts and get the page check.
+  const plain = channel === 'linkedin'
   // Only Bluesky publishes Shots' card, so only Bluesky can leave it out (TF-029).
   const removable = channel === 'bluesky'
   // Each platform keeps its own cards, so opening another tab looks up what it lacks.
@@ -232,8 +228,8 @@ export function LinkCards({
             </div>
             {card && !removable ? (
               <p className="text-xs text-muted-foreground">
-                {LABELS[channel]} makes this card from the link itself; its API can&apos;t remove
-                it.
+                {LABELS[channel]} makes this card from the link itself on a post without media; its
+                API can&apos;t remove it.
               </p>
             ) : null}
           </div>

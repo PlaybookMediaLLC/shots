@@ -48,14 +48,14 @@ func XVerifiedAccountLimits(accessLevel string, subscriptionType *string) XCapab
 	}
 	var articles bool
 	// X's documented post-video limits per tier live in limits.json.
-	video := medialimits.Limits.Destinations["x"].Video.Accounts["standard"]
+	video := medialimits.Limits.Destinations["x"].Video.Accounts.Standard
 	switch *subscriptionType {
 	case "None":
 	case "Basic", "Premium", "PremiumPlus":
 		long := 25000
 		caps.LongPostMaxWeightedCharacters = &long
 		articles = *subscriptionType != "Basic"
-		video = medialimits.Limits.Destinations["x"].Video.Accounts["premium"]
+		video = medialimits.Limits.Destinations["x"].Video.Accounts.Premium
 	default:
 		return caps
 	}

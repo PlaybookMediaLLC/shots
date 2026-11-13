@@ -300,7 +300,9 @@ Evidence levels: **Uploadable** (accepted and verified at upload),
 against the adapter's request shape or the worker), **Live-verified** (a real
 provider post on the current architecture), **Blocked**. Provider documents
 were read on 2026-10-28 (X on 2026-11-13); links are in `limits.json` (`docs`,
-`verifiedOn`). X's per-tier video limits are in `x.video.accounts`.
+`verifiedOn`). X's per-tier video limits are in `x.video.accounts`; stored X
+account snapshots must match them, so changing them sends every connected X
+account back through reconnect.
 
 | Destination | Content | Uploadable | Convertible | Implemented | Test-verified | Live-verified |
 | --- | --- | --- | --- | --- | --- | --- |

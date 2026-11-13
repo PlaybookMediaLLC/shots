@@ -67,8 +67,9 @@ function documentProblems(channel: DraftChannel, facts: MediaFacts[]) {
 /** A video longer than the X account's verified length, in Go's words (socialidentity.CheckXMedia). */
 function xVideoLength(account: BatchAccount, facts: MediaFacts[]) {
   const max = account.xVideoMaxSeconds
+  if (account.channel !== 'x' || !max) return []
   const ms = facts.find((fact) => fact.mimeType.startsWith('video/'))?.durationMs
-  if (account.channel !== 'x' || !max || !ms || ms <= max * 1000) return []
+  if (!ms || ms <= max * 1000) return []
   const seconds = Math.floor(ms / 1000)
   return [
     `This X account takes videos up to ${Math.floor(max / 60)} minutes; this one is ${Math.floor(ms / 60000)}:${String(seconds % 60).padStart(2, '0')}. Trim it before scheduling.`,

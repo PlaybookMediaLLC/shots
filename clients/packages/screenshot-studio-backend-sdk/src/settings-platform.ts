@@ -110,7 +110,7 @@ export const socialAccountSchema = z.object({
   /** Native quotes require the deployed app's approved X Enterprise grant. */
   xQuotes: z.boolean().optional(),
   /** The verified X account's video length in seconds; absent values do not permit X video. */
-  xVideoMaxSeconds: z.number().int().positive().nullish(),
+  xVideoMaxSeconds: z.number().int().nonnegative().nullish(),
   /** Verified Mastodon server poll limits; absent values do not permit a poll. */
   mastodonQuotes: z.boolean().nullish(),
   pollLimits: z
