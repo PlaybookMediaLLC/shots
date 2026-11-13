@@ -159,7 +159,7 @@ export function DraftPosts({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Pill tone={POST_STATE_TONE[state]}>{state}</Pill>
-                  {post.url ? (
+                  {post.url && !post.deletedAt ? (
                     <a
                       className="text-xs text-sky-700 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200"
                       href={post.url}

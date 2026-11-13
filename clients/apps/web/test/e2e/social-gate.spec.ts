@@ -20,6 +20,7 @@ import {
   type Page,
 } from './framework'
 import { z } from 'zod'
+import { importedBody } from '@/lib/write/import-text'
 
 const secretReference = 'SOCIAL_API_KEY_GATE'
 const fakeURL = process.env.E2E_SOCIAL_GATE_FAKE_URL ?? 'http://127.0.0.1:5680'
@@ -1076,6 +1077,106 @@ test('a grid video rendered in the browser and scheduled in the background publi
     const [attempt, ...extraAttempts] = await attemptsOf(postId!)
     expect(extraAttempts).toHaveLength(0)
     expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a published thread is deleted through Shots once, part by part, and a repeat deletes nothing', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const connectionId = await connect(page, bootstrap.destinationId)
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        body: importedBody(['Going away', 'Going away, part 2']),
+        channelConnectionIds: [connectionId],
+        plainText: 'Going away\n\nGoing away, part 2',
+        primaryPlatform: 'x',
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const draft = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+    const scheduled = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      body: {
+        channelConnectionIds: [connectionId],
+        // The schedule takes a time at least 30 seconds away.
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version: draft.version,
+      },
+      method: 'POST',
+    })
+    expect(scheduled.status, JSON.stringify(scheduled.body)).toBe(201)
+    const [post] = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(scheduled.body).posts
+    await awaitStatus(post!.id, 'PUBLISHED')
+    // The root went to the fake as a post, and the second part answered it.
+    const root = (await fakeState()).posts.find((item) => item.caption === 'Going away')
+    expect(root).toBeDefined()
+    const partId = (
+      await db.row<{ remoteId: string }>(
+        `SELECT receipt->>'remoteId' AS "remoteId" FROM scheduled_post, jsonb_array_elements("threadProgress"->'receipts') AS receipt WHERE id = $1`,
+        [post!.id]
+      )
+    )?.remoteId
+    expect(partId).toBeTruthy()
+
+    await page.goto(`/publish/${draft.id}`)
+    const card = page.getByTestId('draft-post')
+    await card.getByRole('button', { name: 'Delete from e2e…' }).click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog).toContainText('stays up and is marked not supported')
+    await dialog.getByRole('button', { name: 'Delete from e2e', exact: true }).click()
+    // The thread part goes first and the post last, each once.
+    await expect
+      .poll(
+        async () =>
+          (await fakeState()).actions
+            .filter((action) => action.kind === 'delete')
+            .map((action) => action.postId),
+        { intervals: [1_000], timeout: 120_000 }
+      )
+      .toEqual([partId, root!.id])
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.rows<{ key: string; status: string }>(
+              'SELECT key, status FROM post_deletion WHERE "scheduledPostId" = $1 ORDER BY key',
+              [post!.id]
+            )
+          ).map((row) => `${row.key}:${row.status}`),
+        { intervals: [1_000], timeout: 60_000 }
+      )
+      .toEqual(['root:done', 'thread:1:done'])
+
+    await page.reload()
+    await expect(card).toContainText('Deleted from e2e')
+    await expect(card.getByTestId('delete-parts').getByRole('listitem')).toHaveText([
+      /^Post\s*deleted$/,
+      /^Thread part\s*deleted$/,
+    ])
+    await expect(card.getByRole('button', { name: 'Delete from e2e…' })).toHaveCount(0)
+    await expect(card.getByRole('link', { name: 'View on e2e' })).toHaveCount(0)
+    await expect(page.getByTestId('live-notice')).toContainText('deleted from e2e')
+    // A repeated request is refused and sends nothing more to the platform.
+    const again = await apiRequest(page, `/api/v1/content-draft-posts/${post!.id}/delete`, {
+      method: 'POST',
+    })
+    expect(again.status, JSON.stringify(again.body)).toBe(409)
+    expect((await fakeState()).actions.filter((action) => action.kind === 'delete')).toHaveLength(2)
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,
