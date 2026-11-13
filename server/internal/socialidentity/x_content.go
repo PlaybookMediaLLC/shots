@@ -42,10 +42,16 @@ func CheckXText(caps XCapabilities, text string) error {
 		return nil
 	}
 	limit := caps.PostTextLimit()
-	if helpers.WeightedLength(text) > limit {
+	length, err := helpers.WeightedLength(text)
+	if err != nil {
+		return errors.New("The X post is too long or too complex to count. Shorten it.")
+	}
+	if length > limit {
 		return fmt.Errorf("The X post exceeds this account's verified limit of %d weighted characters.", limit)
 	}
-	if !helpers.ValidTweetText(text, limit) {
+	if valid, err := helpers.ValidTweetText(text, limit); err != nil {
+		return errors.New("The X post is too long or too complex to count. Shorten it.")
+	} else if !valid {
 		return errors.New("The X post contains characters the platform cannot publish.")
 	}
 	return nil

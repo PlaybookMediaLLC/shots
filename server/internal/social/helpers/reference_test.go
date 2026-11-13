@@ -81,18 +81,18 @@ func TestReferenceStripTags(t *testing.T) {
 func TestReferenceTwitterText(t *testing.T) {
 	ref := loadReference(t)
 	for _, c := range ref.Weighted {
-		if got := WeightedLength(c.Text); got != c.Want {
-			t.Errorf("WeightedLength(%q) = %d, want %d", c.Text, got, c.Want)
+		if got, err := WeightedLength(c.Text); err != nil || got != c.Want {
+			t.Errorf("WeightedLength(%q) = %d, %v, want %d", c.Text, got, err, c.Want)
 		}
 	}
 	for _, c := range ref.Slicer {
-		if start, end := TextSlicer(c.Type, c.End, c.Text); start != 0 || end != c.Want {
-			t.Errorf("TextSlicer(%q, %d, %q) = %d,%d, want 0,%d", c.Type, c.End, c.Text, start, end, c.Want)
+		if start, end, err := TextSlicer(c.Type, c.End, c.Text); err != nil || start != 0 || end != c.Want {
+			t.Errorf("TextSlicer(%q, %d, %q) = %d,%d, %v, want 0,%d", c.Type, c.End, c.Text, start, end, err, c.Want)
 		}
 	}
 	for _, c := range ref.Count {
-		if got := CountLength(c.Type, c.Text); got != c.Want {
-			t.Errorf("CountLength(%q, %q) = %d, want %d", c.Type, c.Text, got, c.Want)
+		if got, err := CountLength(c.Type, c.Text); err != nil || got != c.Want {
+			t.Errorf("CountLength(%q, %q) = %d, %v, want %d", c.Type, c.Text, got, err, c.Want)
 		}
 	}
 }
