@@ -160,11 +160,15 @@ const copy: DesignCopy = {
 }
 
 test('captions attach only where both a caption and a publisher exist', () => {
-  // Facebook has captions but no adapter; Mastodon, TikTok and YouTube
-  // publish but get no written caption.
-  assert.deepEqual([...CAPTIONED_CHANNELS], ['x', 'linkedin', 'instagram', 'threads', 'bluesky'])
-  assert.equal(isCaptionedChannel('facebook'), false)
+  // Mastodon, TikTok, YouTube and Pinterest publish but get no written caption.
+  assert.deepEqual(
+    [...CAPTIONED_CHANNELS],
+    ['x', 'linkedin', 'instagram', 'threads', 'bluesky', 'facebook']
+  )
+  assert.equal(isCaptionedChannel('facebook'), true)
+  assert.equal(isCaptionedChannel('pinterest'), false)
   assert.equal(captionFor(copy, 'mastodon'), '')
+  assert.equal(captionFor(copy, 'pinterest'), '')
 })
 
 // A provider platform is not a draft channel: company pages and standalone
@@ -183,12 +187,15 @@ test('every account a draft can post from is offered, under its channel', () => 
       account('old', 'twitter'),
       account('masto', 'mastodon'),
       account('fb', 'facebook'),
+      // Google Business is not a draft channel yet, so its account is not offered.
+      account('local', 'gmb'),
     ]).map((item) => [item.id, item.channel]),
     [
       ['page', 'linkedin'],
       ['solo', 'instagram'],
       ['old', 'x'],
       ['masto', 'mastodon'],
+      ['fb', 'facebook'],
     ]
   )
   const accounts = postAccounts([account('a', 'x'), account('b', 'linkedin')])
