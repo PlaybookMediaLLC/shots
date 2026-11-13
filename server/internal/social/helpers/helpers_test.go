@@ -76,9 +76,9 @@ func TestWeightedLength(t *testing.T) {
 	}
 }
 
-// regexp2 backtracked quadratically through domain-like words, which now
-// count, and still does through a URL path of parenthesised groups, which the
-// budget refuses: without the budget it took seconds.
+// regexp2 backtracked quadratically through domain-like words and through a
+// URL path of parenthesised groups: without the budget each took seconds, and
+// now each counts.
 func TestLinkScanStopsOnCraftedText(t *testing.T) {
 	scans := map[string]func(string) error{
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
@@ -91,7 +91,7 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 		"a.":         {strings.Repeat("a.", 5000), false},
 		"https://a.": {"https://" + strings.Repeat("a.", 5000), false},
 		"many words": {strings.Repeat(" https://"+strings.Repeat("a.", 25), 200), false},
-		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), true},
+		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), false},
 	}
 	for name, c := range cases {
 		for scan, run := range scans {
@@ -114,13 +114,15 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 // A text longer than any caption gets no more time than the longest one: 1 MiB
 // of slow words took 21 s while the budget grew with length.
 func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
-	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
-	start := time.Now()
-	if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
-		t.Fatalf("WeightedLength error = %v", err)
-	}
-	if elapsed := time.Since(start); elapsed > 4*time.Second {
-		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	// Many words, and one word: its TLD checks within the word stop too.
+	for _, text := range []string{strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59), strings.Repeat("a.", 1<<19)} {
+		start := time.Now()
+		if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
+			t.Fatalf("WeightedLength(%.12q…) error = %v", text, err)
+		}
+		if elapsed := time.Since(start); elapsed > 4*time.Second {
+			t.Errorf("%.12q… took %v, want about the 2.2 s budget of a 100,000-unit text", text, elapsed)
+		}
 	}
 }
 
@@ -143,7 +145,7 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	}
 	start := time.Now()
 	for i := range 20 {
-		crafted := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 8000)) // seconds unbounded
+		crafted := fmt.Sprintf("%d.%s", i, strings.Repeat("a.", 100_000)) // seconds unbounded
 		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("crafted %d: %v", i, err)
 		}
@@ -220,12 +222,15 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		return b.String()
 	}
+	// The path's segments: validUrlPath, cut from extractURLSource.
+	pathAt := jsRegexp(`\G`+strings.TrimSuffix(sourceSpan(`\/(?:(?:`, `*)?(\?`), `)?(\?`), regexp2.IgnoreCase)
 	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+		"(a)", "((a)b)", ")", "!", "Ж", "é", ":80",
 		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
 	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
 	rng := rand.New(rand.NewPCG(1, 2))
-	for range 5000 {
+	for range 6000 {
 		var b strings.Builder
 		for range 1 + rng.IntN(16) {
 			b.WriteString(tokens[rng.IntN(len(tokens))])
@@ -239,9 +244,10 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
 			want = append(want, describe(m))
 		}
+		written := slices.Clone(text)
 		matches, err := urlMatches(text, time.Now().Add(time.Hour))
-		if err != nil {
-			t.Fatal(err)
+		if err != nil || !slices.Equal(text, written) {
+			t.Fatalf("urlMatches(%q) changed the text or failed: %v", raw, err)
 		}
 		for _, m := range matches {
 			got = append(got, describe(m))
@@ -250,9 +256,18 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
 		}
 		// A start the regex rejects would be skipped, so check every index.
-		for s, end := range urlEnds(text) {
+		ends, err := urlEnds(text, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for s, end := range ends {
 			if want := matchEnd(extractURLAtRe, text, s, 5); end != want {
 				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
+		for s, c := range text {
+			if want := matchEnd(pathAt, text, s, 0); c == '/' && urlPathEnd(text, s+1) != want {
+				t.Errorf("urlPathEnd(%q, %d) = %d, want %d", raw, s+1, urlPathEnd(text, s+1), want)
 			}
 		}
 		for s, end := range asciiDomainEnds(text) {
@@ -287,6 +302,11 @@ func TestWeightedLengthOfLongText(t *testing.T) {
 		{strings.Repeat("a.", 2000) + "日本.com", 2*2000 + 8},
 		{"xn--a." + strings.Repeat("a.", 2000) + "日本.com", 6 + 2*2000 + 8},
 		{distinct.String() + ".com", 2*20000 + 4},
+		// A path of parenthesised groups, which regexp2 rescanned after each
+		// one: one link, and past 4,096 characters no link at all.
+		{"https://a.co/" + strings.Repeat("(a)", 1300), 23},
+		{"https://a.co/" + strings.Repeat("(a)", 8000), 13 + 3*8000},
+		{"https://a.co/" + strings.Repeat("((a))", 19000), 13 + 5*19000},
 	} {
 		start := time.Now()
 		if got, err := WeightedLength(c.text); err != nil || got != c.want {
