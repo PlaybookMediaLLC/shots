@@ -31,7 +31,15 @@ test('the newest approved video testimonials are listed with the workspace key a
   const request: typeof fetch = async (input, init) => {
     seen.push(new URL(String(input)))
     assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer senja-key-1')
-    return Response.json({ testimonials: [testimonial('t1'), testimonial('text-only', null)] })
+    return Response.json({
+      testimonials: [
+        testimonial('t1'),
+        testimonial('text-only', null),
+        { ...testimonial('pending'), approved: false },
+        // One odd testimonial drops only itself.
+        { customer_name: 'No id' },
+      ],
+    })
   }
   const videos = await listSenjaVideos('senja-key-1', request)
   assert.deepEqual(videos, [
@@ -65,7 +73,8 @@ test('a refused key, an unreachable Senja and an unreadable answer each say so',
         return error.status
       }
     )
-  assert.equal(await failure(answer(new Response('', { status: 401 }))), 401)
+  // A refused key is the workspace's to fix.
+  assert.equal(await failure(answer(new Response('', { status: 401 }))), 422)
   assert.equal(await failure(answer(null)), 503)
   assert.equal(await failure(answer(new Response('', { status: 500 }))), 503)
   assert.equal(await failure(answer(Response.json({ items: [] }))), 503)
@@ -97,4 +106,21 @@ test('an import re-reads the testimonial by id and takes only its MP4', async ()
     await status(senjaVideoFile('key-12345', 't1', { media: media('text/html'), request })),
     422
   )
+})
+
+test('an imported file name is ASCII, as Go stores it, and an unapproved one is refused', async () => {
+  const named = (customer_name: string, approved?: boolean) => {
+    const request: typeof fetch = async () =>
+      Response.json({ ...testimonial('t1'), approved, customer_name })
+    return senjaVideoFile('key-12345', 't1', { media: media('video/mp4'), request })
+  }
+  assert.equal((await named('José García')).fileName, 'senja-Jose-Garcia.mp4')
+  assert.equal((await named('山田 太郎')).fileName, 'senja-testimonial.mp4')
+  await assert.rejects(named('Ada', false), /not approved/)
+  // A CDN may label an MP4 generically; Go probes the bytes when they are stored.
+  const generic = await senjaVideoFile('key-12345', 't1', {
+    media: media('application/octet-stream'),
+    request: async () => Response.json(testimonial('t1')),
+  })
+  assert.equal(generic.contentType, 'video/mp4')
 })

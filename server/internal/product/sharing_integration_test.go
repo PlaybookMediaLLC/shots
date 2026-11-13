@@ -200,6 +200,9 @@ func TestShareLinksAndIntegrations(t *testing.T) {
 	if err != nil || replaced.ID != senja.ID {
 		t.Fatalf("a second Senja key made a second connection: %+v err=%v", replaced, err)
 	}
+	if key, err := repo.IntegrationCredentials(ctx, actor, senja.ID); err != nil || key.EncryptedCredentials != "v1.iv.tag.senja2" {
+		t.Fatalf("the replaced key=%+v err=%v", key, err)
+	}
 	if _, err := repo.IntegrationCredentials(ctx, stranger, senja.ID); !errors.Is(err, publishing.ErrNotFound) {
 		t.Fatalf("stranger reads the Senja key: %v", err)
 	}

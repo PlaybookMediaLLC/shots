@@ -436,7 +436,8 @@ test(
     await editorMore(page, 'From Senja')
     const dialog = page.getByRole('dialog', { name: 'Senja is not set up' })
     await expect(dialog).toContainText('in Settings, under Integrations')
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    // The dialog's own close and its footer button share the name; Escape is one action.
+    await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     // Without a key nothing is listed or imported, and Senja is never asked.
     const listed = await apiRequest(page, '/api/v1/content-drafts/senja')
@@ -452,5 +453,16 @@ test(
     const status = await apiRequest(page, '/api/v1/integrations/senja')
     expect(status.status).toBe(200)
     expect(status.body).toMatchObject({ configured: false })
+    // Without a sealing key, the owner reads why, and no key is taken.
+    if (!z.object({ sealable: z.boolean() }).parse(status.body).sealable) {
+      await expect(
+        page.getByText(/cannot store keys until INTEGRATION_ENCRYPTION_KEY/)
+      ).toBeVisible()
+      const refused = await apiRequest(page, '/api/v1/integrations/senja', {
+        body: { apiKey: 'fixture-senja-key' },
+        method: 'PUT',
+      })
+      expect(refused.status).toBe(503)
+    }
   }
 )

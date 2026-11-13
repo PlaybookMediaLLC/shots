@@ -35,7 +35,7 @@ export async function loadDraftComposer(
   const collabUrl = process.env.PLATFORM_COLLAB_URL || null
   // Every read starts at once; only the library's draft list waits for the draft's set.
   const loadingDraft = getContentDraft(access.tenant, draftId)
-  const [draft, data, posts, settings, collabToken] = await Promise.all([
+  const [draft, data, posts, settings, collabToken, senja] = await Promise.all([
     loadingDraft,
     // The library shows the set the draft belongs to, whatever was open before.
     loadWrite(
@@ -47,6 +47,8 @@ export async function loadDraftComposer(
     getContentDraftSettings(access.tenant),
     // Issued with the page, so the editor connects without waiting for another request.
     collabUrl ? createContentDraftCollabToken(access.tenant, draftId).catch(() => null) : null,
+    // Only the Senja command's badge reads this; the composer opens without it.
+    senjaConfigured(access.tenant).catch(() => false),
   ])
   if (!draft) return null
   return {
@@ -67,7 +69,7 @@ export async function loadDraftComposer(
       draft: contentDraftSchema.parse(draft),
       drive: googleDriveConfig(),
       giphy: giphyEnabled(),
-      senja: await senjaConfigured(access.tenant),
+      senja,
       posts: (posts ?? []).map((post) => contentDraftPostSchema.parse(post)),
       requireApproval: settings.requireApproval,
       set: data.activeSet,

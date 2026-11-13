@@ -5803,8 +5803,7 @@
                 "properties": {
                   "id": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "pattern": "^[A-Za-z0-9_-]{1,100}$"
                   }
                 },
                 "required": [

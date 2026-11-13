@@ -15,7 +15,6 @@ import { call } from '@/lib/content-drafts/client'
 import { clock } from '@/lib/write/media-rules'
 
 type Video = ReturnType<typeof listSenjaVideosContract.output.parse>['items'][number]
-type Imported = ReturnType<typeof importSenjaVideoContract.output.parse>
 
 /**
  * Imports one approved video testimonial from the workspace's Senja project
@@ -50,7 +49,7 @@ export function SenjaImport({
     setImporting(video.id)
     setError(null)
     try {
-      const imported: Imported = importSenjaVideoContract.output.parse(
+      const imported = importSenjaVideoContract.output.parse(
         await call(importSenjaVideoContract.path, { body: { id: video.id }, method: 'POST' })
       )
       onImported({ id: imported.assetId, mediaType: imported.mediaType })

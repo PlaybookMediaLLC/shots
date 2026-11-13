@@ -10,15 +10,15 @@ import {
   saveSenjaKey,
   senjaConfigured,
   SenjaError,
-  senjaKeysSealable,
 } from '@/lib/content-drafts/senja'
+import { canSealCredentials } from '@/lib/integrations/crypto'
 
 /** Whether Senja import is set up; any member may read it, never the key. */
 export const GET = route(senjaStatusContract, {
   auth: organizationAccess('artifact:read'),
   handler: async ({ access }) => ({
     configured: await senjaConfigured(access),
-    sealable: senjaKeysSealable(),
+    sealable: canSealCredentials(),
   }),
 })
 
@@ -26,7 +26,7 @@ export const GET = route(senjaStatusContract, {
 export const PUT = route(saveSenjaKeyContract, {
   auth: organizationAccess('workspace:update'),
   handler: async ({ access, body }) => {
-    if (!senjaKeysSealable())
+    if (!canSealCredentials())
       return errorResponse(
         503,
         'Senja keys cannot be saved on this deployment until INTEGRATION_ENCRYPTION_KEY is set.'
@@ -34,8 +34,7 @@ export const PUT = route(saveSenjaKeyContract, {
     try {
       await saveSenjaKey(access, body.apiKey)
     } catch (error) {
-      if (error instanceof SenjaError)
-        return errorResponse(error.status === 401 ? 422 : 503, error.message)
+      if (error instanceof SenjaError) return errorResponse(error.status, error.message)
       throw error
     }
     return { configured: true, sealable: true }
@@ -47,6 +46,6 @@ export const DELETE = route(removeSenjaKeyContract, {
   auth: organizationAccess('workspace:update'),
   handler: async ({ access }) => {
     await removeSenjaKey(access)
-    return { configured: false, sealable: senjaKeysSealable() }
+    return { configured: false, sealable: canSealCredentials() }
   },
 })

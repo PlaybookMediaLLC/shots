@@ -111,7 +111,11 @@ export function SenjaKey({ canManage }: { canManage: boolean }) {
                       value={key}
                     />
                   </div>
-                  <Button disabled={busy || key.trim().length < 8} size="sm" type="submit">
+                  <Button
+                    disabled={busy || !saveSenjaKeyContract.body.safeParse({ apiKey: key }).success}
+                    size="sm"
+                    type="submit"
+                  >
                     Save key
                   </Button>
                   {status.configured ? (

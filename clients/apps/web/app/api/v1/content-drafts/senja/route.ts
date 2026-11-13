@@ -9,16 +9,15 @@ import { storeFetchedAsset } from '@/lib/tenant/assets'
 const NOT_SET_UP =
   'Senja is not set up for this workspace. An admin can add its API key in Settings, under Integrations.'
 
-/** A refused key is the caller's to fix (422); an unreachable Senja is not (503). */
 function senjaFailure(error: unknown) {
-  if (error instanceof SenjaError)
-    return errorResponse(error.status === 401 ? 422 : error.status, error.message)
+  if (error instanceof SenjaError) return errorResponse(error.status, error.message)
   throw error
 }
 
 /** The newest approved video testimonials of the workspace's Senja project. */
+// Listing serves importing: the key opens only for those who may edit drafts.
 export const GET = route(listSenjaVideosContract, {
-  auth: organizationAccess('artifact:read'),
+  auth: organizationAccess('artifact:edit'),
   handler: async ({ access }) => {
     if (!contentDraftsEnabled()) return errorResponse(503, 'Drafts are not enabled.')
     const key = await senjaKey(access)

@@ -62,7 +62,7 @@ export const removeSenjaKeyContract = defineContract({
 })
 
 /** A Senja video testimonial a draft can import. */
-const senjaVideoSchema = z.object({
+export const senjaVideoSchema = z.object({
   customerName: z.string(),
   durationSeconds: z.number().nullable(),
   id: z.string(),
@@ -105,7 +105,7 @@ export const importSenjaVideoContract = defineContract({
       '503': 'Senja is unreachable.',
     },
   }),
-  body: z.object({ id: z.string().min(1).max(100) }),
+  body: z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/) }),
   method: 'POST',
   name: 'content-drafts.senja-import',
   output: z.object({ assetId: z.string(), mediaType: z.literal('video/mp4') }),

@@ -1,9 +1,9 @@
 import 'server-only'
 import { z } from 'zod'
 import { backendSDK } from '@/lib/backend/sdk'
-import { canSealCredentials, openCredentials, sealCredentials } from '@/lib/integrations/crypto'
+import type { senjaVideoSchema } from '@/lib/api/contracts/senja'
+import { openCredentials, sealCredentials } from '@/lib/integrations/crypto'
 import { safeFetchBytes, type SafeFetchOptions } from '@/lib/launch/safe-fetch'
-import { uploadByteLimit } from '@/lib/write/media-limits'
 
 /**
  * Senja import (composer slice 3c): a workspace admin pastes the Senja
@@ -19,33 +19,33 @@ const API = 'https://api.senja.io/v1'
 /** The workspace has one Senja key: saving again replaces it. */
 const EXTERNAL_ID = 'senja'
 /** The newest approved video testimonials offered at a time. */
-export const SENJA_VIDEO_LIMIT = 100
+const VIDEO_LIMIT = 100
+/**
+ * An imported video is held whole in the web server's memory (twice, while
+ * it is read), so Senja imports stop well below the upload's own video limit.
+ */
+export const SENJA_MAX_BYTES = 150 * 1024 * 1024
 
-/** A Senja API key as pasted. */
-export const senjaKeySchema = z.string().trim().min(8).max(500)
-
+// One odd field drops only itself: an unusable address is read as none.
+const address = z.string().url().nullish().catch(null)
 const testimonialSchema = z.object({
-  customer_name: z.string().nullish(),
+  approved: z.boolean().nullish().catch(null),
+  customer_name: z.string().nullish().catch(null),
   id: z.string().min(1),
-  thumbnail_url: z.string().url().nullish(),
-  video: z.object({ duration: z.number().nullish() }).nullish(),
-  video_url: z.string().url().nullish(),
+  thumbnail_url: address,
+  video: z.object({ duration: z.number().nullish() }).nullish().catch(null),
+  video_url: address,
 })
 type Testimonial = z.infer<typeof testimonialSchema>
 
 /** A video testimonial, as the composer offers it. */
-export type SenjaVideo = {
-  customerName: string
-  durationSeconds: number | null
-  id: string
-  thumbnailUrl: string | null
-}
+export type SenjaVideo = z.infer<typeof senjaVideoSchema>
 
 /** Senja answered; `status` is what Shots answers its caller. */
 export class SenjaError extends Error {
   constructor(
     message: string,
-    readonly status: 401 | 404 | 422 | 503
+    readonly status: 404 | 422 | 503
   ) {
     super(message)
     this.name = 'SenjaError'
@@ -64,7 +64,7 @@ async function senja(key: string, path: string, request: typeof fetch = fetch): 
   if (response.status === 401 || response.status === 403)
     throw new SenjaError(
       'Senja refused the API key. Copy it again from Senja’s Integrations page.',
-      401
+      422
     )
   if (response.status === 404) throw new SenjaError('That testimonial is no longer in Senja.', 404)
   if (!response.ok) throw new SenjaError('Senja did not answer. Try again later.', 503)
@@ -86,22 +86,28 @@ function video(testimonial: Testimonial): SenjaVideo {
 export async function listSenjaVideos(key: string, request?: typeof fetch): Promise<SenjaVideo[]> {
   const parameters = new URLSearchParams({
     approved: 'true',
-    limit: String(SENJA_VIDEO_LIMIT),
+    limit: String(VIDEO_LIMIT),
     order: 'desc',
     sort: 'date',
     type: 'video',
   })
   const body = z
-    .object({ testimonials: z.array(testimonialSchema) })
+    .object({ testimonials: z.array(z.unknown()) })
     .safeParse(await senja(key, `/testimonials?${parameters}`, request))
   if (!body.success) throw new SenjaError('Senja sent an answer Shots could not read.', 503)
-  return body.data.testimonials.filter((item) => item.video_url).map(video)
+  // A testimonial Shots cannot read, or without a video, is left out; the others still list.
+  return body.data.testimonials.flatMap((item) => {
+    const parsed = testimonialSchema.safeParse(item)
+    return parsed.success && parsed.data.video_url && parsed.data.approved !== false
+      ? [video(parsed.data)]
+      : []
+  })
 }
 
 /**
  * A testimonial's video, re-read from Senja by id so the browser never names
- * the address Shots fetches. The fetch is SSRF-guarded and bounded by the
- * upload's own video limit; only an MP4 is taken.
+ * the address Shots fetches. The fetch is SSRF-guarded and bounded by
+ * {@link SENJA_MAX_BYTES}; Go probes the bytes as an MP4 when they are stored.
  */
 export async function senjaVideoFile(
   key: string,
@@ -114,23 +120,32 @@ export async function senjaVideoFile(
     .safeParse(answer)
   if (!parsed.success) throw new SenjaError('Senja sent an answer Shots could not read.', 503)
   const testimonial = 'testimonial' in parsed.data ? parsed.data.testimonial : parsed.data
+  // The list offers approved testimonials only; an id sent directly is held to the same rule.
+  if (testimonial.approved === false)
+    throw new SenjaError('That testimonial is not approved in Senja.', 422)
   if (!testimonial.video_url) throw new SenjaError('That testimonial has no video.', 422)
   const fetched = await safeFetchBytes(testimonial.video_url, {
-    maxBytes: uploadByteLimit('video/mp4'),
     ...transport.media,
+    maxBytes: SENJA_MAX_BYTES,
+    timeoutMs: 120_000,
   })
-  if (!fetched.ok || fetched.truncated)
-    throw new SenjaError('The video could not be fetched, or is larger than Shots uploads.', 422)
-  if (!fetched.contentType.startsWith('video/mp4'))
+  if (!fetched.ok)
+    throw new SenjaError('The video could not be fetched from Senja. Try again.', 503)
+  if (fetched.truncated)
+    throw new SenjaError('The video is larger than Shots imports from Senja (150 MB).', 422)
+  // A CDN may label an MP4 generically.
+  if (!/^(video\/mp4|application\/octet-stream)\b/.test(fetched.contentType))
     throw new SenjaError('Senja did not send the video as an MP4.', 422)
-  const name = video(testimonial)
-    .customerName.replace(/[^\p{L}\p{N}]+/gu, '-')
-    .slice(0, 60)
+  // Go takes ASCII file names only: accents go, and a name in another script becomes a plain one.
+  const name =
+    video(testimonial)
+      .customerName.normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'testimonial'
   return { bytes: fetched.bytes, contentType: 'video/mp4', fileName: `senja-${name}.mp4` }
 }
-
-/** Whether keys can be sealed here; without it no key is saved. */
-export const senjaKeysSealable = canSealCredentials
 
 async function connection(context: BackendContext) {
   const { integrations } = await backendSDK(context).listIntegrations()
