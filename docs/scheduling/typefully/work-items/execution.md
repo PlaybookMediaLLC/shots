@@ -136,8 +136,11 @@ Coverage key **L2**. Each check ran through Write from a local stack (not produc
 | 2026-11-13 02:59 | LinkedIn member `yoanyomba` | Repost of the 02:56 post with commentary; the original showed embedded (TF-098) | `urn:li:share:7526841103610929152` | Removal verified by 03:01:06 |
 | 2026-11-13 03:05 | LinkedIn member `yoanyomba` | Poll, 2 options, 1 day, rendered natively (TF-109) | `urn:li:ugcPost:7526842603464720385` | Removal verified by 03:06:23 |
 | 2026-11-13 03:08 | LinkedIn member `yoanyomba` | 2-page PDF titled "Shots live test PDF"; both pages showed (TF-083) | `urn:li:ugcPost:7526843401661661184` | Removal verified by 03:09:38 |
+| 2026-11-13 04:11 | X `@yoanyombax` | Retest of the #544 fix on a stack built from its branch: Publish now with Auto-RT "Days later at", 0 days, 04:18 UTC (TF-064). The draft stored `days: 0`, reopened, and the Publish review loaded | `2121093675342008401` | Repost undone, post deleted; removal verified by 04:20 |
 
 For the 02:53 post, the plug reply (`2121081510233010373`) went out at 03:23:34 after the owner liked the post. The repost went out at 03:53:48. Both receipts are `done`. The repost was undone in X before the reply and the post were deleted.
+
+For the 04:11 post, the repost receipt was `done` at 04:18:00, and X showed one repost.
 
 Checks without a post:
 
@@ -149,11 +152,12 @@ Uploaded media of the delivered posts was deleted through the Library after thei
 
 ### Open defects found by L2
 
-- A same-day Auto-RT rule ("Days later at", 0 days) is stored without `days` (fixed in #544; live retest pending). `RetweetRule.Days` has `omitempty` (`server/internal/postoptions/postoptions.go`), and the web's strict `retweetRuleSchema` requires `days`. The draft then returns 400 on read and 409 on save, and Publish returns 500 for that profile. The draft was repaired by removing the rule. The shortest working delay is "After 1 hour".
+- A same-day Auto-RT rule ("Days later at", 0 days) is stored without `days` (fixed in #544; the fix passed a live retest at 04:11). `RetweetRule.Days` has `omitempty` (`server/internal/postoptions/postoptions.go`), and the web's strict `retweetRuleSchema` requires `days`. The draft then returns 400 on read and 409 on save, and Publish returns 500 for that profile. The draft was repaired by removing the rule. The shortest working delay is "After 1 hour".
 - A failed read of the X media source, before any X call, is recorded as `UNKNOWN_DELIVERY` and not as a retryable failure (`stageMedia` in `x/media_source.go`; fixed in #544).
 - The LinkedIn adapter keeps no status or body for a 4xx refusal (`linkedin/mutation.go`). The failed first comment therefore records only `provider_error`.
 - A refused mention lookup reaches the client as HTTP 500. `Publisher.Mentions` returns a `socialapi` 502 with a reason, but `writeStoreError` (`internal/httpapi/server.go`) has no case for it.
 - Analyze labels a post by its draft title ("Untitled draft"), not by its text.
+- The Auto-RT dialog preview for a same-day rule can show the repost before the post. For a post at 09:00 and a rule at 04:18, it says "reposts Nov 14, 2026, 4:18 AM".
 
 ## Defects found and resolved during verification
 
@@ -176,7 +180,7 @@ Initial test failures are retained in local logs. Regression checks also repaire
 
 | Boundary | Exact unresolved dependency |
 |---|---|
-| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video (L1). They are also live-verified for polls, the following-only reply restriction, disclosures, Publish now, resized multi-image posts with ALT text, a timed repost, a plug reply, analytics reads and mention lookup (L2). Still unresolved: long posts, Articles, 10-minute and 1080p video need X Premium. Native and finisher quotes need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`). Mixed photo and video has no X API contract. Communities need a Community that the account belongs to. Photo tags and multiple accounts need a second X account. A same-day Auto-RT rule failed in L2 (fixed in #544; live retest pending). Repost removal and like-gated reposts have not run live. |
+| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video (L1). They are also live-verified for polls, the following-only reply restriction, disclosures, Publish now, resized multi-image posts with ALT text, a timed repost, a plug reply, analytics reads and mention lookup (L2). Still unresolved: long posts, Articles, 10-minute and 1080p video need X Premium. Native and finisher quotes need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`). Mixed photo and video has no X API contract. Communities need a Community that the account belongs to. Photo tags and multiple accounts need a second X account. A same-day Auto-RT rule failed in L2; the #544 fix passed a live retest. Repost removal and like-gated reposts have not run live. |
 | LinkedIn | Member publishing with `w_member_social` is live-verified on `yoanyomba` for images and video (L1), and for polls, PDF documents and reposts (L2). Still unresolved: LinkedIn refused the first comment, and Shots kept no reason. The company lookup returns HTTP 500. Page publishing, people mentions (a Page connection and People Typeahead) and Page analytics wait for LinkedIn's Community Management review of app 266682906. |
 | Threads / Instagram | Threads needs `THREADS_APP_ID`/`THREADS_APP_SECRET` and a tester account. Instagram needs Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
 | Mastodon | An account and `PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED`. The instance's advertised poll limits, API version/native-quote support and source quote permission apply; pending federation approval is not a failed root publication. |
