@@ -14,7 +14,7 @@ import (
 
 // VideoProvider substitutes only the remote peer in the isolated social gate,
 // standing in for a platform the gate connects by name: TikTok, YouTube, a
-// Facebook Page or Pinterest.
+// Facebook Page, Pinterest or a Google Business location.
 type VideoProvider struct {
 	*Provider
 	platform string

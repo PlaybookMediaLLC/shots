@@ -307,6 +307,16 @@ test('posting directly takes its own opt-in scope and an idempotency key', () =>
       .success,
     'follow-ups are not part of this call'
   )
+  // A Facebook story and a pin's board go through this call too.
+  assert.ok(
+    contract.body.safeParse({
+      ...body,
+      platforms: {
+        facebook: { options: { facebook: { placement: 'story' } } },
+        pinterest: { options: { pinterest: { boardId: '1001' } } },
+      },
+    }).success
+  )
   assert.ok(!contract.headers?.safeParse({}).success, 'a retry must not be able to post twice')
   assert.ok(!contract.headers?.safeParse({ 'idempotency-key': 'short' }).success)
   assert.ok(contract.headers?.safeParse({ 'idempotency-key': 'a'.repeat(16) }).success)

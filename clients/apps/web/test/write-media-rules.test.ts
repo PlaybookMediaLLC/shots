@@ -152,6 +152,10 @@ test('a Google Business post is text or one image; a Facebook story is one image
   assert.deepEqual(mediaProblems('gmb', [photo]), [])
   assert.match(mediaProblems('gmb', [photo, png]).join(), /up to 1 attachment/)
   assert.deepEqual(mediaProblems('gmb', [mp4]), ["Google Business doesn't take video here."])
+  assert.match(
+    mediaProblems('gmb', [{ ...photo, width: 200, height: 200 }]).join(),
+    /at least 250 pixels wide/
+  )
   assert.deepEqual(mediaProblems('facebook', [mp4], 'story'), [])
   assert.match(mediaProblems('facebook', [], 'story').join(), /A Facebook story needs/)
   assert.match(mediaProblems('facebook', [photo, png], 'story').join(), /up to 1 attachment/)

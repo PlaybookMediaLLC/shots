@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
@@ -750,7 +751,13 @@ test('a Facebook story chosen in the composer and a Google Business post publish
     await bindWorkspace(organizationId, bootstrap.goOrganizationId)
     const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
     const gmb = await connect(page, bootstrap.gmbDestinationId, 'gmb')
-    const image = await createUploadedAsset(page, png, 'image/png', 'story.png')
+    // Google Business takes images at least 250 pixels wide; the shared fixture is 1×1.
+    const photo = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: '#2e6f40' },
+    })
+      .png()
+      .toBuffer()
+    const image = await createUploadedAsset(page, photo, 'image/png', 'story.png')
     const caption = 'Open late on Fridays.'
     const created = await apiRequest(page, '/api/v1/content-drafts', {
       body: {
@@ -804,7 +811,9 @@ test('a Facebook story chosen in the composer and a Google Business post publish
     // The story carries the image alone; the text went to the location's post.
     expect(story).toMatchObject({ caption: '', settings: { postType: 'story' } })
     expect(story?.media).toHaveLength(1)
-    expect(local).toMatchObject({ caption, settings: {} })
+    expect(local?.caption).toBe(caption)
+    // Nothing story-like reached Google Business.
+    expect(local?.settings).toEqual({})
     expect(local?.media).toHaveLength(1)
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [

@@ -88,6 +88,7 @@ func TestDraftMediaFollowsEachDestination(t *testing.T) {
 		{"google business one photo", "gmb", []*ent.Asset{photo}, ""},
 		{"google business two photos", "gmb", many(photo, 2), "up to 1 attachment"},
 		{"google business video", "gmb", []*ent.Asset{mp4}, "video"},
+		{"google business narrow photo", "gmb", []*ent.Asset{mediaRow("image/png", 1000, 200, 200, 0)}, "250 pixels wide"},
 	} {
 		err := checkDraftMedia(tc.channel, tc.rows)
 		if tc.refusal == "" && err != nil || tc.refusal != "" && (err == nil || !strings.Contains(err.Error(), tc.refusal)) {
@@ -253,5 +254,12 @@ func TestStoriesFollowTheirOwnRules(t *testing.T) {
 	}
 	if _, err := versionOptions("x", &draftdoc.VersionOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}); err == nil {
 		t.Fatal("a draft's X version stored a Facebook story")
+	}
+	if checkPostOptions("instagram", &postoptions.PublishOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}, true) == nil {
+		t.Fatal("a Facebook story was scheduled to Instagram")
+	}
+	// The public post API carries a story through to the scheduled post.
+	if !(&PostOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}).publish().Story() {
+		t.Fatal("the post API dropped a Facebook story")
 	}
 }

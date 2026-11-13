@@ -198,7 +198,16 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 	}, nil
 }
 
-// getJSON is a plain fetch(...).json(): the status is not checked.
+// errLocationNotFound is a location the account no longer offers.
+var errLocationNotFound = errors.New("Location not found")
+
+// statusError is a Google answer outside 2xx: its JSON is an error, never data.
+type statusError struct{ status int }
+
+func (e statusError) Error() string { return fmt.Sprintf("google business answered %d", e.status) }
+
+// getJSON reads a JSON answer and refuses one outside 2xx, so an error body
+// never reads as no accounts or no locations.
 func getJSON(ctx context.Context, rawURL, accessToken string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -210,6 +219,9 @@ func getJSON(ctx context.Context, rawURL, accessToken string, out any) error {
 		return err
 	}
 	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return statusError{res.StatusCode}
+	}
 	return json.NewDecoder(res.Body).Decode(out)
 }
 
@@ -356,7 +368,7 @@ func (p *Provider) FetchPageInformation(ctx context.Context, accessToken string,
 		data.LocationName = "locations/" + location
 	}
 	if data.LocationName == "" {
-		return nil, errors.New("Location not found")
+		return nil, errLocationNotFound
 	}
 
 	var location struct {
@@ -379,24 +391,22 @@ func (p *Provider) FetchPageInformation(ctx context.Context, accessToken string,
 	}, nil
 }
 
+// ReConnect renews the chosen location's details with a fresh token. It reads
+// that location only: a refresh never lists every location of the account.
 func (p *Provider) ReConnect(ctx context.Context, _, requiredID, accessToken string) (*integrations.AuthTokenDetails, error) {
-	pages, err := p.Pages(ctx, accessToken)
-	if err != nil {
-		return nil, err
-	}
-	var findPage *Page
-	for i := range pages {
-		if pages[i].ID == requiredID {
-			findPage = &pages[i]
-			break
-		}
-	}
-	if findPage == nil {
-		return nil, errors.New("Location not found")
-	}
-	data, _ := json.Marshal(map[string]string{"id": requiredID, "accountName": findPage.AccountName, "locationName": findPage.LocationName})
+	data, _ := json.Marshal(map[string]string{"id": requiredID})
 	information, err := p.FetchPageInformation(ctx, accessToken, data)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		var status statusError
+		refused := errors.Is(err, errLocationNotFound) ||
+			errors.As(err, &status) && status.status != http.StatusTooManyRequests && status.status < 500
+		if !refused {
+			// A throttled, failing or unreachable Google retries on the next run.
+			return nil, integrations.ErrRefreshUnavailable
+		}
 		return nil, err
 	}
 	return &integrations.AuthTokenDetails{
@@ -675,10 +685,4 @@ func (p *Provider) Analytics(ctx context.Context, id, accessToken string, days i
 		analytics = append(analytics, integrations.AnalyticsData{Label: label, PercentageChange: 0, Data: points})
 	}
 	return analytics, nil
-}
-
-// PostAnalytics: Google My Business local posts don't have detailed individual
-// post analytics, the API focuses on location-level metrics.
-func (p *Provider) PostAnalytics(context.Context, string, string, string, int64) ([]integrations.AnalyticsData, error) {
-	return []integrations.AnalyticsData{}, nil
 }

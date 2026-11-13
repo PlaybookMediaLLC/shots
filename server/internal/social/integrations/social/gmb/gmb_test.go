@@ -3,9 +3,11 @@ package gmb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +19,6 @@ var (
 	_ integrations.Provider               = New()
 	_ integrations.Reconnector            = New()
 	_ integrations.Analytics              = New()
-	_ integrations.PostAnalytics          = New()
 	_ integrations.PageInformationFetcher = New()
 )
 
@@ -178,5 +179,52 @@ func TestALocationChosenInShotsIsFoundByItsID(t *testing.T) {
 		if _, err := p.FetchPageInformation(context.Background(), "tok", json.RawMessage(`{"id":"`+id+`"}`)); err == nil {
 			t.Fatalf("%q was taken for a location", id)
 		}
+	}
+}
+
+func TestARefreshReadsOnlyTheChosenLocation(t *testing.T) {
+	status := http.StatusOK
+	var paths []string
+	p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/v1/locations/10" {
+			w.WriteHeader(status)
+			w.Write([]byte(`{"name":"locations/10","title":"Shop"}`))
+			return
+		}
+		w.Write([]byte(`{}`))
+	})
+	details, err := p.ReConnect(context.Background(), "user", "accounts/1/locations/10", "fresh")
+	if err != nil || details.ID != "accounts/1/locations/10" || details.Name != "Shop" || details.AccessToken != "fresh" {
+		t.Fatalf("details=%+v err=%v", details, err)
+	}
+	for _, path := range paths {
+		if path == "/v1/accounts" || strings.HasSuffix(path, "/locations") {
+			t.Fatalf("a refresh listed the account's locations: %v", paths)
+		}
+	}
+	for _, passing := range []int{http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		status = passing
+		if _, err := p.ReConnect(context.Background(), "user", "accounts/1/locations/10", "fresh"); !errors.Is(err, integrations.ErrRefreshUnavailable) {
+			t.Fatalf("%d: %v, want a retry on the next run", passing, err)
+		}
+	}
+	status = http.StatusNotFound
+	if _, err := p.ReConnect(context.Background(), "user", "accounts/1/locations/10", "fresh"); err == nil || errors.Is(err, integrations.ErrRefreshUnavailable) {
+		t.Fatalf("a removed location: %v, want a reconnect", err)
+	}
+}
+
+func TestAnErrorAnswerIsNeverReadAsNoLocations(t *testing.T) {
+	p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":{"status":"PERMISSION_DENIED"}}`))
+	})
+	if pages, err := p.Pages(context.Background(), "tok"); err == nil {
+		t.Fatalf("a refused account listed %v", pages)
+	}
+	// Local posts have no per-post metrics, so post analytics read as unsupported.
+	if _, ok := any(New()).(integrations.PostAnalytics); ok {
+		t.Fatal("Google Business claims post analytics it cannot read")
 	}
 }
