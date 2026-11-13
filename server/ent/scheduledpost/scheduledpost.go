@@ -37,6 +37,8 @@ const (
 	FieldMetrics = "metrics"
 	// FieldPublishedAt holds the string denoting the published_at field in the database.
 	FieldPublishedAt = "publishedAt"
+	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
+	FieldDeletedAt = "deletedAt"
 	// FieldMetricsAt holds the string denoting the metrics_at field in the database.
 	FieldMetricsAt = "metricsAt"
 	// FieldAutoActions holds the string denoting the auto_actions field in the database.
@@ -117,6 +119,7 @@ var Columns = []string{
 	FieldRemotePostID,
 	FieldMetrics,
 	FieldPublishedAt,
+	FieldDeletedAt,
 	FieldMetricsAt,
 	FieldAutoActions,
 	FieldPoll,
@@ -258,6 +261,11 @@ func ByRemotePostID(opts ...sql.OrderTermOption) OrderOption {
 // ByPublishedAt orders the results by the published_at field.
 func ByPublishedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPublishedAt, opts...).ToFunc()
+}
+
+// ByDeletedAt orders the results by the deleted_at field.
+func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeletedAt, opts...).ToFunc()
 }
 
 // ByMetricsAt orders the results by the metrics_at field.

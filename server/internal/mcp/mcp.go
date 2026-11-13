@@ -321,7 +321,8 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, mount string) 
 const instructions = `Shots writes, schedules, and publishes social posts to a workspace's connected accounts, and turns a software release into a reviewed launch.
 To post: listSocialSets gives the accounts (accounts[].id); for media, createAssetUploadUrl, PUT the bytes to the returned URL, then completeAssetUpload; createPost then writes and schedules or publishes it in one call. It needs the post:publish scope. Confirm the text, the accounts, and the time with the user first, because it goes out to public accounts. Reuse the same idempotencyKey when retrying, and never post again after an unclear result: read listContentDraftPosts instead. A post can take up to a minute to start.
 createContentDraft saves a draft for a person to review instead. Private social sets are not visible here; if no account is listed, ask the user to connect one in a shared set in Shots.
-Only a person approves, in the Shots app; no tool can. With post:schedule you may schedule campaign posts a person approved, and cancel scheduled posts. listScheduledPosts shows the schedule.`
+Only a person approves, in the Shots app; no tool can. With post:schedule you may schedule campaign posts a person approved, and cancel scheduled posts. listScheduledPosts shows the schedule.
+With post:delete, deleteContentDraftPost deletes a published post from its platform, with its thread parts, replies and reposts. Confirm the post with the user first: the delete cannot be undone on the platform. Read listContentDraftPosts for each part's receipt.`
 
 // build makes the MCP server for one request, with the tools the key's
 // scopes allow.

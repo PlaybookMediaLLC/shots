@@ -98,6 +98,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsocialobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformworkspacecreation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postdeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
@@ -1609,6 +1610,22 @@ func init() {
 	postautomationrun.DefaultUpdatedAt = postautomationrunDescUpdatedAt.Default.(func() time.Time)
 	// postautomationrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	postautomationrun.UpdateDefaultUpdatedAt = postautomationrunDescUpdatedAt.UpdateDefault.(func() time.Time)
+	postdeletionFields := schema.PostDeletion{}.Fields()
+	_ = postdeletionFields
+	// postdeletionDescAttempts is the schema descriptor for attempts field.
+	postdeletionDescAttempts := postdeletionFields[7].Descriptor()
+	// postdeletion.DefaultAttempts holds the default value on creation for the attempts field.
+	postdeletion.DefaultAttempts = postdeletionDescAttempts.Default.(int)
+	// postdeletionDescCreatedAt is the schema descriptor for created_at field.
+	postdeletionDescCreatedAt := postdeletionFields[10].Descriptor()
+	// postdeletion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	postdeletion.DefaultCreatedAt = postdeletionDescCreatedAt.Default.(func() time.Time)
+	// postdeletionDescUpdatedAt is the schema descriptor for updated_at field.
+	postdeletionDescUpdatedAt := postdeletionFields[11].Descriptor()
+	// postdeletion.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	postdeletion.DefaultUpdatedAt = postdeletionDescUpdatedAt.Default.(func() time.Time)
+	// postdeletion.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	postdeletion.UpdateDefaultUpdatedAt = postdeletionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	productprofileFields := schema.ProductProfile{}.Fields()
 	_ = productprofileFields
 	// productprofileDescSummary is the schema descriptor for summary field.
@@ -1890,15 +1907,15 @@ func init() {
 	scheduledpostFields := schema.ScheduledPost{}.Fields()
 	_ = scheduledpostFields
 	// scheduledpostDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	scheduledpostDescIdempotencyKey := scheduledpostFields[20].Descriptor()
+	scheduledpostDescIdempotencyKey := scheduledpostFields[21].Descriptor()
 	// scheduledpost.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	scheduledpost.IdempotencyKeyValidator = scheduledpostDescIdempotencyKey.Validators[0].(func(string) error)
 	// scheduledpostDescCreatedAt is the schema descriptor for created_at field.
-	scheduledpostDescCreatedAt := scheduledpostFields[32].Descriptor()
+	scheduledpostDescCreatedAt := scheduledpostFields[33].Descriptor()
 	// scheduledpost.DefaultCreatedAt holds the default value on creation for the created_at field.
 	scheduledpost.DefaultCreatedAt = scheduledpostDescCreatedAt.Default.(func() time.Time)
 	// scheduledpostDescUpdatedAt is the schema descriptor for updated_at field.
-	scheduledpostDescUpdatedAt := scheduledpostFields[33].Descriptor()
+	scheduledpostDescUpdatedAt := scheduledpostFields[34].Descriptor()
 	// scheduledpost.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	scheduledpost.DefaultUpdatedAt = scheduledpostDescUpdatedAt.Default.(func() time.Time)
 	// scheduledpost.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

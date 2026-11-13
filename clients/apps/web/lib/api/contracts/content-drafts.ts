@@ -16,6 +16,7 @@ import {
   draftWriteFieldsSchema,
   draftWriteInputSchema,
   postAutomationSchema,
+  postDeletionReceiptSchema,
   scheduleTimingSchema,
 } from '@/lib/write/wire'
 
@@ -312,6 +313,10 @@ export const contentDraftPostSchema = z.object({
    */
   failureCode: z.string().nullable().default(null),
   publishedAt: timestampSchema.nullable().default(null),
+  /** When Shots deleted it from its platform; it stays published in Shots' record. */
+  deletedAt: timestampSchema.nullable().default(null),
+  /** Each part of a requested delete, with its receipt. */
+  deletions: z.array(postDeletionReceiptSchema).default([]),
 })
 
 /**

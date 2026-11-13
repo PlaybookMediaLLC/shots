@@ -126,6 +126,20 @@ export const postAutomationStatusSchema = z.enum([
 ])
 
 /**
+ * One part of a delete from the platform and its receipt: the root, a thread
+ * part (`thread:N`), a follow-up reply, or a repost to undo (`repost:...`).
+ * `failureCode` is a short code such as `http_403`.
+ */
+export const postDeletionReceiptSchema = z.object({
+  attempts: z.number().int(),
+  failureCode: z.string().nullable(),
+  key: z.string(),
+  kind: z.enum(['post', 'repost']),
+  status: z.enum(['pending', 'done', 'failed', 'unsupported']),
+  updatedAt: timestampSchema,
+})
+
+/**
  * A live post's follow-up and its receipt (RFC 025). `failureCode` is a
  * short code such as `http_403` or `threshold_not_reached`, never a
  * provider message.
