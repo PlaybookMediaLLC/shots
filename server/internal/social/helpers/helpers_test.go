@@ -59,11 +59,15 @@ func TestWeightedLength(t *testing.T) {
 		"see sample.com":                   27, // bare domains too
 		"mail a@sample.com":                17, // not emails
 		"é.com x":                          25, // a domain from the start of text
-		"https://a.co/" + strings.Repeat("(a)", 1000): 23, // a path of parenthesised groups
+		"https://a.co/" + strings.Repeat("(a)", 1000):  23,   // a path of parenthesised groups
+		"https://a.co/" + strings.Repeat("((a))", 800): 23,   // nested
+		"https://a.co/" + strings.Repeat("b", 4075):    23,   // 4,096 units with the protocol
+		"https://a.co/" + strings.Repeat("b", 4076):    4089, // too long to be a link
+		"see sample.com?x=1":                           31,   // a bare domain's link ends before a query
 	}
 	for in, want := range cases {
 		if got, err := WeightedLength(in); err != nil || got != want {
-			t.Errorf("WeightedLength(%q) = %d, %v, want %d", in, got, err, want)
+			t.Errorf("WeightedLength(%.40q…) = %d, %v, want %d", in, got, err, want)
 		}
 	}
 	if start, end, err := TextSlicer("x", 5, "日本語日本語"); err != nil || start != 0 || end != 1 {
@@ -136,6 +140,18 @@ func TestLinkScanStopsWithinAWord(t *testing.T) {
 		if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 			t.Errorf("%s took %v of a 100 ms budget", name, elapsed)
 		}
+	}
+}
+
+// A URL regex call that runs out of time is ErrTextTooComplex, not regexp2's
+// error, which quotes the whole text.
+func TestURLRegexTimeoutIsTextTooComplex(t *testing.T) {
+	saved := extractURLAtRe
+	t.Cleanup(func() { extractURLAtRe = saved })
+	extractURLAtRe = regexp2.MustCompile(`\G(a+)+b`, 0) // exponential: the group keeps regexp2 from merging the loops
+	extractURLAtRe.MatchTimeout = time.Millisecond
+	if _, err := urlMatches([]rune(strings.Repeat("a", 30)+".com"), time.Now().Add(time.Hour)); err != ErrTextTooComplex {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -257,7 +273,8 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
 	// Shapes the random texts miss.
-	texts := []string{"é.com x", "x a-.b.com", "a.co/(a)b(c)(d)", "a.co/((a))x((b)", "a.co:8/@a/b(c)?d=(e", "a.co/b(c)d?e!"}
+	texts := []string{"é.com x", "x a-.b.com", "a.co/(a)b(c)(d)", "a.co/((a))x((b)", "a.co:8/@a/b(c)?d=(e", "a.co/b(c)d?e!",
+		"a.co/(a(b)c)d", "a.co/(a(b))d", "a.co/((b)c)d", "a.co/(())b", "a.co/(a()b)c"}
 	rng := rand.New(rand.NewPCG(1, 2))
 	for range 8000 {
 		var b strings.Builder
