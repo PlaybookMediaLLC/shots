@@ -1,4 +1,4 @@
-import { xLength } from '@/lib/content-drafts/x-length'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from './document'
 import { postBreak } from './versions'
 
@@ -31,35 +31,63 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  const length = channel === 'x' ? xLength : (value: string) => [...value].length
+  const measure = (value: string) => platformCaptionLength(channel, value)
   const posts: string[] = []
   let current = ''
+  // What `current` counts. A word is measured with the spaces before it, after a
+  // letter: X's count trims a lone space, and a link right after U+FEFF is not
+  // one. No count looks back further, so a post counts its words added up.
+  let counted = 0
   const push = () => {
     if (current.trim()) posts.push(current.trim())
     current = ''
+    counted = 0
     if (posts.length > THREAD_POST_LIMIT)
       throw new Error(
         `This text needs more than ${THREAD_POST_LIMIT} posts. Shorten it or increase the limit.`
       )
   }
+  let gap = ''
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    if (length((current + token).trim()) <= limit) {
-      current += token
-      continue
+    const word = token.trimEnd()
+    const space = token.slice(word.length)
+    let count = current ? measure(`a${gap}${word}`) - 1 : measure(word)
+    if (counted + count > limit) {
+      push()
+      count = measure(word)
     }
-    push()
-    if (length(token.trim()) <= limit) {
-      current = token
-      continue
+    // A word longer than a post is cut between graphemes. Each piece grows by
+    // doubling until it stops fitting, then halves back, so no measure runs far
+    // past a post. A cut can split a link, so pieces are measured whole.
+    const ends =
+      count > limit
+        ? Array.from(
+            new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(word),
+            ({ index, segment }) => index + segment.length
+          )
+        : []
+    let [start, first] = [0, 0]
+    while (count > limit) {
+      const fits = (index: number) => measure(word.slice(start, ends[index])) <= limit
+      let [low, high, step] = [first - 1, ends.length - 1, 1]
+      while (low + step <= high && fits(low + step)) [low, step] = [low + step, step * 2]
+      high = Math.min(high, low + step - 1)
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2)
+        if (fits(middle)) low = middle
+        else high = middle - 1
+      }
+      if (low < first) throw new Error('A character sequence exceeds the selected limit.')
+      if (low === ends.length - 1) count = measure(word.slice(start))
+      else {
+        current = word.slice(start, ends[low])
+        push()
+        ;[start, first] = [ends[low], low + 1]
+      }
     }
-    for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
-      token
-    )) {
-      if (length(segment) > limit)
-        throw new Error('A character sequence exceeds the selected limit.')
-      if (length((current + segment).trim()) > limit) push()
-      current += segment
-    }
+    current += word.slice(start) + space
+    counted += count
+    gap = space
   }
   push()
   return posts

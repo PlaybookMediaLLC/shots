@@ -1,26 +1,35 @@
 package socialidentity
 
 import (
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 )
 
 func TestXContentUsesVerifiedLimitsWithoutChangingContent(t *testing.T) {
 	standard := XStandardPostLimits("read-write", nil)
 	for _, text := range []string{strings.Repeat("a", 281), "bad\ufefftext", string([]byte{0xff}), strings.Repeat("example.com ", 12)} {
-		if CheckXText(standard, text) == nil {
+		if CheckXText(standard, text, nil) == nil {
 			t.Fatalf("invalid X text accepted: %q", text)
 		}
 	}
 	for _, text := range []string{"", strings.Repeat("e\u0301", 280), strings.Repeat("🇫🇷", 140), strings.Repeat("a", 280)} {
-		if err := CheckXText(standard, text); err != nil {
+		if err := CheckXText(standard, text, nil); err != nil {
 			t.Fatalf("valid X text refused: %v", err)
 		}
 	}
 	basic := "Basic"
 	premium := XVerifiedAccountLimits("read-write", &basic)
-	if CheckXText(premium, strings.Repeat("a", 25000)) != nil || CheckXText(premium, strings.Repeat("a", 25001)) == nil || premium.Articles == nil || *premium.Articles {
+	if CheckXText(premium, strings.Repeat("a", 25000), nil) != nil || CheckXText(premium, strings.Repeat("a", 25001), nil) == nil || premium.Articles == nil || *premium.Articles {
 		t.Fatal("long posts and Articles must be independent")
+	}
+	// 24,013 characters fit the premium limit; only the link scan refuses them,
+	// with a sentence that still matches the error the publisher retries.
+	if err := CheckXText(premium, "https://a.co/"+strings.Repeat("(a)", 8000), nil); !errors.Is(err, helpers.ErrTextTooComplex) ||
+		err.Error() != "The X post is too long or too complex to count. Shorten it." {
+		t.Fatalf("text too complex to count: %v", err)
 	}
 	for _, media := range [][]XMedia{
 		{{MIME: "image/png", Bytes: 5000001}},

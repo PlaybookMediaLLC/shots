@@ -823,7 +823,7 @@ func validEngagement(engagement schema.Engagement) (schema.Engagement, error) {
 	}
 	engagement.AutoRepost.Text = ""
 	engagement.AutoPlug.Text = strings.TrimSpace(engagement.AutoPlug.Text)
-	if engagement.AutoPlug.Enabled && (engagement.AutoPlug.Text == "" || xLength(engagement.AutoPlug.Text) > 280) {
+	if engagement.AutoPlug.Enabled && !fitsXPost(engagement.AutoPlug.Text, 0, nil) {
 		return engagement, invalid("The auto-plug needs text that fits in one X post.")
 	}
 	return engagement, nil
