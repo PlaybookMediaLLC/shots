@@ -39,6 +39,17 @@ func checkPostOptions(channel string, options *postoptions.PublishOptions, first
 		return nil
 	}
 	o := *options
+	if o.Instagram != nil {
+		if channel != "instagram" {
+			return invalid("Collaborators, tags, covers and trial reels are Instagram settings.")
+		}
+		if err := o.Instagram.Validate(); err != nil {
+			return invalid(err.Error())
+		}
+	}
+	if cover := postoptions.CoverAsset(o.YouTube, o.Instagram); cover != "" && !contentDraftRefPattern.MatchString(cover) {
+		return invalid("A cover or thumbnail is an uploaded image of this workspace.")
+	}
 	if err := postoptions.CheckPhotoTags(o.PhotoTagIDs); err != nil {
 		return invalid(err.Error())
 	}

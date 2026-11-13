@@ -5,10 +5,14 @@ import type { PlateBody } from '@/lib/write/document'
 import {
   preparePublication,
   buildPublication,
+  type PublicationAccount,
   type PublicationDraft,
 } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
 import { optionsSummary } from '@/components/write/composer/video-options'
+import { handlesFrom } from '@/components/write/composer/instagram-options'
+import { youtubeTagsLength } from '@/lib/write/capabilities'
+import type { InstagramOptions } from 'screenshot-studio-backend-sdk'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
 const brk = (extra: object = {}) => ({ children: [{ text: '' }], type: POST_BREAK, ...extra })
@@ -617,6 +621,102 @@ test('video publication keeps explicit privacy and refuses missing choices', () 
     connectionId: 'ct0000000001',
   })
   assert.ok(unavailable.problems.some((problem) => problem.includes('permissions are unavailable')))
+})
+
+test('YouTube tags, disclosure and thumbnail travel with the video, and tags count as YouTube counts them', () => {
+  assert.equal(youtubeTagsLength(['news', 'a b']), 10)
+  assert.equal(youtubeTagsLength([]), 0)
+  const youtube = {
+    title: 'Launch',
+    privacy: 'public' as const,
+    madeForKids: false,
+    tags: ['launch', 'product demo'],
+    containsSyntheticMedia: true,
+    thumbnailAssetId: 'cthumb000001',
+  }
+  const account = { channel: 'youtube' as const, connectionId: 'cy0000000001' }
+  const result = buildPublication(
+    draft({
+      body: [p('Video')],
+      platformVersions: withOptions(readVersions(undefined), 'youtube', { youtube }),
+    }),
+    account
+  )
+  assert.deepEqual(result.target.options?.youtube, youtube)
+  assert.deepEqual(result.optionProblems, [])
+  // 100 tags of four characters and 99 commas is 499; one more tag is over.
+  const tags = Array.from({ length: 101 }, (_, index) => `t${String(index).padStart(3, '0')}`)
+  const over = buildPublication(
+    draft({
+      body: [p('Video')],
+      platformVersions: withOptions(readVersions(undefined), 'youtube', {
+        youtube: { ...youtube, tags },
+      }),
+    }),
+    account
+  )
+  assert.ok(over.optionProblems.some((problem) => problem.includes('500 characters')))
+})
+
+test('Instagram settings go to Instagram only, and reel settings need one video', () => {
+  const instagram = { channel: 'instagram' as const, connectionId: 'ci0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const video = { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }
+  const build = (
+    media: PlateBody,
+    options: InstagramOptions,
+    account: PublicationAccount = instagram
+  ) =>
+    buildPublication(
+      draft({
+        body: [p('Caption'), ...media],
+        platformVersions: withOptions(readVersions(undefined), 'instagram', { instagram: options }),
+      }),
+      account
+    )
+  const reel = build([video], {
+    collaborators: ['partner'],
+    userTags: ['brand'],
+    coverAssetId: 'ccover000001',
+    shareToFeed: false,
+    trialReel: true,
+  })
+  assert.deepEqual(reel.target.options?.instagram, {
+    collaborators: ['partner'],
+    userTags: ['brand'],
+    coverAssetId: 'ccover000001',
+    shareToFeed: false,
+    trialReel: true,
+    trialGraduation: 'MANUAL',
+  })
+  assert.deepEqual(reel.optionProblems, [])
+  // Instagram's defaults send nothing.
+  assert.equal(
+    build([image], { shareToFeed: true, collaborators: [] }).target.options?.instagram,
+    undefined
+  )
+  assert.match(build([image], { trialReel: true }).optionProblems.join(), /for a reel/)
+  assert.match(
+    build([video, video], { userTags: ['brand'] }).optionProblems.join(),
+    /photo or a reel/
+  )
+  assert.deepEqual(build([image, video], { userTags: ['brand'] }).optionProblems, [])
+  assert.equal(
+    build(
+      [image],
+      { collaborators: ['partner'] },
+      { channel: 'threads', connectionId: 'ct0000000001' }
+    ).target.options?.instagram,
+    undefined
+  )
+})
+
+test('handles are typed with or without @, kept when Instagram takes them, and capped', () => {
+  assert.deepEqual(handlesFrom('@partner, maker brand', 3), {
+    handles: ['partner', 'maker', 'brand'],
+    refused: [],
+  })
+  assert.deepEqual(handlesFrom('@a @A b! c d', 2), { handles: ['a', 'c'], refused: ['b!', 'd'] })
 })
 
 test('a platform chip names its options in words, and option problems open the options', () => {

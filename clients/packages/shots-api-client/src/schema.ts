@@ -2082,6 +2082,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -2094,6 +2097,15 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -2210,7 +2222,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -3194,6 +3206,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -3206,6 +3221,15 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3403,6 +3427,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -3415,6 +3442,15 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3518,6 +3554,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3530,6 +3569,15 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3746,6 +3794,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3758,6 +3809,15 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3860,6 +3920,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3872,6 +3935,15 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -4006,7 +4078,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -4060,6 +4132,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                     };
                     posts?: {
@@ -4198,6 +4273,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -4210,6 +4288,15 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -6461,7 +6548,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10357,6 +10444,9 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
                                             /** @enum {string} */
@@ -10369,6 +10459,15 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10485,7 +10584,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10637,6 +10736,9 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
                                             /** @enum {string} */
@@ -10649,6 +10751,15 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10765,7 +10876,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";

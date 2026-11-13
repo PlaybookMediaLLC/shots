@@ -197,3 +197,36 @@ func TestRunAutomation(t *testing.T) {
 		t.Fatalf("unsupported: %+v", got)
 	}
 }
+
+// A YouTube thumbnail is a follow-up of the live video (PB-03): planned only
+// with a thumbnail to set, sent with that image, and a refusal is recorded on
+// its own receipt while the video stays published.
+func TestYouTubeThumbnailIsAFollowUp(t *testing.T) {
+	published := time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
+	no := false
+	cover := &publishing.MediaAsset{AssetID: "thumb-1", ObjectKey: "org/thumb.png", MediaType: "image/png"}
+	job := PreparedPublication{PostID: "post-1", Platform: "youtube", Cover: cover, Options: &postoptions.PublishOptions{
+		YouTube: &postoptions.YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no, ThumbnailAssetID: "thumb-1"}}}
+	steps := automationPlan(job, published)
+	if len(steps) != 1 || steps[0].Kind != AutomationThumbnail || steps[0].Key != "thumbnail" || !steps[0].At.Equal(published) {
+		t.Fatalf("steps = %+v", steps)
+	}
+	without := job
+	without.Options = &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no}}
+	if steps := automationPlan(without, published); len(steps) != 0 {
+		t.Fatalf("a video without a thumbnail planned %+v", steps)
+	}
+
+	store := &receiptStore{receipts: map[string]*receipt{"thumbnail": {status: ReceiptPending}}}
+	provider := &fakeAutomator{err: httpError(403)}
+	result, err := NewActivities(store, provider).RunAutomation(context.Background(), AutomationInput{Job: job, ProviderID: "vid1", Step: steps[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := store.receipts["thumbnail"]; !result.Settled || got.status != ReceiptFailed || got.code != "http_403" {
+		t.Fatalf("refused thumbnail: %+v %+v", result, got)
+	}
+	if call := provider.calls[0]; call.Kind != AutomationThumbnail || call.RemotePostID != "vid1" || call.Media != cover {
+		t.Fatalf("thumbnail request = %+v", call)
+	}
+}

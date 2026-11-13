@@ -4,8 +4,10 @@ export {
   youtubeOptionsSchema,
   tiktokOptionsSchema,
   tiktokCreatorSchema,
+  instagramOptionsSchema,
+  instagramUsernameSchema,
 } from './video-publishing.ts'
-export type { YouTubeOptions, TikTokOptions } from './video-publishing.ts'
+export type { YouTubeOptions, TikTokOptions, InstagramOptions } from './video-publishing.ts'
 import { z } from 'zod'
 import {
   founderHubProfileSchema,
@@ -1229,7 +1231,7 @@ export type BackendPostAutomation = {
   dueAt: string
   failureCode: string | null
   key: string
-  kind: 'first_comment' | 'retweet' | 'unretweet' | 'plug' | 'repost_at_likes' | 'quote'
+  kind: 'first_comment' | 'retweet' | 'unretweet' | 'plug' | 'repost_at_likes' | 'quote' | 'thumbnail'
   remoteId: string | null
   status: 'pending' | 'done' | 'failed' | 'skipped' | 'cancelled' | 'expired'
   updatedAt: string

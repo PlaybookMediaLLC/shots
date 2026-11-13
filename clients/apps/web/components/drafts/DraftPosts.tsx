@@ -553,6 +553,7 @@ const FOLLOW_UP_LABELS: Record<DraftPostWire['automations'][number]['kind'], str
   quote: 'Quote',
   repost_at_likes: 'Repost at likes',
   retweet: 'Auto-RT repost',
+  thumbnail: 'Custom thumbnail',
   unretweet: 'Remove the repost',
 }
 

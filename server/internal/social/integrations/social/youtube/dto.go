@@ -53,6 +53,7 @@ type SettingsDTO struct {
 	SelfDeclaredMadeForKids *string        `json:"selfDeclaredMadeForKids,omitempty"`
 	Thumbnail               *MediaDTO      `json:"thumbnail,omitempty"`
 	Tags                    []TagsSettings `json:"tags,omitempty"`
+	ContainsSyntheticMedia  bool           `json:"containsSyntheticMedia,omitempty"`
 }
 
 // Validate reproduces class-validator: properties in declaration order, each

@@ -120,6 +120,8 @@ type Metrics map[string]float64
 type PublishOptions struct {
 	YouTube *YouTubeOptions `json:"youtube,omitempty"`
 	TikTok  *TikTokOptions  `json:"tiktok,omitempty"`
+	// Instagram: collaborators, tags, and a reel's cover, grid and trial.
+	Instagram *InstagramOptions `json:"instagram,omitempty"`
 	// X: up to ten numeric user IDs tagged in attached photos.
 	PhotoTagIDs   []string     `json:"photoTagIds,omitempty"`
 	LinkPreview   *LinkPreview `json:"linkPreview,omitempty"`

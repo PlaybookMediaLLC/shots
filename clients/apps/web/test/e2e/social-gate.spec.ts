@@ -37,6 +37,13 @@ const fakeStateSchema = z.object({
           signedAt: z.string(),
         })
       ),
+      settings: z
+        .object({
+          containsSyntheticMedia: z.boolean().optional(),
+          tags: z.array(z.string()).optional(),
+          title: z.string().optional(),
+        })
+        .optional(),
     })
   ),
   requests: z.number(),
@@ -46,7 +53,9 @@ async function fakeState() {
   return fakeStateSchema.parse(await (await fetch(`${fakeURL}/state`)).json())
 }
 
-async function resetFake(mode: 'normal' | 'throttle-once' | 'server-error-once'): Promise<void> {
+async function resetFake(
+  mode: 'normal' | 'throttle-once' | 'server-error-once' | 'refuse-thumbnail'
+): Promise<void> {
   const response = await fetch(`${fakeURL}/control`, {
     body: JSON.stringify({ mode }),
     headers: { 'Content-Type': 'application/json' },
@@ -465,6 +474,101 @@ test('the backend worker publishes draft photos, video, and ordered images once 
       expect(extraAttempts).toHaveLength(0)
       expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
     }
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('PB-03: a refused YouTube thumbnail leaves the video published and shows the failed follow-up', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('refuse-thumbnail')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const youtube = await connect(page, bootstrap.youtubeDestinationId, 'youtube')
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
+    const clip = await createUploadedAsset(page, mp4, 'video/mp4', 'clip.mp4')
+    const thumbnail = await createUploadedAsset(page, png, 'image/png', 'thumbnail.png')
+    const options = {
+      youtube: {
+        title: 'Fixture video',
+        privacy: 'private',
+        madeForKids: false,
+        tags: ['launch', 'product demo'],
+        containsSyntheticMedia: true,
+        thumbnailAssetId: thumbnail,
+      },
+    }
+    const caption = 'A video whose thumbnail YouTube refuses.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [clip],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: clip,
+            children: [{ text: '' }],
+            mimeType: 'video/mp4',
+            type: 'video',
+            url: `/api/v1/assets/${clip}/content`,
+          },
+        ],
+        channelConnectionIds: [youtube],
+        primaryPlatform: 'youtube',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [{ channel: 'youtube', mode: 'synced', options }],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const draft = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+    const response = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      body: {
+        channelConnectionIds: [youtube],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version: draft.version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const postId = z.object({ posts: z.array(z.object({ id: z.string() })) }).parse(response.body)
+      .posts[0]!.id
+    await awaitStatus(postId, 'PUBLISHED')
+    // The tags and disclosure went with the upload.
+    const received = (await fakeState()).posts.find((post) => post.caption === caption)
+    expect(received?.settings).toEqual({
+      containsSyntheticMedia: true,
+      tags: ['launch', 'product demo'],
+      title: 'Fixture video',
+    })
+    // The thumbnail is its own follow-up: refused and recorded, the video still live.
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.row<{ status: string }>(
+              `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+              [postId]
+            )
+          )?.status,
+        { intervals: [1_000], timeout: 120_000 }
+      )
+      .toBe('failed')
+    expect(await statusOf(postId)).toBe('PUBLISHED')
+    await page.goto(`/publish/${draft.id}`)
+    const followUp = page.getByTestId('follow-up').filter({ hasText: 'Custom thumbnail' })
+    await expect(followUp).toContainText('failed')
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

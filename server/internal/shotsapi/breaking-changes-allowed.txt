@@ -55,3 +55,13 @@ POST /api/v1/content-drafts/{id}/plan the `platformVersions/versions` response p
 POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `tiktok` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
 POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `youtube` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
 POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover the `draft/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `201`
+
+# Composer options (docs/scheduling/post-bridge/composer/implementation.md):
+# a YouTube custom thumbnail is set as a follow-up of the live video, so a
+# refused thumbnail never fails it (RFC 042 lesson 4). Additive: existing
+# follow-up kinds stay valid.
+POST /api/v1/calendar/mutations added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `200`
+GET /api/v1/content-draft-posts added the new `thumbnail` enum value to the `items/items/automations/items/kind` response property for the response status `200`
+GET /api/v1/content-drafts/{id}/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `200`
+POST /api/v1/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `200`
+POST /api/v1/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `201`

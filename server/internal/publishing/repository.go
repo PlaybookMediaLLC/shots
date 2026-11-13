@@ -568,8 +568,9 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if post.ReplyTo != nil {
 		job.ReplyTo = *post.ReplyTo
 	}
-	// A document or article cover that was deleted cancels the post too.
-	for _, id := range []string{post.PublishOptions.DocumentAssetID, post.PublishOptions.ArticleCoverAssetID} {
+	// A document or cover that was deleted cancels the post too.
+	options := post.PublishOptions
+	for _, id := range []string{options.DocumentAssetID, options.ArticleCoverAssetID, postoptions.CoverAsset(options.YouTube, options.Instagram)} {
 		if id == "" {
 			continue
 		}
@@ -577,7 +578,7 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 		if err != nil || missing {
 			return inactive, err
 		}
-		if id == post.PublishOptions.DocumentAssetID {
+		if id == options.DocumentAssetID {
 			job.Document = &media[0]
 		} else {
 			job.Cover = &media[0]

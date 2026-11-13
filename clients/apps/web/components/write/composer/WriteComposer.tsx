@@ -1918,6 +1918,11 @@ export function WriteComposer({
                 disabled={!canEdit}
                 onChange={(options) => setOptions(active, options)}
                 options={versionOfTab.options ?? {}}
+                uploadFile={
+                  services.uploadFile
+                    ? async (file) => ({ assetId: (await services.uploadFile!(file)).assetId ?? '' })
+                    : undefined
+                }
               />
             </section>
           ) : null}

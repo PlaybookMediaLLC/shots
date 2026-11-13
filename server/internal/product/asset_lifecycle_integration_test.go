@@ -136,3 +136,57 @@ func TestDeletingAnAssetKeepsMediaThatIsStillNeeded(t *testing.T) {
 	}
 	_ = draft
 }
+
+// A reel's cover and a video's thumbnail stay while a draft's version or an
+// unfinished post names them.
+func TestCoversAndThumbnailsStayInUse(t *testing.T) {
+	w := newTestWorkspace(t)
+	subscribe(t, w.ctx, w.repo, w.org, "business")
+	repo := w.repo.WithObjectStore(&recordingAssetObjects{exists: true}).WithMonthlyMeter(&recordingMonthlyMeter{})
+	uploaded := func() string {
+		id := uuid.NewString()
+		w.exec(t, `INSERT INTO asset (id,"organizationId","objectKey","mediaType",bytes,status,width,height,"updatedAt") VALUES ($1,$2,$3,'image/jpeg',10,'UPLOADED',1080,1920,now())`,
+			id, w.org, "org/"+w.org+"/input/"+id+"/1/a.jpg")
+		return id
+	}
+	cover, thumbnail, postCover := uploaded(), uploaded(), uploaded()
+	draft, err := repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Reel", PlainText: "Reel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.exec(t, `UPDATE content_draft SET "platformVersions"=jsonb_build_object('schemaVersion',1,'versions',jsonb_build_array(
+		jsonb_build_object('channel','instagram','mode','synced','options',jsonb_build_object('instagram',jsonb_build_object('coverAssetId',$2::text))),
+		jsonb_build_object('channel','youtube','mode','synced','options',jsonb_build_object('youtube',jsonb_build_object('title','','privacy','','thumbnailAssetId',$3::text)))))
+		WHERE id=$1`, draft.ID, cover, thumbnail)
+	addCredential := socialCredentialFixture(t, w.ctx, w.db.SQL, w.org)
+	addCredential("li-"+w.id, "linkedin")
+	connection, err := repo.auth.CreateConnection(w.ctx, publishing.Actor{Organization: w.org, UserID: w.owner.UserID, RequestID: w.owner.RequestID, Type: "USER"},
+		publishing.CreateConnectionInput{ExternalAccountID: "li-" + w.id, Platform: "linkedin", ProviderSettings: map[string]any{}, SecretReference: "SOCIAL_API_KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Queued", PlainText: "Queued"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduled, err := repo.ScheduleContentDraft(w.ctx, w.owner, queued.ID, ScheduleContentDraftInput{Version: queued.Version, ScheduledFor: time.Now().Add(time.Hour),
+		Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: connection.ID, Caption: "Queued"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The snapshot alone names this cover; its draft is archived.
+	w.exec(t, `UPDATE scheduled_post SET "publishOptions"=jsonb_build_object('instagram',jsonb_build_object('coverAssetId',$2::text)) WHERE id=$1`, scheduled.Posts[0].ID, postCover)
+	archived := "archived"
+	if _, err := repo.UpdateContentDraft(w.ctx, w.owner, queued.ID, ContentDraftUpdate{BaseVersion: scheduled.Draft.Version, Status: &archived}); err != nil {
+		t.Fatal(err)
+	}
+	for name, id := range map[string]string{"draft cover": cover, "draft thumbnail": thumbnail, "queued cover": postCover} {
+		if result, err := repo.DeleteAsset(w.ctx, w.owner, id); err != nil || result != AssetInUse {
+			t.Fatalf("%s: %s %v", name, result, err)
+		}
+	}
+	w.exec(t, `UPDATE scheduled_post SET status='PUBLISHED' WHERE id=$1`, scheduled.Posts[0].ID)
+	if result, err := repo.DeleteAsset(w.ctx, w.owner, postCover); err != nil || result != AssetDeleted {
+		t.Fatalf("published cover: %s %v", result, err)
+	}
+}

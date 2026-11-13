@@ -4789,7 +4789,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -12761,6 +12762,23 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "maxItems": 500,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 500
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -12817,6 +12835,46 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -13384,7 +13442,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -13981,6 +14040,23 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "maxItems": 500,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 500
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -14037,6 +14113,46 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -14604,7 +14720,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -22550,6 +22667,23 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "maxItems": 500,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -22606,6 +22740,46 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -23174,7 +23348,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -27550,6 +27725,23 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "maxItems": 500,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -27606,6 +27798,46 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -28459,6 +28691,23 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "maxItems": 500,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -28515,6 +28764,46 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -29020,6 +29309,23 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "maxItems": 500,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -29076,6 +29382,46 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -29956,6 +30302,23 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "maxItems": 500,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -30012,6 +30375,46 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -30508,6 +30911,23 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "maxItems": 500,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -30564,6 +30984,46 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -31179,7 +31639,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -31443,6 +31904,23 @@
                         },
                         "madeForKids": {
                           "type": "boolean"
+                        },
+                        "tags": {
+                          "maxItems": 500,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "containsSyntheticMedia": {
+                          "type": "boolean"
+                        },
+                        "thumbnailAssetId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
                         }
                       },
                       "required": [
@@ -31971,6 +32449,23 @@
                                 },
                                 "madeForKids": {
                                   "type": "boolean"
+                                },
+                                "tags": {
+                                  "maxItems": 500,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  }
+                                },
+                                "containsSyntheticMedia": {
+                                  "type": "boolean"
+                                },
+                                "thumbnailAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               },
                               "required": [
@@ -32027,6 +32522,46 @@
                                 "madeWithAi",
                                 "consent"
                               ],
+                              "additionalProperties": false
+                            },
+                            "instagram": {
+                              "type": "object",
+                              "properties": {
+                                "collaborators": {
+                                  "maxItems": 3,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                  }
+                                },
+                                "userTags": {
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                  }
+                                },
+                                "coverAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "shareToFeed": {
+                                  "type": "boolean"
+                                },
+                                "trialReel": {
+                                  "type": "boolean"
+                                },
+                                "trialGraduation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "MANUAL",
+                                    "SS_PERFORMANCE"
+                                  ]
+                                }
+                              },
                               "additionalProperties": false
                             },
                             "autoDm": {

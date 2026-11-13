@@ -437,6 +437,9 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		if err := checkDraftMedia(channel, rows); err != nil {
 			return nil, nil, err
 		}
+		if err := checkOptionMedia(ctx, tx.Client(), organizationID, channel, target.Options, rows); err != nil {
+			return nil, nil, err
+		}
 		if channel == "tiktok" {
 			standing := c.accountStanding(ctx, connection)
 			duration := 0
@@ -815,7 +818,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			media = append(media, reply.AssetIDs...)
 		}
 		if target.Options != nil {
-			media = append(media, target.Options.DocumentAssetID, target.Options.ArticleCoverAssetID)
+			media = append(media, target.Options.DocumentAssetID, target.Options.ArticleCoverAssetID,
+				postoptions.CoverAsset(target.Options.YouTube, target.Options.Instagram))
 		}
 	}
 	if _, err := tx.PlatformExec(ctx, `SELECT id FROM asset WHERE "organizationId"=$1 AND id = ANY($2::text[]) FOR SHARE`,

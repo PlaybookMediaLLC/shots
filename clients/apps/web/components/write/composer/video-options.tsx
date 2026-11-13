@@ -1,5 +1,8 @@
 'use client'
 
+import * as React from 'react'
+import { toast } from 'sonner'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,8 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
-import type { AccountStanding } from '@/lib/write/capabilities'
-import type { VersionOptions } from '@/lib/write/document'
+import {
+  type AccountStanding,
+  YOUTUBE_TAGS_LIMIT,
+  youtubeTagsLength,
+} from '@/lib/write/capabilities'
+import type { DraftChannel, VersionOptions } from '@/lib/write/document'
+import { DESTINATION_MEDIA } from '@/lib/write/media-rules'
 
 /** TikTok's privacy levels as a person reads them. */
 const TIKTOK_PRIVACY_LABELS: Record<string, string> = {
@@ -61,6 +69,146 @@ function durationLabel(seconds: number): string {
     : `${seconds} seconds`
 }
 
+/** Upload a file to the workspace; the composer's upload service. */
+export type UploadFile = (file: File) => Promise<{ assetId: string }>
+
+/**
+ * A video's cover or thumbnail: one image in a format and size its
+ * destination takes (`cover` in limits.json, which Go checks too).
+ */
+export function CoverUpload({
+  assetId,
+  channel,
+  disabled,
+  hint,
+  label,
+  onChange,
+  uploadFile,
+}: {
+  assetId?: string
+  channel: DraftChannel
+  disabled: boolean
+  hint: string
+  label: string
+  onChange: (assetId: string | undefined) => void
+  uploadFile: UploadFile
+}) {
+  const [busy, setBusy] = React.useState(false)
+  const rules = DESTINATION_MEDIA[channel].cover
+  if (!rules) return null
+  return (
+    <div className="grid gap-1.5">
+      <span className="text-ui-lg font-medium text-foreground">{label}</span>
+      <FileDropZone
+        accept={Object.fromEntries(rules.formats.map((format) => [format, []]))}
+        busy={busy}
+        disabled={disabled}
+        hint={hint}
+        label={label}
+        maxSize={rules.maxBytes}
+        onFiles={async ([file]) => {
+          if (!file) return
+          setBusy(true)
+          try {
+            onChange((await uploadFile(file)).assetId || undefined)
+          } catch {
+            toast.error(`The ${label.toLowerCase()} could not be uploaded.`)
+          } finally {
+            setBusy(false)
+          }
+        }}
+        onRemove={() => onChange(undefined)}
+        preview={assetId ? <span>{label} added</span> : null}
+      />
+    </div>
+  )
+}
+
+/** Comma-separated words as distinct tags, the first spelling of each kept. */
+function tagsFrom(text: string): string[] {
+  const seen = new Set<string>()
+  return text
+    .split(',')
+    .map((tag) => tag.trim().replace(/[<>]/g, ''))
+    .filter((tag) => {
+      const key = tag.toLowerCase()
+      if (!tag || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
+/** YouTube's tags, its disclosure and a custom thumbnail. */
+function YouTubeExtras({
+  disabled,
+  onChange,
+  uploadFile,
+  value,
+}: {
+  disabled: boolean
+  onChange: (next: Partial<NonNullable<VersionOptions['youtube']>>) => void
+  uploadFile?: UploadFile
+  value: NonNullable<VersionOptions['youtube']>
+}) {
+  const [text, setText] = React.useState(() => (value.tags ?? []).join(', '))
+  // A co-editor's change replaces the text; typing never differs from what it saved.
+  if (tagsFrom(text).join(',') !== (value.tags ?? []).join(',')) setText((value.tags ?? []).join(', '))
+  const length = youtubeTagsLength(value.tags ?? [])
+  return (
+    <>
+      <div className="grid gap-2">
+        <div className="flex justify-between">
+          <Label htmlFor="youtube-tags">YouTube tags</Label>
+          <span
+            className={length > YOUTUBE_TAGS_LIMIT ? 'text-destructive' : undefined}
+            data-testid="youtube-tags-count"
+          >
+            {length}/{YOUTUBE_TAGS_LIMIT}
+          </span>
+        </div>
+        <Input
+          aria-invalid={length > YOUTUBE_TAGS_LIMIT || undefined}
+          disabled={disabled}
+          id="youtube-tags"
+          onChange={(event) => {
+            setText(event.target.value)
+            const tags = tagsFrom(event.target.value)
+            onChange({ tags: tags.length > 0 ? tags : undefined })
+          }}
+          placeholder="launch, product demo"
+          value={text}
+        />
+        <p>Separate tags with commas. YouTube counts all of them together.</p>
+      </div>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          checked={value.containsSyntheticMedia ?? false}
+          disabled={disabled}
+          id="youtube-synthetic"
+          onCheckedChange={(checked) =>
+            onChange({ containsSyntheticMedia: checked === true ? true : undefined })
+          }
+        />
+        <div className="grid gap-0.5">
+          <Label htmlFor="youtube-synthetic">Altered or synthetic content</Label>
+          <p>Realistic people, places or events made or changed with AI or editing.</p>
+        </div>
+      </div>
+      {uploadFile ? (
+        <CoverUpload
+          assetId={value.thumbnailAssetId}
+          channel="youtube"
+          disabled={disabled}
+          hint="JPEG or PNG up to 2 MB; 1280×720 works best. Needs a verified channel, and Shorts ignore it. If YouTube refuses it, the video still goes out."
+          label="Custom thumbnail"
+          onChange={(thumbnailAssetId) => onChange({ thumbnailAssetId })}
+          uploadFile={uploadFile}
+        />
+      ) : null}
+    </>
+  )
+}
+
 /** Explicit metadata travels with the reviewed platform version, all of it in one place. */
 export function VideoOptions({
   channel,
@@ -68,12 +216,15 @@ export function VideoOptions({
   onChange,
   disabled,
   creator,
+  uploadFile,
 }: {
   channel: 'youtube' | 'tiktok'
   options: VersionOptions
   onChange: (options: VersionOptions) => void
   disabled: boolean
   creator?: AccountStanding['tiktokCreator']
+  /** Without it, the thumbnail is chosen in the composer rather than here. */
+  uploadFile?: UploadFile
 }) {
   if (channel === 'youtube') {
     const value = options.youtube ?? { title: '', privacy: '' }
@@ -143,6 +294,12 @@ export function VideoOptions({
             Only you can watch a private video. Choose Public or Unlisted to share it.
           </p>
         ) : null}
+        <YouTubeExtras
+          disabled={disabled}
+          onChange={change}
+          uploadFile={uploadFile}
+          value={value}
+        />
       </div>
     )
   }

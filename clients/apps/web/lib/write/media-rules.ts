@@ -29,6 +29,10 @@ const destinationSchema = z.object({
       maxBytes: z.number().int().positive(),
     })
     .optional(),
+  /** The image a video post takes as its cover or thumbnail. */
+  cover: z
+    .object({ formats: z.array(z.string()), maxBytes: z.number().int().positive() })
+    .optional(),
   docs: z.array(z.url()),
   verifiedOn: z.string(),
 })

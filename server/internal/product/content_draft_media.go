@@ -10,6 +10,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/mediavideo"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 )
 
 // Scheduling checks each post's media against its channel's published limits
@@ -152,6 +153,46 @@ func checkDraftMedia(channel string, rows []*ent.Asset) error {
 	}
 	if !rules.Mixed && videos > 0 && images+gifs > 0 {
 		return conflict(label + " can't mix images and video in one post.")
+	}
+	return nil
+}
+
+// checkOptionMedia checks what a post's options need of its media: one video
+// for Instagram's reel settings, a photo or a reel to tag accounts on, and a
+// cover or thumbnail its destination takes.
+func checkOptionMedia(ctx context.Context, client *ent.Client, organizationID, channel string, options *postoptions.PublishOptions, rows []*ent.Asset) error {
+	if options == nil {
+		return nil
+	}
+	if ig := options.Instagram; ig != nil {
+		reel := len(rows) == 1 && strings.HasPrefix(rows[0].MediaType, "video/")
+		photo := slices.ContainsFunc(rows, func(row *ent.Asset) bool { return strings.HasPrefix(row.MediaType, "image/") })
+		if ig.Reel() && !reel {
+			return invalid("A cover, grid setting or trial is for a reel. Post one video, or turn them off.")
+		}
+		if len(ig.UserTags) > 0 && !reel && !photo {
+			return invalid("Tag accounts on a photo or a reel.")
+		}
+	}
+	id := postoptions.CoverAsset(options.YouTube, options.Instagram)
+	if id == "" {
+		return nil
+	}
+	covers, err := draftMediaRows(ctx, client, organizationID, []string{id})
+	if err != nil {
+		return err
+	}
+	return checkCover(channel, covers[0])
+}
+
+// checkCover checks a cover or thumbnail against its destination's rules.
+func checkCover(channel string, cover *ent.Asset) error {
+	label, rules := draftChannelLabels[channel], medialimits.Limits.Destinations[channel].Cover
+	if rules == nil {
+		return invalid(label + " takes no custom cover.")
+	}
+	if !slices.Contains(rules.Formats, cover.MediaType) || cover.Bytes > rules.MaxBytes {
+		return conflict(fmt.Sprintf("%s takes a %s cover of up to %.0f MB. Choose another image.", label, formatNames(rules.Formats), float64(rules.MaxBytes)/1_000_000))
 	}
 	return nil
 }

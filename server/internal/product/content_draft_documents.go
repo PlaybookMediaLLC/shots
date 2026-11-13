@@ -228,6 +228,14 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	if err := postoptions.ValidateVideoOptions(channel, clean.YouTube, clean.TikTok, false); err != nil {
 		return nil, invalid(err.Error())
 	}
+	if clean.Instagram != nil {
+		if channel != "instagram" {
+			return nil, invalid("Collaborators, tags, covers and trial reels are Instagram settings.")
+		}
+		if err := clean.Instagram.Validate(); err != nil {
+			return nil, invalid(err.Error())
+		}
+	}
 	if len(clean.LinkPreviews) > 25 {
 		return nil, invalid("A draft can store at most 25 link previews.")
 	}
@@ -304,6 +312,11 @@ func versionDocumentAssets(doc draftdoc.PlatformVersions) []string {
 	for _, version := range doc.Versions {
 		if version.Options != nil && version.Options.Document != nil {
 			ids = append(ids, version.Options.Document.AssetID)
+		}
+		if version.Options != nil {
+			if id := postoptions.CoverAsset(version.Options.YouTube, version.Options.Instagram); id != "" {
+				ids = append(ids, id)
+			}
 		}
 	}
 	return ids

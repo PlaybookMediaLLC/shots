@@ -29,6 +29,12 @@ type VideoRules struct {
 	MaxBytes int      `json:"maxBytes"`
 }
 
+// CoverRules are the images a destination takes as a video's cover.
+type CoverRules struct {
+	Formats  []string `json:"formats"`
+	MaxBytes int      `json:"maxBytes"`
+}
+
 // Destination is one draft channel's media rules, shared with the composer
 // (lib/write/capabilities.ts). Docs and VerifiedOn record where each number was
 // read. Account-specific limits are checked separately.
@@ -50,7 +56,9 @@ type Destination struct {
 		Alone    bool `json:"alone"`
 		MaxBytes int  `json:"maxBytes"`
 	} `json:"gif"`
-	Video      *VideoRules `json:"video"`
+	Video *VideoRules `json:"video"`
+	// Cover is the image a video post takes as its cover or thumbnail.
+	Cover      *CoverRules `json:"cover"`
 	Docs       []string    `json:"docs"`
 	VerifiedOn string      `json:"verifiedOn"`
 }
