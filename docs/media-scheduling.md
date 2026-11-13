@@ -219,7 +219,7 @@ The analysis's remaining checks ([verification matrix](scheduling/post-bridge/bu
 
 | Matrix | Where Shots proves it |
 | --- | --- |
-| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts` |
+| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts`; destination limits at intake in `test/write-batch.test.ts` |
 | BULK-018 to 022: variations and overflow | `test/write-spintax.test.ts`, `test/write-batch.test.ts` |
 | BULK-023, 055: CSV matching | `test/write-bulk-import.test.ts` |
 | BULK-025 to 030: schedule | `TestSpreadTimes`, `test/write-batch.test.ts` |
@@ -269,9 +269,14 @@ the batch's others. "Regenerate video" also redraws its four items from the batc
 content items, in a new order, and clears its images, keeping its music; it asks
 first, and keeps the headline if AI gives nothing back. Either drops a rendered video.
 
-Deliberately not built from the analysis: global format and length caps and a
-120-day horizon (destination rules decide), and an hourly AI image cap (AI credits
-decide).
+**Limits the analysis proposed, decided 13 November 2026.** The owner approved these:
+
+| Proposal | Decision | Why |
+| --- | --- | --- |
+| Global file-size and length caps | Not built. The import preview checks each file's type and size against its row's accounts before upload (`intakeChecks` in `lib/write/batch.ts`). A row no account takes needs fixing. A row only some refuse is added, with a note naming them. | The per-type upload caps in `limits.json` stay. A tighter global cap would refuse files some destinations take, such as LinkedIn's 30-minute, 500 MB videos. Length and shape are known once a file uploads, so Check judges them. |
+| A 120-day scheduling limit | Not built | Nothing needs one. Temporal holds a post on a durable timer. Shots, not the provider, publishes at the due time. Quota is charged in the month a post is scheduled. At publish time, a post whose account, media or approval changed is refused. |
+| An hourly cap on AI images | Not built | Grid images already pass the per-workspace AI limit (`LAUNCH_AI_RATE_LIMIT`, 20 actions a minute shared with every AI action) and the AI credit meter. |
+| A music library | Not here | The Content Studio work owns it. |
 
 ## Scheduling semantics
 
