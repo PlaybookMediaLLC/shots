@@ -135,7 +135,7 @@ func CountLength(integrationType, text string) int {
 }
 
 func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int) {
-	normalized := utf16Units(norm.NFC.String(text))
+	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
 	// Hash all entities by their startIndex for fast lookup
@@ -179,6 +179,48 @@ func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, va
 	valid = valid && weightedLength > 0 && weightedLength <= maxWeightedTweetLength
 	validDisplayIndex += jsLength(text) - len(normalized)
 	return weightedLength, valid, validDisplayIndex
+}
+
+// nfcLikeJS is JavaScript's normalize('NFC'). norm.NFC inserts U+034F after
+// 30 combining marks in a row (Unicode's stream-safe format), which also
+// keeps the marks after it from reordering or composing with the letter
+// before; JavaScript does neither, so such text gets NFC by the book.
+func nfcLikeJS(text string) string {
+	if out := norm.NFC.String(text); strings.Count(out, "\u034f") == strings.Count(text, "\u034f") {
+		return out
+	}
+	ccc := func(r rune) uint8 { return norm.NFD.PropertiesString(string(r)).CCC() }
+	var runes []rune
+	for _, r := range text {
+		runes = append(runes, []rune(norm.NFD.String(string(r)))...)
+	}
+	// Canonical order: each run of combining marks sorted by class.
+	for i := 0; i < len(runes); i++ {
+		j := i
+		for j < len(runes) && ccc(runes[j]) != 0 {
+			j++
+		}
+		slices.SortStableFunc(runes[i:j], func(a, b rune) int { return int(ccc(a)) - int(ccc(b)) })
+		i = j
+	}
+	// Canonical composition: a character joins the last starter unless a
+	// character of class 0, or of its class or higher, stands between them.
+	out := runes[:0]
+	starter := -1
+	for _, r := range runes {
+		class := ccc(r)
+		if starter >= 0 && (starter == len(out)-1 || class != 0 && ccc(out[len(out)-1]) < class) {
+			if composed := []rune(norm.NFC.String(string([]rune{out[starter], r}))); len(composed) == 1 {
+				out[starter] = composed[0]
+				continue
+			}
+		}
+		out = append(out, r)
+		if class == 0 {
+			starter = len(out) - 1
+		}
+	}
+	return string(out)
 }
 
 func isSurrogatePair(text []rune, i int) bool {

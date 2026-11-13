@@ -513,6 +513,20 @@
         "x": 29,
         "youtube": 37
       }
+    },
+    {
+      "label": "40 combining marks after a letter count 40 on X, with no U+034F",
+      "text": "a\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301\u0301",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 41,
+        "linkedin": 41,
+        "mastodon": 1,
+        "threads": 41,
+        "tiktok": 41,
+        "x": 40,
+        "youtube": 41
+      }
     }
   ]
 }
