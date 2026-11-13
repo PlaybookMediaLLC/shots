@@ -896,11 +896,18 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 		SetNillableProviderMessage(nonEmpty(RedactProviderMessage(attempt.ProviderMessage))).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.publish_failed", auditInput{
+	failed := auditInput{
 		Action: "post.publish_failed", Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": failureCode, "retry": retry},
-	}); err != nil {
+	}
+	// An automatic retry needs no one yet: only the attempt that gives up alerts.
+	if retry {
+		err = appendAudit(ctx, tx, failed)
+	} else {
+		err = recordPostActivity(ctx, tx, "post.publish_failed", failed)
+	}
+	if err != nil {
 		return err
 	}
 	return tx.Commit()
