@@ -41,10 +41,10 @@ const surrogateShift = 0xf0000
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 
 // The link scan is linear, but a long text makes many regexp2 calls: so one
-// call of the URL regex gets linkScanBudget, and one text's scan
-// linkScanBudget plus linkScanPerUnit for each of its UTF-16 units up to
-// linkScanMaxUnits, the longest caption (an X Article); ordinary text uses a
-// small fraction of either.
+// call of the URL regex gets linkScanBudget, and one text's link and emoji
+// scans together linkScanBudget plus linkScanPerUnit for each of its UTF-16
+// units up to linkScanMaxUnits, the longest caption (an X Article); ordinary
+// text uses a small fraction of either.
 const (
 	linkScanBudget   = 200 * time.Millisecond
 	linkScanMaxUnits = 100_000
@@ -55,10 +55,20 @@ const (
 // a fraction of it unloaded.
 var linkScanPerUnit = 20 * time.Microsecond
 
-// ErrTextTooComplex is a text whose links the URL scan could not find within
-// its budget. Callers refuse it, since any count would be a guess. It replaces
-// regexp2's timeout error, which quotes the whole text.
-var ErrTextTooComplex = errors.New("the text is too long or too complex to count its links")
+// ErrTextTooComplex is a text whose links or emoji the scans could not find
+// within its budget. Callers refuse it, since any count would be a guess. It
+// replaces regexp2's timeout error, which quotes the whole text.
+var ErrTextTooComplex = errors.New("the text is too long or too complex to count")
+
+// scanDeadline is when the scans of a text of n UTF-16 units must end: its
+// budget from now, or limit when it is set and sooner.
+func scanDeadline(n int, limit time.Time) time.Time {
+	deadline := time.Now().Add(linkScanBudget + time.Duration(min(n, linkScanMaxUnits))*linkScanPerUnit)
+	if !limit.IsZero() && limit.Before(deadline) {
+		return limit
+	}
+	return deadline
+}
 
 func jsRegexp(source string, opts regexp2.RegexOptions) *regexp2.Regexp {
 	source = surrogateEscapeRe.ReplaceAllStringFunc(source, func(escape string) string {
@@ -230,11 +240,12 @@ func CountLength(integrationType, text string) (int, error) {
 	return jsLength(text), nil
 }
 
-// parseTweet is twitter-text parseTweet, finding links by deadline when it is set.
+// parseTweet is twitter-text parseTweet, finding links and emoji by deadline when it is set.
 func parseTweet(text string, maxWeightedTweetLength int, deadline time.Time) (weightedLength int, valid bool, validRangeEnd int, err error) {
 	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
+	deadline = scanDeadline(len(shifted), deadline)
 	// Hash all entities by their startIndex for fast lookup
 	urls, err := extractURLsWithIndices(shifted, true, deadline)
 	if err != nil {
@@ -244,9 +255,9 @@ func parseTweet(text string, maxWeightedTweetLength int, deadline time.Time) (we
 	for _, u := range urls {
 		urlEntities[u.start] = len(u.url)
 	}
-	emojiEntities := map[int]int{}
-	for m, _ := twemojiRe.FindRunesMatch(shifted); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
-		emojiEntities[m.Index] = m.Length
+	emojiEntities, err := emojiMatches(shifted, emojiScanWindow, deadline)
+	if err != nil {
+		return 0, false, 0, err
 	}
 
 	weighted := 0
@@ -280,6 +291,44 @@ func parseTweet(text string, maxWeightedTweetLength int, deadline time.Time) (we
 	valid = valid && weightedLength > 0 && weightedLength <= maxWeightedTweetLength
 	validDisplayIndex += jsLength(text) - len(normalized)
 	return weightedLength, valid, validDisplayIndex, nil
+}
+
+// twemojiMaxLength is the most units a twemoji match spans. The regex also
+// reads one unit past a match, to refuse a U+FE0E after it.
+const twemojiMaxLength = 14
+
+// emojiScanWindow is how many units one twemoji regex call reads: one call
+// over 1 MiB of digits, which never match, took 1.5 s.
+const emojiScanWindow = 4096
+
+// emojiMatches is twemoji's matches in text, length by start, as one scan
+// finds them, but read window units at a time (more than twemojiMaxLength+1)
+// with the deadline checked between regex calls. A match at p depends on
+// text[p:p+twemojiMaxLength+1] alone, so a window's matches that start
+// before the last twemojiMaxLength+1 units are the scan's; the next window
+// starts after them.
+func emojiMatches(text []rune, window int, deadline time.Time) (map[int]int, error) {
+	matches := map[int]int{}
+	for at := 0; at < len(text); {
+		if time.Now().After(deadline) {
+			return nil, ErrTextTooComplex
+		}
+		end := min(at+window, len(text))
+		settled := end
+		if end < len(text) {
+			settled = end - twemojiMaxLength - 1
+		}
+		m, err := twemojiRe.FindRunesMatchStartingAt(text[:end], at)
+		for ; m != nil && m.Index < settled; m, err = twemojiRe.FindNextMatch(m) {
+			matches[m.Index] = m.Length
+			at = m.Index + m.Length
+		}
+		if err != nil { // only a timeout, were one set: never drop matches
+			return nil, ErrTextTooComplex
+		}
+		at = max(at, settled)
+	}
+	return matches, nil
 }
 
 // nfcLikeJS is JavaScript's normalize('NFC'). norm.NFC inserts U+034F after
@@ -411,10 +460,7 @@ func linkSpans(text string, deadline time.Time) ([][2]int, error) {
 // sooner, runs out; each call is bounded, but a text of many slow words makes
 // many calls.
 func extractURLsWithIndices(text []rune, withoutProtocol bool, limit time.Time) ([]*urlEntity, error) {
-	deadline := time.Now().Add(linkScanBudget + time.Duration(min(len(text), linkScanMaxUnits))*linkScanPerUnit)
-	if !limit.IsZero() && limit.Before(deadline) {
-		deadline = limit
-	}
+	deadline := scanDeadline(len(text), limit)
 	var urls []*urlEntity
 	for start, end := 0, 0; start < len(text); start = end {
 		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {

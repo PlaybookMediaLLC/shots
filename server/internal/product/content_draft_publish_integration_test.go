@@ -11,6 +11,8 @@ import (
 
 	"github.com/lucsky/cuid"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
@@ -18,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/thread"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/webhooks"
 )
 
 // standings supplies display metadata; it cannot authorize scheduling.
@@ -456,10 +459,27 @@ func TestWritePublishing(t *testing.T) {
 		if _, err := repo.ReconcileContentDraftPost(ctx, owner, unknown, ReconcileInput{Live: true, URL: "https://example.com/nope"}); !errors.Is(err, ErrInvalidInput) {
 			t.Fatalf("a URL from elsewhere: %v", err)
 		}
+		w.db.Client.WebhookSubscription.Create().SetID("hook_" + w.org).SetOrganizationID(w.org).SetName("Hook").
+			SetURL("https://hooks.example.test/shots").SetEvents([]string{webhooks.DraftPublished}).SetEncryptedSecret("unused").SaveX(ctx)
+		t.Cleanup(func() { w.exec(t, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+w.org) })
+		published := func(draftID string) []*ent.OutboxEvent {
+			return w.db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(w.org),
+				outboxevent.Type("webhook."+webhooks.DraftPublished), outboxevent.AggregateID(draftID)).AllX(ctx)
+		}
 		live, err := repo.ReconcileContentDraftPost(ctx, owner, unknown, ReconcileInput{Live: true,
 			URL: "https://www.linkedin.com/feed/update/urn:li:share:7100000000000000000/"})
 		if err != nil || live.Status != "PUBLISHED" || live.URL == nil || live.FailureCode != nil {
 			t.Fatalf("live=%+v err=%v", live, err)
+		}
+		// A post a person confirmed live notifies subscribers as the worker would.
+		events := published(d.ID)
+		if len(events) != 1 {
+			t.Fatalf("%d draft.published events for the reconciled post, want 1", len(events))
+		}
+		data, _ := events[0].Payload["data"].(map[string]any)
+		if post, _ := data["post"].(map[string]any); post["id"] != unknown || post["remotePostId"] != "urn:li:share:7100000000000000000" ||
+			post["url"] != "https://www.linkedin.com/feed/update/urn:li:share:7100000000000000000" {
+			t.Fatalf("event data %+v", data)
 		}
 		other := draft(ContentDraftInput{})
 		again, err := repo.ScheduleContentDraft(ctx, owner, other.ID, ScheduleContentDraftInput{PublishNow: true, Targets: target("Unknown", x), Version: 1})
@@ -471,8 +491,24 @@ func TestWritePublishing(t *testing.T) {
 		if err != nil || notLive.Status != "FAILED" || notLive.FailureCode == nil || *notLive.FailureCode != publishing.FailureNotLive {
 			t.Fatalf("not live=%+v err=%v", notLive, err)
 		}
-		if _, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID); err != nil {
+		if events := published(other.ID); len(events) != 0 {
+			t.Fatalf("a post reconciled as not live emitted %d draft.published events", len(events))
+		}
+		retriedAgain, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID)
+		if err != nil {
 			t.Fatalf("a post reconciled as not live cannot be retried: %v", err)
+		}
+		// Confirmed live without its URL: subscribers hear of it with no remote id.
+		w.exec(t, `UPDATE scheduled_post SET status='UNKNOWN_DELIVERY',"failureCode"='UNKNOWN_DELIVERY' WHERE id=$1`, retriedAgain.Post.ID)
+		if _, err := repo.ReconcileContentDraftPost(ctx, owner, retriedAgain.Post.ID, ReconcileInput{Live: true}); err != nil {
+			t.Fatal(err)
+		}
+		if events = published(other.ID); len(events) != 1 {
+			t.Fatalf("%d draft.published events for the post confirmed live without a URL, want 1", len(events))
+		}
+		data, _ = events[0].Payload["data"].(map[string]any)
+		if post, _ := data["post"].(map[string]any); post["id"] != retriedAgain.Post.ID || post["remotePostId"] != nil || post["url"] != nil {
+			t.Fatalf("event data %+v", data)
 		}
 		if n, err := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).Count(ctx); err != nil || n != 4 {
 			t.Fatalf("the draft has %d posts, want the two and two retries: %v", n, err)
@@ -535,6 +571,61 @@ func TestWritePublishing(t *testing.T) {
 				}
 				if count := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).CountX(ctx); count != 1 {
 					t.Fatalf("created %d posts", count)
+				}
+			})
+		}
+	})
+
+	// A confirmed post's link reaches webhook subscribers, so it must be a post
+	// on its own platform, never an arbitrary page or a link with credentials.
+	t.Run("a live post's link must point at its own platform", func(t *testing.T) {
+		for _, item := range []struct {
+			platform, handle, link, remoteID, liveURL string
+			invalid                                   []string
+		}{
+			// Stored without its tracking query or fragment, in canonical form.
+			{"threads", "@canary", "HTTPS://WWW.Threads.com/@canary/post/C8abc?igsh=share#top", "https://www.threads.com/@canary/post/C8abc", "https://www.threads.com/@canary/post/C8abc",
+				[]string{"https://example.com/@canary/post/C8abc", "https://www.threads.net.evil.test/@canary/post/C8abc", "https://evilthreads.net/@canary/post/C8abc",
+					"https://user:pw@www.threads.net/@canary/post/C8abc", "http://www.threads.net/@canary/post/C8abc", "https://www.threads.net:8443/@canary/post/C8abc",
+					"https://[::ffff:169.254.169.254%25.threads.net]/@canary/post/C8abc", "https://l.threads.com/?u=https://evil.test", "https://www.threads.net/",
+					"https://www.threads.net/@someone/post/C8abc", `https://www.threads.net/@canary/post/C8abc"><svg>`}},
+			{"instagram-standalone", "", "https://www.instagram.com/reel/C8abc/?igsh=share", "https://www.instagram.com/reel/C8abc/", "",
+				[]string{"https://instagram.com.evil.test/p/C8abc/", "https://user@www.instagram.com/p/C8abc/", "https://l.instagram.com/?u=https://evil.test",
+					"https://www.instagram.com/accounts/login/"}},
+			// The query is the post's address here, so it stays.
+			{"facebook", "", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "",
+				[]string{"https://facebook.evil.test/permalink.php?story_fbid=1&id=2", "https://l.facebook.com/l.php?u=https://evil.test", "https://www.facebook.com/l.php?u=https://evil.test"}},
+			{"pinterest", "", "https://www.pinterest.com/pin/123/", "https://www.pinterest.com/pin/123/", "", []string{"https://example.com/pin/123/", "https://www.pinterest.com/canary/"}},
+			{"gmb", "", "https://local.google.com/place?id=1&use=posts&lpsid=2", "https://local.google.com/place?id=1&use=posts&lpsid=2", "",
+				[]string{"https://www.google.com/url?q=https://evil.test"}},
+			{"bluesky", "canary.bsky.social", "https://bsky.app/profile/canary.bsky.social/post/3kabc", "at://canary.bsky.social/app.bsky.feed.post/3kabc", "https://bsky.app/profile/canary.bsky.social/post/3kabc",
+				[]string{"https://example.com/profile/canary.bsky.social/post/3kabc", "https://bsky.app/profile/canary.bsky.social", "https://bsky.app/profile/someone.bsky.social/post/3kabc"}},
+			{"mastodon", "", "HTTPS://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233",
+				[]string{"https://mastodon.social/about", "https://user@mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233?ref=x"}},
+			// Legacy names of a platform take its rules.
+			{"mastodon-custom", "", "https://fixture.social/@canary/112233", "https://fixture.social/@canary/112233", "", []string{"https://example.com/about"}},
+			{"twitter", "", "https://x.com/canary/status/1234567890", "1234567890", "", []string{"https://x.com/canary"}},
+		} {
+			t.Run(item.platform, func(t *testing.T) {
+				connection := connect(item.platform, "link-"+item.platform+"-"+w.id, nil)
+				if item.handle != "" {
+					w.db.Client.ChannelConnection.UpdateOneID(connection).SetHandle(item.handle).ExecX(ctx)
+				}
+				post := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).
+					SetContentDraftID(draft(ContentDraftInput{}).ID).SetChannelConnectionID(connection).
+					SetScheduledFor(time.Now().UTC()).SetStatus(scheduledpost.StatusUNKNOWN_DELIVERY).SetCaption("Link canary").
+					SetIdempotencyKey(cuid.New()).SetFailureCode(publishing.FailureUnknownDelivery).SaveX(ctx)
+				for _, bad := range item.invalid {
+					if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: bad}); !errors.Is(err, ErrInvalidInput) {
+						t.Fatalf("accepted %q: %v", bad, err)
+					}
+				}
+				live, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.link})
+				if err != nil || item.liveURL != "" && (live.URL == nil || *live.URL != item.liveURL) {
+					t.Fatalf("live=%+v err=%v", live, err)
+				}
+				if stored := w.db.Client.ScheduledPost.GetX(ctx, post.ID); stored.RemotePostID == nil || *stored.RemotePostID != item.remoteID {
+					t.Fatalf("stored remote id %v, want %q", stored.RemotePostID, item.remoteID)
 				}
 			})
 		}

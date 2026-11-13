@@ -111,7 +111,7 @@ func mastodonLength(text string, budget *helpers.ScanBudget) (int, error) {
 // X, Mastodon's on Mastodon, grapheme clusters on Bluesky, and UTF-16 units
 // elsewhere. The composer's platformCaptionLength is the same rule; both are
 // tested against testdata/caption-length-cases.json. X and Mastodon fail with
-// helpers.ErrTextTooComplex on text their link scan cannot finish in time, or
+// helpers.ErrTextTooComplex on text their scans cannot finish in time, or
 // within budget (nil bounds each text alone).
 func draftPostLength(channel, text string, budget *helpers.ScanBudget) (int, error) {
 	if channel == "x" {
