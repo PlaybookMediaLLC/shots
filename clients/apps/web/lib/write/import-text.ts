@@ -31,38 +31,54 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  // Only X's and Mastodon's counts (a short link is 23) exceed UTF-16 units: elsewhere, a text within the limit in units fits.
-  const fits = (value: string) =>
-    (channel !== 'x' && channel !== 'mastodon' && value.length <= limit) ||
-    platformCaptionLength(channel, value) <= limit
+  const measure = (value: string) => platformCaptionLength(channel, value)
   const posts: string[] = []
   let current = ''
+  // What `current` counts. No link, mention, emoji or normalization crosses a
+  // space, so a post counts its words and spaces added up. (A grapheme that joins
+  // a space, such as an accent right after one, is counted twice: a cut comes early.)
+  let counted = 0
   const push = () => {
     if (current.trim()) posts.push(current.trim())
     current = ''
+    counted = 0
     if (posts.length > THREAD_POST_LIMIT)
       throw new Error(
         `This text needs more than ${THREAD_POST_LIMIT} posts. Shorten it or increase the limit.`
       )
   }
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    if (fits((current + token).trim())) {
-      current += token
-      continue
+    let word = token.trimEnd()
+    const space = token.slice(word.length)
+    let count = measure(word)
+    if (counted + count > limit) push()
+    // A word longer than a post is cut between graphemes, each time at the
+    // longest piece that fits. A cut can split a link, so pieces are measured whole.
+    const ends =
+      count > limit
+        ? Array.from(
+            new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(word),
+            ({ index, segment }) => index + segment.length
+          )
+        : []
+    let [start, first] = [0, 0]
+    while (count > limit) {
+      let [low, high] = [first - 1, ends.length - 2]
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2)
+        if (measure(word.slice(start, ends[middle])) <= limit) low = middle
+        else high = middle - 1
+      }
+      if (low < first) throw new Error('A character sequence exceeds the selected limit.')
+      current = word.slice(start, ends[low])
+      push()
+      ;[start, first] = [ends[low], low + 1]
+      count = measure(word.slice(start))
     }
-    push()
-    if (fits(token.trim())) {
-      current = token
-      continue
-    }
-    for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
-      token
-    )) {
-      if (!fits(segment))
-        throw new Error('A character sequence exceeds the selected limit.')
-      if (!fits((current + segment).trim())) push()
-      current += segment
-    }
+    word = word.slice(start)
+    current += word + space
+    // Spaces count the same between any two words.
+    counted += count + (space ? measure(`a${space}a`) - 2 : 0)
   }
   push()
   return posts

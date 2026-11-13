@@ -30,6 +30,19 @@ test('thread split uses weighted URLs and preserves grapheme sequences', () => {
     family,
   ])
 })
+test('thread split counts the spaces between words and cuts a long word at the longest piece', () => {
+  // X counts an ideographic space as 2: ten, the space and eleven make 23.
+  const words = (last: number) => `${'a'.repeat(10)}\u3000${'b'.repeat(last)}`
+  assert.deepEqual(splitThread(words(11), 'x', 23), [words(11)])
+  assert.deepEqual(splitThread(words(12), 'x', 23), ['a'.repeat(10), 'b'.repeat(12)])
+  // X counts each of these characters as 2, so a run with no spaces is cut every 11.
+  const text = '日本語'.repeat(10)
+  assert.deepEqual(splitThread(text, 'x', 23), [
+    text.slice(0, 11),
+    text.slice(11, 22),
+    text.slice(22),
+  ])
+})
 test('imports enforce the thread and input size limits', () => {
   assert.throws(() => importedPosts(Array(26).fill('post').join('\n---\n')), /25 posts/)
   assert.throws(() => splitThread('a'.repeat(100001), 'x', 280), /100,000/)
