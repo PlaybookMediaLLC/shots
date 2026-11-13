@@ -9,11 +9,13 @@ import { cn } from '@/lib/utils'
  * small screens, made for the editor's panels.
  */
 export function Segmented<T extends string>({
+  disabled,
   label,
   onChange,
   options,
   value,
 }: {
+  disabled?: boolean
   label: string
   onChange: (value: T) => void
   options: readonly (readonly [T, string])[]
@@ -28,6 +30,7 @@ export function Segmented<T extends string>({
       {options.map(([option, text]) => (
         <Button
           aria-pressed={value === option}
+          disabled={disabled}
           className={cn(
             'h-7 rounded px-2.5 text-label',
             value === option

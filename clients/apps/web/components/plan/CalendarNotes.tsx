@@ -18,6 +18,8 @@ import {
   type CalendarNoteWire,
 } from '@/lib/api/contracts/calendar-notes'
 import { call } from '@/lib/content-drafts/client'
+import { useHydratedSession } from '@/lib/auth/client'
+import { trackPostManagementUse } from '@/lib/plan/feature-use'
 import { readWire } from '@/lib/plan/wire'
 
 const COLORS: Record<CalendarNoteWire['color'], { dot: string; edge: string }> = {
@@ -96,6 +98,7 @@ export function NoteDialog({
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState('')
   const colorLabel = React.useId()
+  const workspaceId = useHydratedSession().data?.session.activeOrganizationId
   const run = async (request: () => Promise<unknown>) => {
     setBusy(true)
     setError('')
@@ -109,7 +112,7 @@ export function NoteDialog({
     }
   }
   const save = () =>
-    run(async () =>
+    run(async () => {
       readWire(
         calendarNoteSchema,
         await call(note ? `/api/v1/calendar/notes/${note.id}` : '/api/v1/calendar/notes', {
@@ -117,7 +120,8 @@ export function NoteDialog({
           body: note ? { title, color } : { day, title, color },
         })
       )
-    )
+      if (!note) trackPostManagementUse(workspaceId, 'calendar_note')
+    })
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent>

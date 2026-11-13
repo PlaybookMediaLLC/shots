@@ -229,6 +229,50 @@ function GridScene() {
   )
 }
 
+/** One image fading in under a headline: three frames, from dark to clear. */
+function SingleScene() {
+  return (
+    <>
+      {[0.25, 0.6, 1].map((opacity, index) => {
+        const x = 52 + index * 80
+        return (
+          <g key={x} opacity={opacity}>
+            <Surface height={128} rx={7} width={72} x={x} y={18} />
+            <Bar h={4} tone="ink" width={52} x={x + 10} y={30} />
+            <Bar h={4} tone="ink" width={34} x={x + 19} y={38} />
+            <Picture h={60} strength={0.4} w={56} x={x + 8} y={54} />
+          </g>
+        )
+      })}
+      <Tint height={12} rx={6} strength={1} width={22} x={260} y={10} />
+      <Caption className="fill-white font-semibold" textAnchor="middle" x={271} y={18.5}>
+        6s
+      </Caption>
+    </>
+  )
+}
+
+/** A clip with bold text over it, then a closing clip. */
+function UgcScene() {
+  return (
+    <>
+      <Surface height={128} rx={7} width={72} x={96} y={18} />
+      <Tint height={120} rx={4} strength={0.35} width={64} x={100} y={22} />
+      <circle className="fill-current" cx={132} cy={66} fillOpacity={0.45} r={13} />
+      <path className="fill-current" d="M110 142c2-24 42-24 44 0Z" fillOpacity={0.45} />
+      <Bar h={5} tone="ink" width={52} x={106} y={96} />
+      <Bar h={5} tone="ink" width={38} x={113} y={105} />
+      <Play cx={132} cy={124} r={7} />
+      <Arrow from={[176, 82]} to={[196, 82]} />
+      <g opacity={0.7}>
+        <Surface height={100} rx={7} width={56} x={204} y={32} />
+        <Bar h={4} tone="accent" width={36} x={214} y={76} />
+        <Bar h={3} width={28} x={218} y={84} />
+      </g>
+    </>
+  )
+}
+
 /** A file's outline with a folded corner. */
 function File({ x, y, children }: { x: number; y: number; children: ReactNode }) {
   return (
@@ -315,6 +359,8 @@ function MixedScene() {
 
 const SCENES = {
   grid: { Scene: GridScene, tone: 'rose' },
+  single: { Scene: SingleScene, tone: 'amber' },
+  ugc: { Scene: UgcScene, tone: 'violet' },
   images: { Scene: ImageScene, tone: 'amber' },
   mixed: { Scene: MixedScene, tone: 'emerald' },
   text: { Scene: TextScene, tone: 'blue' },
