@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
@@ -16,15 +16,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  importedBody,
-  importedPosts,
-  splitThread,
-  THREAD_POST_LIMIT,
-} from '@/lib/write/import-text'
-import type { SplitResult } from '@/lib/write/import-text.worker'
+import { importedBody, THREAD_POST_LIMIT } from '@/lib/write/import-text'
 import type { DraftChannel } from '@/lib/write/document'
 import { withLeadMedia, type PostMedia } from '@/lib/write/screenshot-post'
+import { useThreadPosts } from '@/lib/write/use-thread-posts'
 import { postRanges } from '@/components/drafts/thread'
 import { toast } from 'sonner'
 
@@ -54,65 +49,10 @@ export function PasteThreadDialog({
   // A screenshot belongs on the post that opens the explanation, not under it.
   const [lead, setLead] = useState<PostMedia[]>([])
   const [picking, setPicking] = useState(false)
-  const explicit = useMemo(() => {
-    try {
-      return { posts: importedPosts(text), error: '' }
-    } catch (error) {
-      return { posts: [], error: (error as Error).message }
-    }
-  }, [text])
-  // The split by length runs in a worker (see import-text.worker.ts). Starting
-  // one takes a few hundred milliseconds, so an idle one is reused and only a
-  // worker still busy with older text is replaced.
-  const request = useMemo(
-    (): Parameters<typeof splitThread> => [text, channel, length],
-    [text, channel, length]
-  )
-  const [split, setSplit] = useState<SplitResult & { request: typeof request }>()
-  const worker = useRef<{ worker: Worker; busy: boolean } | null>(null)
-  useEffect(() => {
-    if (worker.current?.busy) {
-      worker.current.worker.terminate()
-      worker.current = null
-    }
-    if (!automatic) return
-    const fail = () => setSplit({ request, posts: [], error: 'The split preview could not load.' })
-    try {
-      worker.current ??= {
-        worker: new Worker(new URL('../../../lib/write/import-text.worker.ts', import.meta.url), {
-          type: 'module',
-        }),
-        busy: false,
-      }
-    } catch {
-      fail()
-      return
-    }
-    const current = worker.current
-    current.busy = true
-    current.worker.onmessage = ({ data }: MessageEvent<SplitResult>) => {
-      current.busy = false
-      setSplit({ ...data, request })
-    }
-    current.worker.onerror = () => {
-      current.worker.terminate()
-      if (worker.current === current) worker.current = null
-      fail()
-    }
-    current.worker.postMessage(request)
-  }, [automatic, request])
-  useEffect(
-    () => () => {
-      worker.current?.worker.terminate()
-      worker.current = null
-    },
-    []
-  )
-  const splitting = automatic && split?.request !== request
-  const preview = automatic ? (split ?? { posts: [], error: '' }) : explicit
+  const preview = useThreadPosts(text, channel, automatic ? length : undefined)
   const insert = () => {
     const current = editor.current
-    if (!current || !preview.posts.length) return
+    if (!current || preview.pending || !preview.posts.length) return
     if (postRanges(current.children).length + preview.posts.length > THREAD_POST_LIMIT) {
       toast.error(`The combined thread would exceed ${THREAD_POST_LIMIT} posts.`)
       return
@@ -184,7 +124,13 @@ export function PasteThreadDialog({
             onInsert={setLead}
           />
         ) : null}
-        {preview.error && <p role="alert">{preview.error}</p>}
+        {preview.pending ? (
+          <p className="text-muted-foreground" role="status">
+            Splitting…
+          </p>
+        ) : (
+          preview.error && <p role="alert">{preview.error}</p>
+        )}
         <ol className="grid max-h-60 gap-3 overflow-auto text-sm">
           {preview.posts.map((post, index) => (
             <li className="whitespace-pre-wrap rounded border p-2" key={index}>
@@ -198,10 +144,12 @@ export function PasteThreadDialog({
           ))}
         </ol>
         <Button
-          disabled={splitting || !preview.posts.length || Boolean(preview.error) || length > limit}
+          disabled={
+            preview.pending || !preview.posts.length || Boolean(preview.error) || length > limit
+          }
           onClick={insert}
         >
-          {splitting ? 'Splitting…' : `Append ${preview.posts.length} posts`}
+          Append {preview.posts.length} posts
         </Button>
       </DialogContent>
     </Dialog>
