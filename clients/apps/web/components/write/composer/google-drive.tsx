@@ -11,9 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { DRAFT_MEDIA_TYPES } from '@/lib/platform/asset-handoff'
 import {
   downloadDriveFiles,
-  DRIVE_MIME_TYPES,
   DRIVE_PICK_LIMIT,
   DRIVE_SCOPE,
   drivePickSchema,
@@ -45,20 +45,28 @@ type GoogleScripts = {
   }
   picker: {
     Action: { CANCEL: string; PICKED: string }
-    DocsView: new () => { setIncludeFolders(on: boolean): unknown; setMimeTypes(types: string): unknown }
+    DocsView: new () => {
+      setIncludeFolders(on: boolean): unknown
+      setMimeTypes(types: string): unknown
+    }
     Feature: { MULTISELECT_ENABLED: string }
     PickerBuilder: new () => PickerBuilder
     Response: { ACTION: string; DOCUMENTS: string }
   }
 }
 type DriveWindow = Window & {
-  gapi?: { load(name: string, callback: () => void): void }
+  gapi?: {
+    load(
+      name: string,
+      options: { callback: () => void; onerror: () => void; ontimeout: () => void; timeout: number }
+    ): void
+  }
   google?: GoogleScripts
 }
 
+const UNREACHABLE = 'Google Drive could not be reached. Try again.'
 const scripts = new Map<string, Promise<void>>()
 
-/** Loads a script once per page. */
 function loadScript(src: string): Promise<void> {
   const loading =
     scripts.get(src) ??
@@ -69,7 +77,7 @@ function loadScript(src: string): Promise<void> {
       script.onload = () => resolve()
       script.onerror = () => {
         scripts.delete(src)
-        reject(new Error('Google Drive could not be reached. Try again.'))
+        reject(new Error(UNREACHABLE))
       }
       document.head.appendChild(script)
     })
@@ -84,31 +92,26 @@ async function googleScripts(): Promise<GoogleScripts> {
     loadScript('https://accounts.google.com/gsi/client'),
   ])
   const page = window as DriveWindow
-  await new Promise<void>((resolve) => page.gapi!.load('picker', resolve))
-  return page.google!
-}
-
-/** The person's `drive.file` token, from Google's own sign-in popup. */
-function driveToken(google: GoogleScripts, clientId: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    google.accounts.oauth2
-      .initTokenClient({
-        callback: (response) =>
-          response.access_token
-            ? resolve(response.access_token)
-            : reject(new Error('Google did not allow access to Drive.')),
-        client_id: clientId,
-        error_callback: () => reject(new Error('Google sign-in was closed.')),
-        scope: DRIVE_SCOPE,
-      })
-      .requestAccessToken()
-  })
+  const gapi = page.gapi
+  if (!gapi) throw new Error(UNREACHABLE)
+  await new Promise<void>((resolve, reject) =>
+    gapi.load('picker', {
+      callback: resolve,
+      onerror: () => reject(new Error(UNREACHABLE)),
+      ontimeout: () => reject(new Error(UNREACHABLE)),
+      timeout: 15_000,
+    })
+  )
+  if (!page.google?.picker || !page.google.accounts) throw new Error(UNREACHABLE)
+  return page.google
 }
 
 /**
  * Picks images and videos from the person's Google Drive and hands them to
- * the composer's upload, as if they were dropped in. Unavailable until Shots'
- * Picker keys are deployed.
+ * the composer's upload, as if they were dropped in. Google's sign-in opens
+ * from the dialog's button, inside the click, so no browser blocks it.
+ * Closing the dialog cancels the import. Unavailable until Shots' Picker keys
+ * are deployed.
  */
 export function GoogleDriveImport({
   config,
@@ -119,63 +122,124 @@ export function GoogleDriveImport({
   onClose: () => void
   onFiles: (files: File[]) => void
 }) {
-  const started = React.useRef(false)
+  const [google, setGoogle] = React.useState<GoogleScripts | null>(null)
+  const [state, setState] = React.useState<
+    { kind: 'ready' } | { kind: 'busy'; text: string } | { kind: 'failed'; text: string }
+  >({ kind: 'ready' })
+  const downloads = React.useRef<AbortController | null>(null)
   React.useEffect(() => {
-    if (!config || started.current) return
-    started.current = true
-    void (async () => {
-      try {
-        const google = await googleScripts()
-        const token = await driveToken(google, config.clientId)
-        const view = new google.picker.DocsView()
-        view.setIncludeFolders(true)
-        view.setMimeTypes(DRIVE_MIME_TYPES.join(','))
-        new google.picker.PickerBuilder()
-          .addView(view)
-          .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-          .setMaxItems(DRIVE_PICK_LIMIT)
-          .setOAuthToken(token)
-          .setDeveloperKey(config.apiKey)
-          .setAppId(config.appId)
-          .setCallback((data) => {
-            const action = data[google.picker.Response.ACTION]
-            if (action === google.picker.Action.CANCEL) return onClose()
-            if (action !== google.picker.Action.PICKED) return
-            const picks = drivePickSchema.array().safeParse(data[google.picker.Response.DOCUMENTS])
-            if (!picks.success) {
-              toast.error('Google Drive sent files Shots could not read.')
-              return onClose()
-            }
-            void downloadDriveFiles(picks.data, token)
-              .then(onFiles)
-              .catch((error: unknown) =>
-                toast.error(error instanceof Error ? error.message : 'Google Drive import failed.')
-              )
-              .finally(onClose)
+    if (!config) return
+    let current = true
+    googleScripts()
+      .then((loaded) => current && setGoogle(loaded))
+      .catch((error: unknown) => {
+        if (current) setState({ kind: 'failed', text: message(error) })
+      })
+    return () => {
+      current = false
+      downloads.current?.abort()
+    }
+  }, [config])
+
+  const pick = (token: string, scripts: GoogleScripts, keys: GoogleDriveConfig) => {
+    const view = new scripts.picker.DocsView()
+    view.setIncludeFolders(true)
+    view.setMimeTypes(DRAFT_MEDIA_TYPES.join(','))
+    new scripts.picker.PickerBuilder()
+      .addView(view)
+      .enableFeature(scripts.picker.Feature.MULTISELECT_ENABLED)
+      .setMaxItems(DRIVE_PICK_LIMIT)
+      .setOAuthToken(token)
+      .setDeveloperKey(keys.apiKey)
+      .setAppId(keys.appId)
+      .setCallback((data) => {
+        const action = data[scripts.picker.Response.ACTION]
+        if (action === scripts.picker.Action.CANCEL) return setState({ kind: 'ready' })
+        if (action !== scripts.picker.Action.PICKED) return
+        const picks = drivePickSchema.array().safeParse(data[scripts.picker.Response.DOCUMENTS])
+        if (!picks.success)
+          return setState({ kind: 'failed', text: 'Google Drive sent files Shots could not read.' })
+        const controller = new AbortController()
+        downloads.current = controller
+        const count = picks.data.length
+        setState({
+          kind: 'busy',
+          text: `Downloading ${count === 1 ? '1 file' : `${count} files`}…`,
+        })
+        downloadDriveFiles(picks.data, token, { signal: controller.signal })
+          .then(({ failed, files }) => {
+            if (controller.signal.aborted) return
+            if (failed.length) toast.error(`Google Drive did not send ${failed.join(', ')}.`)
+            if (files.length) onFiles(files)
+            onClose()
           })
-          .build()
-          .setVisible(true)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Google Drive import failed.')
-        onClose()
-      }
-    })()
-  }, [config, onClose, onFiles])
-  if (config) return null
+          .catch((error: unknown) => {
+            if (!controller.signal.aborted) setState({ kind: 'failed', text: message(error) })
+          })
+      })
+      .build()
+      .setVisible(true)
+  }
+
+  // Inside the click: Google's sign-in popup opens only from a person's gesture.
+  const choose = () => {
+    if (!google || !config) return
+    setState({ kind: 'busy', text: 'Waiting for Google…' })
+    google.accounts.oauth2
+      .initTokenClient({
+        callback: (response) =>
+          response.access_token
+            ? pick(response.access_token, google, config)
+            : setState({ kind: 'failed', text: 'Google did not allow access to Drive.' }),
+        client_id: config.clientId,
+        error_callback: (error) =>
+          setState(
+            error.type === 'popup_failed_to_open'
+              ? { kind: 'failed', text: 'Allow pop-ups for Shots, then try again.' }
+              : { kind: 'ready' }
+          ),
+        scope: DRIVE_SCOPE,
+      })
+      .requestAccessToken()
+  }
+
   return (
     <Dialog onOpenChange={(open) => (open ? null : onClose())} open>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Google Drive is not set up</DialogTitle>
+          <DialogTitle>
+            {config ? 'Import from Google Drive' : 'Google Drive is not set up'}
+          </DialogTitle>
           <DialogDescription>
-            Importing from Google Drive needs Shots&apos; Google Picker keys, which this
-            deployment does not have yet. Upload the files instead.
+            {config
+              ? `Choose up to ${DRIVE_PICK_LIMIT} images and videos. Google asks you to sign in and lets Shots open only the files you pick.`
+              : 'Importing from Google Drive needs Shots’ Google Picker keys, which this deployment does not have yet. Upload the files instead.'}
           </DialogDescription>
         </DialogHeader>
+        {state.kind === 'failed' ? (
+          <p className="text-sm text-destructive" role="alert">
+            {state.text}
+          </p>
+        ) : state.kind === 'busy' ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            {state.text}
+          </p>
+        ) : null}
         <DialogFooter>
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose} variant={config ? 'outline' : 'default'}>
+            {config ? 'Cancel' : 'Close'}
+          </Button>
+          {config ? (
+            <Button disabled={!google || state.kind === 'busy'} onClick={choose}>
+              {google ? 'Choose from Google Drive' : 'Loading Google Drive…'}
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : 'Google Drive import failed.'
 }

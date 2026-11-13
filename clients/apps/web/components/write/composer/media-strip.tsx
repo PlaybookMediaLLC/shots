@@ -28,6 +28,7 @@ export async function uploadFiles(editor: PlateEditor, files: File[]) {
   files.forEach((file) => list.items.add(file))
   editor.getTransforms(PlaceholderPlugin).insert.media(list.files)
 }
+
 const ACCEPT = {
   'image/gif': ['.gif'],
   'image/jpeg': ['.jpg', '.jpeg'],

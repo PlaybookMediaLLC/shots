@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { DESTINATION_MEDIA } from '@/lib/write/media-rules'
+import { supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import { uploadByteLimit } from '@/lib/write/media-limits'
 
 /**
  * Google Drive import (composer slice 3b): the browser picks files with Google
@@ -16,30 +17,13 @@ export const googleDriveConfigSchema = z.object({
   clientId: z.string().min(1),
 })
 
-/** One of {@link googleDriveConfigSchema}. */
 export type GoogleDriveConfig = z.infer<typeof googleDriveConfigSchema>
 
 /** The only scope Drive import asks for: the files the person picks. */
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 
-/** The files a draft takes from Drive: the images and videos the composer uploads. */
-export const DRIVE_MIME_TYPES = [
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-] as const
-
-/** At most this many files in one import. */
+/** As many files as the editor's own upload takes at once (`maxFileCount`). */
 export const DRIVE_PICK_LIMIT = 20
-
-/** Nothing larger is downloaded: no destination takes a bigger video, nor image. */
-export const DRIVE_MAX_BYTES = Math.max(
-  ...Object.values(DESTINATION_MEDIA).map((rules) => rules.video?.maxBytes ?? 0)
-)
 
 /** A file as Picker returns it. */
 export const drivePickSchema = z.object({
@@ -49,34 +33,40 @@ export const drivePickSchema = z.object({
   sizeBytes: z.coerce.number().int().nonnegative().optional(),
 })
 
-/** One of {@link drivePickSchema}. */
 export type DrivePick = z.infer<typeof drivePickSchema>
 
 /**
- * Downloads picked files as `File`s for the composer's upload, refusing what
- * no draft takes before any byte is fetched.
+ * Downloads picked files as `File`s for the composer's upload. What no draft
+ * takes is refused before any byte is fetched; a file Drive does not send is
+ * named in `failed`, and the others still arrive.
  */
 export async function downloadDriveFiles(
   picks: DrivePick[],
   token: string,
-  request: typeof fetch = fetch
-): Promise<File[]> {
+  { request = fetch, signal }: { request?: typeof fetch; signal?: AbortSignal } = {}
+): Promise<{ failed: string[]; files: File[] }> {
   if (picks.length > DRIVE_PICK_LIMIT)
     throw new Error(`Import up to ${DRIVE_PICK_LIMIT} files from Google Drive at a time.`)
   for (const pick of picks) {
-    if (!DRIVE_MIME_TYPES.some((type) => type === pick.mimeType))
+    if (!supportedDraftMedia(pick.mimeType))
       throw new Error(`${pick.name} is not an image or video a post takes.`)
-    if (pick.sizeBytes !== undefined && pick.sizeBytes > DRIVE_MAX_BYTES)
-      throw new Error(`${pick.name} is larger than any platform takes.`)
+    if (pick.sizeBytes !== undefined && pick.sizeBytes > uploadByteLimit(pick.mimeType))
+      throw new Error(`${pick.name} is larger than Shots uploads.`)
   }
-  return Promise.all(
+  const results = await Promise.allSettled(
     picks.map(async (pick) => {
       const response = await request(
         `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(pick.id)}?alt=media`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, signal }
       )
-      if (!response.ok) throw new Error(`Google Drive did not send ${pick.name}. Try again.`)
+      if (!response.ok) throw new Error(pick.name)
       return new File([await response.blob()], pick.name, { type: pick.mimeType })
     })
   )
+  return {
+    failed: picks
+      .filter((_, index) => results[index]!.status === 'rejected')
+      .map((pick) => pick.name),
+    files: results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+  }
 }

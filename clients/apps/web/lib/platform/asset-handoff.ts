@@ -5,6 +5,9 @@ import { postBreak } from '@/lib/write/versions'
 const IMAGES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const VIDEOS = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
 
+/** The formats as a list, for a picker that filters by type. */
+export const DRAFT_MEDIA_TYPES = [...IMAGES, ...VIDEOS]
+
 /** The writing editor's existing native media formats. */
 export function supportedDraftMedia(mediaType: string): boolean {
   return IMAGES.has(mediaType) || VIDEOS.has(mediaType)

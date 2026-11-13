@@ -407,9 +407,11 @@ test(
     })
 
     await editorMore(page, 'From Google Drive')
+    // Google's sign-in opens from this click, so no browser blocks its popup.
+    await page.getByRole('button', { name: 'Choose from Google Drive', exact: true }).click()
     await expect(draftEditor(page).locator('figure')).toHaveCount(1)
     await expectSaved(page)
-    // The person's token went to Drive, once, and nowhere else.
+    // The person's token went to Drive, once.
     expect(downloads).toEqual(['Bearer fixture-drive-token'])
     const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
     const image = z
