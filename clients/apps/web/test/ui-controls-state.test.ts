@@ -29,6 +29,7 @@ const browser = {
       'MouseEvent',
       'MutationObserver',
       'Node',
+      'NodeFilter',
       'CustomEvent',
       'DocumentFragment',
     ].map((name) => [name, dom.window[name]])
@@ -761,4 +762,87 @@ test('cancelling an image worker before ready cannot poison its replacement read
   assert.equal((await client.process(new Blob(['third']), imagePlan().options)).bytes, 2)
   assert.equal(instances[1].posts, 2)
   client.terminate()
+})
+
+test('the paste dialog splits in a reused worker and enables Append only for the current text', async (t) => {
+  const workers: FakeSplitWorker[] = []
+  class FakeSplitWorker {
+    onmessage: ((event: { data: unknown }) => void) | null = null
+    onerror: (() => void) | null = null
+    requests: unknown[][] = []
+    terminated = false
+    constructor() {
+      workers.push(this)
+    }
+    postMessage(request: unknown[]) {
+      this.requests.push(request)
+    }
+    terminate() {
+      this.terminated = true
+    }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeSplitWorker })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'Worker', previous)
+    else Reflect.deleteProperty(globalThis, 'Worker')
+  })
+  const { PasteThreadDialog } = await import('@/components/write/composer/paste-thread')
+  await mount(
+    createElement(PasteThreadDialog, {
+      channel: 'x',
+      editor: { current: null },
+      limit: 280,
+      onClose: () => {},
+    })
+  )
+  const write = (text: string) =>
+    act(async () => {
+      const input = get<HTMLTextAreaElement>('textarea')
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        input,
+        text
+      )
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+  const reply = (worker: FakeSplitWorker, posts: string[]) =>
+    act(async () => worker.onmessage?.({ data: { posts, error: '' } }))
+  const append = () =>
+    [...document.querySelectorAll('button')].find((button) =>
+      /^(Append|Splitting)/.test(button.textContent!)
+    )!
+  await write('one two')
+  await act(async () => get<HTMLButtonElement>('[role="checkbox"]').click())
+  assert.deepEqual(workers[0].requests, [['one two', 'x', 280]])
+  assert.equal(append().textContent, 'Splitting…')
+  assert.equal(append().disabled, true)
+  await reply(workers[0], ['one two'])
+  assert.equal(append().textContent, 'Append 1 posts')
+  assert.equal(append().disabled, false)
+
+  // An idle worker takes the next edit; one still busy is replaced, and its
+  // late answer, for older text, never enables Append.
+  await write('one two three')
+  assert.equal(workers.length, 1)
+  assert.equal(append().textContent, 'Splitting…')
+  await write('one two three four')
+  assert.equal(workers[0].terminated, true)
+  assert.deepEqual(workers[1].requests, [['one two three four', 'x', 280]])
+  await reply(workers[0], ['stale'])
+  assert.equal(append().textContent, 'Splitting…')
+  await reply(workers[1], ['one two', 'three four'])
+  assert.equal(append().textContent, 'Append 2 posts')
+  assert.match(document.body.textContent!, /three four/)
+  assert.doesNotMatch(document.body.textContent!, /stale/)
+
+  // A worker that fails is reported and dropped, and closing the dialog stops the next.
+  await write('five')
+  await act(async () => workers[1].onerror?.())
+  assert.equal(workers[1].terminated, true)
+  assert.equal(get('[role="alert"]').textContent, 'The split preview could not load.')
+  await write('six')
+  assert.equal(workers.length, 3)
+  await act(async () => root!.unmount())
+  root = null
+  assert.equal(workers[2].terminated, true)
 })
