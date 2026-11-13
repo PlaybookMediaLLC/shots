@@ -5,7 +5,7 @@ import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
 import { importedPosts, THREAD_POST_LIMIT } from '@/lib/write/import-text'
-import type { SplitRequest, SplitResult } from '@/lib/write/import-text.worker'
+import type { SplitMessage, SplitRequest } from '@/lib/write/import-text.worker'
 import { platformVersionsSchema } from '@/lib/write/document'
 import type { DesignCopy } from '@/lib/captions/channels'
 import {
@@ -80,14 +80,20 @@ test('a screenshot thread stays inside the one thread limit', () => {
 // Both screens split through useThreadPosts: `---` on the page, a length in
 // the composer's split worker, which answers each request by its id.
 test('an explanation splits the way the composer splits a paste', async (t) => {
-  const replies: SplitResult[] = []
+  const replies: SplitMessage[] = []
   const scope = {
     onmessage: null as ((event: { data: SplitRequest }) => void) | null,
-    postMessage: (result: SplitResult) => replies.push(result),
+    postMessage: (message: SplitMessage) => replies.push(message),
   }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'self')
   Object.defineProperty(globalThis, 'self', { configurable: true, value: scope })
-  t.after(() => Reflect.deleteProperty(globalThis, 'self'))
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'self', previous)
+    else Reflect.deleteProperty(globalThis, 'self')
+  })
   await import('@/lib/write/import-text.worker')
+  // It says when it has loaded, so the page knows a request will start at once.
+  assert.deepEqual(replies, [{ ready: true }])
   const split = (id: number, text: string, limit: number) => {
     scope.onmessage!({ data: { channel: 'x', id, limit, text } })
     return replies.at(-1)

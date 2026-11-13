@@ -7,6 +7,9 @@ export type SplitRequest = { channel: DraftChannel; id: number; limit: number; t
 /** The posts for request `id`, or why its text cannot be split. */
 export type SplitResult = { error: string; id: number; posts: string[] }
 
+/** What the worker posts: that it has loaded, then one result per request. */
+export type SplitMessage = SplitResult | { ready: true }
+
 // Counting X's links is quadratic in a run without spaces (seconds for long
 // CJK text), so the split runs here instead of on the page that is typing.
 self.onmessage = ({ data }: MessageEvent<SplitRequest>) => {
@@ -19,3 +22,4 @@ self.onmessage = ({ data }: MessageEvent<SplitRequest>) => {
   }
   self.postMessage(result)
 }
+self.postMessage({ ready: true } satisfies SplitMessage)
