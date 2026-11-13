@@ -5901,6 +5901,7 @@ export interface operations {
                                 xCaptionLimit?: (280 | 25000) | null;
                                 xArticles?: boolean | null;
                                 xQuotes?: boolean;
+                                xVideoMaxSeconds?: number | null;
                                 mastodonQuotes?: boolean | null;
                                 pollLimits?: {
                                     maxOptions: number;
@@ -5990,6 +5991,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6092,6 +6094,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6323,6 +6326,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;

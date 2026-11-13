@@ -559,6 +559,7 @@ export function WriteComposer({
             maxWeightedCharacters: account.xCaptionLimit,
             articles: account.xArticles,
             xQuotes: account.xQuotes,
+            xVideoMaxSeconds: account.xVideoMaxSeconds,
             pollLimits: account.pollLimits,
             mastodonQuotes: account.mastodonQuotes,
           },

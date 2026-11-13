@@ -24,7 +24,12 @@ import (
 type standings map[string]bool
 
 func (s standings) AccountStanding(_ context.Context, _, destinationID, _, _ string) (AccountStanding, error) {
-	return AccountStanding{Premium: s[destinationID]}, nil
+	standing := AccountStanding{Premium: s[destinationID]}
+	if s[destinationID] {
+		seconds := 7500
+		standing.XVideoMaxSeconds = &seconds
+	}
+	return standing, nil
 }
 
 // Mentions answers with the account and query it was asked with.
@@ -83,14 +88,19 @@ func TestWritePublishing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listedPremium := map[string]bool{}
+	listedPremium, listedVideo := map[string]bool{}, map[string]bool{}
 	for _, set := range listed.Items {
 		for _, account := range set.Accounts {
 			listedPremium[account.ID] = account.Premium
+			listedVideo[account.ID] = account.XVideoMaxSeconds != nil && *account.XVideoMaxSeconds == 7500
 		}
 	}
 	if !listedPremium[x] || !listedPremium[premium] || listedPremium[linkedin] || listedPremium[premiumLinkedIn] {
 		t.Fatalf("listed standings=%v", listedPremium)
+	}
+	// The verified X video length reaches the listed account, which the composer reads.
+	if !listedVideo[x] || !listedVideo[premium] || listedVideo[linkedin] || listedVideo[premiumLinkedIn] {
+		t.Fatalf("listed video lengths=%v", listedVideo)
 	}
 	draft := func(input ContentDraftInput) *ContentDraftRecord {
 		t.Helper()

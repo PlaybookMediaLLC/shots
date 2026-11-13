@@ -106,13 +106,14 @@ func TestAccountStandingRequiresVerifiedCapabilities(t *testing.T) {
 			editable := `[{"title":"Verified","value":true}]`
 			account.AdditionalSettings = &editable
 			standing, err := p.AccountStanding(context.Background(), "product-org", "destination", "x", "SOCIAL_API_KEY")
-			if err != nil || standing.Premium || standing.XCaptionLimit == nil || *standing.XCaptionLimit != 280 || standing.XArticles != nil {
+			if err != nil || standing.Premium || standing.XCaptionLimit == nil || *standing.XCaptionLimit != 280 || standing.XArticles != nil || standing.XVideoMaxSeconds != nil {
 				t.Fatalf("editable settings granted access: %+v %v", standing, err)
 			}
 			caps := socialidentity.XVerifiedAccountLimits("read-write", &subscription)
 			account.VerifiedCapabilities.X = &caps
 			standing, err = p.AccountStanding(context.Background(), "product-org", "destination", "x", "SOCIAL_API_KEY")
-			if err != nil || standing.Premium != (subscription != "None") || standing.XCaptionLimit == nil || *standing.XCaptionLimit != caps.PostTextLimit() || standing.XArticles == nil || *standing.XArticles != (subscription == "Premium" || subscription == "PremiumPlus") {
+			if err != nil || standing.Premium != (subscription != "None") || standing.XCaptionLimit == nil || *standing.XCaptionLimit != caps.PostTextLimit() || standing.XArticles == nil || *standing.XArticles != (subscription == "Premium" || subscription == "PremiumPlus") ||
+				standing.XVideoMaxSeconds == nil || *standing.XVideoMaxSeconds != *caps.VideoMaxDurationSeconds {
 				t.Fatalf("verified capabilities lost: %+v %v", standing, err)
 			}
 		})
