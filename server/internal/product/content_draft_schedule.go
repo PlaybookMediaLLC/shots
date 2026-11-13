@@ -36,6 +36,7 @@ var draftPlatformChannels = map[string]string{
 	"x": "x", "linkedin": "linkedin", "instagram": "instagram", "instagram-standalone": "instagram",
 	"threads": "threads", "bluesky": "bluesky", "mastodon": "mastodon",
 	"tiktok": "tiktok", "youtube": "youtube", "twitter": "x", "linkedin-page": "linkedin", "mastodon-custom": "mastodon", "mastodoncustom": "mastodon",
+	"facebook": "facebook", "pinterest": "pinterest", "gmb": "gmb",
 }
 
 // EnableE2EDraftPlatform lets the local provider fixture's "e2e" connections
@@ -49,6 +50,7 @@ func EnableE2EDraftPlatform() {
 // same numbers (DRAFT_CHANNEL_LIMITS in lib/content-drafts/serialize.ts).
 var draftChannelLimits = map[string]int{
 	"tiktok": 2000, "youtube": 5000, "bluesky": 300, "instagram": 2200, "linkedin": 3000, "mastodon": 500, "threads": 500, "x": 280,
+	"facebook": 63206, "pinterest": 500, "gmb": 1500,
 }
 
 // ContentDraftScheduleTarget is one channel and the caption serialized for it.
@@ -146,8 +148,9 @@ func recentDuplicates(ctx context.Context, tx *ent.Tx, organizationID string, at
 	// A post publishes at most an hour after its time (the late window), so one
 	// range on scheduledFor finds every candidate through the tenant's index.
 	rows, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID), scheduledpost.ChannelConnectionIDIn(ids...),
-		// UNKNOWN_DELIVERY may be live: the likeliest double post of all.
-		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusPUBLISHED, scheduledpost.StatusUNKNOWN_DELIVERY),
+		// UNKNOWN_DELIVERY may be live: the likeliest double post of all. A post
+		// sent to an app may be posted there.
+		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP, scheduledpost.StatusUNKNOWN_DELIVERY),
 		scheduledpost.ScheduledForGT(from.Add(-time.Hour)), scheduledpost.ScheduledForLT(to)).
 		Select(scheduledpost.FieldID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldCaption, scheduledpost.FieldAssetIds,
 			scheduledpost.FieldScheduledFor, scheduledpost.FieldPublishedAt, scheduledpost.FieldStatus).
@@ -254,6 +257,10 @@ type ContentDraftPost struct {
 	// worker), and when its provider confirmed it.
 	FailureCode *string    `json:"failureCode"`
 	PublishedAt *time.Time `json:"publishedAt"`
+	// When it was deleted from its platform through Shots; it stays PUBLISHED.
+	DeletedAt *time.Time `json:"deletedAt"`
+	// Each part of a requested delete, with its receipt.
+	Deletions []PostDeletionReceipt `json:"deletions"`
 }
 
 // livePostURL is a live post's address on its platform, where one can be
@@ -324,7 +331,7 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		URL: postURL, Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
 		NaturalOffsetSeconds: post.NaturalOffsetSeconds, ScheduleMode: mode, ScheduleTimeZone: post.ScheduleTimeZone,
 		SlotAt: post.SlotAt, SocialSetID: post.SocialSetID, Automations: []PostAutomation{},
-		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt}
+		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt, Deletions: []PostDeletionReceipt{}}
 }
 
 // validateDraftTargets checks the shape of a schedule before any lookup.
@@ -350,7 +357,8 @@ func validateDraftTargets(input ScheduleContentDraftInput) error {
 			return invalid("Each channel must be a distinct, valid connection.")
 		}
 		seen[target.ChannelConnectionID] = true
-		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "") {
+		// A story has no caption: its media check says what it needs.
+		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "" && !target.Options.Story()) {
 			return invalid("Every channel needs a caption.")
 		}
 	}
@@ -439,7 +447,19 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := checkDraftMedia(channel, rows); err != nil {
+		story := target.Options.Story()
+		if story {
+			if err := checkStory(channel, target); err != nil {
+				return nil, nil, err
+			}
+			err = checkStoryMedia(channel, rows)
+		} else {
+			err = checkDraftMedia(channel, rows)
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := checkOptionMedia(ctx, tx.Client(), organizationID, channel, target.Options, rows); err != nil {
 			return nil, nil, err
 		}
 		if channel == "tiktok" {
@@ -503,6 +523,18 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		}
 	}
 	return connections, images, nil
+}
+
+// checkStory checks what a story leaves out: its text, which goes to the
+// draft's other platforms, and a first comment.
+func checkStory(channel string, target ContentDraftScheduleTarget) error {
+	if strings.TrimSpace(target.Caption) != "" || len(target.Replies) > 0 {
+		return invalid(storyLabel(channel) + " has no caption. Its text goes to your other platforms.")
+	}
+	if strings.TrimSpace(target.Options.FirstComment) != "" {
+		return invalid(storyLabel(channel) + " takes no first comment.")
+	}
+	return nil
 }
 
 // checkDraftExtras checks a target's follow-ups: X only, and sensible.
@@ -742,7 +774,7 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID,
 func liveDraftChannels(ctx context.Context, tx *ent.Tx, draftID string, targets []ContentDraftScheduleTarget) ([]string, error) {
 	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(draftID), scheduledpost.StatusIn(
 		scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING,
-		scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED)).All(ctx)
+		scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +785,7 @@ func liveDraftChannels(ctx context.Context, tx *ent.Tx, draftID string, targets 
 				return nil, conflict("This draft already has a post on a selected account. Reschedule that post instead of adding another.")
 			}
 		}
-		if post.Status != scheduledpost.StatusPUBLISHED && !slices.Contains(kept, post.ChannelConnectionID) {
+		if post.Status != scheduledpost.StatusPUBLISHED && post.Status != scheduledpost.StatusSENT_TO_APP && !slices.Contains(kept, post.ChannelConnectionID) {
 			kept = append(kept, post.ChannelConnectionID)
 		}
 	}
@@ -832,7 +864,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			media = append(media, reply.AssetIDs...)
 		}
 		if target.Options != nil {
-			media = append(media, target.Options.DocumentAssetID, target.Options.ArticleCoverAssetID)
+			media = append(media, target.Options.DocumentAssetID, target.Options.ArticleCoverAssetID,
+				postoptions.CoverAsset(target.Options.YouTube, target.Options.Instagram))
 		}
 	}
 	if _, err := tx.PlatformExec(ctx, `SELECT id FROM asset WHERE "organizationId"=$1 AND id = ANY($2::text[]) FOR SHARE`,
@@ -1139,11 +1172,18 @@ func (c *Configuration) ListContentDraftPosts(ctx context.Context, actor Actor, 
 	if err != nil {
 		return nil, err
 	}
+	deletions, err := c.deletionReceipts(ctx, posts...)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]ContentDraftPost, 0, len(posts))
 	for _, post := range posts {
 		item := contentDraftPost(post, post.Edges.ChannelConnection.Platform)
 		if found := automations[post.ID]; found != nil {
 			item.Automations = found
+		}
+		if found := deletions[post.ID]; found != nil {
+			item.Deletions = found
 		}
 		items = append(items, item)
 	}

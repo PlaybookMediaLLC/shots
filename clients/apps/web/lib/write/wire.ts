@@ -33,6 +33,8 @@ export const draftWriteFieldsSchema = z.object({
   platformVersions: platformVersionsSchema,
   /** Posts waiting to go out (lists only). */
   queuedPosts: z.number().int(),
+  /** Posts sent to an app as drafts, finished there; never published (lists only). */
+  sentToAppPosts: z.number().int().default(0),
   /** Internal notes; never part of a post. */
   scratchpad: z.string(),
   /** The draft it was duplicated, copied or recovered from. */
@@ -110,6 +112,7 @@ export const postAutomationKindSchema = z.enum([
   'plug',
   'repost_at_likes',
   'quote',
+  'thumbnail',
 ])
 
 /** Where a follow-up is: waiting, settled one way or another. */
@@ -121,6 +124,20 @@ export const postAutomationStatusSchema = z.enum([
   'cancelled',
   'expired',
 ])
+
+/**
+ * One part of a delete from the platform and its receipt: the root, a thread
+ * part (`thread:N`), a follow-up reply, or a repost to undo (`repost:...`).
+ * `failureCode` is a short code such as `http_403`.
+ */
+export const postDeletionReceiptSchema = z.object({
+  attempts: z.number().int(),
+  failureCode: z.string().nullable(),
+  key: z.string(),
+  kind: z.enum(['post', 'repost']),
+  status: z.enum(['pending', 'done', 'failed', 'unsupported']),
+  updatedAt: timestampSchema,
+})
 
 /**
  * A live post's follow-up and its receipt (RFC 025). `failureCode` is a

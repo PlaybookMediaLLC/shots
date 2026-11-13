@@ -363,7 +363,7 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 	if err != nil {
 		return nil, err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusPROCESSING {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusPROCESSING {
 		return nil, ErrInvalidState
 	}
 	if post.Status != scheduledpost.StatusCANCELLED {
@@ -616,16 +616,25 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if post.ReplyTo != nil {
 		job.ReplyTo = *post.ReplyTo
 	}
-	// A document or article cover that was deleted cancels the post too.
-	for _, id := range []string{post.PublishOptions.DocumentAssetID, post.PublishOptions.ArticleCoverAssetID} {
+	// A document or cover that was deleted cancels the post too. A YouTube
+	// thumbnail does not: it is a follow-up, and its step reports it missing.
+	options := post.PublishOptions
+	thumbnail := options.YouTube != nil && options.YouTube.ThumbnailAssetID != ""
+	for _, id := range []string{options.DocumentAssetID, options.ArticleCoverAssetID, postoptions.CoverAsset(options.YouTube, options.Instagram)} {
 		if id == "" {
 			continue
 		}
 		media, missing, err := r.draftMedia(ctx, post.OrganizationID, []string{id})
-		if err != nil || missing {
+		if err != nil {
 			return inactive, err
 		}
-		if id == post.PublishOptions.DocumentAssetID {
+		if missing && thumbnail && id == options.YouTube.ThumbnailAssetID {
+			continue
+		}
+		if missing {
+			return inactive, nil
+		}
+		if id == options.DocumentAssetID {
 			job.Document = &media[0]
 		} else {
 			job.Cover = &media[0]
@@ -749,7 +758,7 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	if err != nil {
 		return err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
 		return nil
 	}
 	updated, err := tx.ScheduledPost.Update().Where(
@@ -790,17 +799,31 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		return err
 	}
 	defer tx.Rollback()
-	updated, err := tx.ScheduledPost.Update().Where(
+	options, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).Select(scheduledpost.FieldPublishOptions).Only(ctx)
+	if err != nil {
+		return err
+	}
+	// A TikTok app draft reached the person's TikTok app, where they finish
+	// and post it: delivered, never published from here.
+	inApp := options.PublishOptions.TikTok != nil && options.PublishOptions.TikTok.SendToApp
+	status, event := scheduledpost.StatusPUBLISHED, "post.published"
+	update := tx.ScheduledPost.Update().Where(
 		scheduledpost.ID(post.ID),
 		scheduledpost.StatusEQ(scheduledpost.StatusPROCESSING),
 		scheduledpost.TriggerRunIDEQ(runID),
-	).SetStatus(scheduledpost.StatusPUBLISHED).SetPublishedAt(time.Now().UTC()).SetRemotePostID(providerPostID).Save(ctx)
+	).SetRemotePostID(providerPostID)
+	if inApp {
+		status, event = scheduledpost.StatusSENT_TO_APP, "post.sent_to_app"
+	} else {
+		update.SetPublishedAt(time.Now().UTC())
+	}
+	updated, err := update.SetStatus(status).Save(ctx)
 	if err != nil || updated != 1 {
 		if err != nil {
 			return err
 		}
 		published, queryErr := tx.ScheduledPost.Query().Where(
-			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED),
+			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(status),
 		).Exist(ctx)
 		if queryErr != nil {
 			return queryErr
@@ -819,8 +842,10 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		}
 		return ErrInvalidState
 	}
+	// The worker passes a partial post; the draft event needs the stored one.
 	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).
-		Select(scheduledpost.FieldID, scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
+		Select(scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldContentDraftID,
+			scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
 		WithChannelConnection(func(q *ent.ChannelConnectionQuery) {
 			q.Select(channelconnection.FieldID, channelconnection.FieldPlatform)
 		}).Only(ctx)
@@ -832,14 +857,17 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		SetNillableRemoteURL(postoptions.PostURL(platformOf(live), &providerPostID, live.ThreadProgress)).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.published", auditInput{
-		Action: "post.published", Actor: serviceActor(post), EntityID: post.ID,
+	if err := recordPostActivity(ctx, tx, event, auditInput{
+		Action: event, Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"providerPostId": providerPostID},
 	}); err != nil {
 		return err
 	}
-	if err := emitDraftPublished(ctx, tx, post, providerPostID); err != nil {
+	if inApp {
+		return tx.Commit()
+	}
+	if err := emitDraftPublished(ctx, tx, live, providerPostID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -896,11 +924,18 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 		SetNillableProviderMessage(nonEmpty(RedactProviderMessage(attempt.ProviderMessage))).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.publish_failed", auditInput{
+	failed := auditInput{
 		Action: "post.publish_failed", Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": failureCode, "retry": retry},
-	}); err != nil {
+	}
+	// An automatic retry needs no one yet: only the attempt that gives up alerts.
+	if retry {
+		err = appendAudit(ctx, tx, failed)
+	} else {
+		err = recordPostActivity(ctx, tx, "post.publish_failed", failed)
+	}
+	if err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1047,7 +1082,7 @@ func serviceActor(post *ent.ScheduledPost) Actor {
 	if post.TriggerRunID != nil && *post.TriggerRunID != "" {
 		requestID = *post.TriggerRunID
 	}
-	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Type: "SERVICE"}
+	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Source: "workflow", Type: "SERVICE"}
 }
 
 func ProviderFailureCode(status int, unknown bool) string {

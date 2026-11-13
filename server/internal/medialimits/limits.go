@@ -43,6 +43,12 @@ type AccountVideo struct {
 	MaxBytes int64 `json:"maxBytes"`
 }
 
+// CoverRules are the images a destination takes as a video's cover.
+type CoverRules struct {
+	Formats  []string `json:"formats"`
+	MaxBytes int      `json:"maxBytes"`
+}
+
 // Destination is one draft channel's media rules, shared with the composer
 // (lib/write/capabilities.ts). Docs and VerifiedOn record where each number was
 // read. Account-specific limits are checked separately.
@@ -64,9 +70,13 @@ type Destination struct {
 		Alone    bool `json:"alone"`
 		MaxBytes int  `json:"maxBytes"`
 	} `json:"gif"`
-	Video      *VideoRules `json:"video"`
-	Docs       []string    `json:"docs"`
-	VerifiedOn string      `json:"verifiedOn"`
+	Video *VideoRules `json:"video"`
+	// Cover is the image a video post takes as its cover or thumbnail.
+	Cover *CoverRules `json:"cover"`
+	// Story is what one story takes, where the destination has stories.
+	Story      *Destination `json:"story"`
+	Docs       []string     `json:"docs"`
+	VerifiedOn string       `json:"verifiedOn"`
 }
 
 var Limits struct {

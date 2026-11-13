@@ -10,7 +10,7 @@ import { draftChannelSchema, type DraftChannel } from '@/lib/write/document'
  * (an X subscription, a Mastodon server, Bluesky upload rights) are checked
  * by the backend against the account's verified capabilities.
  */
-const destinationSchema = z.object({
+const rulesSchema = z.object({
   maxMedia: z.number().int().positive(),
   requiresMedia: z.boolean().optional(),
   mixed: z.boolean(),
@@ -29,8 +29,17 @@ const destinationSchema = z.object({
       maxBytes: z.number().int().positive(),
     })
     .optional(),
+  /** The image a video post takes as its cover or thumbnail. */
+  cover: z
+    .object({ formats: z.array(z.string()), maxBytes: z.number().int().positive() })
+    .optional(),
   docs: z.array(z.url()),
   verifiedOn: z.string(),
+})
+
+const destinationSchema = rulesSchema.extend({
+  /** What one story takes, where the destination has stories. */
+  story: rulesSchema.optional(),
 })
 
 /** One destination's media rules. */
@@ -61,6 +70,9 @@ export const LABELS: Record<DraftChannel, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   x: 'X',
+  facebook: 'Facebook',
+  pinterest: 'Pinterest',
+  gmb: 'Google Business',
 }
 
 /** Formats as people know them: JPEG, PNG, MP4, MOV. */
@@ -93,24 +105,37 @@ export function clock(ms: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+/** A channel's story as Go names it (`storyLabel`): "An Instagram story". */
+function storyLabel(channel: DraftChannel): string {
+  return `${/^[AEIOU]/.test(LABELS[channel]) ? 'An' : 'A'} ${LABELS[channel]} story`
+}
+
 /**
  * Why one post's attachments, in order, cannot go to a channel, as the
  * backend words it; empty when they can. Only known facts are checked.
  */
-export function mediaProblems(channel: DraftChannel, media: MediaFacts[]): string[] {
-  const rules = DESTINATION_MEDIA[channel]
-  const label = LABELS[channel]
+export function mediaProblems(
+  channel: DraftChannel,
+  media: MediaFacts[],
+  placement?: 'story'
+): string[] {
+  const story = DESTINATION_MEDIA[channel].story
+  if (placement === 'story' && !story) return [`${LABELS[channel]} takes no stories.`]
+  const rules = (placement === 'story' && story) || DESTINATION_MEDIA[channel]
+  const label = placement === 'story' ? storyLabel(channel) : LABELS[channel]
   if (media.length === 0)
     return rules.requiresMedia
       ? [
           rules.images.length === 0
             ? `${label} needs one video. Add one to the post.`
-            : `${label} needs at least one image or video. Add one to the post.`,
+            : rules.video
+              ? `${label} needs at least one image or video. Add one to the post.`
+              : `${label} needs an image. Add one to the post.`,
         ]
       : []
   if (media.length > rules.maxMedia)
     return [
-      `${label} takes up to ${rules.maxMedia} attachments in one post; this one has ${media.length}. Remove some, or schedule them as separate posts.`,
+      `${label} takes up to ${rules.maxMedia} attachment${rules.maxMedia === 1 ? '' : 's'} in one post; this one has ${media.length}. Remove some, or schedule them as separate posts.`,
     ]
   let images = 0,
     gifs = 0,

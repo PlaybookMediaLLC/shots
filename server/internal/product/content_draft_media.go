@@ -10,6 +10,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/mediavideo"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 )
 
 // Scheduling checks each post's media against its channel's published limits
@@ -19,6 +20,7 @@ import (
 
 var draftChannelLabels = map[string]string{
 	"tiktok": "TikTok", "youtube": "YouTube", "x": "X", "linkedin": "LinkedIn", "instagram": "Instagram", "threads": "Threads", "bluesky": "Bluesky", "mastodon": "Mastodon",
+	"facebook": "Facebook", "pinterest": "Pinterest", "gmb": "Google Business",
 }
 
 // draftMediaLimit is how many attachments one post on a channel takes.
@@ -74,18 +76,51 @@ func checkDraftMedia(channel string, rows []*ent.Asset) error {
 	if !ok {
 		return nil
 	}
+	return checkMedia(draftChannelLabels[channel], rules, rows)
+}
+
+// checkStoryMedia checks a story's attachment against its destination's story rules.
+func checkStoryMedia(channel string, rows []*ent.Asset) error {
+	rules := medialimits.Limits.Destinations[channel].Story
+	if rules == nil {
+		return invalid(draftChannelLabels[channel] + " takes no stories.")
+	}
+	return checkMedia(storyLabel(channel), *rules, rows)
+}
+
+// storyLabel names a channel's story as the composer does: "An Instagram story".
+func storyLabel(channel string) string {
 	label := draftChannelLabels[channel]
+	if strings.ContainsAny(label[:1], "AEIOU") {
+		return "An " + label + " story"
+	}
+	return "A " + label + " story"
+}
+
+// plural is a noun for a count: "1 attachment", "4 attachments".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return noun
+	}
+	return noun + "s"
+}
+
+// checkMedia checks attachments, in order, against one set of rules.
+func checkMedia(label string, rules medialimits.Destination, rows []*ent.Asset) error {
 	if len(rows) == 0 {
 		if rules.RequiresMedia {
-			if len(rules.Images) == 0 {
+			switch {
+			case len(rules.Images) == 0:
 				return conflict(label + " needs one video. Add one to the post.")
+			case rules.Video == nil:
+				return conflict(label + " needs an image. Add one to the post.")
 			}
 			return conflict(label + " needs at least one image or video. Add one to the post.")
 		}
 		return nil
 	}
 	if len(rows) > rules.MaxMedia {
-		return invalid(fmt.Sprintf("%s takes up to %d attachments in one post; this one has %d. Remove some, or schedule them as separate posts.", label, rules.MaxMedia, len(rows)))
+		return invalid(fmt.Sprintf("%s takes up to %d %s in one post; this one has %d. Remove some, or schedule them as separate posts.", label, rules.MaxMedia, plural(rules.MaxMedia, "attachment"), len(rows)))
 	}
 	images, gifs, videos := 0, 0, 0
 	for i, row := range rows {
@@ -152,6 +187,46 @@ func checkDraftMedia(channel string, rows []*ent.Asset) error {
 	}
 	if !rules.Mixed && videos > 0 && images+gifs > 0 {
 		return conflict(label + " can't mix images and video in one post.")
+	}
+	return nil
+}
+
+// checkOptionMedia checks what a post's options need of its media: one video
+// for Instagram's reel settings, a photo or a reel to tag accounts on, and a
+// cover or thumbnail its destination takes.
+func checkOptionMedia(ctx context.Context, client *ent.Client, organizationID, channel string, options *postoptions.PublishOptions, rows []*ent.Asset) error {
+	if options == nil {
+		return nil
+	}
+	if ig := options.Instagram; ig != nil {
+		reel := len(rows) == 1 && strings.HasPrefix(rows[0].MediaType, "video/")
+		photo := slices.ContainsFunc(rows, func(row *ent.Asset) bool { return strings.HasPrefix(row.MediaType, "image/") })
+		if ig.Reel() && !reel {
+			return invalid("A cover, grid setting or trial is for a reel. Post one video, or turn them off.")
+		}
+		if len(ig.UserTags) > 0 && !reel && !photo {
+			return invalid("Tag accounts on a photo or a reel.")
+		}
+	}
+	id := postoptions.CoverAsset(options.YouTube, options.Instagram)
+	if id == "" {
+		return nil
+	}
+	covers, err := draftMediaRows(ctx, client, organizationID, []string{id})
+	if err != nil {
+		return err
+	}
+	return checkCover(channel, covers[0])
+}
+
+// checkCover checks a cover or thumbnail against its destination's rules.
+func checkCover(channel string, cover *ent.Asset) error {
+	label, rules := draftChannelLabels[channel], medialimits.Limits.Destinations[channel].Cover
+	if rules == nil {
+		return invalid(label + " takes no custom cover.")
+	}
+	if !slices.Contains(rules.Formats, cover.MediaType) || cover.Bytes > rules.MaxBytes {
+		return conflict(fmt.Sprintf("%s takes a %s cover of up to %.0f MB. Choose another image.", label, formatNames(rules.Formats), float64(rules.MaxBytes)/1_000_000))
 	}
 	return nil
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { prepareWorkspaceSwitch } from '@/lib/platform/navigation-guard'
 import { announceSessionChange } from '@/lib/auth/client'
 
@@ -181,11 +183,14 @@ export function WorkspaceCreationDialog({
             >
               Invite members
             </Button>
-            <Button disabled aria-describedby="workspace-move-unavailable" variant="outline">
-              Move a personal profile
+            <Button asChild variant="outline">
+              <Link aria-describedby="workspace-move-how" href="/settings/publishing-brands">
+                Move a profile here
+              </Link>
             </Button>
-            <p id="workspace-move-unavailable" className="text-sm text-muted-foreground">
-              Moving existing sets between workspaces is not available yet.
+            <p id="workspace-move-how" className="text-sm text-muted-foreground">
+              Open a profile in the workspace you are in now and choose Move to another
+              workspace. The new workspace needs a plan first.
             </p>
             <p className="text-sm text-muted-foreground">
               Choose this workspace&apos;s plan before publishing or adding teammates.

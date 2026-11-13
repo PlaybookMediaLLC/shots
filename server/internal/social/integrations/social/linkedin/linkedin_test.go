@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -295,6 +296,40 @@ func TestComment(t *testing.T) {
 	}
 	if v := f.find("POST", "/rest/socialActions/urn:li:share:9/comments")[0].header.Get("LinkedIn-Version"); v != Headers("", "")["LinkedIn-Version"] {
 		t.Fatalf("version %q", v)
+	}
+}
+
+// A delete removes a post or a comment as its author; a missing post reports 404.
+func TestDeletePost(t *testing.T) {
+	var actors []string
+	deleted := func(w http.ResponseWriter, r *http.Request) {
+		actors = append(actors, r.URL.Query().Get("actor"))
+		w.WriteHeader(http.StatusNoContent)
+	}
+	f, _ := newFake(t, map[string]http.HandlerFunc{
+		"DELETE /rest/posts/urn:li:share:9":                    deleted,
+		"DELETE /rest/socialActions/urn:li:share:9/comments/5": deleted,
+		"DELETE /rest/posts/urn:li:share:8":                    func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) },
+	})
+	ctx, member := context.Background(), &ent.Integration{Token: "tok", InternalID: "person1"}
+	if err := New().DeletePost(ctx, member, "urn:li:share:9"); err != nil {
+		t.Fatal(err)
+	}
+	if h := f.find("DELETE", "/rest/posts/urn:li:share:9")[0].header; h.Get("X-RestLi-Method") != "DELETE" || h.Get("Authorization") != "Bearer tok" {
+		t.Fatalf("headers %v", h)
+	}
+	if err := New().DeletePost(ctx, member, "urn:li:comment:(urn:li:share:9,5)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithIdentifier("linkedin-page").DeletePost(ctx, &ent.Integration{Token: "tok", InternalID: "106"}, "urn:li:comment:(urn:li:share:9,5)"); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(actors, []string{"", "urn:li:person:person1", "urn:li:organization:106"}) {
+		t.Fatalf("actors %v", actors)
+	}
+	var status interface{ HTTPStatus() int }
+	if err := New().DeletePost(ctx, member, "urn:li:share:8"); !errors.As(err, &status) || status.HTTPStatus() != 404 {
+		t.Fatalf("missing post = %v", err)
 	}
 }
 

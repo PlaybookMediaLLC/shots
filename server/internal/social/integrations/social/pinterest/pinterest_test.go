@@ -218,3 +218,48 @@ func TestValidate(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestAnErrorAnswerIsNeverReadAsNoBoards(t *testing.T) {
+	status := http.StatusUnauthorized
+	p, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		w.Write([]byte(`{"code":2,"message":"Authentication failed."}`))
+	})
+	if boards, err := p.Boards(context.Background(), "revoked"); err == nil {
+		t.Fatalf("a refused token listed boards %v", boards)
+	}
+	status = http.StatusOK
+	if boards, err := p.Boards(context.Background(), "token"); err != nil || len(boards) != 0 {
+		t.Fatalf("an account with no boards: %v %v", boards, err)
+	}
+}
+
+func TestRefreshKeepsAPassingFailureApartFromARefusedGrant(t *testing.T) {
+	t.Setenv("PINTEREST_CLIENT_ID", "cid")
+	t.Setenv("PINTEREST_CLIENT_SECRET", "sec")
+	status := http.StatusServiceUnavailable
+	p, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v5/oauth/token":
+			w.WriteHeader(status)
+			json.NewEncoder(w).Encode(map[string]any{"access_token": "new", "refresh_token": "rotated", "expires_in": 100})
+		case "/v5/user_account":
+			w.Write([]byte(`{"id":"u1","username":"jane"}`))
+		}
+	})
+	for _, passing := range []int{http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		status = passing
+		if _, err := p.RefreshToken(context.Background(), "old"); !errors.Is(err, integrations.ErrRefreshUnavailable) {
+			t.Fatalf("%d: %v, want a retry on the next run", passing, err)
+		}
+	}
+	status = http.StatusBadRequest
+	if _, err := p.RefreshToken(context.Background(), "old"); err == nil || errors.Is(err, integrations.ErrRefreshUnavailable) {
+		t.Fatalf("a refused grant: %v, want a reconnect", err)
+	}
+	status = http.StatusOK
+	details, err := p.RefreshToken(context.Background(), "old")
+	if err != nil || details.AccessToken != "new" || details.RefreshToken != "rotated" {
+		t.Fatalf("refresh = %+v, %v; want the rotated refresh token kept", details, err)
+	}
+}

@@ -219,6 +219,16 @@ func publishingOrigin(integration *ent.Integration, posts []integrations.PostDet
 	return origin, nil
 }
 
+// DeletePost deletes a status on the connection's own instance; the embedded
+// default-instance delete must never reach another server.
+func (p *Provider) DeletePost(ctx context.Context, integration *ent.Integration, id string) error {
+	origin, err := instanceURL(integration)
+	if err != nil {
+		return err
+	}
+	return mastodon.DeleteStatus(ctx, p.client, origin, integration.Token, id)
+}
+
 func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []integrations.PostDetails, integration *ent.Integration) ([]integrations.PostResponse, error) {
 	origin, err := publishingOrigin(integration, posts)
 	if err != nil {

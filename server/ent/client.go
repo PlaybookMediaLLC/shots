@@ -118,6 +118,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsocialobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformworkspacecreation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postdeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
@@ -376,6 +377,8 @@ type Client struct {
 	PlatformWorkspaceCreation *PlatformWorkspaceCreationClient
 	// PostAutomationRun is the client for interacting with the PostAutomationRun builders.
 	PostAutomationRun *PostAutomationRunClient
+	// PostDeletion is the client for interacting with the PostDeletion builders.
+	PostDeletion *PostDeletionClient
 	// ProductProfile is the client for interacting with the ProductProfile builders.
 	ProductProfile *ProductProfileClient
 	// ProductSurface is the client for interacting with the ProductSurface builders.
@@ -580,6 +583,7 @@ func (c *Client) init() {
 	c.PlatformSocialObservation = NewPlatformSocialObservationClient(c.config)
 	c.PlatformWorkspaceCreation = NewPlatformWorkspaceCreationClient(c.config)
 	c.PostAutomationRun = NewPostAutomationRunClient(c.config)
+	c.PostDeletion = NewPostDeletionClient(c.config)
 	c.ProductProfile = NewProductProfileClient(c.config)
 	c.ProductSurface = NewProductSurfaceClient(c.config)
 	c.Project = NewProjectClient(c.config)
@@ -820,6 +824,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PlatformSocialObservation:       NewPlatformSocialObservationClient(cfg),
 		PlatformWorkspaceCreation:       NewPlatformWorkspaceCreationClient(cfg),
 		PostAutomationRun:               NewPostAutomationRunClient(cfg),
+		PostDeletion:                    NewPostDeletionClient(cfg),
 		ProductProfile:                  NewProductProfileClient(cfg),
 		ProductSurface:                  NewProductSurfaceClient(cfg),
 		Project:                         NewProjectClient(cfg),
@@ -987,6 +992,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PlatformSocialObservation:       NewPlatformSocialObservationClient(cfg),
 		PlatformWorkspaceCreation:       NewPlatformWorkspaceCreationClient(cfg),
 		PostAutomationRun:               NewPostAutomationRunClient(cfg),
+		PostDeletion:                    NewPostDeletionClient(cfg),
 		ProductProfile:                  NewProductProfileClient(cfg),
 		ProductSurface:                  NewProductSurfaceClient(cfg),
 		Project:                         NewProjectClient(cfg),
@@ -1094,8 +1100,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
-		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
-		c.PublicationAttempt, c.Release, c.ReleaseAutomation,
+		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
+		c.ProjectVersion, c.PublicationAttempt, c.Release, c.ReleaseAutomation,
 		c.ReleaseAutomationExecutor, c.ReleaseAutomationNode, c.ReleaseAutomationRun,
 		c.ReleaseAutomationVersion, c.ReleaseDocument, c.ReleaseSourceEvent,
 		c.ReleaseSpec, c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink,
@@ -1150,8 +1156,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
-		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
-		c.PublicationAttempt, c.Release, c.ReleaseAutomation,
+		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
+		c.ProjectVersion, c.PublicationAttempt, c.Release, c.ReleaseAutomation,
 		c.ReleaseAutomationExecutor, c.ReleaseAutomationNode, c.ReleaseAutomationRun,
 		c.ReleaseAutomationVersion, c.ReleaseDocument, c.ReleaseSourceEvent,
 		c.ReleaseSpec, c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink,
@@ -1378,6 +1384,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PlatformWorkspaceCreation.mutate(ctx, m)
 	case *PostAutomationRunMutation:
 		return c.PostAutomationRun.mutate(ctx, m)
+	case *PostDeletionMutation:
+		return c.PostDeletion.mutate(ctx, m)
 	case *ProductProfileMutation:
 		return c.ProductProfile.mutate(ctx, m)
 	case *ProductSurfaceMutation:
@@ -15252,6 +15260,139 @@ func (c *PostAutomationRunClient) mutate(ctx context.Context, m *PostAutomationR
 	}
 }
 
+// PostDeletionClient is a client for the PostDeletion schema.
+type PostDeletionClient struct {
+	config
+}
+
+// NewPostDeletionClient returns a client for the PostDeletion from the given config.
+func NewPostDeletionClient(c config) *PostDeletionClient {
+	return &PostDeletionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `postdeletion.Hooks(f(g(h())))`.
+func (c *PostDeletionClient) Use(hooks ...Hook) {
+	c.hooks.PostDeletion = append(c.hooks.PostDeletion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `postdeletion.Intercept(f(g(h())))`.
+func (c *PostDeletionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PostDeletion = append(c.inters.PostDeletion, interceptors...)
+}
+
+// Create returns a builder for creating a PostDeletion entity.
+func (c *PostDeletionClient) Create() *PostDeletionCreate {
+	mutation := newPostDeletionMutation(c.config, OpCreate)
+	return &PostDeletionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PostDeletion entities.
+func (c *PostDeletionClient) CreateBulk(builders ...*PostDeletionCreate) *PostDeletionCreateBulk {
+	return &PostDeletionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PostDeletionClient) MapCreateBulk(slice any, setFunc func(*PostDeletionCreate, int)) *PostDeletionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PostDeletionCreateBulk{err: fmt.Errorf("calling to PostDeletionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PostDeletionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PostDeletionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PostDeletion.
+func (c *PostDeletionClient) Update() *PostDeletionUpdate {
+	mutation := newPostDeletionMutation(c.config, OpUpdate)
+	return &PostDeletionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PostDeletionClient) UpdateOne(_m *PostDeletion) *PostDeletionUpdateOne {
+	mutation := newPostDeletionMutation(c.config, OpUpdateOne, withPostDeletion(_m))
+	return &PostDeletionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PostDeletionClient) UpdateOneID(id string) *PostDeletionUpdateOne {
+	mutation := newPostDeletionMutation(c.config, OpUpdateOne, withPostDeletionID(id))
+	return &PostDeletionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PostDeletion.
+func (c *PostDeletionClient) Delete() *PostDeletionDelete {
+	mutation := newPostDeletionMutation(c.config, OpDelete)
+	return &PostDeletionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PostDeletionClient) DeleteOne(_m *PostDeletion) *PostDeletionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PostDeletionClient) DeleteOneID(id string) *PostDeletionDeleteOne {
+	builder := c.Delete().Where(postdeletion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PostDeletionDeleteOne{builder}
+}
+
+// Query returns a query builder for PostDeletion.
+func (c *PostDeletionClient) Query() *PostDeletionQuery {
+	return &PostDeletionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePostDeletion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PostDeletion entity by its id.
+func (c *PostDeletionClient) Get(ctx context.Context, id string) (*PostDeletion, error) {
+	return c.Query().Where(postdeletion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PostDeletionClient) GetX(ctx context.Context, id string) *PostDeletion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PostDeletionClient) Hooks() []Hook {
+	return c.hooks.PostDeletion
+}
+
+// Interceptors returns the client interceptors.
+func (c *PostDeletionClient) Interceptors() []Interceptor {
+	return c.inters.PostDeletion
+}
+
+func (c *PostDeletionClient) mutate(ctx context.Context, m *PostDeletionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PostDeletionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PostDeletionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PostDeletionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PostDeletionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PostDeletion mutation op: %q", m.Op())
+	}
+}
+
 // ProductProfileClient is a client for the ProductProfile schema.
 type ProductProfileClient struct {
 	config
@@ -21318,18 +21459,18 @@ type (
 		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
-		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
-		Release, ReleaseAutomation, ReleaseAutomationExecutor, ReleaseAutomationNode,
-		ReleaseAutomationRun, ReleaseAutomationVersion, ReleaseDocument,
-		ReleaseSourceEvent, ReleaseSpec, ScheduledPost, ScreenshotCache, Session,
-		ShareLink, SocialOAuthStart, SocialSet, SocialSetWritingSample,
-		SocialTenantBinding, SourceApp, SourceChange, StorePublishingCredential,
-		StoreReview, StoreReviewComment, SupportAccessGrant, SurfaceCapture, User,
-		UserPreference, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
-		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
-		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceCreditGrant,
-		WorkspaceDeletion, WorkspaceEntitlement, WorkspaceGitHubInstallation,
-		WorkspaceSettings []ent.Hook
+		PostDeletion, ProductProfile, ProductSurface, Project, ProjectVersion,
+		PublicationAttempt, Release, ReleaseAutomation, ReleaseAutomationExecutor,
+		ReleaseAutomationNode, ReleaseAutomationRun, ReleaseAutomationVersion,
+		ReleaseDocument, ReleaseSourceEvent, ReleaseSpec, ScheduledPost,
+		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
+		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
+		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,
+		SurfaceCapture, User, UserPreference, VoiceAudioRun, VoiceCommand,
+		VoiceMemberSettings, VoiceNote, VoiceSettings, VoiceTranscriptRevision,
+		WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription,
+		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
+		WorkspaceGitHubInstallation, WorkspaceSettings []ent.Hook
 	}
 	inters struct {
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
@@ -21362,17 +21503,17 @@ type (
 		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
-		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
-		Release, ReleaseAutomation, ReleaseAutomationExecutor, ReleaseAutomationNode,
-		ReleaseAutomationRun, ReleaseAutomationVersion, ReleaseDocument,
-		ReleaseSourceEvent, ReleaseSpec, ScheduledPost, ScreenshotCache, Session,
-		ShareLink, SocialOAuthStart, SocialSet, SocialSetWritingSample,
-		SocialTenantBinding, SourceApp, SourceChange, StorePublishingCredential,
-		StoreReview, StoreReviewComment, SupportAccessGrant, SurfaceCapture, User,
-		UserPreference, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
-		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
-		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceCreditGrant,
-		WorkspaceDeletion, WorkspaceEntitlement, WorkspaceGitHubInstallation,
-		WorkspaceSettings []ent.Interceptor
+		PostDeletion, ProductProfile, ProductSurface, Project, ProjectVersion,
+		PublicationAttempt, Release, ReleaseAutomation, ReleaseAutomationExecutor,
+		ReleaseAutomationNode, ReleaseAutomationRun, ReleaseAutomationVersion,
+		ReleaseDocument, ReleaseSourceEvent, ReleaseSpec, ScheduledPost,
+		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
+		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
+		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,
+		SurfaceCapture, User, UserPreference, VoiceAudioRun, VoiceCommand,
+		VoiceMemberSettings, VoiceNote, VoiceSettings, VoiceTranscriptRevision,
+		WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription,
+		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
+		WorkspaceGitHubInstallation, WorkspaceSettings []ent.Interceptor
 	}
 )

@@ -7,6 +7,9 @@ test(
   async ({ app, page, startWorkspace }) => {
     const workspace = await startWorkspace({ channels: ['x'] })
     const anchor = new Date(Date.now() + 10 * 86_400_000)
+    // A Tuesday: the three days the posts move between share one row of the
+    // month grid, so no drag has to scroll the grid under the pointer.
+    anchor.setUTCDate(anchor.getUTCDate() + ((9 - anchor.getUTCDay()) % 7))
     anchor.setUTCHours(10, 0, 0, 0)
     const secondAt = new Date(anchor.getTime() + 86_400_000)
     const create = async (title: string, at: Date) => {

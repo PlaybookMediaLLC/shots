@@ -14,6 +14,7 @@ import {
   moveAttachment,
   moveAttachmentRelative,
   removeAttachment,
+  replaceWithDerived,
 } from '../lib/write/media-operations'
 
 const image = (id: string) => ({
@@ -162,4 +163,37 @@ test('TF-068: upload UI shares plan and media byte ceilings with Go', () => {
   assert.equal(uploadByteLimit('image/png', 'free'), 5_000_000)
   assert.equal(uploadByteLimit('image/png', 'pro'), 20_000_000)
   assert.equal(uploadByteLimit('application/pdf'), 100_000_000)
+})
+
+test('UP-03: a crop and a frame each replace the other on the attachment, and refuse a changed one', () => {
+  const editor = createPlateEditor({ value: [image('a')] as never })
+  const file = (assetId: string) => ({
+    assetId,
+    height: 600,
+    mimeType: 'image/jpeg',
+    sourceAssetId: 'original-a',
+    url: `/api/v1/assets/${assetId}/content`,
+    width: 480,
+  })
+  replaceWithDerived(editor, 'a', 'a', file('cropped'), {
+    cropSettings: { ratio: 0.8, x: 0, y: 0.5 },
+  })
+  const [cropped] = editor.children as TElement[]
+  assert.equal(cropped.assetId, 'cropped')
+  assert.equal(cropped.sourceAssetId, 'original-a')
+  assert.equal(cropped.processingStatus, 'ready')
+  assert.deepEqual(cropped.cropSettings, { ratio: 0.8, x: 0, y: 0.5 })
+  assert.equal(cropped.frameSettings, undefined, 'the crop replaced the frame')
+  assert.equal(cropped.alt, 'Description a', 'the description stays')
+
+  replaceWithDerived(editor, 'a', 'cropped', file('framed'), { frameSettings: { padding: 8 } })
+  const [framed] = editor.children as TElement[]
+  assert.deepEqual(framed.frameSettings, { padding: 8 })
+  assert.equal(framed.cropSettings, undefined, 'the frame replaced the crop')
+
+  assert.throws(
+    () => replaceWithDerived(editor, 'a', 'cropped', file('late'), { frameSettings: {} }),
+    /changed while it was being edited/
+  )
+  assert.equal((editor.children[0] as TElement).assetId, 'framed')
 })

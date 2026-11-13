@@ -40,6 +40,45 @@ func (f *automatingPoster) ReplyTo(_ context.Context, _ *socialent.Integration, 
 	return "plug-reply-1", nil
 }
 
+type thumbnailPoster struct {
+	fakePoster
+	set []string
+	err error
+}
+
+func (f *thumbnailPoster) SetThumbnail(_ context.Context, token, videoID, thumbnail string) error {
+	f.set = append(f.set, token+">"+videoID+">"+thumbnail)
+	return f.err
+}
+
+// A thumbnail is set on the live video with a freshly signed image, and a
+// provider without thumbnails or a step without an image says so.
+func TestAutomateSetsAThumbnail(t *testing.T) {
+	p, _, _, _ := directFixture()
+	provider := &thumbnailPoster{}
+	p.resolve = func(string) poster { return provider }
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "youtube", InternalID: "remote-user", Token: "private-token"}}
+	input := socialapi.AutomationInput{DestinationID: "destination", OrganizationID: "product-org", Platform: "youtube", Kind: "thumbnail",
+		RemotePostID: "vid1", SecretReference: "SOCIAL_API_KEY", Media: &publishing.MediaAsset{MediaType: "image/png", ObjectKey: "org/product-org/thumb.png"}}
+	if result, err := p.Automate(context.Background(), input); err != nil || !result.Done ||
+		len(provider.set) != 1 || provider.set[0] != "private-token>vid1>https://r2.example/private/image.png?fresh-signature" {
+		t.Fatalf("result=%+v err=%v set=%v", result, err, provider.set)
+	}
+	provider.err = errors.New("youtube.thumbnail")
+	if _, err := p.Automate(context.Background(), input); err == nil {
+		t.Fatal("a refused thumbnail reported success")
+	}
+	input.Media = nil
+	if _, err := p.Automate(context.Background(), input); !errors.Is(err, socialapi.ErrUnsupported) {
+		t.Fatalf("no image = %v", err)
+	}
+	p.resolve = func(string) poster { return &fakePoster{} }
+	input.Media = &publishing.MediaAsset{MediaType: "image/png", ObjectKey: "org/product-org/thumb.png"}
+	if _, err := p.Automate(context.Background(), input); !errors.Is(err, socialapi.ErrUnsupported) {
+		t.Fatalf("no thumbnails = %v", err)
+	}
+}
+
 func TestAutomateRunsEachFollowUpOnTheProvider(t *testing.T) {
 	p, _, _, _ := directFixture()
 	provider := &automatingPoster{likes: 120, reposts: 4}
@@ -163,5 +202,45 @@ func TestNativeQuoteSettingsAcrossSupportedProviders(t *testing.T) {
 	}
 	if _, err := nativeQuoteSettings("threads", json.RawMessage(`{}`), "123"); !errors.Is(err, socialapi.ErrUnsupported) {
 		t.Fatal("unsupported provider substituted a link")
+	}
+}
+
+type deletingPoster struct {
+	automatingPoster
+	answer error
+}
+
+func (f *deletingPoster) DeletePost(_ context.Context, _ *socialent.Integration, id string) error {
+	f.actions = append(f.actions, "delete:"+id)
+	return f.answer
+}
+
+// A delete part undoes a repost or deletes a record through the account, and
+// passes the provider's answer back with its status; a platform without a
+// delete call is unsupported.
+func TestDeleteRemoteDispatchesEachPart(t *testing.T) {
+	p, _, _, _ := directFixture()
+	provider := &deletingPoster{answer: &integrations.HTTPError{Status: 404}}
+	p.resolve = func(string) poster { return provider }
+	ctx := context.Background()
+	input := socialapi.DeleteInput{DestinationID: "destination", OrganizationID: "product-org", Platform: "linkedin",
+		RemoteID: "remote-post-1", SecretReference: "SOCIAL_API_KEY"}
+	repost, post := input, input
+	repost.Kind, post.Kind = "repost", "post"
+	if err := p.DeleteRemote(ctx, repost); err != nil {
+		t.Fatal(err)
+	}
+	var status interface{ HTTPStatus() int }
+	if err := p.DeleteRemote(ctx, post); !errors.As(err, &status) || status.HTTPStatus() != 404 {
+		t.Fatalf("delete error = %v", err)
+	}
+	if fmt.Sprint(provider.actions) != "[unretweet:remote-post-1 delete:remote-post-1]" {
+		t.Fatalf("actions = %v", provider.actions)
+	}
+	p.resolve = func(string) poster { return &fakePoster{} }
+	for _, part := range []socialapi.DeleteInput{repost, post} {
+		if err := p.DeleteRemote(ctx, part); !errors.Is(err, socialapi.ErrUnsupported) {
+			t.Fatalf("%s on a platform without the call: %v", part.Kind, err)
+		}
 	}
 }

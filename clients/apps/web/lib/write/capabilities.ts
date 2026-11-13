@@ -193,6 +193,14 @@ export const CAPABILITIES: Record<DraftChannel, PlatformCapabilities> = {
   tiktok: { ...simple('TikTok', 2000, false), kinds: ['standard'], mentions: 'none' },
   youtube: { ...simple('YouTube', 5000, false), kinds: ['standard'], mentions: 'none' },
   x: X,
+  facebook: {
+    ...simple('Facebook', 63_206, false),
+    kinds: ['standard'],
+    mentions: 'none',
+    settings: { ...simple('Facebook', 63_206, false).settings, firstComment: true },
+  },
+  pinterest: { ...simple('Pinterest', 500, false), kinds: ['standard'], mentions: 'none' },
+  gmb: { ...simple('Google Business', 1500, false), kinds: ['standard'], mentions: 'none' },
 }
 
 /** Publishing capabilities verified for the connected account. */
@@ -344,4 +352,19 @@ export function pollRules(channel: DraftChannel, standing?: AccountStanding): Po
     durationsMinutes: [Math.min(max, Math.max(min, 1440))],
     durationRange: { min, max },
   }
+}
+
+/** YouTube's cap on a video's tags together. */
+export const YOUTUBE_TAGS_LIMIT = 500
+
+/**
+ * Tags counted as YouTube counts them, and as Go does (`YouTubeTagsLength`):
+ * UTF-16 units, two more for the quotes around a tag with a space, and a
+ * comma between tags.
+ */
+export function youtubeTagsLength(tags: readonly string[]): number {
+  return tags.reduce(
+    (total, tag) => total + tag.length + (/\s/.test(tag) ? 2 : 0),
+    Math.max(tags.length - 1, 0)
+  )
 }

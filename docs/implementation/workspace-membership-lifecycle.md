@@ -36,6 +36,38 @@ SCIM and enterprise provisioning still use their existing hooks and auth-store
 path. Those hooks remain intact, including owner protection and revocation. This
 increment does not claim to finish their separate transaction/capacity audit.
 
+## Plans, downgrades and lapses
+
+A team is a workspace, and each workspace has its own subscription. No plan
+limits how many teams a person creates or joins; there is no Agency plan and no
+team quota (Teams spec §8). Plans cap seats and social channels
+(`server/internal/workspaceplan/capacity.go`) and stored bytes
+(`storageLimits`), and set the monthly allowances (`planQuotas`). The billing
+page shows what the backend's entitlement summary says a plan includes; pricing
+pages read the same tables from `lib/billing/plans.ts`, which parity tests pin
+to Go. A plan value the backend does not sell (billing sync refuses one) grants
+nothing, whatever its feature overrides.
+
+When a workspace downgrades, or its subscription is cancelled or its past-due
+grace runs out:
+
+- Members stay. A new invitation, or accepting a pending one, needs a free seat
+  on the current plan.
+- Connected accounts stay connected, and an account the workspace holds renews
+  without a free slot while the plan stands. A new account, or restoring a
+  removed one, needs a free channel slot, checked when the connection commits.
+  While the plan does not stand, no account can be connected or reconnected.
+- Stored files stay; a new upload needs room under the plan's storage cap.
+- Posts already queued, which were charged against the monthly allowance when
+  they were scheduled, still publish while their account's authorization holds.
+  New posts need a plan that stands.
+- Nothing is deleted or unscheduled automatically. Owners can remove members or
+  accounts to get under a limit, and can unschedule posts themselves.
+
+Tests: `TestDowngradeKeepsWhatExistsAndRefusesMore`,
+`TestUnknownPlansResolveTheSameForUIAndServer`, `TestFeaturesFollowTheirMinimumPlan`,
+`TestPlansHaveNoTeamLimit`, `TestInvitationConcurrentLastSeatAndTerminalStates`.
+
 ## Compatibility and rollout
 
 There is no database migration, backfill, new secret or production setting.
@@ -96,4 +128,5 @@ the focused final run alongside the new membership flow (2/2, 22 seconds).
 The build retains existing MediaPipe and circular-chunk warnings. Full `make e2e`
 was not rerun; focused Playwright tests used the isolated runtime wrapper. T12/T16
 remain open for media, audit, notification, provisioning and delayed-work boundaries.
-T17 remains open for downgrade and pending-invitation/scheduled-work consequences.
+Downgrade, pending-invitation and scheduled-work consequences are specified under
+[Plans, downgrades and lapses](#plans-downgrades-and-lapses).

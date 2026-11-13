@@ -18,9 +18,10 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
+import { DraftHistory } from '@/components/drafts/DraftHistory'
+import { LocalTime } from '@/components/drafts/local-time'
 import { call, type DraftWire } from '@/lib/content-drafts/client'
-import { type DraftActivityWire, writeApi } from '@/lib/write/client'
+import { writeApi } from '@/lib/write/client'
 import type { Publication } from '@/lib/write/publication'
 import { cn } from '@/lib/utils'
 import { TagChip, TagManager } from '../tags'
@@ -34,43 +35,6 @@ export function wordCount(text: string): number {
 /** Reading time at 238 words a minute, rounded to the next 5 seconds. */
 export function readingSeconds(words: number): number {
   return Math.ceil(((words / 238) * 60) / 5) * 5
-}
-
-/** An activity event's action as a person reads it. */
-const ACTIONS: Record<string, string> = {
-  'post.reconciled_live': 'Marked a post as live',
-  'post.reconciled_not_live': 'Marked a post as not published',
-  'post.retried': 'Retried a destination',
-  'post.thread_resumed': 'Posted the rest of a thread',
-  'product.content_draft_created': 'Created the draft',
-  'product.content_draft_deleted': 'Deleted the draft',
-  'product.content_draft_planned': 'Changed the plan',
-  'product.content_draft_properties_updated': 'Organized the draft',
-  'product.content_draft_recovered': 'Recovered a backup as a new draft',
-  'product.content_draft_review': 'Review step',
-  'product.content_draft_scheduled': 'Scheduled',
-  'product.content_draft_shared': 'Changed sharing',
-  'product.content_draft_updated': 'Edited',
-  'post.cancelled': 'Cancelled a post',
-  'post.scheduled': 'Queued a post',
-  'post.published': 'Published a post',
-  'post.publish_failed': 'A post failed',
-  'post.publish_recovery_required': 'A post’s outcome is unknown',
-}
-
-/** What an event changed, from its references. */
-function detail(item: DraftActivityWire): string {
-  const metadata = item.metadata
-  const changed = Array.isArray(metadata.changed) ? (metadata.changed as string[]) : []
-  if (changed.length > 0) return changed.join(', ').replaceAll('_', ' ')
-  if (typeof metadata.enabled === 'boolean')
-    return metadata.enabled ? 'public link on' : 'public link off'
-  if (metadata.cleared) return 'plan cleared'
-  if (typeof metadata.plannedFor === 'string')
-    return `for ${new Date(metadata.plannedFor).toLocaleString(undefined, WHEN_STYLE)}`
-  if (typeof metadata.reason === 'string' && metadata.reason !== 'schedule') return metadata.reason
-  if (typeof metadata.action === 'string') return metadata.action
-  return ''
 }
 
 /**
@@ -105,7 +69,6 @@ export function PropertiesPanel({
   const [scratchpad, setScratchpad] = React.useState(draft.scratchpad)
   const [tagIds, setTagIds] = React.useState(draft.tagIds)
   const [managing, setManaging] = React.useState(false)
-  const [activity, setActivity] = React.useState<DraftActivityWire[] | null>(null)
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const [naming, setNaming] = React.useState(false)
   const [skipSlack,setSkipSlack] = React.useState(Boolean(draft.suppressSlackOnPublish))
@@ -113,12 +76,6 @@ export function PropertiesPanel({
   React.useEffect(() => setSkipSlack(Boolean(draft.suppressSlackOnPublish)),[draft.suppressSlackOnPublish])
   const setId = draft.socialSetId ?? data.sets.find((set) => set.visibility === 'WORKSPACE')?.id
   const tags = data.sets.find((set) => set.id === setId)?.id === data.activeSet?.id ? data.tags : []
-  React.useEffect(() => {
-    void writeApi
-      .activity(draft.id)
-      .then(({ items }) => setActivity(items))
-      .catch(() => setActivity([]))
-  }, [draft.id, draft.version])
   React.useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [])
   const saveScratchpad = (value: string) => {
     setScratchpad(value)
@@ -353,21 +310,7 @@ export function PropertiesPanel({
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Activity
         </h3>
-        {activity === null ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
-        <ol className="grid gap-2" data-testid="activity">
-          {activity?.map((item) => (
-            <li className="text-xs" key={item.id}>
-              <p className="text-foreground">
-                {ACTIONS[item.action] ?? item.action.replace(/^product\./, '').replaceAll('_', ' ')}
-                {detail(item) ? <span className="text-muted-foreground"> · {detail(item)}</span> : null}
-              </p>
-              <p className="text-label text-muted-foreground">
-                {item.actorName ?? (item.actorType === 'SERVICE' ? 'Publishing' : 'Someone')} ·{' '}
-                <LocalTime value={item.at} />
-              </p>
-            </li>
-          ))}
-        </ol>
+        <DraftHistory draftId={draft.id} key={draft.id} version={draft.version} />
       </section>
       {managing && setId ? <TagManager onClose={() => setManaging(false)} setId={setId} /> : null}
     </div>

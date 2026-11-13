@@ -10,6 +10,9 @@ import (
 )
 
 type EntitlementSummary struct {
+	// Allowances is each monthly quota the plan includes, 0 while it does not
+	// stand: the one figure the web shows, so it never computes its own.
+	Allowances map[string]int `json:"allowances"`
 	// CreditBalance is what is left of the workspace's purchased credit packs.
 	CreditBalance int             `json:"creditBalance"`
 	Features      map[string]bool `json:"features"`
@@ -66,7 +69,15 @@ func (c *Configuration) entitlementSummary(ctx context.Context, actor Actor) (*E
 		return nil, err
 	}
 	plan, status, features := evaluateBootstrapEntitlement(row, time.Now().UTC())
-	return &EntitlementSummary{Features: features, Plan: plan, Status: status}, nil
+	allowances := make(map[string]int, len(monthlyQuotas))
+	for name := range monthlyQuotas {
+		if features["workspace:use"] {
+			allowances[name] = planQuotas[plan][name]
+		} else {
+			allowances[name] = 0
+		}
+	}
+	return &EntitlementSummary{Allowances: allowances, Features: features, Plan: plan, Status: status}, nil
 }
 
 // GetEntitlementSummary is the workspace's plan, standing, features, and

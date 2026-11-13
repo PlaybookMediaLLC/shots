@@ -59,15 +59,18 @@ and backfills categories without changing existing unread receipts. Previously
 deleted acknowledgments cannot be reconstructed and are not replayed. Apply the
 additive migration before releasing the new API/UI. Rolling the application back
 to the destructive acknowledgment implementation can delete read/archive history;
-retain the new handler during rollback. Recipient receipts follow the existing
-outbox retention lifecycle; archive is not permanent storage or legal hold.
+retain the new handler during rollback. Notifications and their delivery
+records are deleted 90 days after creation, read or not, by the daily
+`notification-retention` job; a workspace legal hold pauses it. Archive is not
+permanent storage.
 
 `platform_notification_delivery` is a content-free receipt after completion. Its
 unique workspace/event/channel/destination identity survives recipient state changes, so
-outbox replay cannot reset read/archive state or resend a success. An encrypted,
-immutable payload exists only while an external request may require retry or
-reconciliation. Uncertain payloads expire after 24 hours. Receipt cleanup occurs
-only when the canonical outbox event no longer exists. Workspace deletion removes
+outbox replay cannot reset read/archive state or resend a success while the
+receipt is kept. An encrypted, immutable payload exists only while an external
+request may require retry or reconciliation. Uncertain payloads expire after 24
+hours. A receipt is removed after 90 days, or earlier when its canonical outbox
+event no longer exists. Workspace deletion removes
 the workspace's inbox, preferences, receipts and Slack connections, and preserves
 installations still used by other workspaces.
 
