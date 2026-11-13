@@ -349,6 +349,18 @@ test('closing a dialog opened from a dialog returns focus to each launcher in tu
   await expect(editor).toBeFocused()
   await page.keyboard.type('right ')
   await expect(editor).toContainText('Focus goes back where it came right from')
+
+  // ⌘⇧↵ opens the review from the editor, adds no block, and the caret comes back.
+  const blocks = () => editor.locator('[data-slate-node="element"]').count()
+  const before = await blocks()
+  await page.keyboard.press('ControlOrMeta+Shift+Enter')
+  await holdsFocus(review)
+  await page.keyboard.press('Escape')
+  await expect(review).toHaveCount(0)
+  await expect(editor).toBeFocused()
+  expect(await blocks()).toBe(before)
+  await page.keyboard.type('all ')
+  await expect(editor).toContainText('Focus goes back where it came right all from')
 })
 
 test(
