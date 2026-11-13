@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,12 +22,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { call } from '@/lib/content-drafts/client'
 import { assetContentUrl } from '@/lib/editor/services'
+import { decodeImage, processBitmap } from '@/lib/image-tools/ops'
+import { DEFAULT_RESIZE, DEFAULT_REENCODE_QUALITY } from '@/lib/image-tools/plan'
+import type { RasterFormat } from '@/lib/image-tools/types'
 import { useTRPCClient } from '@/lib/trpc/react'
-import { saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { coverCrop } from '@/lib/write/grid-layout'
 import { attachmentEntry } from '@/lib/write/media-operations'
+import { applyDerivedImage } from './derived-image'
 
 /** The shapes the destinations take, width over height. */
 const SHAPES = [
@@ -37,7 +40,23 @@ const SHAPES = [
   { label: 'Wide 16:9', ratio: 16 / 9 },
 ] as const
 
-type Crop = { ratio: number; x: number; y: number }
+/** A crop as the attachment keeps it, so cropping again starts from the same place. */
+const cropSchema = z.object({
+  ratio: z.number().refine((ratio) => SHAPES.some((shape) => shape.ratio === ratio)),
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+})
+type Crop = z.infer<typeof cropSchema>
+
+/**
+ * The longest side a crop is saved at. Each destination's own size comes from
+ * its derivative (limits.json maxEdge), so this only bounds memory and upload.
+ */
+const MAX_EDGE = 4096
+
+/** Keep the source's format where a canvas can write it; anything else saves as PNG. */
+const formatOf = (mime: string): RasterFormat =>
+  mime === 'image/jpeg' ? 'jpeg' : mime === 'image/webp' ? 'webp' : 'png'
 
 /**
  * Crop an image to a shape. As a frame does, it saves a new image from the
@@ -56,10 +75,10 @@ export function MediaCrop({
   const client = useTRPCClient()
   const [original] = React.useState(() => attachmentEntry(editor, id)?.[0])
   const [crop, setCrop] = React.useState<Crop>(
-    () => (original?.cropSettings as Crop | undefined) ?? { ratio: 1, x: 0.5, y: 0.5 }
+    () => cropSchema.safeParse(original?.cropSettings).data ?? { ratio: 1, x: 0.5, y: 0.5 }
   )
   const [bitmap, setBitmap] = React.useState<ImageBitmap | null>(null)
-  const [type, setType] = React.useState('image/png')
+  const [format, setFormat] = React.useState<RasterFormat>('png')
   const [busy, setBusy] = React.useState(false)
   const preview = React.useRef<HTMLCanvasElement>(null)
   const sourceId = String(original?.sourceAssetId ?? original?.assetId ?? '')
@@ -70,23 +89,29 @@ export function MediaCrop({
   })
 
   React.useEffect(() => {
+    const abort = new AbortController()
     let image: ImageBitmap | undefined
     void (async () => {
       try {
-        const response = await fetch(assetContentUrl(sourceId))
+        const response = await fetch(assetContentUrl(sourceId), { signal: abort.signal })
         if (!response.ok) throw new Error('The original image is unavailable.')
         const blob = await response.blob()
         if (blob.type === 'image/gif')
           throw new Error('Crop works on still images. A GIF keeps its animation uncropped.')
-        image = await createImageBitmap(blob)
-        setType(blob.type === 'image/jpeg' ? 'image/jpeg' : 'image/png')
+        image = await decodeImage(blob)
+        if (abort.signal.aborted) return image.close()
+        setFormat(formatOf(blob.type))
         setBitmap(image)
       } catch (error) {
+        if (abort.signal.aborted) return
         toast.error(error instanceof Error ? error.message : 'The image could not be opened.')
         close.current()
       }
     })()
-    return () => image?.close()
+    return () => {
+      abort.abort()
+      image?.close()
+    }
   }, [sourceId])
 
   const rect = bitmap ? coverCrop(bitmap, { height: 1, width: crop.ratio }, crop) : null
@@ -115,58 +140,24 @@ export function MediaCrop({
     if (!bitmap || !rect) return
     setBusy(true)
     try {
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(rect.width)
-      canvas.height = Math.round(rect.height)
-      canvas
-        .getContext('2d')
-        ?.drawImage(
-          bitmap,
-          rect.x,
-          rect.y,
-          rect.width,
-          rect.height,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        )
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob(
-          (result) =>
-            result ? resolve(result) : reject(new Error('The crop could not be drawn.')),
-          type,
-          0.92
-        )
-      )
-      const saved = await saveExportToWorkspace({
-        blob,
-        fileName: type === 'image/jpeg' ? 'cropped-image.jpg' : 'cropped-image.png',
-        classification: 'derived',
-        parentAssetId: sourceId,
-        trpcClient: client,
+      const result = await processBitmap(bitmap, {
+        crop: rect,
+        encode: { format, quality: DEFAULT_REENCODE_QUALITY },
+        resize: { ...DEFAULT_RESIZE, height: MAX_EDGE, width: MAX_EDGE },
       })
-      await call(`/api/v1/assets/${encodeURIComponent(saved.assetId)}/alt-text`, {
-        method: 'PUT',
-        body: { altText: String(original?.alt ?? '') },
+      // A browser that cannot write WebP returns PNG; name and type follow the bytes.
+      const mimeType = result.blob.type || 'image/png'
+      await applyDerivedImage({
+        alt: String(original?.alt ?? ''),
+        blob: result.blob,
+        client,
+        editor,
+        expectedAssetId: original?.assetId,
+        fileName: `cropped-image.${mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1]}`,
+        id,
+        image: { height: result.height, mimeType, sourceAssetId: sourceId, width: result.width },
+        settings: { cropSettings: crop },
       })
-      const entry = attachmentEntry(editor, id)
-      if (!entry || entry[0].assetId !== original?.assetId)
-        throw new Error('This image changed while the crop was open. Reopen it to crop.')
-      editor.tf.setNodes(
-        {
-          assetId: saved.assetId,
-          url: assetContentUrl(saved.assetId),
-          sourceAssetId: sourceId,
-          cropSettings: crop,
-          mimeType: type,
-          width: canvas.width,
-          height: canvas.height,
-          processingStatus: 'ready',
-        },
-        { at: entry[1] }
-      )
-      editor.tf.unsetNodes('frameSettings', { at: entry[1] })
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The cropped image did not save.')
@@ -191,6 +182,7 @@ export function MediaCrop({
           </DialogDescription>
         </DialogHeader>
         <Select
+          disabled={busy}
           value={String(crop.ratio)}
           onValueChange={(value) => setCrop({ ...crop, ratio: Number(value) })}
         >
@@ -210,6 +202,7 @@ export function MediaCrop({
             Horizontal position
             <Slider
               aria-label="Horizontal position"
+              disabled={busy}
               max={100}
               min={0}
               onValueChange={([x]) => setCrop({ ...crop, x: x / 100 })}
@@ -222,6 +215,7 @@ export function MediaCrop({
             Vertical position
             <Slider
               aria-label="Vertical position"
+              disabled={busy}
               max={100}
               min={0}
               onValueChange={([y]) => setCrop({ ...crop, y: y / 100 })}

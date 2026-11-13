@@ -11,22 +11,27 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { listContentDraftsContract } from '@/lib/api/contracts/content-drafts'
+import { serializeDraft } from '@/lib/content-drafts/serialize'
+import type { DraftChannel } from '@/lib/write/document'
 
 /** One caption to reuse: a draft's text, and where it came from. */
 export type PastCaption = { draftId: string; text: string; title: string }
 
 /**
- * The captions a search found, newest first: the workspace's other drafts
- * with text, each text once.
+ * The captions a search found, in the list's order (pinned drafts first): the
+ * workspace's other drafts with text, each written as the channel being
+ * edited posts it, each text once.
  */
 export function captionChoices(
-  drafts: readonly { id: string; plainText: string; title: string }[],
-  currentDraftId: string
+  drafts: readonly { body: unknown; id: string; title: string }[],
+  currentDraftId: string,
+  channel: DraftChannel
 ): PastCaption[] {
   const seen = new Set<string>()
   return drafts.flatMap((draft) => {
-    const text = draft.plainText.trim()
-    if (!text || draft.id === currentDraftId || seen.has(text)) return []
+    if (draft.id === currentDraftId) return []
+    const text = serializeDraft(draft.body, channel).caption.trim()
+    if (!text || seen.has(text)) return []
     seen.add(text)
     return [{ draftId: draft.id, text, title: draft.title }]
   })
@@ -34,11 +39,14 @@ export function captionChoices(
 
 /** Search the workspace's drafts and put one's text where the cursor is. */
 export function PastCaptions({
+  channel,
   draftId,
   onApply,
   onClose,
   setId,
 }: {
+  /** The version being edited; a caption is written as this channel posts it. */
+  channel: DraftChannel
   draftId: string
   onApply: (text: string) => void
   onClose: () => void
@@ -65,7 +73,7 @@ export function PastCaptions({
           const page = listContentDraftsContract.output.parse(await response.json())
           setState({
             status: 'ready',
-            captions: captionChoices([...page.pinned, ...page.items], draftId),
+            captions: captionChoices([...page.pinned, ...page.items], draftId, channel),
           })
         })
         .catch((error: unknown) => {
@@ -80,7 +88,7 @@ export function PastCaptions({
       clearTimeout(timer)
       abort.abort()
     }
-  }, [attempt, draftId, search, setId])
+  }, [attempt, channel, draftId, search, setId])
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
       <DialogContent className="max-w-lg" data-testid="past-captions">
@@ -93,6 +101,7 @@ export function PastCaptions({
         <Input
           aria-label="Search past captions"
           autoFocus
+          maxLength={200}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search drafts"
           value={search}

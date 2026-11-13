@@ -222,23 +222,39 @@ test('a paste keeps bold, italic, links and lists and loses headings, colors and
   ])
 })
 
-test('past captions open their tool and offer each other draft’s text once', () => {
+test('past captions open their tool and offer each other draft’s text once, as the channel writes it', () => {
   const opened: string[] = []
   const command = commandsFor(context({ openTool: (tool) => opened.push(tool) })).find(
     (item) => item.id === 'past-captions'
   )
   command?.run()
   assert.deepEqual(opened, ['captions'])
-  assert.deepEqual(
-    captionChoices(
-      [
-        { id: 'current00001', plainText: 'This draft', title: 'This draft' },
-        { id: 'other0000001', plainText: '  Launch day  ', title: 'Launch' },
-        { id: 'other0000002', plainText: 'Launch day', title: 'Again' },
-        { id: 'other0000003', plainText: '   ', title: 'Empty' },
-      ],
-      'current00001'
-    ),
-    [{ draftId: 'other0000001', text: 'Launch day', title: 'Launch' }]
+  const draft = (id: string, title: string, ...children: Record<string, unknown>[]) => ({
+    body: [{ type: 'p', children }],
+    id,
+    title,
+  })
+  const mention = {
+    type: 'social_mention',
+    label: 'Acme',
+    platform: 'linkedin',
+    providerId: 'urn:li:organization:1',
+    children: [{ text: '' }],
+  }
+  const drafts = [
+    draft('current00001', 'This draft', { text: 'This draft' }),
+    draft('other0000001', 'Launch', { text: '  Launch day  ' }),
+    draft('other0000002', 'Again', { text: 'Launch day' }),
+    draft('other0000003', 'Empty', { text: '   ' }),
+    draft('other0000004', 'Partner', { text: 'With ' }, mention, { text: '' }),
+  ]
+  assert.deepEqual(captionChoices(drafts, 'current00001', 'x'), [
+    { draftId: 'other0000001', text: 'Launch day', title: 'Launch' },
+    { draftId: 'other0000004', text: 'With Acme', title: 'Partner' },
+  ])
+  // LinkedIn's mention annotation is written only for LinkedIn.
+  assert.equal(
+    captionChoices(drafts, 'current00001', 'linkedin')[1].text,
+    'With @[Acme](urn:li:organization:1)'
   )
 })

@@ -120,3 +120,38 @@ export function withAssetDescription<T>(value: T, assetId: string, alt: string):
     }).map(([key, item]) => [key, withAssetDescription(item, assetId, alt)])
   ) as T
 }
+
+/** An image a tool saved from an attachment's original. */
+export type DerivedFile = {
+  assetId: string
+  height: number
+  mimeType: string
+  sourceAssetId: string
+  url: string
+  width: number
+}
+
+/** The settings of the tool that made a derived image. */
+export type DerivedSettings =
+  { cropSettings: Record<string, unknown> } | { frameSettings: Record<string, unknown> }
+
+/**
+ * Point an attachment at an image derived from its original. A crop and a
+ * frame each start from the original, so applying one clears the other.
+ * Throws when the attachment changed while the tool was open.
+ */
+export function replaceWithDerived(
+  editor: PlateEditor,
+  id: string,
+  expectedAssetId: unknown,
+  file: DerivedFile,
+  settings: DerivedSettings
+) {
+  const entry = attachmentEntry(editor, id)
+  if (!entry || entry[0].assetId !== expectedAssetId)
+    throw new Error('This image changed while it was being edited. Reopen it and try again.')
+  editor.tf.setNodes({ ...file, ...settings, processingStatus: 'ready' }, { at: entry[1] })
+  editor.tf.unsetNodes('cropSettings' in settings ? 'frameSettings' : 'cropSettings', {
+    at: entry[1],
+  })
+}

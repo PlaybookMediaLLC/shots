@@ -306,6 +306,7 @@ export function ComposerToolbar({
       ) : null}
       {tool === 'captions' ? (
         <PastCaptions
+          channel={channel}
           draftId={draftId}
           onApply={(text) => {
             if (!editor.selection) editor.tf.select(editor.api.end([]))

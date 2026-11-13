@@ -65,6 +65,9 @@ test('a crop focus places the shape along the side it does not fill', () => {
     { height: story.height, width: Math.round(story.width), x: Math.round(story.x), y: story.y },
     { height: 900, width: 506, x: 547, y: 0 }
   )
+  // A square from a 100×400 portrait moves only up and down.
+  const portrait = coverCrop({ height: 400, width: 100 }, { height: 1, width: 1 }, { x: 0.5, y: 1 })
+  assert.deepEqual(portrait, { height: 100, width: 100, x: 0, y: 300 })
 })
 
 test('a cover crop fills the target from the middle without stretching', () => {
