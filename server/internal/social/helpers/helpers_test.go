@@ -477,7 +477,9 @@ func longestMatch(t *testing.T, source string) int {
 				i++ // optional: no longer
 			case strings.HasPrefix(source[i:], "(?!"):
 				i += 3
-				alternation() // spans nothing
+				if alternation() > 1 { // spans nothing, but emojiMatches leaves it one unit
+					t.Fatalf("a twemoji lookahead reads more than one unit")
+				}
 			case strings.HasPrefix(source[i:], "(?:"):
 				i += 3
 				n += alternation()

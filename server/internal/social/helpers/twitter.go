@@ -318,10 +318,13 @@ func emojiMatches(text []rune, window int, deadline time.Time) (map[int]int, err
 		if end < len(text) {
 			settled = end - twemojiMaxLength - 1
 		}
-		m, _ := twemojiRe.FindRunesMatchStartingAt(text[:end], at)
-		for ; m != nil && m.Index < settled; m, _ = twemojiRe.FindNextMatch(m) {
+		m, err := twemojiRe.FindRunesMatchStartingAt(text[:end], at)
+		for ; m != nil && m.Index < settled; m, err = twemojiRe.FindNextMatch(m) {
 			matches[m.Index] = m.Length
 			at = m.Index + m.Length
+		}
+		if err != nil { // only a timeout, were one set: never drop matches
+			return nil, ErrTextTooComplex
 		}
 		at = max(at, settled)
 	}
@@ -436,8 +439,7 @@ func linkSpans(text string, deadline time.Time) ([][2]int, error) {
 		}
 	}
 	offsets = append(offsets, len(text))
-	units := shiftSurrogates(utf16Units(text))
-	urls, err := extractURLsWithIndices(units, false, scanDeadline(len(units), deadline))
+	urls, err := extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false, deadline)
 	if err != nil {
 		return nil, err
 	}
@@ -454,9 +456,11 @@ func linkSpans(text string, deadline time.Time) ([][2]int, error) {
 // scan runs word by word, each with the space before it, and skips the words
 // with no dot, or, when only links with a protocol count, with no "://": one
 // regexp2 call never sees more than one word. It fails with
-// ErrTextTooComplex past deadline; each call is bounded, but a text of many
-// slow words makes many calls.
-func extractURLsWithIndices(text []rune, withoutProtocol bool, deadline time.Time) ([]*urlEntity, error) {
+// ErrTextTooComplex once the text's budget, or limit when it is set and
+// sooner, runs out; each call is bounded, but a text of many slow words makes
+// many calls.
+func extractURLsWithIndices(text []rune, withoutProtocol bool, limit time.Time) ([]*urlEntity, error) {
+	deadline := scanDeadline(len(text), limit)
 	var urls []*urlEntity
 	for start, end := 0, 0; start < len(text); start = end {
 		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {
