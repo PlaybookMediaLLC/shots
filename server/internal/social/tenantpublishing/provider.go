@@ -192,11 +192,12 @@ func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
 // must be checked for before any retry. The provider's message rides along
 // for the attempt record.
 func publicationOutcome(err error) *socialapi.Error {
-	if errors.Is(err, helpers.ErrTextTooComplex) {
+	if temporalx.FailureType(err) == "" && errors.Is(err, helpers.ErrTextTooComplex) {
 		// Shots, not the platform, ran out of time counting the text before it
-		// sent anything, most likely under load: the post retries.
-		retry := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherUnavailable,
-			"Shots could not finish checking this post's text in time. Nothing was sent; it retries.")
+		// sent anything, most likely under load: the post retries, and stops
+		// with this cause if its text can never be counted.
+		retry := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherError,
+			"Shots could not finish checking this post's text in time, so nothing was sent. If this keeps happening, shorten the post or remove some links.")
 		retry.ProviderMessage = retry.Error()
 		return retry
 	}

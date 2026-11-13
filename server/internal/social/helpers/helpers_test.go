@@ -132,7 +132,7 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	}
 	start := time.Now()
 	for i := range 20 {
-		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 150))
+		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 1000)) // seconds unbounded
 		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("crafted %d: %v", i, err)
 		}
@@ -142,6 +142,14 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	}
 	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
 		t.Fatalf("after = %v, %v", spans, err)
+	}
+	// X counts bare domains, Mastodon does not: their scans are remembered apart.
+	both := NewScanBudget(time.Second)
+	if spans, err := both.LinkSpans("https://a.com b.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("spans = %v, %v", spans, err)
+	}
+	if weighted, _, err := both.ParseTweet("https://a.com b.com", 280); err != nil || weighted != 47 {
+		t.Fatalf("weighted = %d, %v", weighted, err)
 	}
 }
 

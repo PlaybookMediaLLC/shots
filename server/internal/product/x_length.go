@@ -1,6 +1,8 @@
 package product
 
 import (
+	"context"
+
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"regexp"
@@ -14,10 +16,27 @@ import (
 // xLinkLength is X's length for one link, whatever its real length.
 const xLinkLength = 23
 
-// draftCountBudget is the time one request may spend finding the links of all
-// its posts, up to 10 targets of 25 posts each. Ordinary posts take
-// milliseconds, and a caption repeated across targets is scanned once.
+// draftCountBudget is the time one request may spend counting the posts of
+// the targets it checks (draftTargetConnections), up to 10 targets of 25 posts
+// each. Ordinary posts take milliseconds, and a caption repeated across targets
+// or checks is counted once.
 const draftCountBudget = 2 * time.Second
+
+type draftCountBudgetKey struct{}
+
+// withDraftCountBudget gives every target check under ctx one shared budget,
+// for a request that checks targets more than once.
+func withDraftCountBudget(ctx context.Context) context.Context {
+	return context.WithValue(ctx, draftCountBudgetKey{}, helpers.NewScanBudget(draftCountBudget))
+}
+
+// draftCountBudgetOf is the budget ctx shares, or a new one.
+func draftCountBudgetOf(ctx context.Context) *helpers.ScanBudget {
+	if budget, ok := ctx.Value(draftCountBudgetKey{}).(*helpers.ScanBudget); ok {
+		return budget
+	}
+	return helpers.NewScanBudget(draftCountBudget)
+}
 
 // xLength uses the same twitter-text v3 parser as the X adapter, including
 // NFC normalization, bare-domain URLs, and complete emoji sequences.

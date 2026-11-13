@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/mediaresize"
@@ -60,7 +61,8 @@ func checkXTarget(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnec
 			return conflict("X quote posts require Enterprise API access, which this connection has not verified.")
 		}
 		if !isArticle {
-			if err := socialidentity.CheckXText(*caps, text, budget); err != nil {
+			// Trimmed, as it is stored and published, and as draftPostLength counts it.
+			if err := socialidentity.CheckXText(*caps, strings.TrimSpace(text), budget); err != nil {
 				return conflict(err.Error())
 			}
 		}

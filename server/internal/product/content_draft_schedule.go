@@ -370,7 +370,7 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		return nil, nil, err
 	}
 	// Every caption, reply and follow-up of the request counts within one budget.
-	budget := helpers.NewScanBudget(draftCountBudget)
+	budget := draftCountBudgetOf(ctx)
 	loaded := make([]*ent.ChannelConnection, 0, len(targets))
 	for _, target := range targets {
 		connection, err := tx.ChannelConnection.Query().Where(channelconnection.ID(target.ChannelConnectionID),

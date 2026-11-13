@@ -462,7 +462,7 @@ func TestTextTooComplexToCountRetries(t *testing.T) {
 	var retry *socialapi.Error
 	err := publicationOutcome(fmt.Errorf("x: %w", helpers.ErrTextTooComplex))
 	if !errors.As(err, &retry) || retry.UnknownDelivery || retry.Status != http.StatusTooManyRequests ||
-		retry.Code != publishing.FailurePublisherUnavailable || !strings.Contains(retry.ProviderMessage, "Nothing was sent") {
+		retry.Code != publishing.FailurePublisherError || !strings.Contains(retry.ProviderMessage, "nothing was sent") {
 		t.Fatalf("too complex = %#v", err)
 	}
 }

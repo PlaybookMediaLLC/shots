@@ -70,21 +70,23 @@ func TestFitsXPost(t *testing.T) {
 	}
 }
 
-// A request of 10 X targets with 25 crafted posts each counts every text as
-// draftTargetConnections does (CheckXText, then draftPostLength) within one
-// budget, not a budget for each text.
+// 10 X targets of 25 posts, each slow to count but within its own limit,
+// counted the way draftTargetConnections counts them (CheckXText, then
+// draftPostLength, stopping at the first refusal): the shared budget refuses
+// the request after about 2 s, where counting them all would take many more.
 func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	caps := socialidentity.XVerifiedAccountLimits("read-write", nil)
 	budget := helpers.NewScanBudget(draftCountBudget)
 	start := time.Now()
-	for i := range 250 {
-		text := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 150))
-		if err := socialidentity.CheckXText(caps, text, budget); !errors.Is(err, helpers.ErrTextTooComplex) {
-			t.Fatalf("CheckXText %d: %v", i, err)
+	var err error
+	for i := 0; i < 250 && err == nil; i++ {
+		text := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 60))
+		if err = socialidentity.CheckXText(caps, text, budget); err == nil {
+			_, err = draftPostLength("x", text, budget)
 		}
-		if _, err := draftPostLength("x", text, budget); !errors.Is(err, helpers.ErrTextTooComplex) {
-			t.Fatalf("draftPostLength %d: %v", i, err)
-		}
+	}
+	if !errors.Is(err, helpers.ErrTextTooComplex) {
+		t.Fatalf("counted every post: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Errorf("counting took %v, want about the %v budget", elapsed, draftCountBudget)
