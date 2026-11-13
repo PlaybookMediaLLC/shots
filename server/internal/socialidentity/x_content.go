@@ -30,7 +30,7 @@ func CheckXPoll(options []string, minutes, mediaCount int, article bool) error {
 }
 
 // CheckXText validates the actual text without truncation or link removal,
-// finding its links within budget (nil bounds the text alone). The caller
+// finding its links and emoji within budget (nil bounds the text alone). The caller
 // ensures a post with empty text has selected media.
 func CheckXText(caps XCapabilities, text string, budget *helpers.ScanBudget) error {
 	if err := caps.Validate(); err != nil {

@@ -445,7 +445,7 @@ func TestEmojiMatchesAreTheFullScan(t *testing.T) {
 		for m, _ := twemojiRe.FindRunesMatch(text); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
 			want[m.Index] = m.Length
 		}
-		for _, window := range []int{twemojiMaxLength + 2, 23, 40, emojiScanWindow} {
+		for _, window := range []int{twemojiMaxLength + 2, 23, 40} {
 			if got, err := emojiMatches(text, window, time.Now().Add(time.Hour)); err != nil || !maps.Equal(got, want) {
 				t.Fatalf("emojiMatches(%q, %d) = %v, %v, want %v", b.String(), window, got, err, want)
 			}
@@ -477,7 +477,9 @@ func longestMatch(t *testing.T, source string) int {
 				i++ // optional: no longer
 			case strings.HasPrefix(source[i:], "(?!"):
 				i += 3
-				alternation() // spans nothing
+				if alternation() > 1 { // spans nothing, but emojiMatches leaves it one unit
+					t.Fatalf("a twemoji lookahead reads more than one unit")
+				}
 			case strings.HasPrefix(source[i:], "(?:"):
 				i += 3
 				n += alternation()

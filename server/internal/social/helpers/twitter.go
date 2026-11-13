@@ -41,10 +41,10 @@ const surrogateShift = 0xf0000
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 
 // The link scan is linear, but a long text makes many regexp2 calls: so one
-// call of the URL regex gets linkScanBudget, and one text's scan
-// linkScanBudget plus linkScanPerUnit for each of its UTF-16 units up to
-// linkScanMaxUnits, the longest caption (an X Article); ordinary text uses a
-// small fraction of either.
+// call of the URL regex gets linkScanBudget, and one text's link and emoji
+// scans together linkScanBudget plus linkScanPerUnit for each of its UTF-16
+// units up to linkScanMaxUnits, the longest caption (an X Article); ordinary
+// text uses a small fraction of either.
 const (
 	linkScanBudget   = 200 * time.Millisecond
 	linkScanMaxUnits = 100_000
@@ -55,9 +55,9 @@ const (
 // a fraction of it unloaded.
 var linkScanPerUnit = 20 * time.Microsecond
 
-// ErrTextTooComplex is a text whose links the URL scan could not find within
-// its budget. Callers refuse it, since any count would be a guess. It replaces
-// regexp2's timeout error, which quotes the whole text.
+// ErrTextTooComplex is a text whose links or emoji the scans could not find
+// within its budget. Callers refuse it, since any count would be a guess. It
+// replaces regexp2's timeout error, which quotes the whole text.
 var ErrTextTooComplex = errors.New("the text is too long or too complex to count")
 
 // scanDeadline is when the scans of a text of n UTF-16 units must end: its
@@ -240,13 +240,13 @@ func CountLength(integrationType, text string) (int, error) {
 	return jsLength(text), nil
 }
 
-// parseTweet is twitter-text parseTweet, finding links by deadline when it is set.
+// parseTweet is twitter-text parseTweet, finding links and emoji by deadline when it is set.
 func parseTweet(text string, maxWeightedTweetLength int, deadline time.Time) (weightedLength int, valid bool, validRangeEnd int, err error) {
 	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
-	// Hash all entities by their startIndex for fast lookup
 	deadline = scanDeadline(len(shifted), deadline)
+	// Hash all entities by their startIndex for fast lookup
 	urls, err := extractURLsWithIndices(shifted, true, deadline)
 	if err != nil {
 		return 0, false, 0, err
@@ -318,10 +318,13 @@ func emojiMatches(text []rune, window int, deadline time.Time) (map[int]int, err
 		if end < len(text) {
 			settled = end - twemojiMaxLength - 1
 		}
-		m, _ := twemojiRe.FindRunesMatchStartingAt(text[:end], at)
-		for ; m != nil && m.Index < settled; m, _ = twemojiRe.FindNextMatch(m) {
+		m, err := twemojiRe.FindRunesMatchStartingAt(text[:end], at)
+		for ; m != nil && m.Index < settled; m, err = twemojiRe.FindNextMatch(m) {
 			matches[m.Index] = m.Length
 			at = m.Index + m.Length
+		}
+		if err != nil { // only a timeout, were one set: never drop matches
+			return nil, ErrTextTooComplex
 		}
 		at = max(at, settled)
 	}
