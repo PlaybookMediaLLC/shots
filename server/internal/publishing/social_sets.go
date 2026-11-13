@@ -10,6 +10,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -120,10 +121,11 @@ func enableDefaultPlatform(ctx context.Context, tx *ent.Tx, setID *string, platf
 	return err
 }
 
-// emitDraftPublished writes a draft.published webhook event (RFC 024) in the
+// EmitDraftPublished writes a draft.published webhook event (RFC 024) in the
 // transaction that marks a draft's post live: the draft's identity and the
-// live post, never its text.
-func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost, providerPostID string) error {
+// live post, never its text. post must be the stored row; providerPostID may
+// be empty, and is then sent as null.
+func EmitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost, providerPostID string) error {
 	if post.ContentDraftID == nil {
 		return nil
 	}
@@ -132,7 +134,10 @@ func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 	if err != nil || !subscribed {
 		return err
 	}
-	draft, err := tx.ContentDraft.Get(ctx, *post.ContentDraftID)
+	// Only what the event carries: the full row holds collaboration state up to 5 MiB.
+	draft, err := tx.ContentDraft.Query().Where(contentdraft.ID(*post.ContentDraftID)).
+		Select(contentdraft.FieldID, contentdraft.FieldOrganizationID, contentdraft.FieldSocialSetID,
+			contentdraft.FieldStatus, contentdraft.FieldTagIds, contentdraft.FieldTitle).Only(ctx)
 	if err != nil {
 		return err
 	}
@@ -159,7 +164,7 @@ func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 		"draft": map[string]any{"id": draft.ID, "socialSetId": draft.SocialSetID, "status": string(draft.Status),
 			"tags": tags, "title": draft.Title},
 		"post": map[string]any{"id": post.ID, "platform": connection.Platform, "publishedAt": time.Now().UTC(),
-			"remotePostId": providerPostID, "url": postoptions.LivePostURL(connection.Platform, &providerPostID)},
+			"remotePostId": nonEmpty(providerPostID), "url": postoptions.LivePostURL(connection.Platform, &providerPostID)},
 	}
 	return webhooks.Emit(ctx, tx, webhooks.NewEnvelope(post.OrganizationID, webhooks.DraftPublished, draft.SocialSetID,
 		webhooks.Resource{ID: draft.ID, Type: "draft"}, data))
