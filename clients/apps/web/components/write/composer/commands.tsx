@@ -34,6 +34,7 @@ import {
   deletePost,
   duplicatePost,
   insertPostBreak,
+  insertSnippet,
   postRanges,
   splitPostAtCaret,
 } from '@/components/drafts/thread'
@@ -348,7 +349,7 @@ export function commandsFor(context: CommandContext): Command[] {
         icon: StackIcon,
         id: `snippet-${snippet.id}`,
         label: snippet.name,
-        run: () => editor.tf.insertText(snippet.text),
+        run: () => insertSnippet(editor, snippet.text),
       })
     ),
     {

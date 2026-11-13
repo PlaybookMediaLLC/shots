@@ -4,7 +4,7 @@ import (
 	"errors"
 	"unicode/utf8"
 
-	"github.com/rivo/uniseg"
+	"github.com/clipperhouse/uax29/v2/graphemes"
 )
 
 // BlueskyLexiconLimits returns the pinned post and embed contracts. Account and
@@ -14,12 +14,19 @@ func BlueskyLexiconLimits() BlueskyCapabilities {
 		ImageMaxBytes: 2000000, MaxVideos: 1, VideoMaxBytes: 300000000}
 }
 
-// BlueskyTextLength counts user-perceived characters rather than UTF-16 units.
-func BlueskyTextLength(text string) int { return uniseg.GraphemeClusterCount(text) }
+// GraphemeLength counts user-perceived characters (Unicode 17 grapheme
+// clusters, as browsers' Intl.Segmenter does) rather than UTF-16 units.
+func GraphemeLength(text string) int {
+	count := 0
+	for clusters := graphemes.FromString(text); clusters.Next(); {
+		count++
+	}
+	return count
+}
 
 // CheckBlueskyText enforces both independent bounds without changing the text.
 func CheckBlueskyText(text string) error {
-	if !utf8.ValidString(text) || len(text) > 3000 || BlueskyTextLength(text) > 300 {
+	if !utf8.ValidString(text) || len(text) > 3000 || GraphemeLength(text) > 300 {
 		return errors.New("Bluesky text must fit within 300 characters and 3,000 UTF-8 bytes")
 	}
 	return nil

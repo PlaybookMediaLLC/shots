@@ -9,6 +9,7 @@ import { draftsApi } from '@/lib/content-drafts/client'
 import { auditLinkPreview, issueSeveritySchema } from '@/lib/link-preview/audit'
 import { MAX_GATED_LINKS } from '@/lib/link-preview/gate'
 import { POST_COLUMN } from '@/components/drafts/layout'
+import { LABELS } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
 import { linkPreviewSchema, type DraftChannel, type LinkPreview } from '@/lib/write/document'
 
@@ -98,9 +99,14 @@ export function LinkCards({
   const [checks, setChecks] = React.useState<Record<string, string>>({})
   const checked = React.useEffectEvent((url: string) => url in checks)
   const noCards = NO_LINK_CARDS.includes(channel)
+  // LinkedIn makes no card from the text and Shots sends none (Posts API, TF-029);
+  // its links still open quote drafts and get the page check.
+  const plain = channel === 'linkedin'
+  // Only Bluesky publishes Shots' card, so only Bluesky can leave it out (TF-029).
+  const removable = channel === 'bluesky'
   // Each platform keeps its own cards, so opening another tab looks up what it lacks.
   React.useEffect(() => {
-    if (noCards) return
+    if (noCards || plain) return
     let cancelled = false
     const timer = window.setTimeout(() => {
       for (const url of key.split('\n').filter(Boolean)) {
@@ -131,7 +137,7 @@ export function LinkCards({
       window.clearTimeout(timer)
       cancelled = true
     }
-  }, [channel, key, noCards, retry])
+  }, [channel, key, noCards, plain, retry])
   // A check reads the whole page, so it waits for a longer pause than the card does.
   React.useEffect(() => {
     if (noCards) return
@@ -174,8 +180,19 @@ export function LinkCards({
     )
   return (
     <section aria-label="Link previews" className={cn('my-2 space-y-2', POST_COLUMN)}>
+      {plain ? (
+        <p className="text-xs text-muted-foreground" data-testid="plain-links">
+          LinkedIn shows links without a preview card: it makes none from the text, and Shots sends
+          none.
+        </p>
+      ) : removable ? null : (
+        <p className="text-xs text-muted-foreground" data-testid="provider-cards">
+          {LABELS[channel]} makes its own card from a link on a post without media; its API
+          can&apos;t remove it.
+        </p>
+      )}
       {links.map((url) => {
-        const card = cards.find((item) => item.url === url)
+        const card = plain ? undefined : cards.find((item) => item.url === url)
         const quote =
           Boolean(linkedInPostIdentity(url)) ||
           /^https:\/\/(?:www\.)?(?:(?:x|twitter)\.com\/[^/]+\/status\/\d+|bsky\.app\/profile\/[^/]+\/post\/)/.test(
@@ -184,10 +201,10 @@ export function LinkCards({
           /^https:\/\/[^/@:]+\/(?:@[^/]+\/|users\/[^/]+\/statuses\/|statuses\/)\d+$/.test(url)
         return (
           <div key={url}>
-            {card?.removed ? (
+            {plain ? null : card?.removed && removable ? (
               <p className="text-xs text-muted-foreground">Preview removed for {url}</p>
             ) : card ? (
-              <LinkPreviewCard card={card} />
+              <LinkPreviewCard card={{ ...card, removed: false }} />
             ) : (
               <p role="status" className="text-xs text-muted-foreground">
                 {errors[url] || 'Loading link preview…'}
@@ -195,7 +212,7 @@ export function LinkCards({
             )}
             {checks[url] !== undefined ? <LinkCheckResult problem={checks[url]} url={url} /> : null}
             <div className="flex flex-wrap gap-2">
-              {card ? (
+              {card && removable ? (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -203,7 +220,7 @@ export function LinkCards({
                 >
                   {card.removed ? 'Restore preview' : 'Remove preview'}
                 </Button>
-              ) : errors[url] ? (
+              ) : errors[url] && !plain ? (
                 <Button size="sm" variant="ghost" onClick={() => setRetry((value) => value + 1)}>
                   Retry preview
                 </Button>
@@ -214,12 +231,6 @@ export function LinkCards({
                 </Button>
               ) : null}
             </div>
-            {card?.removed && channel !== 'bluesky' ? (
-              <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
-                This provider cannot confirm preview removal through its API. Restore the preview
-                before publishing.
-              </p>
-            ) : null}
           </div>
         )
       })}

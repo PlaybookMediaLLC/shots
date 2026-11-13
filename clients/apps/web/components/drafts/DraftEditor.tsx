@@ -620,7 +620,8 @@ function DraftEditorSession({
       // Only an explicitly supplied host lookup may replace literal social handles.
       // `dnd` is Plate's document gutter (drag handle and "+" beside every block):
       // posts move from their bar and header, and file drops keep working without it.
-      excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts'].filter(
+      // `exitBreak` would take ⌘⇧↵ (a block above) from the publish review; ⌘↵ is the post break's.
+      excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts', 'exitBreak'].filter(
         (key) => !hosted.some((plugin) => plugin.key === key)
       ),
       additionalPlugins: live

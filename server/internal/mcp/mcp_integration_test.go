@@ -93,6 +93,7 @@ func (memoryObjects) SignDownload(_ context.Context, key string) (string, error)
 func (memoryObjects) Exists(context.Context, string) (bool, error)         { return true, nil }
 func (memoryObjects) Put(context.Context, string, string, io.Reader) error { return nil }
 func (memoryObjects) Delete(context.Context, string) error                 { return nil }
+func (memoryObjects) Copy(context.Context, string, string) error           { return nil }
 
 func (memoryObjects) Read(context.Context, string) ([]byte, error) {
 	var body bytes.Buffer
@@ -563,7 +564,8 @@ func TestMutationsAreAuditedWithTheRequestID(t *testing.T) {
 	id := body["campaign"].(map[string]any)["id"].(string)
 	row, err := f.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(f.orgs["a"]), auditlog.EntityID(id),
 		auditlog.Action("product.campaign_created")).Only(f.ctx)
-	if err != nil || row.RequestID != requestID || row.ActorDisplay == nil || *row.ActorDisplay != f.keyNames["a"] {
+	if err != nil || row.RequestID != requestID || row.ActorDisplay == nil || *row.ActorDisplay != f.keyNames["a"] ||
+		row.Metadata["actorSource"] != "mcp" {
 		t.Fatalf("audit: %+v %v", row, err)
 	}
 }

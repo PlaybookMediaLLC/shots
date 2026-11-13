@@ -29,9 +29,10 @@ func CheckXPoll(options []string, minutes, mediaCount int, article bool) error {
 	return nil
 }
 
-// CheckXText validates the actual text without truncation or link removal.
-// The caller ensures a post with empty text has selected media.
-func CheckXText(caps XCapabilities, text string) error {
+// CheckXText validates the actual text without truncation or link removal,
+// finding its links within budget (nil bounds the text alone). The caller
+// ensures a post with empty text has selected media.
+func CheckXText(caps XCapabilities, text string, budget *helpers.ScanBudget) error {
 	if err := caps.Validate(); err != nil {
 		return err
 	}
@@ -42,14 +43,27 @@ func CheckXText(caps XCapabilities, text string) error {
 		return nil
 	}
 	limit := caps.PostTextLimit()
-	if helpers.WeightedLength(text) > limit {
+	length, valid, err := budget.ParseTweet(text, limit)
+	if err != nil {
+		return tooComplexError{}
+	}
+	if length > limit {
 		return fmt.Errorf("The X post exceeds this account's verified limit of %d weighted characters.", limit)
 	}
-	if !helpers.ValidTweetText(text, limit) {
+	if !valid {
 		return errors.New("The X post contains characters the platform cannot publish.")
 	}
 	return nil
 }
+
+// tooComplexError is a sentence for people that still matches
+// helpers.ErrTextTooComplex, which the publisher retries.
+type tooComplexError struct{}
+
+func (tooComplexError) Error() string {
+	return "The X post is too long or too complex to count. Shorten it."
+}
+func (tooComplexError) Unwrap() error { return helpers.ErrTextTooComplex }
 
 // XMedia contains persisted or inspected source facts, never filename guesses.
 type XMedia struct {
@@ -87,8 +101,10 @@ func CheckXMedia(caps XCapabilities, media []XMedia) error {
 			}
 			limit = *caps.VideoMaxBytes
 			if item.DurationMs > *caps.VideoMaxDurationSeconds*1000 {
+				// Round up, so a refused video never reads as exactly the limit (20:00.5 is 20:01).
+				seconds := (item.DurationMs + 999) / 1000
 				return fmt.Errorf("This X account takes videos up to %d minutes; this one is %d:%02d. Trim it before scheduling.",
-					*caps.VideoMaxDurationSeconds/60, item.DurationMs/60000, item.DurationMs/1000%60)
+					*caps.VideoMaxDurationSeconds/60, seconds/60, seconds%60)
 			}
 		default:
 			return errors.New("X supports JPEG, PNG, WebP, GIF, or MP4 attachments.")

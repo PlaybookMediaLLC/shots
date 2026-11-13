@@ -227,6 +227,11 @@ const POST_FAILURES: Record<string, { action: PostFailureAction | null; reason: 
     reason:
       'The account was disconnected or removed, so it was not sent. Reconnect it, then schedule again.',
   },
+  SCHEDULER_UNAUTHORIZED: {
+    action: 'reschedule',
+    reason:
+      'The person who scheduled it can no longer publish here, so it was not sent. Someone who can publish should schedule it again.',
+  },
   WORKSPACE_INACTIVE: {
     action: null,
     reason: 'The workspace or this content is no longer active, so it was not sent.',

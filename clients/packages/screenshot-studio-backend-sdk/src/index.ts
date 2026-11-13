@@ -1134,6 +1134,8 @@ export type BackendDraftActivity = {
   entityId: string
   id: string
   metadata: Record<string, unknown>
+  /** Who or what made the change. */
+  source: 'person' | 'api' | 'mcp' | 'workflow' | 'callback' | 'support' | 'automation'
 }
 
 /** A workspace's drafts settings: its queue's weekly slots and approvals. */
@@ -1390,11 +1392,22 @@ export type BackendBatchMedia = {
   uploadAssetId?: string
 }
 
-/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+/**
+ * A template video concept, Go's `schema.BatchGrid`. Without `kind` it is the
+ * 2x2 grid (a headline above four labelled images); `single` fades one image in
+ * under a headline (`hideHeadline` leaves it out and keeps it); `ugc` writes its
+ * text over the workspace's clip in its one slot, with an optional closing clip.
+ * Music is optional and plays from `musicStartMs`.
+ */
 export type BackendBatchGrid = {
+  kind?: 'single' | 'ugc'
   headline: string
-  musicAssetId?: string
+  hideHeadline?: boolean
+  textPosition?: 'top' | 'middle' | 'bottom'
   slots: { assetId?: string; topic: string }[]
+  closingAssetId?: string
+  musicAssetId?: string
+  musicStartMs?: number
 }
 
 /** When a batch item is meant to go out: a local time in a zone, or the queue at a previewed slot. */
@@ -1704,6 +1717,8 @@ export type BackendCreativeApproval = {
 }
 
 export type BackendEntitlementSummary = {
+  /** Each monthly quota the plan includes; 0 while the plan does not stand. An older backend omits it. */
+  allowances?: Record<string, number>
   /** What is left of the workspace's purchased credit packs. */
   creditBalance: number
   features: Record<string, boolean>
@@ -3602,9 +3617,10 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
-  async listContentDraftActivity(id: string) {
-    return this.request<{ items: BackendDraftActivity[] }>(
-      `v1/content-drafts/${encodeURIComponent(id)}/activity`
+  async listContentDraftActivity(id: string, cursor?: string) {
+    const parameters = new URLSearchParams(cursor ? { cursor } : {})
+    return this.request<{ items: BackendDraftActivity[]; nextCursor: string | null }>(
+      `v1/content-drafts/${encodeURIComponent(id)}/activity?${parameters}`
     )
   }
 
@@ -3999,6 +4015,32 @@ export class ScreenshotStudioBackendSDK {
       body: { confirmation },
       method: 'DELETE',
     })
+  }
+
+  /** Where a set can move and what the move changes; changes nothing. */
+  async previewSocialSetTransfer(id: string) {
+    return this.request<{
+      accounts: string[]
+      blocked: string
+      destinations: { name: string; organizationId: string }[]
+      drafts: number
+      mediaBytes: number
+      mediaFiles: number
+      noDestination: string
+      publishedPosts: number
+      queuedPosts: number
+      version: number
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`)
+  }
+
+  /** Moves a set, at the previewed version, to a workspace the person manages. */
+  async transferSocialSet(id: string, input: { destinationOrganizationId: string; version: number }) {
+    return this.request<{
+      cancelledPostIds: string[]
+      movedDrafts: number
+      organizationId: string
+      socialSetId: string
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`, { body: input, method: 'POST' })
   }
 
   /** Shares a private set with the workspace; only its owner can. */
