@@ -51,22 +51,26 @@ export function FloatingToolbarButtons() {
     >
       {!readOnly && (
         <>
-          <ToolbarGroup>
-            <AIToolbarButton
-              className="gap-1.5"
-              shortcut="⌘+J"
-              tooltip="Edit, generate, and more"
-            >
-              <AIIcon className="!size-3" />
-              <div className="hidden sm:inline">
-                Ask AI
-              </div>
-            </AIToolbarButton>
-          </ToolbarGroup>
+          {editor.plugins[KEYS.aiChat] && (
+            <ToolbarGroup>
+              <AIToolbarButton
+                // Its own name: the text below hides on narrow screens, and the tooltip differs.
+                aria-label="Ask AI"
+                className="gap-1.5"
+                shortcut="⌘+J"
+                tooltip="Edit, generate, and more"
+              >
+                <AIIcon className="!size-3" />
+                <div className="hidden sm:inline">
+                  Ask AI
+                </div>
+              </AIToolbarButton>
+            </ToolbarGroup>
+          )}
 
           <ToolbarGroup>
             {editor.plugins[KEYS.comment] && <CommentToolbarButton />}
-            <SuggestionToolbarButton />
+            {editor.plugins[KEYS.suggestion] && <SuggestionToolbarButton />}
           </ToolbarGroup>
           <ToolbarGroup>
             <TurnIntoToolbarButton />
