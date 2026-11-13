@@ -16,6 +16,7 @@ import {
   type PublicationDraft,
 } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
+import type { AccountStanding } from '@/lib/write/capabilities'
 import { optionsSummary } from '@/components/write/composer/video-options'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
@@ -348,7 +349,7 @@ test('Threads polls use native single-choice text-only rules', () => {
   )
 })
 
-test('link preview removal is persisted and cannot be silently ignored by a provider', () => {
+test('link preview removal is persisted for Bluesky, the only provider that takes it', () => {
   const card = { url: 'https://example.com/story', title: 'Story', removed: true }
   let versions = withOptions(readVersions(undefined), 'bluesky', { linkPreviews: [card] })
   const value = draft({ body: [p('Read https://example.com/story')], platformVersions: versions })
@@ -357,18 +358,45 @@ test('link preview removal is persisted and cannot be silently ignored by a prov
       ?.linkPreview?.removed,
     true
   )
+  // X makes its own card; an old removal choice neither travels nor blocks scheduling.
   versions = withOptions(versions, 'x', { linkPreviews: [card] })
-  assert.ok(
-    buildPublication({ ...value, platformVersions: versions }, x).problems.some((problem) =>
-      problem.includes('preview removal')
-    )
-  )
+  const onX = buildPublication({ ...value, platformVersions: versions }, x)
+  assert.deepEqual(onX.problems, [])
+  assert.equal(onX.target.options?.linkPreview, undefined)
   const unrelated = draft({ body: [p('A different post')], platformVersions: versions })
   assert.equal(
     buildPublication(unrelated, { channel: 'bluesky', connectionId: 'cb0000000001' }).target.options
       ?.linkPreview,
     undefined
   )
+})
+
+test("X video needs the account's verified video length, as Go requires", () => {
+  const value = draft({
+    body: [p('Clip'), { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }],
+  })
+  const reconnect = "Reconnect X to verify this account's video limits."
+  const read = { maxWeightedCharacters: 280 as const }
+  const problems = (standing?: AccountStanding, body = value) =>
+    buildPublication(body, { ...x, standing }).accountProblems
+  // A read standing that reports no verified length refuses X video, as Go does.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 0 }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 1200 }), [])
+  // Unknown is left to Go: an unread standing, an older API without the field, the preview.
+  assert.deepEqual(problems({ maxWeightedCharacters: null, xVideoMaxSeconds: null }), [])
+  assert.deepEqual(problems(read), [])
+  assert.deepEqual(problems(undefined), [])
+  // An X article refuses video for its own reason, never by asking to reconnect.
+  assert.deepEqual(
+    problems(
+      { ...read, articles: true, xVideoMaxSeconds: null },
+      draft({ ...value, kind: 'article' })
+    ),
+    []
+  )
+  // Images alone are not judged.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }, draft({ body: [p('Text')] })), [])
 })
 
 test('Mastodon quotes require a verified server and quote lookup scopes', () => {

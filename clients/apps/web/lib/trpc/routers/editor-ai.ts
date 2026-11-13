@@ -9,7 +9,12 @@ import {
   proposeVariants,
   type VariantBrand,
 } from '@/lib/ai/agents/editor-assist'
-import { gridLinesRequestSchema, suggestGridLines } from '@/lib/ai/agents/grid-lines'
+import {
+  gridLinesRequestSchema,
+  overlayIdeasRequestSchema,
+  suggestGridLines,
+  suggestOverlayIdeas,
+} from '@/lib/ai/agents/grid-lines'
 import { BackgroundGenerationError, generateBackground } from '@/lib/ai/images/background'
 import { generateGridSlotImage, gridSlotRequestSchema } from '@/lib/ai/images/grid-slot'
 import { backgroundRequestSchema } from '@/lib/ai/images/background-request'
@@ -186,6 +191,16 @@ export const editorAiRouter = router({
       await allowAiAction(ctx.access)
       const voice = await getWorkspaceVoice(ctx.access)
       return { lines: await withAiCredits(ctx.access, () => suggestGridLines(input, voice)) }
+    }),
+  /** Ideas for a UGC video's text from a product description: the caption assistant. */
+  suggestOverlayIdeas: organizationProcedure('artifact:edit')
+    .input(overlayIdeasRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      await allowAiAction(ctx.access)
+      const voice = await getWorkspaceVoice(ctx.access)
+      return {
+        lines: await withAiCredits(ctx.access, () => suggestOverlayIdeas(input.description, voice)),
+      }
     }),
   /**
    * Alt text and platform-aware captions for the design, from a snapshot and

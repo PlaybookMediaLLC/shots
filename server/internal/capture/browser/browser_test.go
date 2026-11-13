@@ -21,6 +21,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
 	"github.com/coder/websocket"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 )
 
@@ -257,11 +258,21 @@ func signIn(t *testing.T, a *protectedApp) *State {
 		t.Fatal(err)
 	}
 	_ = form.Input("demo@acme.test")
-	if _, err := page.Eval(`() => document.querySelector('form').submit()`); err != nil {
+	// Submit after the call returns: a CDP call still waiting when the page
+	// navigates fails with "Inspected target navigated or closed".
+	if _, err := page.Eval(`() => { setTimeout(() => document.querySelector('form').submit()) }`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := page.Element("[data-testid=ready]"); err != nil {
-		t.Fatal(err)
+	// The submit and /session's own redirect each navigate; a search that
+	// overlaps one fails the same way, so look again until the context ends.
+	for {
+		_, err := page.Element("[data-testid=ready]")
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, &cdp.Error{Code: -32000, Message: "Inspected target navigated or closed"}) {
+			t.Fatal(err)
+		}
 	}
 	state, err := ExportConnected(ctx, browser, target)
 	if err != nil {

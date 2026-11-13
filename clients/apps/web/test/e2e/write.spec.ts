@@ -442,13 +442,19 @@ test(
     )
     await snap(page, 'write-publish-review')
 
-    // Commit through Publish now, then seed confirmed provider failures.
-    // Worker outcome semantics are covered by the Go state-machine tests;
-    // this browser case never sends fixture credentials to real providers.
-    await publish.getByRole('button', { name: 'Publish now' }).click()
+    // Commit through the queue, then seed confirmed provider failures. Publish now
+    // would start the worker at once, and with the lane's fixture credentials it can
+    // fail the posts itself first, with codes and an account reconnect that rightly
+    // hide Retry. Queued posts wait for their slot. Publish now is covered in
+    // content-drafts.spec.ts and typefully-lifecycle.spec.ts; worker outcome
+    // semantics in the Go state-machine tests.
+    await publish.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByTestId('queue-button').click()
+    const queue = page.getByTestId('schedule-dialog')
+    await queue.getByLabel('Open a new draft after scheduling').uncheck()
+    await queue.getByRole('button', { name: 'Add to queue', exact: true }).click()
     await expect(page.getByTestId('draft-post')).toHaveCount(2, { timeout: 30_000 })
     await db.query(
-      // A running worker may already have claimed the posts.
       `UPDATE scheduled_post SET status='FAILED' WHERE "contentDraftId"=$1 AND status IN ('SCHEDULED', 'PROCESSING')`,
       [draftId]
     )
@@ -480,7 +486,14 @@ test(
     await snap(page, 'write-failed-destinations')
 
     // Retrying one destination makes one new post for it; the other stays as it is.
-    await failed.first().getByRole('button', { name: 'Retry this destination' }).click()
+    // The worker can reach a destination before the update above; one it found needing a
+    // reconnect rightly offers no retry, so retry one that does.
+    const retry = page.getByRole('button', { name: 'Retry this destination' })
+    await failed
+      .filter({ has: retry })
+      .first()
+      .getByRole('button', { name: 'Retry this destination' })
+      .click()
     await expect.poll(async () => (await draftPosts(draftId)).length, { timeout: 30_000 }).toBe(3)
   }
 )

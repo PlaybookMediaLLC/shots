@@ -617,7 +617,7 @@ function ThreadPreview({ item, target }: { item: PreviewCard; target: DraftTarge
               !settings.poll &&
               target?.kind !== 'quote' &&
               !NO_LINK_CARDS.includes(channel) &&
-              !publication.target.options?.linkPreview ? (
+              channel !== 'bluesky' ? (
                 <PreviewLinkCard text={post.caption} />
               ) : null}
               <Media media={post.media} />
