@@ -33,9 +33,10 @@ import (
 
 // scriptedCopyModel answers every requested post and records what it was sent.
 type scriptedCopyModel struct {
-	calls   int
-	prompts []string
-	systems []string
+	calls       int
+	prompts     []string
+	systems     []string
+	beforeReply func()
 }
 
 func (m *scriptedCopyModel) Structured(_ context.Context, request platformai.Request, out any) (platformai.Usage, error) {
@@ -48,7 +49,91 @@ func (m *scriptedCopyModel) Structured(_ context.Context, request platformai.Req
 		}
 	}
 	body, _ := json.Marshal(map[string]any{"posts": posts})
+	if m.beforeReply != nil {
+		m.beforeReply()
+	}
 	return platformai.Usage{CostUSD: 0.042, InputTokens: 900, OutputTokens: 80}, json.Unmarshal(body, out)
+}
+
+func TestAutomationGenerationPreservesEdits(t *testing.T) {
+	for _, when := range []string{"during generation", "before receipt replay"} {
+		t.Run(when, func(t *testing.T) {
+			f, model, _ := generationFixture(t)
+			if err := f.repo.AdvertiseReleaseAutomationExecutor(f.ctx, "ai-"+f.id, f.repo.AutomationCapabilities()...); err != nil {
+				t.Fatal(err)
+			}
+			runID, err := f.runUntil(t, f.activate(t), "preserve-edits", 23, "release", "campaign")
+			if err != nil {
+				t.Fatal(err)
+			}
+			post := f.db.Client.CampaignPost.Query().Where(campaignpost.OrganizationID(f.org)).OnlyX(f.ctx)
+			edit := func() {
+				current := f.db.Client.CampaignPost.GetX(f.ctx, post.ID)
+				copy := "The team's reviewed description of the export update."
+				if _, err := f.repo.UpdateCampaignPost(f.ctx, f.owner, post.CampaignID, post.ID, UpdateCampaignPostInput{Copy: &copy, ExpectedCopy: &current.Copy}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if when == "during generation" {
+				model.beforeReply = edit
+			}
+			if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "copy", nil, 0); err != nil {
+				t.Fatal(err)
+			}
+			if when == "before receipt replay" {
+				edit()
+				f.exec(t, `UPDATE release_automation_node SET status='running' WHERE "runId"=$1 AND "nodeId"='copy'`, runID)
+				if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "copy", nil, 0); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := f.db.Client.CampaignPost.GetX(f.ctx, post.ID); got.Copy != "The team's reviewed description of the export update." || got.Status != campaignpost.StatusDRAFT || model.calls != 1 {
+				t.Fatalf("user edit lost: copy=%q status=%s model calls=%d", got.Copy, got.Status, model.calls)
+			}
+		})
+	}
+}
+
+func TestAutomationGenerationPreservesDraftVersion(t *testing.T) {
+	for _, change := range []string{"title", "review", "legacy receipt"} {
+		t.Run(change, func(t *testing.T) {
+			f, model, _ := generationFixture(t)
+			if err := f.repo.AdvertiseReleaseAutomationExecutor(f.ctx, "ai-"+f.id, f.repo.AutomationCapabilities()...); err != nil {
+				t.Fatal(err)
+			}
+			runID, err := f.runUntil(t, f.activate(t), "preserve-version", 24, "release", "campaign")
+			if err != nil {
+				t.Fatal(err)
+			}
+			post := f.db.Client.CampaignPost.Query().Where(campaignpost.OrganizationID(f.org)).OnlyX(f.ctx)
+			if change == "legacy receipt" {
+				generation := &automation.Generation{Credits: 5, Posts: []automation.GeneratedPost{{PostID: post.ID, Copy: "Old model response."}}}
+				f.db.Client.ReleaseAutomationNode.Create().SetID("legacy" + f.id).SetOrganizationID(f.org).SetRunID(runID).SetNodeID("copy").SetActionKey("legacy" + f.id).SetStatus("running").SetGeneration(generation).SaveX(f.ctx)
+			} else {
+				model.beforeReply = func() {
+					if change == "title" {
+						title := "The team's revised title"
+						_, err = f.repo.UpdateCampaignPost(f.ctx, f.owner, post.CampaignID, post.ID, UpdateCampaignPostInput{Title: &title, ExpectedCopy: &post.Copy})
+					} else {
+						_, err = f.repo.TransitionCampaignPosts(f.ctx, f.owner, post.CampaignID, CampaignPostDecision{Decision: "submit", PostIDs: []string{post.ID}, IdempotencyKey: "review" + f.id})
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "copy", nil, 0); err != nil {
+				t.Fatal(err)
+			}
+			got := f.db.Client.CampaignPost.GetX(f.ctx, post.ID)
+			if got.Copy != post.Copy || change == "title" && optionalText(got.Title) != "The team's revised title" || change == "review" && got.Status != campaignpost.StatusREADY_FOR_REVIEW {
+				t.Fatalf("changed draft version: copy=%q title=%q status=%s", got.Copy, optionalText(got.Title), got.Status)
+			}
+			if change == "legacy receipt" && model.calls != 0 {
+				t.Fatal("replayed receipt called the model again")
+			}
+		})
+	}
 }
 
 // generationFixture runs release → campaign → generate_copy → review on v2.

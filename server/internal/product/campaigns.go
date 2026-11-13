@@ -490,6 +490,8 @@ type UpdateCampaignPostInput struct {
 	Copy         *string `json:"copy"`
 	ExpectedCopy *string `json:"expectedCopy"`
 	Title        *string `json:"title"`
+	// Automated generation may change only the draft version it read.
+	unchangedDraftAt *time.Time
 }
 
 // UpdateCampaignPost edits a post's copy, call to action, or title with the
@@ -522,6 +524,9 @@ func (c *Configuration) UpdateCampaignPost(ctx context.Context, actor Actor, cam
 		return nil, err
 	}
 	stale := conflict("This post changed since you opened it. Reload it to see the latest copy.")
+	if input.unchangedDraftAt != nil && (post.Status != campaignpost.StatusDRAFT || !post.UpdatedAt.Equal(*input.unchangedDraftAt)) {
+		return nil, stale
+	}
 	if err := revisePost(ctx, tx, post, *input.ExpectedCopy, stale,
 		postRevision{CallToAction: input.CallToAction, Copy: input.Copy, Title: input.Title}); err != nil {
 		return nil, err
