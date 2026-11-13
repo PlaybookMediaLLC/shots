@@ -29,9 +29,10 @@ func CheckXPoll(options []string, minutes, mediaCount int, article bool) error {
 	return nil
 }
 
-// CheckXText validates the actual text without truncation or link removal.
-// The caller ensures a post with empty text has selected media.
-func CheckXText(caps XCapabilities, text string) error {
+// CheckXText validates the actual text without truncation or link removal,
+// finding its links within budget (nil bounds the text alone). The caller
+// ensures a post with empty text has selected media.
+func CheckXText(caps XCapabilities, text string, budget *helpers.ScanBudget) error {
 	if err := caps.Validate(); err != nil {
 		return err
 	}
@@ -42,20 +43,27 @@ func CheckXText(caps XCapabilities, text string) error {
 		return nil
 	}
 	limit := caps.PostTextLimit()
-	length, err := helpers.WeightedLength(text)
+	length, valid, err := budget.ParseTweet(text, limit)
 	if err != nil {
-		return errors.New("The X post is too long or too complex to count. Shorten it.")
+		return tooComplexError{}
 	}
 	if length > limit {
 		return fmt.Errorf("The X post exceeds this account's verified limit of %d weighted characters.", limit)
 	}
-	if valid, err := helpers.ValidTweetText(text, limit); err != nil {
-		return errors.New("The X post is too long or too complex to count. Shorten it.")
-	} else if !valid {
+	if !valid {
 		return errors.New("The X post contains characters the platform cannot publish.")
 	}
 	return nil
 }
+
+// tooComplexError is a sentence for people that still matches
+// helpers.ErrTextTooComplex, which the publisher retries.
+type tooComplexError struct{}
+
+func (tooComplexError) Error() string {
+	return "The X post is too long or too complex to count. Shorten it."
+}
+func (tooComplexError) Unwrap() error { return helpers.ErrTextTooComplex }
 
 // XMedia contains persisted or inspected source facts, never filename guesses.
 type XMedia struct {

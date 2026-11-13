@@ -18,6 +18,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/articlebody"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/thread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/webhooks"
@@ -368,6 +369,8 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 	if err := checkDraftKindTargets(string(draft.Kind), targets); err != nil {
 		return nil, nil, err
 	}
+	// Every caption, reply and follow-up of the request counts within one budget.
+	budget := draftCountBudgetOf(ctx)
 	loaded := make([]*ent.ChannelConnection, 0, len(targets))
 	for _, target := range targets {
 		connection, err := tx.ChannelConnection.Query().Where(channelconnection.ID(target.ChannelConnectionID),
@@ -418,7 +421,7 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		}
 		limit := draftChannelLimits[channel]
 		if channel == "x" && connection.Platform != "e2e" {
-			caps, err := checkXTarget(ctx, tx, connection, target, ids, draft.Kind == contentdraft.KindArticle)
+			caps, err := checkXTarget(ctx, tx, connection, target, ids, draft.Kind == contentdraft.KindArticle, budget)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -456,14 +459,14 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 			// This is the application's article-size bound, not an X entitlement.
 			limit = 100_000
 		}
-		length, err := draftPostLength(channel, target.Caption)
+		length, err := draftPostLength(channel, target.Caption, budget)
 		if err != nil {
 			return nil, nil, conflict(fmt.Sprintf("The %s caption is too long or too complex to count. Shorten it.", channel))
 		}
 		if length > limit {
 			return nil, nil, conflict(fmt.Sprintf("The %s caption is %d characters; the limit is %d.", channel, length, limit))
 		}
-		if err := checkDraftReplies(ctx, tx, organizationID, channel, limit, target.Replies); err != nil {
+		if err := checkDraftReplies(ctx, tx, organizationID, channel, limit, target.Replies, budget); err != nil {
 			return nil, nil, err
 		}
 		media := len(ids)
@@ -479,7 +482,7 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		if err := checkPoll(channel, target.Poll, target.Options, media); err != nil {
 			return nil, nil, err
 		}
-		if err := checkDraftExtras(channel, target); err != nil {
+		if err := checkDraftExtras(channel, target, budget); err != nil {
 			return nil, nil, err
 		}
 		connections[target.ChannelConnectionID] = connection
@@ -503,7 +506,7 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 }
 
 // checkDraftExtras checks a target's follow-ups: X only, and sensible.
-func checkDraftExtras(channel string, target ContentDraftScheduleTarget) error {
+func checkDraftExtras(channel string, target ContentDraftScheduleTarget, budget *helpers.ScanBudget) error {
 	if target.AutoActions != nil && !target.AutoActions.Empty() {
 		actions := *target.AutoActions
 		if channel != "x" {
@@ -513,10 +516,10 @@ func checkDraftExtras(channel string, target ContentDraftScheduleTarget) error {
 			actions.RepostAtLikes > 1_000_000 || actions.PlugAtLikes > 1_000_000 || actions.QuoteAfterHours > 24*30 {
 			return invalid("Set like counts and hours as small positive numbers.")
 		}
-		if actions.PlugAtLikes > 0 && !fitsXPost(actions.PlugText, 0) {
+		if actions.PlugAtLikes > 0 && !fitsXPost(actions.PlugText, 0, budget) {
 			return invalid("The auto reply needs text that fits in one X post.")
 		}
-		if actions.QuoteAfterHours > 0 && !fitsXPost(actions.QuoteText, 1+xLinkLength) {
+		if actions.QuoteAfterHours > 0 && !fitsXPost(actions.QuoteText, 1+xLinkLength, budget) {
 			return invalid("The quote needs text that fits in one X post with the link.")
 		}
 		if actions.PlugMetric != "" && actions.PlugMetric != "likes" && actions.PlugMetric != "reposts" {
@@ -615,7 +618,7 @@ func checkDraftDocument(ctx context.Context, tx *ent.Tx, organizationID, assetID
 // checkDraftReplies checks a thread's later posts: a thread channel, at most
 // contentDraftReplyLimit, each within the limit with text or an image, and
 // every image an upload of the workspace, up to the channel's image limit.
-func checkDraftReplies(ctx context.Context, tx *ent.Tx, organizationID, channel string, limit int, replies []thread.Reply) error {
+func checkDraftReplies(ctx context.Context, tx *ent.Tx, organizationID, channel string, limit int, replies []thread.Reply, budget *helpers.ScanBudget) error {
 	if len(replies) == 0 {
 		return nil
 	}
@@ -628,7 +631,7 @@ func checkDraftReplies(ctx context.Context, tx *ent.Tx, organizationID, channel 
 	for index := range replies {
 		reply := &replies[index]
 		reply.Caption = strings.TrimSpace(reply.Caption)
-		length, err := draftPostLength(channel, reply.Caption)
+		length, err := draftPostLength(channel, reply.Caption, budget)
 		if err != nil {
 			return conflict(fmt.Sprintf("Post %d is too long or too complex to count. Shorten it.", index+2))
 		}

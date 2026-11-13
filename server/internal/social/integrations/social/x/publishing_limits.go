@@ -83,14 +83,17 @@ func checkPublishingContent(caps socialidentity.XCapabilities, message string, s
 		plain := toTweetText(message)
 		valid, err := helpers.ValidTweetText(plain, 100000)
 		if err != nil {
-			return publishRejected("The X Article is too long or too complex to count. Shorten it.")
+			return err // Not a rejection: nothing was sent, and a post retries it.
 		}
 		if !utf8.ValidString(message) || !valid {
 			return publishRejected("An X Article must contain valid text within the application's 100000 weighted-character limit.")
 		}
 		return nil
 	}
-	if err := socialidentity.CheckXText(caps, message); err != nil {
+	if err := socialidentity.CheckXText(caps, message, nil); err != nil {
+		if errors.Is(err, helpers.ErrTextTooComplex) {
+			return err // Not a rejection: nothing was sent, and a post retries it.
+		}
 		return publishRejected(err.Error())
 	}
 	if message == "" && mediaCount == 0 {
