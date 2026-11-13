@@ -17,6 +17,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
 )
@@ -187,11 +188,16 @@ func (c *Configuration) automationGenerateCopy(ctx context.Context, actor Actor,
 	}
 	for _, generated := range generation.Posts {
 		post := byID[generated.PostID]
-		if post == nil || post.Copy == generated.Copy || post.Status != campaignpost.StatusDRAFT {
+		if post == nil || post.Copy == generated.Copy || post.Status != campaignpost.StatusDRAFT || generated.OriginalCopy == nil || generated.OriginalUpdatedAt == nil {
 			continue
 		}
-		copy, expected := generated.Copy, post.Copy
-		_, err := c.UpdateCampaignPost(ctx, actor, input.CampaignID, post.ID, UpdateCampaignPostInput{Copy: &copy, ExpectedCopy: &expected})
+		copy := generated.Copy
+		_, err := c.UpdateCampaignPost(ctx, actor, input.CampaignID, post.ID, UpdateCampaignPostInput{Copy: &copy, ExpectedCopy: generated.OriginalCopy, unchangedDraftAt: generated.OriginalUpdatedAt})
+		if errors.Is(err, publishing.ErrConflict) {
+			// A person edited or reviewed this draft while the model ran or since
+			// a previous attempt applied it. Their version takes precedence.
+			continue
+		}
 		var prohibited *ProhibitedTermsError
 		if errors.As(err, &prohibited) {
 			// Keep the source-grounded draft; a reviewer sees it unchanged.
@@ -244,7 +250,7 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 	for _, post := range posts {
 		for _, candidate := range reply.Posts {
 			if candidate.PostID == post.ID && fitsChannel(post.Channel, candidate.Copy) && !slices.ContainsFunc(generation.Posts, func(p automation.GeneratedPost) bool { return p.PostID == post.ID }) {
-				generation.Posts = append(generation.Posts, automation.GeneratedPost{PostID: post.ID, Copy: strings.TrimSpace(candidate.Copy)})
+				generation.Posts = append(generation.Posts, automation.GeneratedPost{PostID: post.ID, Copy: strings.TrimSpace(candidate.Copy), OriginalCopy: &post.Copy, OriginalUpdatedAt: &post.UpdatedAt})
 			}
 		}
 	}

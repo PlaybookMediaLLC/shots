@@ -93,6 +93,10 @@ type Generation struct {
 type GeneratedPost struct {
 	PostID string `json:"postId"`
 	Copy   string `json:"copy"`
+	// These preconditions come from the stored draft, never the model. Older
+	// receipts lack them and must not overwrite a draft on replay.
+	OriginalCopy      *string    `json:"originalCopy,omitempty"`
+	OriginalUpdatedAt *time.Time `json:"originalUpdatedAt,omitempty"`
 }
 
 type Family string
