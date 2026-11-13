@@ -906,9 +906,11 @@ test('the paste dialog splits in a reused worker, replaced only while busy, and 
 
 test('the screenshot sheet counts its captions in a worker, only when the caption or platforms change', async (t) => {
   type CaptionCountRequest = import('@/lib/write/caption-count.worker').CaptionCountRequest
+  type CaptionCountMessage = import('@/lib/write/caption-count.worker').CaptionCountMessage
+  type CaptionOverLimit = import('@/lib/write/screenshot-post').CaptionOverLimit
   const workers: FakeCountWorker[] = []
   class FakeCountWorker {
-    onmessage: ((event: { data: unknown }) => void) | null = null
+    onmessage: ((event: { data: CaptionCountMessage }) => void) | null = null
     onerror: (() => void) | null = null
     requests: CaptionCountRequest[] = []
     terminated = false
@@ -921,6 +923,13 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
     terminate() {
       this.terminated = true
     }
+    async ready() {
+      await act(async () => this.onmessage?.({ data: { ready: true } }))
+    }
+    async reply(overLimit: CaptionOverLimit[]) {
+      const { id } = this.requests.at(-1)!
+      await act(async () => this.onmessage?.({ data: { id, overLimit } }))
+    }
   }
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
   Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeCountWorker })
@@ -928,15 +937,23 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
     if (previous) Object.defineProperty(globalThis, 'Worker', previous)
     else Reflect.deleteProperty(globalThis, 'Worker')
   })
-  // One workspace profile with one X account; nothing else the sheet reads has data.
+  // One workspace profile posting to X and Bluesky; nothing else the sheet reads has data.
   t.mock.method(globalThis, 'fetch', async (input: string) =>
     Response.json(
       input === '/api/v1/social-sets'
         ? {
             items: [
               {
-                accounts: [{ displayName: null, handle: '@shots', id: 'account-x', platform: 'x' }],
-                defaultPlatforms: ['x'],
+                accounts: [
+                  { displayName: null, handle: '@shots', id: 'account-x', platform: 'x' },
+                  {
+                    displayName: null,
+                    handle: '@shots.bsky',
+                    id: 'account-b',
+                    platform: 'bluesky',
+                  },
+                ],
+                defaultPlatforms: ['x', 'bluesky'],
                 engagementDefaults: null,
                 id: 'set-a',
                 name: 'Shots',
@@ -977,7 +994,7 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
       }),
     })
   )
-  // Let the profile list arrive and its X account be chosen.
+  // Let the profile list arrive and its accounts be chosen.
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
   const write = (selector: string, text: string) =>
     act(async () => {
@@ -992,10 +1009,21 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
     [...document.querySelectorAll('[role="status"]')]
       .map((element) => element.textContent!)
       .filter((text) => /caption/.test(text))
-  // No count starts while the profile loads, only once its X account is chosen.
+  // No count starts while the profile loads; once its accounts are chosen, the
+  // loading worker takes the latest request when it is ready.
   assert.equal(workers.length, 1)
-  assert.deepEqual(workers[0].requests, [{ body: '', channels: ['x'], copy: null, primary: 'x' }])
-  await act(async () => workers[0].onmessage?.({ data: [] }))
+  assert.deepEqual(workers[0].requests, [])
+  await workers[0].ready()
+  assert.deepEqual(workers[0].requests, [
+    {
+      body: '',
+      channels: ['x', 'bluesky'],
+      copy: null,
+      id: workers[0].requests[0].id,
+      primary: 'x',
+    },
+  ])
+  await workers[0].reply([])
 
   // 10,000 CJK characters and a '.': about a second for X's count on the page.
   const long = '漢'.repeat(10_000) + '.'
@@ -1007,23 +1035,30 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
   assert.ok(workers[0].requests.at(-1)!.body === long)
   // Nothing was counted on the page: no warning until the worker answers.
   assert.deepEqual(warnings(), [])
-  await act(async () =>
-    workers[0].onmessage?.({
-      data: [{ channel: 'x', length: 20_001, limit: 280, reused: false }],
-    })
-  )
-  assert.deepEqual(warnings(), [
-    'The X caption is 20001 characters; the limit is 280. Shorten it before scheduling.',
+  await workers[0].reply([
+    { channel: 'x', length: 20_001, limit: 280, reused: false },
+    { channel: 'bluesky', length: 10_001, limit: 300, reused: true },
   ])
+  const xWarning =
+    'The X caption is 20001 characters; the limit is 280. Shorten it before scheduling.'
+  assert.equal(warnings().length, 2)
+  assert.equal(warnings()[0], xWarning)
 
-  // Typing elsewhere in the sheet sends no new count, and keeps the warning.
+  // Typing elsewhere in the sheet sends no new count, and keeps the warnings.
   const counts = workers[0].requests.length
   await write('textarea[aria-label="Longer explanation"]', 'More detail')
   assert.equal(workers[0].requests.length, counts)
-  assert.equal(warnings().length, 1)
+  assert.equal(warnings().length, 2)
+
+  // A platform taken off loses its warning at once, before the recount answers.
+  const bluesky = [...document.querySelectorAll('label')].find((label) =>
+    label.textContent!.includes('@shots.bsky')
+  )!
+  await act(async () => bluesky.querySelector<HTMLButtonElement>('[role="checkbox"]')!.click())
+  assert.deepEqual(workers[0].requests.at(-1)!.channels, ['x'])
+  assert.deepEqual(warnings(), [xWarning])
 
   // A worker that crashes is reported and dropped, rather than hiding the check.
-  await write('textarea[id$="-caption"]', `${long}!`)
   await act(async () => workers[0].onerror?.())
   assert.equal(workers[0].terminated, true)
   assert.deepEqual(warnings(), ['The caption lengths could not be checked.'])

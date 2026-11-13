@@ -1,63 +1,101 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import * as React from 'react'
+
+/** What a worker posts: that it has loaded, then each answer with its request's id. */
+export type WorkerMessage<Answer> = { ready: true } | (Answer & { id: number })
 
 /**
- * What a Web Worker answers for `request`, for counting too slow for the page:
- * X's link scan (twitter-text) is quadratic in a run without spaces, about a
- * second for 10,000 CJK characters. The worker gets each request as one
- * message and answers it with one.
+ * What a Web Worker answers for `request`. The worker posts `{ ready: true }`
+ * once loaded, then answers each request, sent as `{ ...request, id }`, with
+ * `{ ...answer, id }` (see `import-text.worker.ts`).
  *
- * Starting a worker takes a few hundred milliseconds, so an idle one is reused
- * and only a worker still busy with an older request is replaced. No request
- * starts nothing. `answer` is the latest answer, kept while a newer one runs,
- * or `failed` when the worker could not load or crashed; `pending` is true
- * until it answers this exact `request`, so callers memoize `request`.
- * `start` and `failed` must keep their identity (module-level values), or every
- * render restarts the request.
+ * One worker serves the caller while it is mounted. A request made while it
+ * is answering replaces it, so typing never waits behind an answer nobody
+ * will read; one made while it is still loading becomes the request it
+ * starts with. No request ends the work in progress. A worker that cannot
+ * start, or crashes, answers `failed`.
+ *
+ * Until the answer for this exact `request` arrives, the last answer is
+ * returned with `pending` set, so callers memoize `request`. `start` and
+ * `failed` must be module-level values: a new one each render re-sends the
+ * request after every answer, without end.
  */
-export function useWorkerAnswer<Request, Answer>(
+export function useWorkerAnswer<Request extends object, Answer extends object>(
   start: () => Worker,
   request: Request | undefined,
   failed: Answer
 ): { answer: Answer | undefined; pending: boolean } {
-  const [result, setResult] = useState<{ answer: Answer; request: Request }>()
-  const worker = useRef<{ worker: Worker; busy: boolean } | null>(null)
-  useEffect(() => {
-    if (worker.current?.busy) {
-      worker.current.worker.terminate()
-      worker.current = null
-    }
-    if (request === undefined) return
-    const fail = () => setResult({ answer: failed, request })
-    try {
-      worker.current ??= { worker: start(), busy: false }
-    } catch {
-      fail()
-      return
-    }
-    const current = worker.current
-    current.busy = true
-    current.worker.onmessage = ({ data }: MessageEvent<Answer>) => {
-      current.busy = false
-      setResult({ answer: data, request })
-    }
-    current.worker.onerror = () => {
-      current.worker.terminate()
-      if (worker.current === current) worker.current = null
-      fail()
-    }
-    current.worker.postMessage(request)
-  }, [failed, request, start])
-  useEffect(
+  const worker = React.useRef<Worker | null>(null)
+  // Whether `worker` has loaded, so a request sent to it starts at once.
+  const ready = React.useRef(false)
+  // The request the worker is answering, or will answer once loaded; null when idle.
+  const sent = React.useRef<{ id: number; request: Request } | null>(null)
+  const lastId = React.useRef(0)
+  const [result, setResult] = React.useState<{ answer: Answer; request: Request } | null>(null)
+
+  React.useEffect(
     () => () => {
-      worker.current?.worker.terminate()
+      worker.current?.terminate()
       worker.current = null
     },
     []
   )
-  return {
-    answer: result?.answer,
-    pending: request !== undefined && result?.request !== request,
-  }
+
+  React.useEffect(() => {
+    const send = (to: Worker, message: { id: number; request: Request }) =>
+      to.postMessage({ ...message.request, id: message.id })
+    if (request === undefined) {
+      // Nobody reads an answer once its request is gone.
+      if (sent.current) {
+        worker.current?.terminate()
+        worker.current = null
+        sent.current = null
+      }
+      return
+    }
+    const message = { id: ++lastId.current, request }
+    if (sent.current && ready.current) {
+      worker.current?.terminate()
+      worker.current = null
+    }
+    // A worker still loading has started nothing: this becomes its first request.
+    sent.current = message
+    if (worker.current) {
+      if (ready.current) send(worker.current, message)
+      return
+    }
+    let created: Worker
+    try {
+      created = start()
+    } catch {
+      sent.current = null
+      setResult({ answer: failed, request })
+      return
+    }
+    ready.current = false
+    created.onmessage = ({ data }: MessageEvent<WorkerMessage<Answer>>) => {
+      if (worker.current !== created) return
+      if ('ready' in data) {
+        ready.current = true
+        if (sent.current) send(created, sent.current)
+        return
+      }
+      const answered = sent.current
+      if (!answered || data.id !== answered.id) return
+      sent.current = null
+      setResult({ answer: data, request: answered.request })
+    }
+    created.onerror = created.onmessageerror = () => {
+      if (worker.current !== created) return
+      const lost = sent.current
+      created.terminate()
+      worker.current = null
+      sent.current = null
+      if (lost) setResult({ answer: failed, request: lost.request })
+    }
+    worker.current = created
+  }, [failed, request, start])
+
+  return { answer: result?.answer, pending: request !== undefined && result?.request !== request }
 }
