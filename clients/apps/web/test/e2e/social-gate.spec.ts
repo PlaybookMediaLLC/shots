@@ -900,11 +900,11 @@ test('PB-05: a TikTok video sent to the app as a draft is never published, and s
     expect(await attemptsOf(post!.id)).toEqual([
       { outcome: 'SUCCEEDED', providerPostId: `v_inbox_file~v2.${sent[0]?.id}` },
     ])
-    const row = await db.row<{ publishedAt: Date | null }>(
+    const stored = await db.row<{ publishedAt: Date | null }>(
       'SELECT "publishedAt" FROM scheduled_post WHERE id = $1',
       [post!.id]
     )
-    expect(row?.publishedAt).toBeNull()
+    expect(stored?.publishedAt).toBeNull()
 
     // The draft says where it is and what is left to do.
     await page.reload()
