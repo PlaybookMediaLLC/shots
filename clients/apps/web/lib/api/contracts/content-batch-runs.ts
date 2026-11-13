@@ -28,19 +28,78 @@ export const GRID_HEADLINE_LIMIT = 60
 /** The most characters of a grid cell's label; Go's `batchGridTopicLimit`. */
 export const GRID_TOPIC_LIMIT = 100
 
-/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
-export const batchGridSchema = z.object({
-  headline: z.string().trim().min(1).max(GRID_HEADLINE_LIMIT),
-  musicAssetId: contentDraftIdSchema.optional(),
-  slots: z
-    .array(
-      z.object({
-        assetId: contentDraftIdSchema.optional(),
-        topic: z.string().max(GRID_TOPIC_LIMIT),
+/** The most characters of a UGC video's overlay text; Go's `batchUGCTextLimit`. */
+export const UGC_TEXT_LIMIT = 150
+
+/** The latest a template's music may start; Go's `batchMusicStartLimit`. */
+export const MUSIC_START_LIMIT_MS = 10 * 60 * 1000
+
+/** Clip lengths a UGC video takes, to the tenth of a second; Go's `checkBatchGrid`. */
+export const UGC_CLIP_MS = { max: 60_000, min: 3_000 } as const
+
+/** Lengths of the clip shown after a UGC video. */
+export const UGC_CLOSING_MS = { max: 15_000, min: 3_000 } as const
+
+/** Where a UGC video's text sits. */
+export const overlayPositionSchema = z.enum(['top', 'middle', 'bottom'])
+
+/** Where a UGC video's text sits. */
+export type OverlayPosition = z.infer<typeof overlayPositionSchema>
+
+/** How many slots and characters of text each template takes; a grid is the default. */
+export const TEMPLATE_SHAPES = {
+  grid: { slots: 4, text: GRID_HEADLINE_LIMIT },
+  single: { slots: 1, text: GRID_HEADLINE_LIMIT },
+  ugc: { slots: 1, text: UGC_TEXT_LIMIT },
+} as const
+
+/**
+ * A template video concept. Without `kind` it is the 2x2 grid: a headline above
+ * four labelled images. `single` fades one image in under a headline, which
+ * `hideHeadline` leaves out while keeping it; `ugc` writes its text over the
+ * workspace's own clip, in its one slot, with an optional closing clip after.
+ * Music is optional and plays from `musicStartMs`.
+ */
+export const batchGridSchema = z
+  .object({
+    closingAssetId: contentDraftIdSchema.optional(),
+    headline: z.string().trim().max(UGC_TEXT_LIMIT),
+    hideHeadline: z.boolean().optional(),
+    kind: z.enum(['single', 'ugc']).optional(),
+    musicAssetId: contentDraftIdSchema.optional(),
+    musicStartMs: z.number().int().min(0).max(MUSIC_START_LIMIT_MS).optional(),
+    slots: z
+      .array(
+        z.object({
+          assetId: contentDraftIdSchema.optional(),
+          topic: z.string().max(GRID_TOPIC_LIMIT),
+        })
+      )
+      .min(1)
+      .max(4),
+    textPosition: overlayPositionSchema.optional(),
+  })
+  .superRefine((grid, context) => {
+    const shape = TEMPLATE_SHAPES[grid.kind ?? 'grid']
+    if (grid.slots.length !== shape.slots)
+      context.addIssue({
+        code: 'custom',
+        message: `This video takes ${shape.slots}.`,
+        path: ['slots'],
       })
-    )
-    .length(4),
-})
+    if (grid.headline.length > shape.text || (!grid.headline && !grid.hideHeadline))
+      context.addIssue({
+        code: 'custom',
+        message: `A video needs text of 1 to ${shape.text} characters.`,
+        path: ['headline'],
+      })
+    if (grid.musicStartMs && !grid.musicAssetId)
+      context.addIssue({
+        code: 'custom',
+        message: 'Music starts only with music.',
+        path: ['musicStartMs'],
+      })
+  })
 
 /** One of {@link batchGridSchema}. */
 export type BatchGrid = z.infer<typeof batchGridSchema>

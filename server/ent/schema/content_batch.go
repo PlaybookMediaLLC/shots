@@ -54,12 +54,20 @@ type BatchGridSlot struct {
 	AssetID string `json:"assetId,omitempty"`
 }
 
-// BatchGrid is a 2x2 grid video concept: a headline above four labelled images,
-// with an optional music track. The rendered video becomes the item's media.
+// BatchGrid is a template video concept. Kind "" is the 2x2 grid (a headline
+// above four labelled images); "single" is one image fading in under a headline;
+// "ugc" is the workspace's own clip with overlay text and an optional closing
+// clip after it. Slots hold the images, or for "ugc" the clip. Music is optional
+// and plays from MusicStartMs. The rendered video becomes the item's media.
 type BatchGrid struct {
-	Headline     string          `json:"headline"`
-	Slots        []BatchGridSlot `json:"slots"`
-	MusicAssetID string          `json:"musicAssetId,omitempty"`
+	Kind           string          `json:"kind,omitempty"`
+	Headline       string          `json:"headline"`
+	HideHeadline   bool            `json:"hideHeadline,omitempty"`
+	TextPosition   string          `json:"textPosition,omitempty"`
+	Slots          []BatchGridSlot `json:"slots"`
+	ClosingAssetID string          `json:"closingAssetId,omitempty"`
+	MusicAssetID   string          `json:"musicAssetId,omitempty"`
+	MusicStartMs   int             `json:"musicStartMs,omitempty"`
 }
 
 // BatchTiming is when an item is meant to go out: a local time in an IANA zone
