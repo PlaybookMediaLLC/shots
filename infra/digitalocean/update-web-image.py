@@ -28,6 +28,9 @@ LEGACY_JOBS = {"social-migrate", "postiz-migrate"}
 STRIPE_SECRET_KEYS = ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
 STRIPE_PRICE_KEYS = ("STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_ANNUAL", "STRIPE_PRICE_BUSINESS_MONTHLY",
                      "STRIPE_PRICE_BUSINESS_ANNUAL", "STRIPE_PRICE_EXTRA_LAUNCH")
+# The composer's Google Drive import. The Picker keys reach the browser, so they
+# are plain settings that follow Infisical: removing them turns the import off.
+GOOGLE_PICKER_KEYS = ("GOOGLE_PICKER_API_KEY", "GOOGLE_PICKER_APP_ID", "GOOGLE_PICKER_CLIENT_ID")
 # The web reaches data and storage only through the backend.
 WEB_DATABASE_KEYS = {"DATABASE_URL", "DIRECT_URL", "MIGRATION_DATABASE_URL", "AUDIT_RETENTION_DATABASE_URL",
                      "STORAGE_SERVICE_KEY", "STORAGE_API_URL", "STORAGE_PROXY_URL", "STORAGE_BUCKET",
@@ -95,6 +98,9 @@ def update_web_image(base, tag, secrets=None):
             web_envs[:] = [item for item in web_envs if item["key"] != key]
             web_envs.append({"key": key, "value": secrets[key], "scope": "RUN_TIME",
                              "type": "SECRET" if key in STRIPE_SECRET_KEYS else "GENERAL"})
+        web_envs[:] = [item for item in web_envs if item["key"] not in GOOGLE_PICKER_KEYS]
+        web_envs += [{"key": key, "value": secrets[key], "type": "GENERAL", "scope": "RUN_TIME"}
+                     for key in GOOGLE_PICKER_KEYS if secrets.get(key)]
     source = next((item for item in web_envs if item["key"] == "CLIENT_IP_SOURCE"), None)
     if source is None:
         web_envs.append({"key": "CLIENT_IP_SOURCE", "value": "digitalocean",

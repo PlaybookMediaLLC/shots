@@ -79,6 +79,22 @@ class UpdateWebImageTest(unittest.TestCase):
         again = module.update_web_image(result, tag, {**base, **stripe})
         self.assertEqual(len(again["services"][0]["envs"]), len({item["key"] for item in again["services"][0]["envs"]}))
 
+    def test_google_drive_import_follows_infisical(self):
+        tag = "web-" + "b" * 40
+        base = {"REDIS_URL": "runtime-redis", "PLATFORM_RENDER_CDP_URL": "wss://render.example/devtools",
+                "PLATFORM_RENDER_CDP_TOKEN": "cdp-token"}
+        picker = {"GOOGLE_PICKER_API_KEY": "AIza-key", "GOOGLE_PICKER_APP_ID": "123456789012",
+                  "GOOGLE_PICKER_CLIENT_ID": "client.apps.googleusercontent.com"}
+        result = module.update_web_image(self.base, tag, {**base, **picker})
+        envs = {item["key"]: item for item in result["services"][0]["envs"]}
+        for key, value in picker.items():
+            self.assertEqual((envs[key]["type"], envs[key]["value"]), ("GENERAL", value))
+        again = module.update_web_image(result, tag, {**base, **picker})
+        self.assertEqual(len(again["services"][0]["envs"]), len({item["key"] for item in again["services"][0]["envs"]}))
+        # Removing the keys from Infisical turns the import off.
+        removed = module.update_web_image(result, tag, base)
+        self.assertFalse({item["key"] for item in removed["services"][0]["envs"]} & set(module.GOOGLE_PICKER_KEYS))
+
     def test_content_drafts_and_collab_follow_infisical(self):
         tag = "web-" + "b" * 40
         base = {"REDIS_URL": "runtime-redis", "PLATFORM_RENDER_CDP_URL": "wss://render.example/devtools",
