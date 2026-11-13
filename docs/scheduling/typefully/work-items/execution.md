@@ -1,6 +1,6 @@
 # Typefully implementation and verification record
 
-Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 34 Exists, 69 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
+Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 43 Exists, 60 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
 
 ## Develop integration
 
@@ -122,6 +122,39 @@ Coverage key **L1**. Each post was scheduled through Write from a local stack (n
 
 The same run also published to Instagram `@get.eigenn`, TikTok `@the_dark_lightskin` and YouTube `@getconduitt`; no Typefully row depends on those networks alone.
 
+Coverage key **L2**. Each check ran through Write from a local stack (not production) on 2026-11-13. The X posts used X API credit. Each post was confirmed by its receipt, one successful attempt and the public post, and its native ID matched the receipt. Each post was then deleted with the network's own Delete control in the signed-in browser. The worker read signed media through a public quick tunnel (`R2_DELIVERY_ENDPOINT`), as in L1.
+
+| Date (UTC) | Account | Content | Receipt | Deletion |
+|---|---|---|---|---|
+| 2026-11-13 01:45 | X `@yoanyombax` | Poll, 2 choices, 5 minutes, rendered natively (TF-036). Before deletion, Analyze showed its stored metrics observation (TF-003) | `2121056706041925765` | Removal verified by 01:47:33 |
+| 2026-11-13 01:49 | X `@yoanyombax` | Replies limited to accounts you follow; X showed the restriction (TF-107) | `2121057905294090370` | Removal verified by 01:51:04 |
+| 2026-11-13 01:52 | X `@yoanyombax` | Made with AI and Paid partnership labels (TF-097) | `2121058611589722292` | Removal verified by 01:53:32 |
+| 2026-11-13 01:58 | X `@yoanyombax` | Two images, Publish now. The worker could not read the media source before any X call | `UNKNOWN_DELIVERY`, no native ID | Nothing delivered. After a profile check at 03:22, reconciled as not live at 03:23:17; the attempt keeps its `UNKNOWN_DELIVERY` result |
+| 2026-11-13 02:50 | X `@yoanyombax` | Publish now on a draft scheduled for 16:15 (TF-069). A 7.9 MB PNG went as a recorded 4.08 MB resized derivative (TF-068), then a 13 KB PNG, in draft order (TF-092), with ALT text on both (TF-007) | `2121073120832311594` | Removal verified by 02:51:40 |
+| 2026-11-13 02:53 | X `@yoanyombax` | Auto-repost after 1 hour and auto-plug at 1 like (TF-011, TF-027, TF-064) | `2121073956824183158` | Repost undone, plug reply and post deleted; removal verified by 03:56:01 |
+| 2026-11-13 02:56 | LinkedIn member `yoanyomba` | Post with a first comment (TF-071). The post published; the comment receipt is `failed`, `provider_error` | `urn:li:share:7526840307548594176` | Removal verified by 03:01:06, after the repost |
+| 2026-11-13 02:59 | LinkedIn member `yoanyomba` | Repost of the 02:56 post with commentary; the original showed embedded (TF-098) | `urn:li:share:7526841103610929152` | Removal verified by 03:01:06 |
+| 2026-11-13 03:05 | LinkedIn member `yoanyomba` | Poll, 2 options, 1 day, rendered natively (TF-109) | `urn:li:ugcPost:7526842603464720385` | Removal verified by 03:06:23 |
+| 2026-11-13 03:08 | LinkedIn member `yoanyomba` | 2-page PDF titled "Shots live test PDF"; both pages showed (TF-083) | `urn:li:ugcPost:7526843401661661184` | Removal verified by 03:09:38 |
+
+For the 02:53 post, the plug reply (`2121081510233010373`) went out at 03:23:34 after the owner liked the post. The repost went out at 03:53:48. Both receipts are `done`. The repost was undone in X before the reply and the post were deleted.
+
+Checks without a post:
+
+- The X composer suggested "Lysol (@getsol)" for `@getsol` (TF-001). The lookup matches an exact handle.
+- The LinkedIn lookup of the Page `getsolomonai` (106498803) returned HTTP 500 (TF-077), so no mention post was sent.
+- The cross-post (TF-035) did not run. X and LinkedIn are in different profiles, and moving a connection disables it.
+
+Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots has no control to delete a published post; a delete API is being built separately.
+
+### Open defects found by L2
+
+- A same-day Auto-RT rule ("Days later at", 0 days) is stored without `days` (fixed in #544; live retest pending). `RetweetRule.Days` has `omitempty` (`server/internal/postoptions/postoptions.go`), and the web's strict `retweetRuleSchema` requires `days`. The draft then returns 400 on read and 409 on save, and Publish returns 500 for that profile. The draft was repaired by removing the rule. The shortest working delay is "After 1 hour".
+- A failed read of the X media source, before any X call, is recorded as `UNKNOWN_DELIVERY` and not as a retryable failure (`stageMedia` in `x/media_source.go`; fixed in #544).
+- The LinkedIn adapter keeps no status or body for a 4xx refusal (`linkedin/mutation.go`). The failed first comment therefore records only `provider_error`.
+- A refused mention lookup reaches the client as HTTP 500. `Publisher.Mentions` returns a `socialapi` 502 with a reason, but `writeStoreError` (`internal/httpapi/server.go`) has no case for it.
+- Analyze labels a post by its draft title ("Untitled draft"), not by its text.
+
 ## Defects found and resolved during verification
 
 - Repurposing returned an empty editor. It now copies confirmed immutable publication text/media and posted replies, retains native PDF options, validates source visibility and excludes private later edits, approval and unfinished replies.
@@ -143,13 +176,13 @@ Initial test failures are retained in local logs. Regression checks also repaire
 
 | Boundary | Exact unresolved dependency |
 |---|---|
-| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video. Still unresolved: Premium long posts, Articles, long or 1080p video and restricted reply modes, which cannot be inferred from a display badge; native quotes, which need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`); and every other X option without a live post. Mixed-image/video capability and provider transcoding remain unpromised. |
-| LinkedIn | Member publishing with `w_member_social` is live-verified on `yoanyomba` for images and video. Still unresolved: Page publishing, people mentions and Page analytics wait for LinkedIn's Community Management review of app 266682906; document upload, polls, reposts, first comments and company mentions have not run live. |
-| Threads / Instagram | Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
-| Mastodon | A real instance's advertised poll limits, API version/native-quote support and source quote permission; pending federation approval is not a failed root publication. |
-| Bluesky | Authorized account and native record/CID resolution against a live PDS; protocol fixtures do not prove live remote behavior. |
-| Slack / email | Real workspace grant, destination access and delivery. The task verified controlled OAuth/HTTP peers with actual fanout/Temporal. |
-| AI / GIPHY | Production credentials and permitted models/search access; transcription accuracy and generated writing quality remain unverified. |
+| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video (L1). They are also live-verified for polls, the following-only reply restriction, disclosures, Publish now, resized multi-image posts with ALT text, a timed repost, a plug reply, analytics reads and mention lookup (L2). Still unresolved: long posts, Articles, 10-minute and 1080p video need X Premium. Native and finisher quotes need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`). Mixed photo and video has no X API contract. Communities need a Community that the account belongs to. Photo tags and multiple accounts need a second X account. A same-day Auto-RT rule failed in L2 (fixed in #544; live retest pending). Repost removal and like-gated reposts have not run live. |
+| LinkedIn | Member publishing with `w_member_social` is live-verified on `yoanyomba` for images and video (L1), and for polls, PDF documents and reposts (L2). Still unresolved: LinkedIn refused the first comment, and Shots kept no reason. The company lookup returns HTTP 500. Page publishing, people mentions (a Page connection and People Typeahead) and Page analytics wait for LinkedIn's Community Management review of app 266682906. |
+| Threads / Instagram | Threads needs `THREADS_APP_ID`/`THREADS_APP_SECRET` and a tester account. Instagram needs Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
+| Mastodon | An account and `PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED`. The instance's advertised poll limits, API version/native-quote support and source quote permission apply; pending federation approval is not a failed root publication. |
+| Bluesky | An app password and `PLATFORM_SOCIAL_BLUESKY_ENABLED`; then native record/CID resolution against a live PDS. Bluesky has no polls. |
+| Slack / email | Slack needs `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET` and a workspace. Email needs `RESEND_API_KEY` or SMTP. The task verified controlled OAuth/HTTP peers with actual fanout/Temporal. |
+| AI / GIPHY | AI needs `OPENROUTER_API_KEY` and the production model IDs; transcription accuracy and generated writing quality remain unverified. GIPHY needs a production key. |
 | Native/external clients | Raycast macOS execution, Apple Shortcut import/signing, hosted Zapier workflows and ChatGPT/Claude directory approval require their external environments. |
 | Deferred products | Public analytics sharing is now implemented by develop with explicit enable and revoke. Auto-DM has a default-off ledger/adapter and still needs an accepted consent/abuse model and provider scope. Substack Notes alone remains Later because no supported official publishing contract is established. Five Typefully-specific products/releases remain Skip with reasons in coverage. |
 

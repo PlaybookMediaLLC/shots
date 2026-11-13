@@ -49,7 +49,7 @@
         "maxBytes": 536870912
       },
       "docs": ["https://docs.x.com/x-api/media/quickstart/best-practices"],
-      "verifiedOn": "2026-10-28"
+      "verifiedOn": "2026-11-13"
     },
     "linkedin": {
       "maxMedia": 20,
@@ -74,7 +74,7 @@
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/images-api",
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/multiimage-post-api"
       ],
-      "verifiedOn": "2026-10-28"
+      "verifiedOn": "2026-11-13"
     },
     "instagram": {
       "maxMedia": 20,
