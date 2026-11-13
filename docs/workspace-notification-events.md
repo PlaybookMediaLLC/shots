@@ -26,6 +26,37 @@ workspace; authentication and security email is unaffected. A reply reaches
 the thread's participants; the draft's author hears about new comments as
 `comment.on_your_draft`.
 
+## Delivery precedence
+
+Each personal delivery is decided once, after the recipient's membership and
+resource access are checked (`personalDecision` in
+`server/internal/notifications/decisions.go`). The first rule that applies wins,
+and its code is stored on the delivery as `decision_code`:
+
+1. The workspace turned the channel off: skipped, `WORKSPACE_CHANNEL_DISABLED`.
+2. The workspace's policy for this event leaves the channel out:
+   `WORKSPACE_EVENT_DISABLED`.
+3. Email only: the person's email switch is off, `EMAIL_TURNED_OFF`.
+4. Slack DM only: the person's Slack switch is off, `SLACK_TURNED_OFF`.
+5. A required failure alert (`post.publish_failed`,
+   `post.publish_recovery_required`) is sent, `REQUIRED_FAILURE_ALERT`. It
+   overrides only the person's own choices in step 6, never steps 1 to 4.
+6. The person turned this kind off, for every set or for the post's social set:
+   `CATEGORY_DISABLED`.
+7. Otherwise it is sent: `SELECTED`.
+
+A channel that cannot deliver never sends, even a required alert. An expired
+Slack connection holds the delivery as `BLOCKED` (`SLACK_RECONNECT_REQUIRED`)
+until it is reconnected; a disconnected one skips it (`SLACK_NOT_CONNECTED`).
+The sender rechecks the policy, preference and connection generations before it
+sends.
+
+The person who acted is not told about their own action. A background action,
+such as a scheduled publish, and a required failure alert still reach them.
+
+`TestRequiredFailurePrecedenceAndIndependentChannelStates` asserts each step for
+in-app, email and Slack DM.
+
 | Canonical event                   | Committed emitter                                                           | Recipients      | Sensitivity / permitted channels | Summary                         | Destination                           |
 | --------------------------------- | --------------------------------------------------------------------------- | --------------- | -------------------------------- | ------------------------------- | ------------------------------------- |
 | `release.created`                 | `CreateRelease`                                                             | creators        | coarse; in-app, email, Slack     | Release created                 | release intake or associated campaign |

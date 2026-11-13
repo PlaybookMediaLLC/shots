@@ -12,7 +12,7 @@ Group controls are computed from child selections for one channel: none is unche
 
 Preference writes require the current session and membership. New or modified nonempty set references must be visible in the current tenant; unchanged historical choices survive removal or transfer, and a member may clear their own old choices. Stable lock ordering avoids multi-set lock inversions. A per-member transaction lock and generation comparison reject a stale save with 409. The UI retains the local draft and offers an explicit reload that discards it, preventing accidental overwrite by another tab.
 
-This increment does not settle mandatory failure-alert precedence or add a personal Slack master switch. N12/N13 track the wider precedence and recovery requirements separately.
+Required failure alerts and the personal Slack switch follow the order in [delivery precedence](../workspace-notification-events.md#delivery-precedence): a required alert overrides these per-set choices but never a workspace ceiling, a personal email or Slack switch, or a channel that cannot deliver.
 
 ## Migration and rollout
 

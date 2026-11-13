@@ -582,6 +582,58 @@ func TestWritePublishing(t *testing.T) {
 		}
 	})
 
+	t.Run("an automatic retry that fails again alerts once", func(t *testing.T) {
+		d := draft(ContentDraftInput{PlainText: "retried publication"})
+		result, e := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Version: d.Version, Targets: target("LinkedIn retried", linkedin)})
+		if e != nil || len(result.Scheduled) != 1 {
+			t.Fatalf("scheduled=%+v %v", result, e)
+		}
+		post := result.Scheduled[0]
+		queue := publishing.NewRepository(w.db.Client)
+		count := func(query string) int {
+			var n int
+			if err := w.db.SQL.QueryRow(query, w.org, post.ID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		alerts := func() int {
+			return count(`SELECT count(*) FROM outbox_event WHERE "organizationId"=$1 AND type='activity.post.publish_failed' AND "aggregateId"=$2`)
+		}
+		audits := func() int {
+			return count(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action='post.publish_failed' AND "entityId"=$2`)
+		}
+		fail := func(run string, number int, retryAt *time.Time) func() error {
+			claimed, e := queue.Claim(ctx, post.ID, run, time.Now().Add(time.Hour))
+			if e != nil || !claimed {
+				t.Fatalf("claim=%v %v", claimed, e)
+			}
+			attempt, e := queue.StartAttempt(ctx, post, run, number)
+			if e != nil {
+				t.Fatal(e)
+			}
+			return func() error { return queue.Fail(ctx, post, attempt, "RATE_LIMITED", retryAt, run) }
+		}
+		retryAt := time.Now().Add(time.Minute)
+		if e = fail("retry-first-"+post.ID, 1, &retryAt)(); e != nil {
+			t.Fatal(e)
+		}
+		// The retry is recorded; no one is told while it can still go out.
+		if alerts() != 0 || audits() != 1 {
+			t.Fatalf("after the automatic retry: alerts=%d audits=%d", alerts(), audits())
+		}
+		final := fail("retry-last-"+post.ID, 2, nil)
+		// A worker that reports the same final failure twice alerts once.
+		for range 2 {
+			if e = final(); e != nil {
+				t.Fatal(e)
+			}
+		}
+		if alerts() != 1 || audits() != 2 {
+			t.Fatalf("after giving up: alerts=%d audits=%d", alerts(), audits())
+		}
+	})
+
 	t.Run("an image's description is kept on it and limited to X's length", func(t *testing.T) {
 		image, pdf := "img_"+w.id, "pdf_"+w.id
 		w.exec(t, `INSERT INTO asset (id,"organizationId","objectKey","mediaType",bytes,status,width,height,"createdAt","updatedAt") VALUES ($1,$2,$3,'image/png',68,'UPLOADED',1,1,now(),now())`, image, w.org, "org/"+w.org+"/alt.png")
