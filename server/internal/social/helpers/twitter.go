@@ -1,10 +1,12 @@
 package helpers
 
 import (
+	"errors"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dlclark/regexp2"
 	"golang.org/x/text/unicode/norm"
@@ -35,6 +37,25 @@ var tweetRanges = []struct{ start, end, weight int }{
 const surrogateShift = 0xf0000
 
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
+
+// regexp2 backtracks quadratically through long domain-like words, far slower
+// than JavaScript: 4,000 characters of "a." took 50 s, a CJK paragraph with a
+// dot 0.8 s per 2,000 characters. So one call of the URL regexes gets
+// linkScanBudget, and one text's scan linkScanBudget plus linkScanPerUnit for
+// each of its UTF-16 units; ordinary text uses a small fraction of either.
+// shortcut: CJK has no spaces, so a paragraph is one word and scans
+// quadratically: a dotted paragraph over about 1,000 characters, or an article
+// of many dotted paragraphs, cannot be counted. Make the scan linear if long
+// CJK articles must count.
+const (
+	linkScanBudget  = 200 * time.Millisecond
+	linkScanPerUnit = 20 * time.Microsecond
+)
+
+// ErrTextTooComplex is a text whose links the URL scan could not find within
+// its budget. Callers refuse it, since any count would be a guess. It replaces
+// regexp2's timeout error, which quotes the whole text.
+var ErrTextTooComplex = errors.New("the text is too long or too complex to count its links")
 
 func jsRegexp(source string, opts regexp2.RegexOptions) *regexp2.Regexp {
 	source = surrogateEscapeRe.ReplaceAllStringFunc(source, func(escape string) string {
@@ -98,49 +119,63 @@ var (
 	twemojiRe                = jsRegexp(twemojiSource, 0)
 )
 
+// Only the URL regexes backtrack badly, so only they can time out; the others
+// are linear and never return an error.
+func init() {
+	extractURLRe.MatchTimeout = linkScanBudget
+	validASCIIDomainRe.MatchTimeout = linkScanBudget
+}
+
 // TextSlicer returns the slice bounds of text within the length limit (twitter-text for x).
-func TextSlicer(integrationType string, end int, text string) (int, int) {
+func TextSlicer(integrationType string, end int, text string) (int, int, error) {
 	if integrationType != "x" {
-		return 0, end
+		return 0, end, nil
 	}
-	_, valid, validRangeEnd := parseTweet(text, end)
+	_, valid, validRangeEnd, err := parseTweet(text, end)
+	if err != nil {
+		return 0, 0, err
+	}
 	if valid {
-		return 0, end
+		return 0, end, nil
 	}
-	return 0, validRangeEnd
+	return 0, validRangeEnd, nil
 }
 
 // WeightedLength is twitter-text parseTweet(text).weightedLength.
-func WeightedLength(text string) int {
-	weighted, _, _ := parseTweet(text, 280)
-	return weighted
+func WeightedLength(text string) (int, error) {
+	weighted, _, _, err := parseTweet(text, 280)
+	return weighted, err
 }
 
 // ValidTweetText applies twitter-text's invalid-character and weighted-length
 // rules together. Empty text is handled separately by media-only publishers.
-func ValidTweetText(text string, limit int) bool {
-	_, valid, _ := parseTweet(text, limit)
-	return valid
+func ValidTweetText(text string, limit int) (bool, error) {
+	_, valid, _, err := parseTweet(text, limit)
+	return valid, err
 }
 
 // CountLength counts the length of text for a provider.
-func CountLength(integrationType, text string) int {
+func CountLength(integrationType, text string) (int, error) {
 	if integrationType == "x" {
 		return WeightedLength(text)
 	}
 	if integrationType == "threads" {
-		return len(text) // TextEncoder: UTF-8 bytes
+		return len(text), nil // TextEncoder: UTF-8 bytes
 	}
-	return jsLength(text)
+	return jsLength(text), nil
 }
 
-func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int) {
+func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int, err error) {
 	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
 	// Hash all entities by their startIndex for fast lookup
+	urls, err := extractURLsWithIndices(shifted, true)
+	if err != nil {
+		return 0, false, 0, err
+	}
 	urlEntities := map[int]int{}
-	for _, u := range extractURLsWithIndices(shifted, true) {
+	for _, u := range urls {
 		urlEntities[u.start] = len(u.url)
 	}
 	emojiEntities := map[int]int{}
@@ -178,7 +213,7 @@ func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, va
 	weightedLength = weighted / tweetScale
 	valid = valid && weightedLength > 0 && weightedLength <= maxWeightedTweetLength
 	validDisplayIndex += jsLength(text) - len(normalized)
-	return weightedLength, valid, validDisplayIndex
+	return weightedLength, valid, validDisplayIndex, nil
 }
 
 // nfcLikeJS is JavaScript's normalize('NFC'). norm.NFC inserts U+034F after
@@ -248,10 +283,10 @@ type urlEntity struct {
 // LinkSpans are the byte ranges of the links in text that start with a
 // protocol: twitter-text's extractUrlsWithIndices with
 // extractUrlsWithoutProtocol: false, as Mastodon finds the links it counts.
-func LinkSpans(text string) [][2]int {
+func LinkSpans(text string) ([][2]int, error) {
 	// Only a link with a protocol counts, and the scan is slow on long runs.
 	if !strings.Contains(text, "://") {
-		return nil
+		return nil, nil
 	}
 	offsets := make([]int, 0, len(text)+1) // the byte offset of each UTF-16 unit
 	for i, r := range text {
@@ -261,21 +296,50 @@ func LinkSpans(text string) [][2]int {
 		}
 	}
 	offsets = append(offsets, len(text))
+	urls, err := extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false)
+	if err != nil {
+		return nil, err
+	}
 	var spans [][2]int
-	for _, u := range extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false) {
+	for _, u := range urls {
 		spans = append(spans, [2]int{offsets[u.start], offsets[u.end]})
 	}
-	return spans
+	return spans, nil
 }
 
 // extractURLsWithIndices is twitter-text's extractUrlsWithIndices, on
-// surrogate-shifted units.
-func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
-	if !slices.Contains(text, '.') {
-		return nil
+// surrogate-shifted units. A match never contains ASCII whitespace, which can
+// only be its first, preceding character, and always contains a dot. So the
+// scan runs word by word, each with the space before it, and skips the words
+// with no dot: one regexp2 call never sees more than one word. It fails with
+// ErrTextTooComplex once the text's budget runs out; each call is bounded,
+// but a text of many slow words makes many calls.
+func extractURLsWithIndices(text []rune, withoutProtocol bool) ([]*urlEntity, error) {
+	deadline := time.Now().Add(linkScanBudget + time.Duration(len(text))*linkScanPerUnit)
+	var urls []*urlEntity
+	for start, end := 0, 0; start < len(text); start = end {
+		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {
+		}
+		if !slices.Contains(text[start:end], '.') {
+			continue
+		}
+		if time.Now().After(deadline) {
+			return nil, ErrTextTooComplex
+		}
+		found, err := extractWordURLs(text[start:end], start, withoutProtocol, deadline)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, found...)
 	}
+	return urls, nil
+}
 
-	folded := slices.Clone(text)
+func isASCIISpace(r rune) bool { return r == ' ' || r >= '\t' && r <= '\r' }
+
+// extractWordURLs scans one word that starts at offset in the text.
+func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline time.Time) ([]*urlEntity, error) {
+	folded := slices.Clone(word)
 	for i, c := range folded {
 		if standIn, ok := jsCaseStandIns[c]; ok {
 			folded[i] = standIn
@@ -283,23 +347,29 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 	}
 
 	var urls []*urlEntity
-	for m, _ := extractURLRe.FindRunesMatch(folded); m != nil; m, _ = extractURLRe.FindNextMatch(m) {
+	m, err := extractURLRe.FindRunesMatch(folded)
+	for ; m != nil; m, err = extractURLRe.FindNextMatch(m) {
+		if time.Now().After(deadline) {
+			return nil, ErrTextTooComplex
+		}
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
 		domainGroup := m.GroupByNumber(5)
 		domain := domainGroup.Runes()
 		// JavaScript punycodes and searches the domain as written.
-		written := text[domainGroup.Index : domainGroup.Index+domainGroup.Length]
+		written := word[domainGroup.Index : domainGroup.Index+domainGroup.Length]
 		path := m.GroupByNumber(7).Runes()
-		endPosition := m.Index + m.Length
+		endPosition := offset + m.Index + m.Length
 		startPosition := endPosition - len(url)
 
 		protocolLen := len(protocol)
 		if protocolLen == 0 {
 			protocolLen = len("https://")
 		}
-		if !isValidTweetURL(url, protocolLen, domain, written) {
+		if ok, err := isValidTweetURL(url, protocolLen, domain, written); err != nil {
+			return nil, err
+		} else if !ok {
 			continue
 		}
 
@@ -314,7 +384,11 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 
 			var lastURL *urlEntity
 			asciiEndPosition := 0
-			for am, _ := validASCIIDomainRe.FindRunesMatch(domain); am != nil; am, _ = validASCIIDomainRe.FindNextMatch(am) {
+			am, err := validASCIIDomainRe.FindRunesMatch(domain)
+			for ; am != nil; am, err = validASCIIDomainRe.FindNextMatch(am) {
+				if time.Now().After(deadline) {
+					return nil, ErrTextTooComplex
+				}
 				asciiDomain := written[am.Index : am.Index+am.Length]
 				asciiStartPosition := indexRunes(written, asciiDomain, asciiEndPosition)
 				asciiEndPosition = asciiStartPosition + len(asciiDomain)
@@ -324,6 +398,9 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 					end:   startPosition + asciiEndPosition,
 				}
 				urls = append(urls, lastURL)
+			}
+			if err != nil {
+				return nil, ErrTextTooComplex
 			}
 
 			// no ASCII-only domain found. Skip the entire URL.
@@ -351,7 +428,10 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 		}
 		urls = append(urls, &urlEntity{url: url, start: startPosition, end: endPosition})
 	}
-	return urls
+	if err != nil {
+		return nil, ErrTextTooComplex
+	}
+	return urls, nil
 }
 
 func indexRunes(s, sub []rune, from int) int {
@@ -368,19 +448,21 @@ func indexRunes(s, sub []rune, from int) int {
 // 1..63 characters, so only the label check and the total length matter.
 // domain carries the stand-ins the regexes need; written is the same span
 // of the original text, which punycode encodes.
-func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) bool {
+func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) (bool, error) {
 	if len(domain) >= 4 && string(domain[:4]) == "xn--" {
 		// Punycode encoded url cannot contain non ASCII characters
-		if ok, _ := validASCIIDomainRe.MatchRunes(domain); !ok {
-			return false
+		if ok, err := validASCIIDomainRe.MatchRunes(domain); err != nil {
+			return false, ErrTextTooComplex
+		} else if !ok {
+			return false, nil
 		}
 	}
 	for _, label := range splitRunes(written, func(r rune) bool { return r == '.' }) {
 		if n := punycodeToASCIILength(unshiftSurrogates(label)); n < 1 || n > 63 {
-			return false
+			return false, nil
 		}
 	}
-	return protocolLen+len(url) <= tweetMaxURLLength
+	return protocolLen+len(url) <= tweetMaxURLLength, nil
 }
 
 func splitRunes(s []rune, sep func(rune) bool) [][]rune {

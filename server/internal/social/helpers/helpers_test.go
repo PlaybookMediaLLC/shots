@@ -2,9 +2,12 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Readable spot checks; the exhaustive comparison against the npm packages
@@ -52,18 +55,57 @@ func TestWeightedLength(t *testing.T) {
 		"mail a@sample.com":                17, // not emails
 	}
 	for in, want := range cases {
-		if got := WeightedLength(in); got != want {
-			t.Errorf("WeightedLength(%q) = %d, want %d", in, got, want)
+		if got, err := WeightedLength(in); err != nil || got != want {
+			t.Errorf("WeightedLength(%q) = %d, %v, want %d", in, got, err, want)
 		}
 	}
-	if start, end := TextSlicer("x", 5, "日本語日本語"); start != 0 || end != 1 {
-		t.Errorf("TextSlicer = %d,%d", start, end)
+	if start, end, err := TextSlicer("x", 5, "日本語日本語"); err != nil || start != 0 || end != 1 {
+		t.Errorf("TextSlicer = %d,%d, %v", start, end, err)
 	}
-	if got := CountLength("threads", "é😀"); got != 6 {
-		t.Errorf("threads counts UTF-8 bytes, got %d", got)
+	if got, err := CountLength("threads", "é😀"); err != nil || got != 6 {
+		t.Errorf("threads counts UTF-8 bytes, got %d, %v", got, err)
 	}
-	if got := CountLength("linkedin", "é😀"); got != 3 {
-		t.Errorf("others count UTF-16 units, got %d", got)
+	if got, err := CountLength("linkedin", "é😀"); err != nil || got != 3 {
+		t.Errorf("others count UTF-16 units, got %d, %v", got, err)
+	}
+}
+
+// regexp2 backtracks quadratically through domain-like words: without the
+// budget each of these took seconds to minutes.
+func TestLinkScanStopsOnCraftedText(t *testing.T) {
+	scans := map[string]func(string) error{
+		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
+		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
+	}
+	cases := map[string]string{
+		"a.":         strings.Repeat("a.", 5000),
+		"https://a.": "https://" + strings.Repeat("a.", 5000),
+		// Each word is far below a call's timeout: only the text's deadline stops them.
+		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+	}
+	for name, text := range cases {
+		for scan, run := range scans {
+			start := time.Now()
+			err := run(text)
+			if elapsed := time.Since(start); elapsed > time.Second {
+				t.Errorf("%s(%s) took %v", scan, name, elapsed)
+			}
+			// Without "://" LinkSpans has no link to find and skips the scan.
+			noProtocol := scan == "LinkSpans" && !strings.Contains(text, "://")
+			if noProtocol && err != nil || !noProtocol && !errors.Is(err, ErrTextTooComplex) {
+				t.Errorf("%s(%s) error = %v", scan, name, err)
+			}
+		}
+	}
+}
+
+// An X Article may weigh 100,000; dotted words and links throughout must not
+// exhaust the budget.
+func TestLinkScanCountsALongArticle(t *testing.T) {
+	paragraph := "Version 2.4 ships today. See https://example.com/notes and docs.example.com for details, e.g. the new API.\n"
+	article := strings.Repeat(paragraph, 850) // 90,950 characters weighing 95,200
+	if valid, err := ValidTweetText(article, 100000); err != nil || !valid {
+		t.Fatalf("ValidTweetText(article) = %v, %v", valid, err)
 	}
 }
 
