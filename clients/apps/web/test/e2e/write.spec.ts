@@ -289,6 +289,80 @@ test(
   }
 )
 
+test('closing a dialog opened from a dialog returns focus to each launcher in turn', async ({
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ channels: ['x'] })
+  await newDraft(page)
+  await draftEditor(page).click()
+  await settleSelection(page)
+  await page.keyboard.type('Focus goes back where it came from')
+  await expectSaved(page)
+  const holdsFocus = (dialog: Locator) =>
+    expect.poll(() => dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true)
+
+  // The review opens from its button and holds focus.
+  const publish = page.getByTestId('publish-button')
+  await publish.click()
+  const review = page.getByTestId('publish-review')
+  await expect(review).toBeVisible()
+  await holdsFocus(review)
+
+  // Auto-DM opens from inside the review and takes focus.
+  await review.getByText('More options', { exact: true }).click()
+  const launcher = review.getByRole('button', { name: 'Auto-DM settings', exact: true })
+  await launcher.click()
+  const nested = page.getByRole('dialog', { name: 'Prepare Auto-DM campaign', exact: true })
+  await expect(nested).toBeVisible()
+  await holdsFocus(nested)
+
+  // Closing it returns focus to its button in the review, which stays open.
+  await page.keyboard.press('Escape')
+  await expect(nested).toHaveCount(0)
+  await expect(review).toBeVisible()
+  await expect(launcher).toBeFocused()
+
+  // Closing the review returns focus to the button that opened it.
+  await page.keyboard.press('Escape')
+  await expect(review).toHaveCount(0)
+  await expect(publish).toBeFocused()
+
+  // The schedule sheet does the same for its button.
+  const schedule = page.getByTestId('schedule-button')
+  await schedule.click()
+  const sheet = page.getByTestId('schedule-dialog')
+  await holdsFocus(sheet)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  await expect(schedule).toBeFocused()
+
+  // Opened by its shortcut (next free slot) while writing, it puts the caret back where it was.
+  const editor = draftEditor(page)
+  await caretAtEndOf(page, editor.getByText('Focus goes back where it came from'))
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowLeft')
+  await settleSelection(page)
+  await page.keyboard.press('ControlOrMeta+Alt+Enter')
+  await holdsFocus(sheet)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  await expect(editor).toBeFocused()
+  await page.keyboard.type('right ')
+  await expect(editor).toContainText('Focus goes back where it came right from')
+
+  // ⌘⇧↵ opens the review from the editor, adds no block, and the caret comes back.
+  const blocks = () => editor.locator('[data-slate-node="element"]').count()
+  const before = await blocks()
+  await page.keyboard.press('ControlOrMeta+Shift+Enter')
+  await holdsFocus(review)
+  await page.keyboard.press('Escape')
+  await expect(review).toHaveCount(0)
+  await expect(editor).toBeFocused()
+  expect(await blocks()).toBe(before)
+  await page.keyboard.type('all ')
+  await expect(editor).toContainText('Focus goes back where it came right all from')
+})
+
 test(
   'refine previews and applies only on accept, the assistant adds a post, follow-ups are set in review, and a failed destination is retried alone',
   { tag: '@journey' },

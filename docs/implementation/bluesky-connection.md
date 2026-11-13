@@ -76,10 +76,10 @@ prevent text/image connection or retain an old affirmative permission.
 Scheduling checks native proof against the original tenant binding, then checks
 every post and reply before creating scheduled work. Text must fit both 300
 grapheme clusters and 3,000 UTF-8 bytes. The editor counts graphemes with
-`Intl.Segmenter`; the Go validator uses `rivo/uniseg` v0.4.7 (Unicode 15.0).
-Backend validation remains authoritative. Newer Unicode segmentation edge cases
-can differ from the browser runtime and need alignment before a universal count
-equivalence can be claimed.
+`Intl.Segmenter`; the Go validator uses `clipperhouse/uax29` v2.7.0 (Unicode
+17), and both are tested against `server/internal/product/testdata/caption-length-cases.json`.
+Backend validation remains authoritative. A browser with an older Unicode
+version can count some clusters (Indic conjuncts) as more than Go does.
 
 Each post accepts up to four PNG/JPEG/GIF/WebP images, each at most 2,000,000
 bytes and within an advertised PDS blob bound, or one MP4 up to 300,000,000
@@ -168,7 +168,7 @@ provider tests only; the ordinary Compose default remains false.
 
 - Complete native account ownership conflict handling across workspaces and
   legacy adapters; product connection IDs alone are not global native identity.
-- Align grapheme segmentation versions across browser, backend and provider.
+- Check the grapheme segmentation Bluesky's own validator uses against ours.
 - Verify live video-service processing, quota behavior and previously uploaded
   media responses; protocol fixtures are not evidence of live video support.
 - Reflect runtime provider availability in the picker before accepting inputs.
