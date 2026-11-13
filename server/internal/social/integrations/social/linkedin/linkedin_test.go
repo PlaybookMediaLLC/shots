@@ -278,7 +278,7 @@ func TestCreatePostRejected(t *testing.T) {
 	})
 	data, _ := json.Marshal(pendingData{AuthorID: "1", PostType: Company, Message: "x", MediaIDs: []string{}, Attempting: true, Confirmed: true})
 	_, err := New().FinalizePost(context.Background(), "tok", data, nil)
-	if temporalx.FailureType(err) != temporalx.TypeBadBody {
+	if temporalx.FailureType(err) != temporalx.TypePublicationRejected {
 		t.Fatalf("got %v", err)
 	}
 }

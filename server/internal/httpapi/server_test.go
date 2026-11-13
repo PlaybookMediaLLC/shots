@@ -17,6 +17,23 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 )
 
+func TestStoreProviderErrorKeepsSafeReasonAndStatus(t *testing.T) {
+	provider := socialapi.NewError(http.StatusForbidden, false, "The platform refused mention lookup (HTTP 403).")
+	provider.ProviderMessage = "private provider body"
+	w := httptest.NewRecorder()
+	writeStoreError(w, fmt.Errorf("lookup: %w", provider))
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), provider.Error()) || strings.Contains(w.Body.String(), provider.ProviderMessage) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	for _, status := range []int{0, 200, 700} {
+		w = httptest.NewRecorder()
+		writeStoreError(w, socialapi.NewError(status, false, "Lookup failed"))
+		if w.Code != http.StatusBadGateway {
+			t.Fatalf("invalid provider status %d reached HTTP: %d", status, w.Code)
+		}
+	}
+}
+
 type fakeStore struct {
 	connections         []*ent.ChannelConnection
 	connection          publishing.CreateConnectionInput

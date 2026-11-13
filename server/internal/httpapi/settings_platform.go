@@ -32,6 +32,7 @@ type SettingsPlatformStore interface {
 	TransferSocialSet(context.Context, product.Actor, string, product.SocialSetTransferInput) (*product.SocialSetTransferResult, error)
 	DeleteSocialSet(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	AssignSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
+	MoveSocialSetAccount(context.Context, product.Actor, string, string, string) (*product.SocialSetRecord, error)
 	RemoveSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	ChannelAccountStates(context.Context, string, []*ent.ChannelConnection) (map[string]product.ChannelAccountState, error)
 	VisibleConnections(context.Context, product.Actor, []*ent.ChannelConnection) ([]*ent.ChannelConnection, error)
@@ -70,6 +71,7 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	mux.Handle("GET /v1/social-sets/{id}/transfer", product(s.previewSocialSetTransfer))
 	mux.Handle("POST /v1/social-sets/{id}/transfer", product(s.transferSocialSet))
 	mux.Handle("POST /v1/social-sets/{id}/accounts/{connectionId}", product(s.assignSocialSetAccount))
+	mux.Handle("POST /v1/social-sets/{id}/accounts/{connectionId}/move", product(s.moveSocialSetAccount))
 	mux.Handle("DELETE /v1/social-sets/{id}/accounts/{connectionId}", product(s.removeSocialSetAccount))
 	mux.Handle("DELETE /v1/channel-connections/{id}", product(s.removeChannelConnection))
 	mux.Handle("POST /v1/channel-connections/{id}/refresh", product(s.refreshChannelConnection))
@@ -279,6 +281,22 @@ func (s *Server) assignSocialSetAccount(w http.ResponseWriter, r *http.Request) 
 // removeSocialSetAccount stops the workflows of the posts the removal
 // cancelled. A workflow that cannot be signalled still finds its post
 // cancelled when it wakes, and does not publish it.
+func (s *Server) moveSocialSetAccount(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id", "connectionId")
+	if !ok {
+		return
+	}
+	var input struct {
+		DestinationSocialSetID string `json:"destinationSocialSetId"`
+	}
+	if err := decodeJSON(r, &input); err != nil || !resourceIDPattern.MatchString(input.DestinationSocialSetID) {
+		writeError(w, http.StatusBadRequest, "Choose a destination profile.")
+		return
+	}
+	set, err := s.configuration.MoveSocialSetAccount(r.Context(), workspaceActor(r), ids[0], ids[1], input.DestinationSocialSetID)
+	respond(w, http.StatusOK, set, err)
+}
+
 func (s *Server) removeSocialSetAccount(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

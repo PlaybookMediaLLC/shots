@@ -1224,6 +1224,9 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	defer tx.Rollback()
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, setID); err != nil {
+		return nil, err
+	}
 	set, err := visibleSocialSet(ctx, tx.Client(), actor, setID)
 	if err != nil {
 		return nil, err
@@ -1256,15 +1259,8 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 		}
 		return nil, err
 	}
-	platform := socialplatform.Canonical(connection.Platform)
-	if !oneOf(platform, set.DefaultPlatforms...) {
-		update := tx.SocialSet.UpdateOneID(set.ID).SetDefaultPlatforms(append(socialplatform.Defaults(set.DefaultPlatforms), platform)).AddVersion(1)
-		if set.PrimaryPlatform == nil {
-			update.SetPrimaryPlatform(platform)
-		}
-		if _, err := update.Save(ctx); err != nil {
-			return nil, err
-		}
+	if err := addAccountToSetDefaults(ctx, tx, connection, set); err != nil {
+		return nil, err
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_added", "channel_connection", connection.ID,
 		map[string]any{"socialSetId": set.ID}); err != nil {
@@ -1278,6 +1274,19 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	return c.socialSetRecord(ctx, actor, saved)
+}
+
+func addAccountToSetDefaults(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection, set *ent.SocialSet) error {
+	platform := socialplatform.Canonical(connection.Platform)
+	if oneOf(platform, set.DefaultPlatforms...) {
+		return nil
+	}
+	update := tx.SocialSet.UpdateOneID(set.ID).SetDefaultPlatforms(append(socialplatform.Defaults(set.DefaultPlatforms), platform)).AddVersion(1)
+	if set.PrimaryPlatform == nil {
+		update.SetPrimaryPlatform(platform)
+	}
+	_, err := update.Save(ctx)
+	return err
 }
 
 // DeleteSocialSet removes a set. It is refused while any of its posts is

@@ -67,17 +67,18 @@ type fakePoster struct {
 	calls      int
 	media      int
 	// replies records each reply as "message>answers", in order.
-	replies          []string
-	poll             *integrations.PollDetails
-	replyPolls       []*integrations.PollDetails
-	message          string
-	path             string
-	thumbnail        string
-	err              error
-	status           string
-	expectedNativeID string
-	afterPost        func()
-	afterReply       func()
+	replies               []string
+	poll                  *integrations.PollDetails
+	replyPolls            []*integrations.PollDetails
+	message               string
+	path                  string
+	thumbnail             string
+	err                   error
+	status                string
+	expectedNativeID      string
+	afterPost             func()
+	afterReply            func()
+	missingCommentReceipt bool
 }
 
 func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrations.PostDetails, _ *socialent.Integration) ([]integrations.PostResponse, error) {
@@ -115,6 +116,9 @@ func (f *fakePoster) Comment(_ context.Context, _, postID, lastCommentID, _ stri
 	f.replyPolls = append(f.replyPolls, posts[0].Poll)
 	if f.afterReply != nil {
 		f.afterReply()
+	}
+	if f.missingCommentReceipt {
+		return nil, nil
 	}
 	return []integrations.PostResponse{{PostID: fmt.Sprintf("reply-%d", len(f.replies)), QuoteState: f.quoteState}}, nil
 }
@@ -492,6 +496,32 @@ func TestDirectPublisherPreservesDefiniteRejection(t *testing.T) {
 	var providerErr *socialapi.Error
 	if !errors.As(err, &providerErr) || providerErr.UnknownDelivery || providerErr.Status != 400 || poster.calls != 1 {
 		t.Fatalf("known rejection became unknown: %v", err)
+	}
+}
+
+type providerHTTPError struct{ error }
+
+func (providerHTTPError) HTTPStatus() int { return http.StatusForbidden }
+func (e providerHTTPError) Unwrap() error { return e.error }
+
+type deniedMentionPoster struct{ fakePoster }
+
+func (*deniedMentionPoster) Mention(context.Context, string, string, string, *socialent.Integration) ([]integrations.MentionResult, bool, error) {
+	return nil, false, providerHTTPError{temporalx.PublicationRejected("linkedin", "ACCESS_DENIED: lookup permission required")}
+}
+
+func TestProviderPermissionRefusalPreservesStatus(t *testing.T) {
+	p, _, provider, input := directFixture()
+	provider.err = providerHTTPError{temporalx.PublicationRejected("linkedin", "ACCESS_DENIED: permission required")}
+	_, err := p.Publish(context.Background(), input)
+	var refused *socialapi.Error
+	if !errors.As(err, &refused) || refused.UnknownDelivery || refused.Status != http.StatusForbidden || !strings.Contains(refused.ProviderMessage, "ACCESS_DENIED") || provider.calls != 1 {
+		t.Fatalf("publish refusal = %#v, calls=%d", err, provider.calls)
+	}
+	p.resolve = func(string) poster { return &deniedMentionPoster{} }
+	_, err = p.Mentions(context.Background(), input.OrganizationID, input.DestinationID, input.Platform, input.SecretReference, "solomon")
+	if !errors.As(err, &refused) || refused.Status != http.StatusForbidden || !strings.Contains(err.Error(), "approved mention lookup permissions") {
+		t.Fatalf("mention refusal = %#v", err)
 	}
 }
 

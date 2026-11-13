@@ -106,6 +106,20 @@ func (_c *PostAutomationRunCreate) SetNillableFailureCode(v *string) *PostAutoma
 	return _c
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (_c *PostAutomationRunCreate) SetProviderMessage(v string) *PostAutomationRunCreate {
+	_c.mutation.SetProviderMessage(v)
+	return _c
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_c *PostAutomationRunCreate) SetNillableProviderMessage(v *string) *PostAutomationRunCreate {
+	if v != nil {
+		_c.SetProviderMessage(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *PostAutomationRunCreate) SetCreatedAt(v time.Time) *PostAutomationRunCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -302,6 +316,10 @@ func (_c *PostAutomationRunCreate) createSpec() (*PostAutomationRun, *sqlgraph.C
 	if value, ok := _c.mutation.FailureCode(); ok {
 		_spec.SetField(postautomationrun.FieldFailureCode, field.TypeString, value)
 		_node.FailureCode = &value
+	}
+	if value, ok := _c.mutation.ProviderMessage(); ok {
+		_spec.SetField(postautomationrun.FieldProviderMessage, field.TypeString, value)
+		_node.ProviderMessage = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(postautomationrun.FieldCreatedAt, field.TypeTime, value)

@@ -35,6 +35,8 @@ type PostAutomationRun struct {
 	Attempts int `json:"attempts,omitempty"`
 	// FailureCode holds the value of the "failure_code" field.
 	FailureCode *string `json:"failure_code,omitempty"`
+	// ProviderMessage holds the value of the "provider_message" field.
+	ProviderMessage *string `json:"provider_message,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -49,7 +51,7 @@ func (*PostAutomationRun) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case postautomationrun.FieldAttempts:
 			values[i] = new(sql.NullInt64)
-		case postautomationrun.FieldID, postautomationrun.FieldOrganizationID, postautomationrun.FieldScheduledPostID, postautomationrun.FieldKey, postautomationrun.FieldKind, postautomationrun.FieldStatus, postautomationrun.FieldRemoteID, postautomationrun.FieldFailureCode:
+		case postautomationrun.FieldID, postautomationrun.FieldOrganizationID, postautomationrun.FieldScheduledPostID, postautomationrun.FieldKey, postautomationrun.FieldKind, postautomationrun.FieldStatus, postautomationrun.FieldRemoteID, postautomationrun.FieldFailureCode, postautomationrun.FieldProviderMessage:
 			values[i] = new(sql.NullString)
 		case postautomationrun.FieldDueAt, postautomationrun.FieldCreatedAt, postautomationrun.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -130,6 +132,13 @@ func (_m *PostAutomationRun) assignValues(columns []string, values []any) error 
 				_m.FailureCode = new(string)
 				*_m.FailureCode = value.String
 			}
+		case postautomationrun.FieldProviderMessage:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field provider_message", values[i])
+			} else if value.Valid {
+				_m.ProviderMessage = new(string)
+				*_m.ProviderMessage = value.String
+			}
 		case postautomationrun.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -206,6 +215,11 @@ func (_m *PostAutomationRun) String() string {
 	builder.WriteString(", ")
 	if v := _m.FailureCode; v != nil {
 		builder.WriteString("failure_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProviderMessage; v != nil {
+		builder.WriteString("provider_message=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

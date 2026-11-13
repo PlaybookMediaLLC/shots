@@ -1601,11 +1601,11 @@ func init() {
 	// postautomationrun.DefaultAttempts holds the default value on creation for the attempts field.
 	postautomationrun.DefaultAttempts = postautomationrunDescAttempts.Default.(int)
 	// postautomationrunDescCreatedAt is the schema descriptor for created_at field.
-	postautomationrunDescCreatedAt := postautomationrunFields[10].Descriptor()
+	postautomationrunDescCreatedAt := postautomationrunFields[11].Descriptor()
 	// postautomationrun.DefaultCreatedAt holds the default value on creation for the created_at field.
 	postautomationrun.DefaultCreatedAt = postautomationrunDescCreatedAt.Default.(func() time.Time)
 	// postautomationrunDescUpdatedAt is the schema descriptor for updated_at field.
-	postautomationrunDescUpdatedAt := postautomationrunFields[11].Descriptor()
+	postautomationrunDescUpdatedAt := postautomationrunFields[12].Descriptor()
 	// postautomationrun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	postautomationrun.DefaultUpdatedAt = postautomationrunDescUpdatedAt.Default.(func() time.Time)
 	// postautomationrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

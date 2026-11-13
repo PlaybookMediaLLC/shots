@@ -843,6 +843,7 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	var exceeded *product.QuotaExceededError
 	var prohibited *product.ProhibitedTermsError
 	var atLimit *product.PlanLimitError
+	var provider *socialapi.Error
 	switch {
 	case errors.As(err, &prohibited):
 		writeJSON(w, http.StatusConflict, map[string]any{
@@ -890,6 +891,12 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusServiceUnavailable, "GitHub is unavailable")
 	case errors.Is(err, product.ErrStorageUnavailable):
 		writeError(w, http.StatusServiceUnavailable, "media storage is unavailable")
+	case errors.As(err, &provider):
+		status := provider.Status
+		if status < 400 || status > 599 {
+			status = http.StatusBadGateway
+		}
+		writeError(w, status, publishing.RedactProviderMessage(provider.Error()))
 	default:
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}

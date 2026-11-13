@@ -3,6 +3,7 @@ package linkedin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ func TestMutationsDoNotRetryAmbiguousResponses(t *testing.T) {
 				}
 				want := temporalx.TypeUnknownDelivery
 				if status == 403 {
-					want = temporalx.TypeBadBody
+					want = temporalx.TypePublicationRejected
 				}
 				// A 429 created nothing: the workflow retries it durably, after LinkedIn's guidance.
 				if status == 429 {
@@ -120,5 +121,37 @@ func TestMutationRedirectAndOversizedReceiptRemainUnknown(t *testing.T) {
 		if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || len(f.calls) != 1 {
 			t.Fatalf("redirect=%t calls=%d err=%v", redirect, len(f.calls), err)
 		}
+	}
+}
+
+func TestRefusalsKeepStatusAndSafeProviderDetails(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		t.Run(method, func(t *testing.T) {
+			endpoint := "/rest/posts"
+			if method == http.MethodGet {
+				endpoint = "/rest/organizations"
+			}
+			f, _ := newFake(t, map[string]http.HandlerFunc{method + " " + endpoint: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"status":403,"serviceErrorCode":100,"code":"ACCESS_DENIED","message":"Not enough permissions. resource is forbidden. token=private-token","ignored":"private payload"}`))
+			}})
+			var err error
+			if method == http.MethodGet {
+				_, _, err = New().Mention(context.Background(), "private-token", "company", "", nil)
+			} else {
+				_, err = New().mutate(context.Background(), endpoint, "private-token", []byte(`{"private":"caption"}`))
+			}
+			var response interface{ HTTPStatus() int }
+			if !errors.As(err, &response) || response.HTTPStatus() != 403 || temporalx.FailureType(err) != temporalx.TypePublicationRejected || len(f.calls) != 1 {
+				t.Fatalf("calls=%d error=%v", len(f.calls), err)
+			}
+			message := temporalx.FailureMessage(err)
+			if !strings.Contains(message, "ACCESS_DENIED (serviceErrorCode 100): Not enough permissions") || strings.Contains(message, "private-token") || strings.Contains(message, "private payload") || strings.Contains(message, "caption") {
+				t.Fatalf("unsafe or missing detail: %s", message)
+			}
+		})
+	}
+	if got := responseMessage(403, []byte("private non-JSON response"), "token"); got != "LinkedIn rejected the request (HTTP 403)" {
+		t.Fatal(got)
 	}
 }

@@ -54,6 +54,9 @@ func (p *Publisher) Automate(ctx context.Context, input socialapi.AutomationInpu
 		if err != nil {
 			return socialapi.AutomationResult{}, err
 		}
+		if firstPostID(posted) == "" {
+			return socialapi.AutomationResult{}, temporalx.UnknownDelivery(input.Platform, "The provider returned no comment receipt. Reconcile before resending.")
+		}
 		return socialapi.AutomationResult{Done: true, RemoteID: firstPostID(posted)}, nil
 	case "thumbnail":
 		setter, ok := provider.(interface {

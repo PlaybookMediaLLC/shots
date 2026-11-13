@@ -40,7 +40,7 @@ func (c *Configuration) UpdateSocialSetQueue(ctx context.Context, actor Actor, i
 }
 
 // lockSocialSetAuthority makes permission and visibility rechecks atomic with a
-// settings save. Revoking a key, membership or subscription cannot race it.
+// settings save. Revoking identity, membership or subscription cannot race it.
 func lockSocialSetAuthority(ctx context.Context, tx *ent.Tx, actor Actor, id string) error {
 	queries := []struct {
 		sql  string
@@ -58,10 +58,13 @@ func lockSocialSetAuthority(ctx context.Context, tx *ent.Tx, actor Actor, id str
 		queries = append(queries, struct {
 			sql  string
 			args []any
-		}{`SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2 FOR SHARE`, []any{actor.OrganizationID, actor.UserID}}, struct {
+		}{`SELECT id FROM session WHERE id=$1 FOR SHARE`, []any{actor.SessionID}}, struct {
 			sql  string
 			args []any
-		}{`SELECT id FROM session WHERE id=$1 FOR SHARE`, []any{actor.SessionID}})
+		}{`SELECT id FROM "user" WHERE id=$1 FOR SHARE`, []any{actor.UserID}}, struct {
+			sql  string
+			args []any
+		}{`SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2 FOR SHARE`, []any{actor.OrganizationID, actor.UserID}})
 	}
 	queries = append(queries, struct {
 		sql  string

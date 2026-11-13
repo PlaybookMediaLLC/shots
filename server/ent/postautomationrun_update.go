@@ -117,6 +117,26 @@ func (_u *PostAutomationRunUpdate) ClearFailureCode() *PostAutomationRunUpdate {
 	return _u
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (_u *PostAutomationRunUpdate) SetProviderMessage(v string) *PostAutomationRunUpdate {
+	_u.mutation.SetProviderMessage(v)
+	return _u
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_u *PostAutomationRunUpdate) SetNillableProviderMessage(v *string) *PostAutomationRunUpdate {
+	if v != nil {
+		_u.SetProviderMessage(*v)
+	}
+	return _u
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (_u *PostAutomationRunUpdate) ClearProviderMessage() *PostAutomationRunUpdate {
+	_u.mutation.ClearProviderMessage()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *PostAutomationRunUpdate) SetUpdatedAt(v time.Time) *PostAutomationRunUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -209,6 +229,12 @@ func (_u *PostAutomationRunUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(postautomationrun.FieldFailureCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProviderMessage(); ok {
+		_spec.SetField(postautomationrun.FieldProviderMessage, field.TypeString, value)
+	}
+	if _u.mutation.ProviderMessageCleared() {
+		_spec.ClearField(postautomationrun.FieldProviderMessage, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(postautomationrun.FieldUpdatedAt, field.TypeTime, value)
@@ -319,6 +345,26 @@ func (_u *PostAutomationRunUpdateOne) SetNillableFailureCode(v *string) *PostAut
 // ClearFailureCode clears the value of the "failure_code" field.
 func (_u *PostAutomationRunUpdateOne) ClearFailureCode() *PostAutomationRunUpdateOne {
 	_u.mutation.ClearFailureCode()
+	return _u
+}
+
+// SetProviderMessage sets the "provider_message" field.
+func (_u *PostAutomationRunUpdateOne) SetProviderMessage(v string) *PostAutomationRunUpdateOne {
+	_u.mutation.SetProviderMessage(v)
+	return _u
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_u *PostAutomationRunUpdateOne) SetNillableProviderMessage(v *string) *PostAutomationRunUpdateOne {
+	if v != nil {
+		_u.SetProviderMessage(*v)
+	}
+	return _u
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (_u *PostAutomationRunUpdateOne) ClearProviderMessage() *PostAutomationRunUpdateOne {
+	_u.mutation.ClearProviderMessage()
 	return _u
 }
 
@@ -444,6 +490,12 @@ func (_u *PostAutomationRunUpdateOne) sqlSave(ctx context.Context) (_node *PostA
 	}
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(postautomationrun.FieldFailureCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProviderMessage(); ok {
+		_spec.SetField(postautomationrun.FieldProviderMessage, field.TypeString, value)
+	}
+	if _u.mutation.ProviderMessageCleared() {
+		_spec.ClearField(postautomationrun.FieldProviderMessage, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(postautomationrun.FieldUpdatedAt, field.TypeTime, value)

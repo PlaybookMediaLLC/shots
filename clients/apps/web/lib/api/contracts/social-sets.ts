@@ -242,6 +242,17 @@ export const assignSocialSetAccountContract = defineContract({
   summary: 'Add an account that is in no set to a social set',
 })
 
+/** `POST /api/v1/social-sets/{id}/accounts/{connectionId}/move` */
+export const moveSocialSetAccountContract = defineContract({
+  body: z.object({ destinationSocialSetId: contentDraftIdSchema }).strict(),
+  method: 'POST',
+  name: 'social-sets.account-move',
+  output: socialSetSchema,
+  params: socialSetAccountParamsSchema,
+  path: '/api/v1/social-sets/{id}/accounts/{connectionId}/move',
+  summary: 'Move a connected account to another profile in this workspace',
+})
+
 /** `DELETE /api/v1/social-sets/{id}/accounts/{connectionId}` */
 export const removeSocialSetAccountContract = defineContract({
   method: 'DELETE',

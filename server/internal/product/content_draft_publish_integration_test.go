@@ -13,6 +13,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
@@ -853,7 +854,7 @@ func TestWritePublishing(t *testing.T) {
 		if err != nil || len(statuses) != 5 || statuses["plug"] != "pending" {
 			t.Fatalf("planned=%v err=%v", statuses, err)
 		}
-		if ok, err := store.RecordAutomation(ctx, postID, "retweet:0", "done", "", ""); !ok || err != nil {
+		if ok, err := store.RecordAutomation(ctx, postID, "retweet:0", "done", "", "", ""); !ok || err != nil {
 			t.Fatalf("record repost: %v %v", ok, err)
 		}
 		cancelled, err := repo.CancelContentDraftPostAutomations(ctx, owner, postID)
@@ -875,11 +876,11 @@ func TestWritePublishing(t *testing.T) {
 		if statuses, _ := store.PlanAutomations(ctx, w.org, postID, receipts); statuses["plug"] != "cancelled" {
 			t.Fatalf("replanned=%v", statuses)
 		}
-		if ok, _ := store.RecordAutomation(ctx, postID, "plug", "expired", "", "threshold_not_reached"); ok {
+		if ok, _ := store.RecordAutomation(ctx, postID, "plug", "expired", "", "threshold_not_reached", ""); ok {
 			t.Fatal("a cancelled plug was settled again")
 		}
 		// A repost in flight when cancelled is recorded as up, so its removal runs.
-		if ok, _ := store.RecordAutomation(ctx, postID, "retweet:1", "done", "", ""); !ok {
+		if ok, _ := store.RecordAutomation(ctx, postID, "retweet:1", "done", "", "", ""); !ok {
 			t.Fatal("an in-flight repost was not recorded")
 		}
 		listed := posts(result.Draft.ID)
@@ -888,6 +889,13 @@ func TestWritePublishing(t *testing.T) {
 		}
 		if _, err := repo.CancelContentDraftPostAutomations(ctx, w.actor("viewer"), postID); err == nil {
 			t.Fatal("a member without publishing rights cancelled follow-ups")
+		}
+		if ok, err := store.RecordAutomation(ctx, postID, "unretweet:0", "failed", "", "http_403", "LinkedIn rejected the request (HTTP 403): ACCESS_DENIED token=secret-value"); !ok || err != nil {
+			t.Fatalf("record refusal: %v %v", ok, err)
+		}
+		refusal, err := w.db.Client.PostAutomationRun.Query().Where(postautomationrun.ScheduledPostID(postID), postautomationrun.Key("unretweet:0")).Only(ctx)
+		if err != nil || refusal.ProviderMessage == nil || !strings.Contains(*refusal.ProviderMessage, "ACCESS_DENIED") || strings.Contains(*refusal.ProviderMessage, "secret-value") {
+			t.Fatalf("stored refusal=%+v err=%v", refusal, err)
 		}
 	})
 }

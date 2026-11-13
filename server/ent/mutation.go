@@ -93370,6 +93370,7 @@ type PostAutomationRunMutation struct {
 	attempts          *int
 	addattempts       *int
 	failure_code      *string
+	provider_message  *string
 	created_at        *time.Time
 	updated_at        *time.Time
 	clearedFields     map[string]struct{}
@@ -93852,6 +93853,55 @@ func (m *PostAutomationRunMutation) ResetFailureCode() {
 	delete(m.clearedFields, postautomationrun.FieldFailureCode)
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (m *PostAutomationRunMutation) SetProviderMessage(s string) {
+	m.provider_message = &s
+}
+
+// ProviderMessage returns the value of the "provider_message" field in the mutation.
+func (m *PostAutomationRunMutation) ProviderMessage() (r string, exists bool) {
+	v := m.provider_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderMessage returns the old "provider_message" field's value of the PostAutomationRun entity.
+// If the PostAutomationRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PostAutomationRunMutation) OldProviderMessage(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderMessage: %w", err)
+	}
+	return oldValue.ProviderMessage, nil
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (m *PostAutomationRunMutation) ClearProviderMessage() {
+	m.provider_message = nil
+	m.clearedFields[postautomationrun.FieldProviderMessage] = struct{}{}
+}
+
+// ProviderMessageCleared returns if the "provider_message" field was cleared in this mutation.
+func (m *PostAutomationRunMutation) ProviderMessageCleared() bool {
+	_, ok := m.clearedFields[postautomationrun.FieldProviderMessage]
+	return ok
+}
+
+// ResetProviderMessage resets all changes to the "provider_message" field.
+func (m *PostAutomationRunMutation) ResetProviderMessage() {
+	m.provider_message = nil
+	delete(m.clearedFields, postautomationrun.FieldProviderMessage)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *PostAutomationRunMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -93958,7 +94008,7 @@ func (m *PostAutomationRunMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PostAutomationRunMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.organization_id != nil {
 		fields = append(fields, postautomationrun.FieldOrganizationID)
 	}
@@ -93985,6 +94035,9 @@ func (m *PostAutomationRunMutation) Fields() []string {
 	}
 	if m.failure_code != nil {
 		fields = append(fields, postautomationrun.FieldFailureCode)
+	}
+	if m.provider_message != nil {
+		fields = append(fields, postautomationrun.FieldProviderMessage)
 	}
 	if m.created_at != nil {
 		fields = append(fields, postautomationrun.FieldCreatedAt)
@@ -94018,6 +94071,8 @@ func (m *PostAutomationRunMutation) Field(name string) (ent.Value, bool) {
 		return m.Attempts()
 	case postautomationrun.FieldFailureCode:
 		return m.FailureCode()
+	case postautomationrun.FieldProviderMessage:
+		return m.ProviderMessage()
 	case postautomationrun.FieldCreatedAt:
 		return m.CreatedAt()
 	case postautomationrun.FieldUpdatedAt:
@@ -94049,6 +94104,8 @@ func (m *PostAutomationRunMutation) OldField(ctx context.Context, name string) (
 		return m.OldAttempts(ctx)
 	case postautomationrun.FieldFailureCode:
 		return m.OldFailureCode(ctx)
+	case postautomationrun.FieldProviderMessage:
+		return m.OldProviderMessage(ctx)
 	case postautomationrun.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case postautomationrun.FieldUpdatedAt:
@@ -94125,6 +94182,13 @@ func (m *PostAutomationRunMutation) SetField(name string, value ent.Value) error
 		}
 		m.SetFailureCode(v)
 		return nil
+	case postautomationrun.FieldProviderMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderMessage(v)
+		return nil
 	case postautomationrun.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -94190,6 +94254,9 @@ func (m *PostAutomationRunMutation) ClearedFields() []string {
 	if m.FieldCleared(postautomationrun.FieldFailureCode) {
 		fields = append(fields, postautomationrun.FieldFailureCode)
 	}
+	if m.FieldCleared(postautomationrun.FieldProviderMessage) {
+		fields = append(fields, postautomationrun.FieldProviderMessage)
+	}
 	return fields
 }
 
@@ -94209,6 +94276,9 @@ func (m *PostAutomationRunMutation) ClearField(name string) error {
 		return nil
 	case postautomationrun.FieldFailureCode:
 		m.ClearFailureCode()
+		return nil
+	case postautomationrun.FieldProviderMessage:
+		m.ClearProviderMessage()
 		return nil
 	}
 	return fmt.Errorf("unknown PostAutomationRun nullable field %s", name)
@@ -94244,6 +94314,9 @@ func (m *PostAutomationRunMutation) ResetField(name string) error {
 		return nil
 	case postautomationrun.FieldFailureCode:
 		m.ResetFailureCode()
+		return nil
+	case postautomationrun.FieldProviderMessage:
+		m.ResetProviderMessage()
 		return nil
 	case postautomationrun.FieldCreatedAt:
 		m.ResetCreatedAt()

@@ -3,8 +3,11 @@ package tenantpublishing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
+	"net/http"
 	"strings"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
@@ -275,7 +278,19 @@ func (p *Publisher) Mentions(ctx context.Context, organizationID, destinationID,
 	}
 	found, _, err := finder.Mention(ctx, account.Token, query, account.InternalID, account)
 	if err != nil {
-		return nil, socialapi.NewError(502, false, "Mention lookup was refused or unavailable. Check the connection permissions and try again.")
+		status := http.StatusBadGateway
+		var response interface{ HTTPStatus() int }
+		if errors.As(err, &response) && response.HTTPStatus() >= 400 && response.HTTPStatus() < 500 {
+			status = response.HTTPStatus()
+		}
+		slog.WarnContext(ctx, "mention lookup failed", "platform", platform, "status", status, "providerMessage", publishing.RedactProviderMessage(err.Error()))
+		message := "Mention lookup is unavailable. Try again later."
+		if status == http.StatusForbidden {
+			message = "The platform refused mention lookup (HTTP 403). This connection needs approved mention lookup permissions."
+		} else if status == http.StatusUnauthorized {
+			message = "Reconnect this account before looking up mentions (HTTP 401)."
+		}
+		return nil, socialapi.NewError(status, false, message)
 	}
 	mentions := make([]product.Mention, 0, len(found))
 	for _, item := range found {

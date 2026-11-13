@@ -440,7 +440,7 @@ func (p *Provider) Mention(ctx context.Context, token, query, _ string, _ *ent.I
 	if len(query) < 2 || len(query) > 100 {
 		return nil, false, errors.New("Search an organization using 2 to 100 characters")
 	}
-	response, err := p.Fetch(ctx, APIURL+"/rest/organizations?q=vanityName&vanityName="+EncodeURIComponent(query)+"&projection=(elements*(id,localizedName,logoV2(original~:playableStreams)))", integrations.Request{Method: http.MethodGet, Headers: Headers(token, "")})
+	response, err := p.request(ctx, http.MethodGet, "/rest/organizations?q=vanityName&vanityName="+EncodeURIComponent(query)+"&projection=(elements*(id,localizedName,logoV2(original~:playableStreams)))", token, nil)
 	if err != nil {
 		return nil, false, err
 	}

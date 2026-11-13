@@ -4103,6 +4103,14 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Moves a connected account between profiles in the current workspace. */
+  async moveSocialSetAccount(id: string, connectionId: string, destinationSocialSetId: string) {
+    return this.request<SocialSet>(
+      `v1/social-sets/${encodeURIComponent(id)}/accounts/${encodeURIComponent(connectionId)}/move`,
+      { body: { destinationSocialSetId }, method: 'POST' }
+    )
+  }
+
   /** Removes an account from a set; its queued posts are cancelled. */
   async removeSocialSetAccount(id: string, connectionId: string) {
     return this.request<SocialSetRemoval>(
