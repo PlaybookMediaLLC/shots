@@ -71,7 +71,6 @@ import {
   captionFor,
   captionsOverLimit,
   carriedFollowUps,
-  explanationPosts,
   platformAcceptsSize,
   type PostMedia,
   postRenders,
@@ -82,6 +81,7 @@ import {
   screenshotPostVersions,
   screenshotPrompts,
 } from '@/lib/write/screenshot-post'
+import { useThreadPosts } from '@/lib/write/use-thread-posts'
 import { buildExportFileName, WorkspaceSaveError } from '@/lib/workspace/save-export'
 
 /**
@@ -426,20 +426,14 @@ export function PrepareScreenshotPost({
         )
       )
     : []
-  const thread = React.useMemo(() => {
-    if (!explanation.trim()) return { error: '', posts: [] as string[] }
-    try {
-      return {
-        error: '',
-        posts: explanationPosts(explanation, channel, bySize ? length : undefined),
-      }
-    } catch (failure) {
-      return {
-        error: failure instanceof Error ? failure.message : 'This text cannot be split.',
-        posts: [] as string[],
-      }
-    }
-  }, [bySize, channel, explanation, length])
+  // The composer's paste-as-thread split, so both break a thread in the same
+  // places. Until the split of this text arrives, it holds the draft back.
+  const split = useThreadPosts(explanation, channel, bySize ? length : undefined)
+  const thread = !explanation.trim()
+    ? { error: '', posts: [] }
+    : split.pending
+      ? { ...split, error: 'Splitting the explanation into posts…' }
+      : split
   // A batch item is one caption and its media; a thread belongs to a draft.
   const threading = destination === 'draft' && thread.posts.length > 0
   // The caption is the opening post, so the explanation fills the rest.

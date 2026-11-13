@@ -29,6 +29,7 @@ const browser = {
       'MouseEvent',
       'MutationObserver',
       'Node',
+      'NodeFilter',
       'CustomEvent',
       'DocumentFragment',
     ].map((name) => [name, dom.window[name]])
@@ -761,4 +762,114 @@ test('cancelling an image worker before ready cannot poison its replacement read
   assert.equal((await client.process(new Blob(['third']), imagePlan().options)).bytes, 2)
   assert.equal(instances[1].posts, 2)
   client.terminate()
+})
+
+test('the paste dialog splits in a reused worker, replaced only while busy, and waits for the current result', async (t) => {
+  const { PasteThreadDialog } = await import('@/components/write/composer/paste-thread')
+  type SplitRequest = import('@/lib/write/import-text.worker').SplitRequest
+  type SplitResult = import('@/lib/write/import-text.worker').SplitResult
+  const workers: FakeWorker[] = []
+  class FakeWorker {
+    onmessage: ((event: { data: SplitResult }) => void) | null = null
+    onerror: (() => void) | null = null
+    requests: SplitRequest[] = []
+    terminated = false
+    constructor() {
+      workers.push(this)
+    }
+    postMessage(request: SplitRequest) {
+      this.requests.push(request)
+    }
+    terminate() {
+      this.terminated = true
+    }
+    async reply(posts: string[], request = this.requests.at(-1)!) {
+      await act(async () => this.onmessage?.({ data: { error: '', id: request.id, posts } }))
+    }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'Worker', previous)
+    else Reflect.deleteProperty(globalThis, 'Worker')
+  })
+  const inserted: unknown[] = []
+  const editor = {
+    children: [],
+    tf: { focus() {}, insertNodes: (nodes: unknown) => inserted.push(nodes) },
+  } as unknown as import('@shots/platejs-editor/platejs/react').PlateEditor
+  await mount(
+    createElement(PasteThreadDialog, {
+      channel: 'x',
+      editor: { current: editor },
+      limit: 280,
+      onClose: () => {},
+    })
+  )
+  const write = async (text: string) => {
+    const area = get<HTMLTextAreaElement>('textarea[aria-label="Thread text"]')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        area,
+        text
+      )
+      area.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+  }
+  const append = () =>
+    [...document.querySelectorAll('button')].find((button) =>
+      button.textContent!.startsWith('Append')
+    )!
+
+  // The explicit --- split is cheap and stays on the page.
+  await write('one\n---\ntwo')
+  assert.equal(append().textContent, 'Append 2 posts')
+  assert.equal(append().disabled, false)
+  assert.equal(workers.length, 0)
+
+  await act(async () => get<HTMLButtonElement>('button[role="checkbox"]').click())
+  assert.equal(workers.length, 1)
+  assert.deepEqual(workers[0].requests[0], {
+    channel: 'x',
+    id: workers[0].requests[0].id,
+    limit: 280,
+    text: 'one\n---\ntwo',
+  })
+  assert.equal(append().disabled, true)
+  assert.equal(get('[role=status]').textContent, 'Splitting…')
+  await workers[0].reply(['one --- two'])
+  assert.equal(append().textContent, 'Append 1 posts')
+  assert.equal(append().disabled, false)
+
+  // An idle worker takes the next text.
+  await write('alpha beta')
+  assert.equal(workers.length, 1)
+  assert.equal(workers[0].requests.length, 2)
+  assert.equal(append().disabled, true)
+  // A busy one is replaced instead of queueing a split nobody will read.
+  await write('alpha beta gamma')
+  assert.equal(workers[0].terminated, true)
+  assert.equal(workers.length, 2)
+  assert.equal(workers[1].requests[0].text, 'alpha beta gamma')
+  // An answer to older text never stands in for the current one.
+  await workers[0].reply(['alpha beta'], workers[0].requests[1])
+  assert.equal(append().disabled, true)
+  assert.doesNotMatch(document.body.textContent!, /1\. alpha beta(?! gamma)/)
+  await workers[1].reply(['alpha beta gamma'])
+  assert.equal(append().disabled, false)
+  await act(async () => append().click())
+  assert.match(JSON.stringify(inserted), /alpha beta gamma/)
+
+  // A crashed worker is reported, and the next text starts a new one.
+  await write('x y')
+  assert.equal(workers[1].requests.length, 2)
+  await act(async () => workers[1].onerror?.())
+  assert.equal(get('[role=alert]').textContent, 'The text could not be split.')
+  assert.equal(append().disabled, true)
+  await write('x y z')
+  assert.equal(workers.length, 3)
+
+  await act(async () => root!.unmount())
+  root = null
+  assert.equal(workers[2].terminated, true)
 })
