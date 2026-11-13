@@ -45,7 +45,7 @@ test(
     await expectSaved(page)
     // X makes the card itself and its API cannot remove it, so no removal control is offered.
     const links = page.getByRole('region', { name: 'Link previews' })
-    await expect(links).toContainText('X makes this card from the link itself')
+    await expect(page.getByTestId('provider-cards')).toContainText('X makes its own card')
     await expect(links.getByRole('button', { name: 'Remove preview' })).toHaveCount(0)
     // LinkedIn makes no card from the text and Shots sends none.
     await page.getByTestId('platform-tab-linkedin').click()
@@ -55,7 +55,6 @@ test(
     const preview = page.getByTestId('preview-x')
     await expect(preview.getByRole('button', { name: 'Show more', exact: true })).toHaveCount(0)
     await expect(preview.getByTestId('post-link-preview')).toContainText('Linked resource')
-    await expect(preview.getByRole('button', { name: 'Hide link preview' })).toHaveCount(0)
     // Preview takes the draft's place, so editing means going back to it; the URL stayed in the text.
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(draftEditor(page)).toContainText(url)

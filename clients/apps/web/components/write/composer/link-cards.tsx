@@ -185,7 +185,12 @@ export function LinkCards({
           LinkedIn shows links without a preview card: it makes none from the text, and Shots sends
           none.
         </p>
-      ) : null}
+      ) : removable ? null : (
+        <p className="text-xs text-muted-foreground" data-testid="provider-cards">
+          {LABELS[channel]} makes its own card from a link on a post without media; its API
+          can&apos;t remove it.
+        </p>
+      )}
       {links.map((url) => {
         const card = plain ? undefined : cards.find((item) => item.url === url)
         const quote =
@@ -226,12 +231,6 @@ export function LinkCards({
                 </Button>
               ) : null}
             </div>
-            {card && !removable ? (
-              <p className="text-xs text-muted-foreground">
-                {LABELS[channel]} makes this card from the link itself on a post without media; its
-                API can&apos;t remove it.
-              </p>
-            ) : null}
           </div>
         )
       })}

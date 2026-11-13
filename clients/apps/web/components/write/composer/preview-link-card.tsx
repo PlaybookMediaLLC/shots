@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { draftsApi } from '@/lib/content-drafts/client'
 
-/** The card a link gets on X, Threads or Mastodon, which make it themselves; Bluesky's saved card shows instead when it has one. */
+/** The card X, Threads or Mastodon make themselves from a link; Bluesky shows only Shots' saved card. */
 export function PreviewLinkCard({ text }: { text: string }) {
   let url = text.match(/https?:\/\/[^\s<>]+/)?.[0]?.replace(/[).,!?;]+$/, '') ?? ''
   try {

@@ -308,7 +308,7 @@ account back through reconnect.
 | --- | --- | --- | --- | --- | --- | --- |
 | X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. |
 | X | GIF, alone, ≤ 15 MB | Yes | — | Yes | Adapter (`TestGIFFullAnimationLimits`) | No |
-| X | Photos and a video in one post | — | — | No | Refused before scheduling, with the reason | Blocked: the X API takes 4 photos, 1 GIF or 1 video (read 2026-11-13) |
+| X | Photos and a video in one post | — | — | No | Refused before scheduling, with the reason (`write-media-rules.test.ts`, `TestDraftMediaFollowsEachDestination`) | Blocked: the X API takes 4 photos, 1 GIF or 1 video (read 2026-11-13) |
 | X | MP4 video, alone, ≥ 0.5 s, within the account's verified length (20 min standard, 125 min Premium; 1080p sent unchanged) | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`, `TestTenMinute1080pSourcePreservedWithoutPremium`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
 | LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | Yes: image on `yoanyomba`, 2026-11-03; receipt and deletion recorded |
 | LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | Yes: 8-second video on `yoanyomba`, 2026-11-03; playback and deletion verified |

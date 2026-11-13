@@ -379,6 +379,14 @@ test("X video needs the account's verified video length, as Go requires", () => 
   assert.deepEqual(problems({ maxWeightedCharacters: null, xVideoMaxSeconds: null }), [])
   assert.deepEqual(problems(read), [])
   assert.deepEqual(problems(undefined), [])
+  // An X article refuses video for its own reason, never by asking to reconnect.
+  assert.deepEqual(
+    problems(
+      { ...read, articles: true, xVideoMaxSeconds: null },
+      draft({ ...value, kind: 'article' })
+    ),
+    []
+  )
   // Images alone are not judged.
   assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }, draft({ body: [p('Text')] })), [])
 })

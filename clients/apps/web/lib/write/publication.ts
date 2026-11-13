@@ -283,6 +283,7 @@ export function buildPublication(
   const standing = account.standing
   if (
     channel === 'x' &&
+    !article &&
     standing?.maxWeightedCharacters &&
     standing.xVideoMaxSeconds !== undefined &&
     !standing.xVideoMaxSeconds &&
