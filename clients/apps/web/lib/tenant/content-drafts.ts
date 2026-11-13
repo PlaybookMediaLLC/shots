@@ -310,6 +310,12 @@ export async function reconcileContentDraftPost(
   return result ? readPost(result.post) : null
 }
 
+/** Start deleting a published post from its platform; null when it is not in this workspace. */
+export async function deleteContentDraftPost(context: TenantContext, id: string) {
+  const result = await orNull(backendSDK(context).deleteContentDraftPost(id))
+  return result ? result.deletion : null
+}
+
 /** Stop a live post's pending follow-ups; null when it is not in this workspace. */
 export async function cancelContentDraftPostAutomations(context: TenantContext, id: string) {
   const result = await orNull(backendSDK(context).cancelContentDraftPostAutomations(id))

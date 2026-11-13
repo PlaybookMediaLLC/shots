@@ -259,6 +259,40 @@ export const reconcileDraftPostContract = defineContract({
   summary: 'Settle a post whose outcome is unknown, without contacting the platform',
 })
 
+/** A delete Shots started: the workflow removes the post's parts with receipts. */
+export const postDeletionSchema = z.object({
+  organizationId: z.string(),
+  platform: z.string(),
+  postId: z.string(),
+  requestedBy: z.string(),
+})
+
+/** `POST /api/v1/content-draft-posts/{id}/delete` */
+export const deleteDraftPostContract = defineContract({
+  access: { apiKeyScope: 'post:delete', feature: 'content:drafts', permission: 'publish:manage' },
+  docs: workspaceDocs({
+    description:
+      'Deletes a post that Shots published from its platform, with its thread parts, the replies Shots posted and its reposts. Each part gets a receipt; a part the platform already removed counts as deleted. Platforms without a delete call record the part as unsupported. Requires the `post:delete` scope.',
+    extensions: entitlement,
+    operationId: 'deleteContentDraftPost',
+    outputName: 'PostDeletion',
+    responses: {
+      '202': 'The delete started.',
+      '403': 'The caller may not publish to this account, or the key lacks `post:delete`.',
+      '404': 'The post was not found in this workspace.',
+      '409': 'The post is not live, or it was already deleted.',
+    },
+    tag: 'Workspace',
+  }),
+  method: 'POST',
+  name: 'content-draft-posts.delete',
+  output: z.object({ deletion: postDeletionSchema }),
+  params: z.object({ id: contentDraftIdSchema }),
+  path: '/api/v1/content-draft-posts/{id}/delete',
+  status: 202,
+  summary: 'Delete a published post from its platform',
+})
+
 /** `POST /api/v1/content-draft-posts/{id}/automations/cancel` */
 export const cancelDraftPostAutomationsContract = defineContract({
   method: 'POST',

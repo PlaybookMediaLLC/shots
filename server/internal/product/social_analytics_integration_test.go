@@ -53,6 +53,10 @@ func TestSocialAnalyticsObservations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A post deleted from its platform is not read: the counts below stay one post and one account.
+	if _, err := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).SetChannelConnectionID(connection.ID).SetContentDraftID(draft.ID).SetSocialSetID(set.ID).SetScheduledFor(time.Now().Add(-time.Hour)).SetPublishedAt(time.Now().Add(-time.Minute)).SetStatus(scheduledpost.StatusPUBLISHED).SetRemotePostID("deleted").SetDeletedAt(time.Now()).SetCaption("Deleted text").SetIdempotencyKey(cuid.New()).Save(w.ctx); err != nil {
+		t.Fatal(err)
+	}
 	provider := &observationMetricsFixture{org: w.org}
 	w.repo.WithPostMetrics(provider)
 	n, err := w.repo.CollectSocialAnalytics(w.ctx)

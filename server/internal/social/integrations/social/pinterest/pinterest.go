@@ -3,6 +3,7 @@ package pinterest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -146,7 +147,13 @@ func handleErrors(body string, _ int) *integrations.HandledError {
 	return nil
 }
 
-// request is a plain fetch(...).json(): the status is not checked.
+// statusError is a Pinterest answer outside 2xx: its JSON is an error, never data.
+type statusError struct{ status int }
+
+func (e statusError) Error() string { return fmt.Sprintf("pinterest answered %d", e.status) }
+
+// request reads a JSON answer, and refuses one outside 2xx, so an error body
+// never reads as an empty list or an empty token.
 func request(ctx context.Context, method, rawURL string, headers map[string]string, body []byte, out any) error {
 	var reader io.Reader
 	if body != nil {
@@ -164,7 +171,24 @@ func request(ctx context.Context, method, rawURL string, headers map[string]stri
 		return err
 	}
 	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return statusError{res.StatusCode}
+	}
 	return json.NewDecoder(res.Body).Decode(out)
+}
+
+// refreshFailure keeps a refused grant apart from a passing failure: a
+// throttled, failing or unreachable Pinterest is retried on the next run
+// rather than asking the person to reconnect.
+func refreshFailure(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var status statusError
+	if errors.As(err, &status) && status.status != http.StatusTooManyRequests && status.status < 500 {
+		return err
+	}
+	return integrations.ErrRefreshUnavailable
 }
 
 // form encodes ordered pairs like URLSearchParams.
@@ -225,17 +249,18 @@ func (p *Provider) RefreshToken(ctx context.Context, refreshToken string) (*inte
 		[2]string{"redirect_uri", redirectURI()},
 	))
 	if err != nil {
-		return nil, err
+		return nil, refreshFailure(ctx, err)
 	}
 	user, err := p.userAccount(ctx, token.AccessToken)
 	if err != nil {
-		return nil, err
+		return nil, refreshFailure(ctx, err)
 	}
 	return &integrations.AuthTokenDetails{
-		ID:           user.ID,
-		Name:         user.Username,
-		AccessToken:  token.AccessToken,
-		RefreshToken: refreshToken,
+		ID:          user.ID,
+		Name:        user.Username,
+		AccessToken: token.AccessToken,
+		// Pinterest may rotate the refresh token; keep the newest it gave.
+		RefreshToken: cmp.Or(token.RefreshToken, refreshToken),
 		ExpiresIn:    token.ExpiresIn,
 		Picture:      user.ProfileImage,
 		Username:     user.Username,

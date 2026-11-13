@@ -68,6 +68,9 @@ const ORDER = [
   'threads',
   'youtube',
   'mastodon',
+  'facebook',
+  'pinterest',
+  'gmb',
 ]
 
 /** One row per platform the connect routes support, from the same registry the brand pages use. */
@@ -76,7 +79,7 @@ const ROWS = [...CONNECT_PROVIDERS].sort(
 )
 
 /** Networks with no connection in the catalog yet. Bluesky joins them while its rollout flag is off. */
-const NOT_YET = ['Facebook', 'Pinterest']
+const NOT_YET: string[] = []
 
 /** Platform names that are another row's platform. */
 const ALIASES: Record<string, string> = {
@@ -98,6 +101,9 @@ const CONNECTED: Record<string, string> = {
   tiktok: 'TikTok is connected. Approved TikTok posts can be scheduled to it.',
   x: 'X is connected. Approved X posts can be scheduled to it.',
   youtube: 'YouTube is connected. Approved YouTube posts can be scheduled to it.',
+  facebook: 'Facebook Page is connected. Approved Facebook posts can be scheduled to it.',
+  pinterest: 'Pinterest is connected. Approved pins can be scheduled to it.',
+  gmb: 'Google Business is connected. Approved posts can be scheduled to its location.',
 }
 
 /** The help tip ID that remembers the banner was dismissed. */
@@ -146,6 +152,8 @@ function profileUrl(platform: string, handle: string | null | undefined): string
     tiktok: `https://www.tiktok.com/@${name}`,
     x: `https://x.com/${name}`,
     youtube: `https://www.youtube.com/@${name}`,
+    facebook: `https://www.facebook.com/${name}`,
+    pinterest: `https://www.pinterest.com/${name}/`,
   }
   return pages[row] ?? null
 }
@@ -601,9 +609,11 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                 <div className="flex min-w-0 flex-wrap items-center gap-2">{others.map(chip)}</div>
               </div>
             ) : null}
-            <p className="px-4 py-3 text-sm text-muted-foreground">
-              Coming soon: {notYet.join(', ')}.
-            </p>
+            {notYet.length ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                Coming soon: {notYet.join(', ')}.
+              </p>
+            ) : null}
           </>
         )}
       </Group>

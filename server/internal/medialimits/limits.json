@@ -27,9 +27,29 @@
       "maxEdge": 1440,
       "formats": ["image/jpeg"]
     },
+    "instagram-standalone-story": {
+      "maxBytes": 8000000,
+      "maxEdge": 1920,
+      "formats": ["image/jpeg"]
+    },
     "threads": {
       "maxBytes": 8000000,
       "maxEdge": 1440,
+      "formats": ["image/jpeg", "image/png"]
+    },
+    "facebook": {
+      "maxBytes": 4000000,
+      "maxEdge": 2048,
+      "formats": ["image/jpeg", "image/png"]
+    },
+    "pinterest": {
+      "maxBytes": 20000000,
+      "maxEdge": 4096,
+      "formats": ["image/jpeg", "image/png"]
+    },
+    "gmb": {
+      "maxBytes": 5000000,
+      "maxEdge": 2048,
       "formats": ["image/jpeg", "image/png"]
     }
   },
@@ -82,7 +102,7 @@
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/images-api",
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/multiimage-post-api"
       ],
-      "verifiedOn": "2026-10-28"
+      "verifiedOn": "2026-11-13"
     },
     "instagram": {
       "maxMedia": 20,
@@ -104,6 +124,27 @@
         "minMs": 3000,
         "maxMs": 900000,
         "maxBytes": 300000000
+      },
+      "story": {
+        "maxMedia": 1,
+        "requiresMedia": true,
+        "mixed": false,
+        "images": ["image/jpeg", "image/png", "image/webp"],
+        "video": {
+          "formats": ["video/mp4", "video/quicktime"],
+          "alone": true,
+          "minMs": 3000,
+          "maxMs": 60000,
+          "maxBytes": 100000000
+        },
+        "docs": [
+          "https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media"
+        ],
+        "verifiedOn": "2026-11-13"
+      },
+      "cover": {
+        "formats": ["image/jpeg"],
+        "maxBytes": 8000000
       },
       "docs": [
         "https://developers.facebook.com/docs/instagram-platform/content-publishing/",
@@ -183,8 +224,76 @@
         "alone": true,
         "maxBytes": 536870912
       },
-      "docs": ["https://developers.google.com/youtube/v3/docs/videos/insert"],
+      "cover": {
+        "formats": ["image/jpeg", "image/png"],
+        "maxBytes": 2097152
+      },
+      "docs": ["https://developers.google.com/youtube/v3/docs/videos/insert",
+        "https://developers.google.com/youtube/v3/docs/thumbnails/set"
+      ],
       "verifiedOn": "2026-11-03"
+    },
+    "facebook": {
+      "maxMedia": 10,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "video": {
+        "formats": ["video/mp4"],
+        "alone": true,
+        "maxMs": 1200000,
+        "maxBytes": 1000000000
+      },
+      "story": {
+        "maxMedia": 1,
+        "requiresMedia": true,
+        "mixed": false,
+        "images": ["image/jpeg", "image/png", "image/webp"],
+        "converts": {
+          "image/webp": "image/png"
+        },
+        "video": {
+          "formats": ["video/mp4"],
+          "alone": true,
+          "minMs": 3000,
+          "maxMs": 60000,
+          "maxBytes": 1000000000
+        },
+        "docs": ["https://developers.facebook.com/docs/page-stories-api"],
+        "verifiedOn": "2026-11-13"
+      },
+      "docs": [
+        "https://developers.facebook.com/docs/graph-api/reference/page/photos/",
+        "https://developers.facebook.com/docs/video-api/guides/publishing"
+      ],
+      "verifiedOn": "2026-11-13"
+    },
+    "pinterest": {
+      "maxMedia": 1,
+      "requiresMedia": true,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "docs": ["https://developers.pinterest.com/docs/api/v5/pins-create/"],
+      "verifiedOn": "2026-11-13"
+    },
+    "gmb": {
+      "maxMedia": 1,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "minImageWidth": 250,
+      "docs": [
+        "https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts",
+        "https://support.google.com/business/answer/6103862"
+      ],
+      "verifiedOn": "2026-11-13"
     }
   }
 }

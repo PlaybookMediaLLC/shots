@@ -22,6 +22,8 @@ var (
 	linkedInVisibility = []string{"PUBLIC", "CONNECTIONS"}
 	numericID          = regexp.MustCompile(`^[0-9]{1,30}$`)
 	linkedInPostID     = regexp.MustCompile(`^urn:li:(?:share|ugcPost|activity):[0-9]{1,30}$`)
+	// firstCommentChannels post a comment under a live post as a follow-up.
+	firstCommentChannels = map[string]bool{"linkedin": true, "instagram": true, "facebook": true}
 )
 
 // checkPostOptions checks one post's settings against its channel. First is
@@ -29,16 +31,31 @@ var (
 func checkPostOptions(channel string, options *postoptions.PublishOptions, first bool) error {
 	var youtube *postoptions.YouTubeOptions
 	var tiktok *postoptions.TikTokOptions
+	var pinterest *postoptions.PinterestOptions
 	if options != nil {
-		youtube, tiktok = options.YouTube, options.TikTok
+		youtube, tiktok, pinterest = options.YouTube, options.TikTok, options.Pinterest
 	}
 	if err := postoptions.ValidateVideoOptions(channel, youtube, tiktok, true); err != nil {
 		return invalid(err.Error())
+	}
+	if err := postoptions.ValidatePinterestOptions(channel, pinterest, first); err != nil {
+		return invalid(err.Error())
+	}
+	if options != nil {
+		if err := postoptions.ValidateFacebookOptions(channel, options.Facebook); err != nil {
+			return invalid(err.Error())
+		}
 	}
 	if options == nil || options.Empty() {
 		return nil
 	}
 	o := *options
+	if err := postoptions.ValidateInstagramOptions(channel, o.Instagram); err != nil {
+		return invalid(err.Error())
+	}
+	if cover := postoptions.CoverAsset(o.YouTube, o.Instagram); cover != "" && !contentDraftRefPattern.MatchString(cover) {
+		return invalid("A cover or thumbnail is an uploaded image of this workspace.")
+	}
 	if err := postoptions.CheckPhotoTags(o.PhotoTagIDs); err != nil {
 		return invalid(err.Error())
 	}
@@ -61,8 +78,8 @@ func checkPostOptions(channel string, options *postoptions.PublishOptions, first
 		return invalid("Reply settings, labels, communities and articles are X settings.")
 	case linkedInOnly && channel != "linkedin":
 		return invalid("Visibility, documents and poll questions are LinkedIn settings here.")
-	case o.FirstComment != "" && channel != "linkedin" && channel != "instagram":
-		return invalid("First comments are for LinkedIn and Instagram posts.")
+	case o.FirstComment != "" && !firstCommentChannels[channel]:
+		return invalid("First comments are for LinkedIn, Instagram and Facebook posts.")
 	case (o.QuoteRemoteID != "" || o.QuoteFirstPost) && channel != "x" && channel != "linkedin" && channel != "bluesky" && channel != "mastodon":
 		return invalid("Quotes are for X, LinkedIn, Bluesky and supported Mastodon servers.")
 	}

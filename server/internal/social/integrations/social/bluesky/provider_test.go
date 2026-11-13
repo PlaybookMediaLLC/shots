@@ -316,3 +316,29 @@ func TestImagesPreserveOriginalAndResizeToVerifiedLimit(t *testing.T) {
 		t.Fatalf("unusable limit accepted: %v", err)
 	}
 }
+
+// A delete removes the account's own record by its AT URI and refuses another account's.
+func TestDeletePost(t *testing.T) {
+	f := newFakePDS(t)
+	var deleted []map[string]any
+	f.override = func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.HasSuffix(r.URL.Path, "/xrpc/com.atproto.repo.deleteRecord") {
+			return false
+		}
+		var in map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		deleted = append(deleted, in)
+		_, _ = w.Write([]byte(`{}`))
+		return true
+	}
+	p, ctx := newProvider(f.Client()), context.Background()
+	if err := p.DeletePost(ctx, f.integration(t, "app-password"), "at://did:plc:abcdefghijklmnopqrstuvwx/app.bsky.feed.post/3kpost"); err != nil {
+		t.Fatal(err)
+	}
+	if len(deleted) != 1 || deleted[0]["repo"] != "did:plc:abcdefghijklmnopqrstuvwx" || deleted[0]["collection"] != "app.bsky.feed.post" || deleted[0]["rkey"] != "3kpost" {
+		t.Fatalf("deleted %v", deleted)
+	}
+	if err := p.DeletePost(ctx, f.integration(t, "app-password"), "at://did:plc:zzzzzzzzzzzzzzzzzzzzzzzz/app.bsky.feed.post/x"); err == nil || len(deleted) != 1 {
+		t.Fatalf("another account's record = %v", err)
+	}
+}

@@ -298,6 +298,10 @@ func (c *Configuration) importCanonicalAnalyticsPosts(ctx context.Context, conne
 			sql.ColumnsEQ(r.C(publicationattempt.FieldProviderPostID), s.C(scheduledpost.FieldRemotePostID)),
 			sql.NotNull(r.C(publicationattempt.FieldCompletedAt)),
 		)))))
+		// A story has no per-post insights Shots reads, and they vanish after a
+		// day: importing one would fail its reads and mark the account failed.
+		options := s.C(scheduledpost.FieldPublishOptions)
+		s.Where(sql.ExprP("coalesce(" + options + "->'instagram'->>'placement', '') <> 'story' AND coalesce(" + options + "->'facebook'->>'placement', '') <> 'story'"))
 		a := sql.Table(analyticspost.Table)
 		s.Where(sql.NotExists(sql.Select(a.C(analyticspost.FieldID)).From(a).Where(sql.And(
 			sql.ColumnsEQ(a.C(analyticspost.FieldConnectionID), s.C(scheduledpost.FieldChannelConnectionID)),

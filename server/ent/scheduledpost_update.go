@@ -102,6 +102,26 @@ func (_u *ScheduledPostUpdate) ClearPublishedAt() *ScheduledPostUpdate {
 	return _u
 }
 
+// SetDeletedAt sets the "deleted_at" field.
+func (_u *ScheduledPostUpdate) SetDeletedAt(v time.Time) *ScheduledPostUpdate {
+	_u.mutation.SetDeletedAt(v)
+	return _u
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_u *ScheduledPostUpdate) SetNillableDeletedAt(v *time.Time) *ScheduledPostUpdate {
+	if v != nil {
+		_u.SetDeletedAt(*v)
+	}
+	return _u
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (_u *ScheduledPostUpdate) ClearDeletedAt() *ScheduledPostUpdate {
+	_u.mutation.ClearDeletedAt()
+	return _u
+}
+
 // SetMetricsAt sets the "metrics_at" field.
 func (_u *ScheduledPostUpdate) SetMetricsAt(v time.Time) *ScheduledPostUpdate {
 	_u.mutation.SetMetricsAt(v)
@@ -354,6 +374,12 @@ func (_u *ScheduledPostUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.PublishedAtCleared() {
 		_spec.ClearField(scheduledpost.FieldPublishedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.DeletedAt(); ok {
+		_spec.SetField(scheduledpost.FieldDeletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DeletedAtCleared() {
+		_spec.ClearField(scheduledpost.FieldDeletedAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.MetricsAt(); ok {
 		_spec.SetField(scheduledpost.FieldMetricsAt, field.TypeTime, value)
 	}
@@ -554,6 +580,26 @@ func (_u *ScheduledPostUpdateOne) SetNillablePublishedAt(v *time.Time) *Schedule
 // ClearPublishedAt clears the value of the "published_at" field.
 func (_u *ScheduledPostUpdateOne) ClearPublishedAt() *ScheduledPostUpdateOne {
 	_u.mutation.ClearPublishedAt()
+	return _u
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (_u *ScheduledPostUpdateOne) SetDeletedAt(v time.Time) *ScheduledPostUpdateOne {
+	_u.mutation.SetDeletedAt(v)
+	return _u
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_u *ScheduledPostUpdateOne) SetNillableDeletedAt(v *time.Time) *ScheduledPostUpdateOne {
+	if v != nil {
+		_u.SetDeletedAt(*v)
+	}
+	return _u
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (_u *ScheduledPostUpdateOne) ClearDeletedAt() *ScheduledPostUpdateOne {
+	_u.mutation.ClearDeletedAt()
 	return _u
 }
 
@@ -838,6 +884,12 @@ func (_u *ScheduledPostUpdateOne) sqlSave(ctx context.Context) (_node *Scheduled
 	}
 	if _u.mutation.PublishedAtCleared() {
 		_spec.ClearField(scheduledpost.FieldPublishedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.DeletedAt(); ok {
+		_spec.SetField(scheduledpost.FieldDeletedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DeletedAtCleared() {
+		_spec.ClearField(scheduledpost.FieldDeletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.MetricsAt(); ok {
 		_spec.SetField(scheduledpost.FieldMetricsAt, field.TypeTime, value)

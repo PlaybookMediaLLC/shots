@@ -56,6 +56,12 @@ export async function searchSocialSetCommunities(
   return result?.items ?? null
 }
 
+/** The boards of a set's Pinterest account; null when the set is not visible. */
+export async function listSocialSetPinterestBoards(context: TenantContext, id: string) {
+  const result = await orNull(backendSDK(context).listSocialSetPinterestBoards(id))
+  return result?.items ?? null
+}
+
 /** The social sets the caller may see, the workspace's default (oldest shared) first. */
 export async function listSocialSets(context: TenantContext) {
   return (await backendSDK(context).listSocialSets()).items.map(readSet)

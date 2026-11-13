@@ -1,7 +1,13 @@
 import { articleContent } from '@/lib/write/article'
-import type { Engagement } from 'screenshot-studio-backend-sdk'
+import type { Engagement, InstagramOptions, PinterestOptions } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
-import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
+import {
+  facebookOptionsSchema,
+  instagramOptionsSchema,
+  pinterestOptionsSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+} from 'screenshot-studio-backend-sdk'
 import {
   type BlockImages,
   type SerializedCaption,
@@ -17,6 +23,8 @@ import {
   captionLimit,
   kindAvailability,
   pollProblems,
+  YOUTUBE_TAGS_LIMIT,
+  youtubeTagsLength,
 } from '@/lib/write/capabilities'
 import {
   type Article,
@@ -27,6 +35,7 @@ import {
   type PlateBody,
   type PlatformVersions,
   type PostSettings,
+  type VersionOptions,
   postSettingsSchema,
   replySettingsSchema,
   linkPreviewSchema,
@@ -44,6 +53,9 @@ import { bodyFor, groupSettings, versionFor } from '@/lib/write/versions'
 export const publishOptionsSchema = z.object({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
+  instagram: instagramOptionsSchema.optional(),
+  pinterest: pinterestOptionsSchema.optional(),
+  facebook: facebookOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -150,6 +162,59 @@ function postOptions(
   return options
 }
 
+/** A pin's settings as they publish: trimmed, without empty fields. */
+function pinChoices(options: PinterestOptions | undefined): PinterestOptions {
+  const title = options?.title?.trim()
+  const link = options?.link?.trim()
+  return {
+    ...(options?.boardId ? { boardId: options.boardId } : {}),
+    ...(title ? { title } : {}),
+    ...(link ? { link } : {}),
+  }
+}
+
+/** Whether a link is a web address Pinterest takes (Go: postoptions.pinterestLink). */
+function webAddress(value: string): boolean {
+  // The URL parser fills in what Go does not: `https:host` has no `//`.
+  if (!/^https?:\/\/[^/]/i.test(value)) return false
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether a version posts as a story: one image or video with no text, on
+ * Instagram or a Facebook Page (Go: PublishOptions.Story).
+ */
+export function isStory(channel: DraftChannel, options: VersionOptions | undefined): boolean {
+  return (
+    (channel === 'instagram' && options?.instagram?.placement === 'story') ||
+    (channel === 'facebook' && options?.facebook?.placement === 'story')
+  )
+}
+
+/** Instagram's settings that do something, or undefined when none is on. */
+function instagramChoices(
+  options: InstagramOptions | undefined
+): InstagramOptions | undefined {
+  if (!options) return undefined
+  // A story takes none of the feed's settings (Go: InstagramOptions.Validate).
+  if (options.placement === 'story') return { placement: 'story' }
+  const chosen: InstagramOptions = {}
+  if (options.collaborators?.length) chosen.collaborators = options.collaborators
+  if (options.userTags?.length) chosen.userTags = options.userTags
+  if (options.coverAssetId) chosen.coverAssetId = options.coverAssetId
+  if (options.shareToFeed === false) chosen.shareToFeed = false
+  if (options.trialReel) {
+    chosen.trialReel = true
+    if (options.trialGraduation) chosen.trialGraduation = options.trialGraduation
+  }
+  return Object.keys(chosen).length > 0 ? chosen : undefined
+}
+
 /** Follow-ups that do something, or undefined when none is on. */
 export function activeAutomation(automation: Automation | undefined): Automation | undefined {
   if (!automation) return undefined
@@ -218,8 +283,11 @@ export function buildPublication(
   const groups = groupSettings(body)
   const options = version.options ?? {}
   const article = draft.kind === 'article'
+  // A story carries no text: the draft's text goes to its other platforms.
+  const story = isStory(channel, options)
   const serialized = serializeDraft(body, channel, blockImages, undefined, {
-    limit: article ? 100_000 : captionLimit(channel, account.standing),
+    story,
+    limit: article || story ? 100_000 : captionLimit(channel, account.standing),
     numbering: CAPABILITIES[channel].thread ? options.numbering : undefined,
     documentAssetId: channel === 'linkedin' ? options.document?.assetId : undefined,
   })
@@ -238,13 +306,37 @@ export function buildPublication(
       options.youtube.madeForKids === undefined)
   )
     optionProblems.push('Choose a YouTube title, privacy and audience before scheduling.')
+  if (channel === 'youtube' && youtubeTagsLength(options.youtube?.tags ?? []) > YOUTUBE_TAGS_LIMIT)
+    optionProblems.push(`Keep YouTube tags under ${YOUTUBE_TAGS_LIMIT} characters together.`)
+  const instagram = channel === 'instagram' ? instagramChoices(options.instagram) : undefined
+  if (story && options.firstComment?.trim())
+    optionProblems.push('A story takes no first comment. Remove it, or post to the feed.')
+  if (instagram && !story) {
+    const media = first?.media ?? []
+    const reel = media.length === 1 && media[0]?.kind === 'video'
+    // A cover, the grid choice and a trial need a reel (Go: InstagramOptions.Reel).
+    if ((instagram.coverAssetId || instagram.shareToFeed === false || instagram.trialReel) && !reel)
+      optionProblems.push(
+        'A cover, grid setting or trial is for a reel. Post one video, or turn them off.'
+      )
+    if (instagram.userTags?.length && !reel && !media.some((item) => item.kind === 'image'))
+      optionProblems.push('Tag accounts on a photo or a reel.')
+  }
+  const pinterest = channel === 'pinterest' ? pinChoices(options.pinterest) : undefined
+  if (channel === 'pinterest' && !pinterest?.boardId)
+    optionProblems.push('Choose the Pinterest board to save the pin to.')
+  if (pinterest?.link && !webAddress(pinterest.link))
+    optionProblems.push("A pin's link is a web address starting with https:// or http://.")
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
+    // An app draft is finished in TikTok: its privacy, interactions, disclosures
+    // and consent are chosen there (postoptions.ValidateVideoOptions).
+    const direct = !options.tiktok?.sendToApp
     if (!creator)
       accountProblems.push(
         'TikTok account permissions are unavailable. Refresh the account before scheduling.'
       )
-    else if (options.tiktok) {
+    else if (options.tiktok && direct) {
       const choice = options.tiktok
       if (!creator.privacyLevels.some((privacy) => privacy === choice.privacy))
         optionProblems.push('Choose a privacy setting permitted by this TikTok account.')
@@ -256,6 +348,7 @@ export function buildPublication(
         optionProblems.push('TikTok account settings do not permit the selected interactions.')
     }
     if (
+      direct &&
       options.tiktok?.commercialContent &&
       !options.tiktok.brandOrganic &&
       !options.tiktok.brandedContent
@@ -264,17 +357,18 @@ export function buildPublication(
         'Indicate whether this TikTok content promotes your brand or another brand.'
       )
     if (
+      direct &&
       (options.tiktok?.brandOrganic || options.tiktok?.brandedContent) &&
       !options.tiktok.commercialContent
     )
       optionProblems.push('Enable commercial content disclosure for promotional content.')
-    if (!options.tiktok?.privacy)
+    if (direct && !options.tiktok?.privacy)
       optionProblems.push('Choose who can see this TikTok post in its options before scheduling.')
-    if (!options.tiktok?.consent)
+    if (direct && !options.tiktok?.consent)
       optionProblems.push(
         'Confirm consent to send this video to TikTok in its options before scheduling.'
       )
-    if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
+    if (direct && options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
   // Go refuses X video until the account's video length is verified (socialidentity.CheckXMedia).
@@ -362,13 +456,16 @@ export function buildPublication(
   if (channel === 'x' && photoTags(first).length) firstOptions.taggedUserIds = photoTags(first)
   if (channel === 'youtube') firstOptions.youtube = options.youtube
   if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
+  if (instagram) firstOptions.instagram = instagram
+  if (pinterest) firstOptions.pinterest = pinterest
+  if (channel === 'facebook' && story) firstOptions.facebook = { placement: 'story' }
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true
   }
   const firstCard = cardFor(first?.caption ?? '', (first?.images ?? 0) + (first?.videos ?? 0))
   if (firstCard) firstOptions.linkPreview = firstCard
-  if (CAPABILITIES[channel].settings.firstComment && options.firstComment?.trim())
+  if (CAPABILITIES[channel].settings.firstComment && options.firstComment?.trim() && !story)
     firstOptions.firstComment = options.firstComment.trim()
   if (channel === 'linkedin') {
     if (options.visibility) firstOptions.visibility = options.visibility
@@ -412,7 +509,7 @@ export function buildPublication(
   }
   const target: PublicationTarget = {
     assetIds: first?.assetIds ?? [],
-    caption: first?.caption ?? '',
+    caption: story ? '' : (first?.caption ?? ''),
     channelConnectionId: account.connectionId,
     ...(compact(firstOptions) ? { options: compact(firstOptions) } : {}),
     ...(automation ? { autoActions: automation } : {}),

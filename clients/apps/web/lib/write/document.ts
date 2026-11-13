@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
+import {
+  facebookOptionsSchema,
+  instagramOptionsSchema,
+  pinterestOptionsSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+} from 'screenshot-studio-backend-sdk'
 
 /**
  * The Write document (RFC 025): the structured parts of a content draft
@@ -17,6 +23,9 @@ export const draftChannelSchema = z.enum([
   'mastodon',
   'tiktok',
   'youtube',
+  'facebook',
+  'pinterest',
+  'gmb',
 ])
 
 /** One of {@link draftChannelSchema}. */
@@ -129,7 +138,8 @@ export const retweetRuleSchema = z.union([
   z.strictObject({ afterMinutes: z.number().int().min(1).max(43_200) }),
   z.strictObject({
     at: clockTimeSchema,
-    days: z.number().int().min(0).max(30),
+    // Older backends stored a same-day rule without days; it means 0.
+    days: z.number().int().min(0).max(30).default(0),
     timeZone: z.string().min(1).max(64),
   }),
 ])
@@ -196,6 +206,12 @@ export type AutoDm = z.infer<typeof autoDmSchema>
 export const versionOptionsSchema = z.strictObject({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
+  /** Instagram: collaborators, tags, and a reel's cover, grid and trial. */
+  instagram: instagramOptionsSchema.optional(),
+  /** Pinterest: the pin's board, title and link. */
+  pinterest: pinterestOptionsSchema.optional(),
+  /** Facebook: a Page story instead of a feed post. */
+  facebook: facebookOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),
