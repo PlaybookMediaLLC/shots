@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
+import { insertMention } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
 import { SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 import type { DraftChannel } from '@/lib/write/document'
@@ -175,23 +176,6 @@ export const SocialMentionPlugin = createPlatePlugin({
   key: SOCIAL_MENTION,
   node: { component: SocialMentionElement, isElement: true, isInline: true, isVoid: true },
 })
-
-/** Put a mention at the caret, then a space after it. */
-function insertMention(editor: PlateEditor, channel: DraftChannel, mention: FoundMention) {
-  if (!editor.selection) editor.tf.select(editor.api.end([]))
-  editor.tf.insertNodes({
-    children: [{ text: '' }],
-    handle: mention.handle,
-    label: mention.label,
-    kind: mention.kind,
-    platform: channel,
-    providerId: mention.providerId,
-    type: SOCIAL_MENTION,
-  })
-  editor.tf.move({ unit: 'offset' })
-  editor.tf.insertText(' ')
-  editor.tf.focus()
-}
 
 /** The platforms a mention can be looked up on, of those being written for. */
 export function mentionLookups(channels: DraftChannel[]): ('x' | 'linkedin')[] {

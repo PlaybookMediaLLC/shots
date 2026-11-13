@@ -86,6 +86,8 @@ type SocialAccount struct {
 	XCaptionLimit *int  `json:"xCaptionLimit"`
 	XArticles     *bool `json:"xArticles"`
 	XQuotes       bool  `json:"xQuotes"`
+	// XVideoMaxSeconds is the verified account's X video length; nil is unverified.
+	XVideoMaxSeconds *int `json:"xVideoMaxSeconds"`
 }
 
 // WritingAssistantRecord is a set's assistant with its derived status:
@@ -519,7 +521,7 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 				standing, account := c.accountStanding(ctx, connection), &built[i]
 				account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
 				account.MastodonQuotes = standing.MastodonQuotes
-				account.XQuotes = standing.XQuotes
+				account.XQuotes, account.XVideoMaxSeconds = standing.XQuotes, standing.XVideoMaxSeconds
 				account.TikTokCreator = standing.TikTokCreator
 			})
 		}
@@ -816,7 +818,7 @@ func validEngagement(engagement schema.Engagement) (schema.Engagement, error) {
 	}
 	engagement.AutoRepost.Text = ""
 	engagement.AutoPlug.Text = strings.TrimSpace(engagement.AutoPlug.Text)
-	if engagement.AutoPlug.Enabled && (engagement.AutoPlug.Text == "" || xLength(engagement.AutoPlug.Text) > 280) {
+	if engagement.AutoPlug.Enabled && !fitsXPost(engagement.AutoPlug.Text, 0, nil) {
 		return engagement, invalid("The auto-plug needs text that fits in one X post.")
 	}
 	return engagement, nil

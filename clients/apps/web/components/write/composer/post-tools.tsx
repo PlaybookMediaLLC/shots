@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
-import { postRanges, setPostSettings } from '@/components/drafts/thread'
+import { asUndoStep, postRanges, setPostSettings } from '@/components/drafts/thread'
 import {
   CAPABILITIES,
   pollProblems,
@@ -146,11 +146,12 @@ function AudienceTools({
   const replies = settings.replySettings ?? 'everyone'
   const labelled = settings.disclosures?.madeWithAi || settings.disclosures?.paidPartnership
   const count = postRanges(editor.children).length
-  const applyToAll = () => {
-    for (let post = 1; post <= count; post += 1) {
-      setPostSettings(editor, post, { replySettings: replies === 'everyone' ? undefined : replies })
-    }
-  }
+  const applyToAll = () =>
+    asUndoStep(editor, () => {
+      for (let post = 1; post <= count; post += 1) {
+        setPostSettings(editor, post, { replySettings: replies === 'everyone' ? undefined : replies })
+      }
+    })
   const [open, setOpen] = useRequestedOpen(number, 'audience')
   return (
     <Popover onOpenChange={setOpen} open={open}>

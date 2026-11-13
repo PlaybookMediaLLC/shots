@@ -2,9 +2,13 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Readable spot checks; the exhaustive comparison against the npm packages
@@ -52,18 +56,110 @@ func TestWeightedLength(t *testing.T) {
 		"mail a@sample.com":                17, // not emails
 	}
 	for in, want := range cases {
-		if got := WeightedLength(in); got != want {
-			t.Errorf("WeightedLength(%q) = %d, want %d", in, got, want)
+		if got, err := WeightedLength(in); err != nil || got != want {
+			t.Errorf("WeightedLength(%q) = %d, %v, want %d", in, got, err, want)
 		}
 	}
-	if start, end := TextSlicer("x", 5, "日本語日本語"); start != 0 || end != 1 {
-		t.Errorf("TextSlicer = %d,%d", start, end)
+	if start, end, err := TextSlicer("x", 5, "日本語日本語"); err != nil || start != 0 || end != 1 {
+		t.Errorf("TextSlicer = %d,%d, %v", start, end, err)
 	}
-	if got := CountLength("threads", "é😀"); got != 6 {
-		t.Errorf("threads counts UTF-8 bytes, got %d", got)
+	if got, err := CountLength("threads", "é😀"); err != nil || got != 6 {
+		t.Errorf("threads counts UTF-8 bytes, got %d, %v", got, err)
 	}
-	if got := CountLength("linkedin", "é😀"); got != 3 {
-		t.Errorf("others count UTF-16 units, got %d", got)
+	if got, err := CountLength("linkedin", "é😀"); err != nil || got != 3 {
+		t.Errorf("others count UTF-16 units, got %d, %v", got, err)
+	}
+}
+
+// regexp2 backtracks quadratically through domain-like words: without the
+// budget each of these took seconds to minutes.
+func TestLinkScanStopsOnCraftedText(t *testing.T) {
+	scans := map[string]func(string) error{
+		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
+		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
+	}
+	cases := map[string]string{
+		"a.":         strings.Repeat("a.", 5000),
+		"https://a.": "https://" + strings.Repeat("a.", 5000),
+		// Each word is far below a call's timeout: only the text's deadline stops them.
+		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+	}
+	for name, text := range cases {
+		for scan, run := range scans {
+			start := time.Now()
+			err := run(text)
+			if elapsed := time.Since(start); elapsed > time.Second {
+				t.Errorf("%s(%s) took %v", scan, name, elapsed)
+			}
+			// Without "://" LinkSpans has no link to find and skips the scan.
+			noProtocol := scan == "LinkSpans" && !strings.Contains(text, "://")
+			if noProtocol && err != nil || !noProtocol && !errors.Is(err, ErrTextTooComplex) {
+				t.Errorf("%s(%s) error = %v", scan, name, err)
+			}
+		}
+	}
+}
+
+// A text longer than any caption gets no more time than the longest one: 1 MiB
+// of slow words took 21 s while the budget grew with length.
+func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
+	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
+	start := time.Now()
+	if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
+		t.Fatalf("WeightedLength error = %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 4*time.Second {
+		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	}
+}
+
+// Mastodon counts only links with a protocol, so a dotted word without one is
+// not scanned and cannot exhaust the budget.
+func TestLinkSpansSkipsWordsWithoutAProtocol(t *testing.T) {
+	text := "Docs at https://example.com and " + strings.Repeat("a.", 1000)
+	spans, err := LinkSpans(text)
+	if err != nil || len(spans) != 1 || text[spans[0][0]:spans[0][1]] != "https://example.com" {
+		t.Fatalf("LinkSpans = %v, %v", spans, err)
+	}
+}
+
+// One request's texts share its budget: once crafted texts spend it, the next
+// scans stop at once, while a text counted before is not scanned again.
+func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
+	budget := NewScanBudget(500 * time.Millisecond)
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("before = %v, %v", spans, err)
+	}
+	start := time.Now()
+	for i := range 20 {
+		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 1000)) // seconds unbounded
+		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Fatalf("crafted %d: %v", i, err)
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+		t.Errorf("20 crafted texts took %v of a 500 ms budget", elapsed)
+	}
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("after = %v, %v", spans, err)
+	}
+	// X counts bare domains, Mastodon does not: their scans are remembered apart.
+	both := NewScanBudget(time.Second)
+	if spans, err := both.LinkSpans("https://a.com b.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("spans = %v, %v", spans, err)
+	}
+	if weighted, _, err := both.ParseTweet("https://a.com b.com", 280); err != nil || weighted != 47 {
+		t.Fatalf("weighted = %d, %v", weighted, err)
+	}
+}
+
+// An X Article may weigh 100,000; dotted words and links throughout must not
+// exhaust the budget.
+func TestLinkScanCountsALongArticle(t *testing.T) {
+	paragraph := "Version 2.4 ships today. See https://example.com/notes and docs.example.com for details, e.g. the new API.\n"
+	article := strings.Repeat(paragraph, 850) // 90,950 characters weighing 95,200
+	if valid, err := ValidTweetText(article, 100000); err != nil || !valid {
+		t.Fatalf("ValidTweetText(article) = %v, %v", valid, err)
 	}
 }
 

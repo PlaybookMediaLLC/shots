@@ -97,6 +97,7 @@ var paragraphBreak = regexp.MustCompile(`\n{2,}`)
 // queued. Everything a schedule checks is checked before the draft exists, so a
 // refused post leaves nothing behind.
 func (c *Configuration) CreatePost(ctx context.Context, actor Actor, input CreatePostInput) (*CreatePostResult, error) {
+	ctx = withDraftCountBudget(ctx) // checkPost, then scheduleContentDraft
 	if err := c.authorizePublishing(ctx, actor); err != nil {
 		return nil, err
 	}
