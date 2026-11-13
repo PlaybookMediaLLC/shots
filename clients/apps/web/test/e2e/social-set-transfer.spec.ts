@@ -1,13 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import {
-  apiRequest,
-  browserRequest,
-  expect,
-  grantWorkspacePlan,
-  requestJson,
-  test,
-} from './framework'
+import { apiRequest, expect, grantWorkspacePlan, requestJson, test } from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -27,8 +20,9 @@ test(
       const created = await requestJson(page, '/api/v1/social-sets', { name })
       expect(created.status).toBeLessThan(300)
     }
+    // Reads follow the session's workspace; this tab stays bound to the one it shows.
     const sets = async () => {
-      const response = await browserRequest(page, '/api/v1/social-sets')
+      const response = await apiRequest(page, '/api/v1/social-sets')
       expect(response.status).toBe(200)
       return setsSchema.parse(response.body).items
     }
@@ -92,12 +86,12 @@ test(
     // The source no longer has the profile or its draft.
     expect((await sets()).map((set) => set.id)).not.toContain(setId)
     expect([403, 404]).toContain(
-      (await browserRequest(page, `/api/v1/content-drafts/${draftId}`)).status
+      (await apiRequest(page, `/api/v1/content-drafts/${draftId}`)).status
     )
     // The destination has the same profile and draft.
     await activate(destination)
     expect((await sets()).map((set) => set.id)).toContain(setId)
-    const arrived = await browserRequest(page, `/api/v1/content-drafts/${draftId}`)
+    const arrived = await apiRequest(page, `/api/v1/content-drafts/${draftId}`)
     expect(arrived.status).toBe(200)
     expect(z.object({ title: z.string() }).parse(arrived.body).title).toBe('Travels')
   }
