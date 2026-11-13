@@ -540,6 +540,15 @@ test('an old draft’s code block and heading keep the kit’s layout, and markd
     return false
   })
   expect(boxed).toBe(true)
+  // ...in one colour: highlighting re-ran on every edit, and "Auto" tried every grammar.
+  const colours = await editor
+    .getByText('const answer = 42', { exact: true })
+    .evaluate(
+      (code) =>
+        new Set([code, ...code.querySelectorAll('*')].map((node) => getComputedStyle(node).color))
+          .size
+    )
+  expect(colours).toBe(1)
   // Its block menu leaves out Ask AI: Write's editor has no AI plugin, so the item threw.
   // Comment stays: Write loads the comment plugin.
   await editor.getByText('const answer = 42', { exact: true }).hover()

@@ -28,6 +28,7 @@ export const auditActions = [
   'post.publish_recovery_required',
   'post.published',
   'post.scheduled',
+  'post.sent_to_app',
   'support.access_granted',
   'support.access_revoked',
 ] as const

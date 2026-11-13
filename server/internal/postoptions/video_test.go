@@ -3,6 +3,7 @@ package postoptions
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -51,6 +52,13 @@ func TestVideoOptionsRequireExplicitPlatformChoices(t *testing.T) {
 		{"missing audience", "youtube", &YouTubeOptions{Title: "Local canary", Privacy: "private"}, nil, true, false},
 		{"missing consent", "tiktok", nil, &TikTokOptions{Privacy: "SELF_ONLY"}, true, false},
 		{"private sponsorship", "tiktok", nil, &TikTokOptions{Privacy: "SELF_ONLY", Consent: true, BrandedContent: true}, true, false},
+		// An app draft is finished in TikTok: it needs no privacy or consent here,
+		// and takes none of the controls TikTok would ignore.
+		{"app draft", "tiktok", nil, &TikTokOptions{SendToApp: true}, true, true},
+		{"app draft with privacy", "tiktok", nil, &TikTokOptions{SendToApp: true, Privacy: "SELF_ONLY"}, false, false},
+		{"app draft with comments", "tiktok", nil, &TikTokOptions{SendToApp: true, AllowComments: true}, false, false},
+		{"app draft with disclosure", "tiktok", nil, &TikTokOptions{SendToApp: true, CommercialContent: true, BrandOrganic: true}, true, false},
+		{"app draft with consent", "tiktok", nil, &TikTokOptions{SendToApp: true, Consent: true}, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := ValidateVideoOptions(tc.channel, tc.youtube, tc.tiktok, tc.complete); (err == nil) != tc.valid {
@@ -82,5 +90,57 @@ func TestTikTokCreatorRechecksAccountRestrictions(t *testing.T) {
 	var missing *TikTokCreator
 	if missing.Check(o, 5000) == nil {
 		t.Fatal("missing creator accepted")
+	}
+	// An app draft's privacy is chosen in TikTok, but its length still counts.
+	draft := &TikTokOptions{SendToApp: true}
+	if err := c.Check(draft, 5000); err != nil {
+		t.Fatalf("app draft refused: %v", err)
+	}
+	if !errors.Is(c.Check(draft, 11000), ErrVideoTooLong) || missing.Check(draft, 5000) == nil {
+		t.Fatal("app draft skipped the account's allowance")
+	}
+}
+
+func TestYouTubeTagsCountAsYouTubeDoes(t *testing.T) {
+	// Two tags: 4 + "a b" quoted (3+2) + one comma.
+	if got := YouTubeTagsLength([]string{"news", "a b"}); got != 10 {
+		t.Fatalf("length = %d, want 10", got)
+	}
+	if YouTubeTagsLength(nil) != 0 {
+		t.Fatal("no tags have no length")
+	}
+	no := false
+	base := YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no}
+	full := make([]string, 100) // 100×4 + 99 commas = 499
+	for i := range full {
+		full[i] = fmt.Sprintf("t%03d", i)
+	}
+	over := append(append([]string{}, full...), "x")
+	draft := base
+	draft.Tags = over
+	if err := ValidateVideoOptions("youtube", &draft, nil, false); err != nil {
+		t.Fatalf("a draft over the tag limit must still save: %v", err)
+	}
+	for _, tc := range []struct {
+		name  string
+		tags  []string
+		valid bool
+	}{
+		{"499 characters", full, true},
+		{"501 characters", append(append([]string{}, full...), "x"), false},
+		{"500 with a quoted tag", append(append([]string{}, full[:99]...), "a b"), true},
+		{"comma inside a tag", []string{"a,b"}, false},
+		{"blank tag", []string{" "}, false},
+		{"padded tag", []string{" launch"}, false},
+		{"repeated tag", []string{"Launch", "launch"}, false},
+		{"angle bracket", []string{"<b>"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := base
+			options.Tags = tc.tags
+			if err := ValidateVideoOptions("youtube", &options, nil, true); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
 	}
 }

@@ -113,6 +113,7 @@ import {
 import {
   contentDraftActivityContract,
   copyContentDraftContract,
+  deleteDraftPostContract,
   duplicateContentDraftContract,
   planContentDraftContract,
   recoverContentDraftRevisionContract,
@@ -202,6 +203,7 @@ export const documentedContracts = [
   updateContentDraftContract,
   deleteContentDraftContract,
   listContentDraftPostsContract,
+  deleteDraftPostContract,
   createPostContract,
   updateDraftPropertiesContract,
   planContentDraftContract,

@@ -340,3 +340,23 @@ func TestCustomInstancePreservesSafeFailureClassification(t *testing.T) {
 		}
 	}
 }
+
+// A delete goes only to the connection's own instance, through the guarded client.
+func TestCustomInstanceDeleteBindsStoredOrigin(t *testing.T) {
+	integration := storedIntegration(t, "example.social")
+	integration.Token = "token-canary"
+	var got []string
+	p := fixtureProvider(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Method+" "+r.URL.Host+r.URL.Path+" "+r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	})
+	if err := p.DeletePost(context.Background(), integration, "42"); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "DELETE example.social/api/v1/statuses/42 Bearer token-canary" {
+		t.Fatalf("requests %v", got)
+	}
+	if err := p.DeletePost(context.Background(), &ent.Integration{Token: "token-canary"}, "42"); err == nil || len(got) != 1 {
+		t.Fatalf("a connection without an instance was called: %v", err)
+	}
+}

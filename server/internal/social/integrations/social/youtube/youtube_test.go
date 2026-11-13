@@ -118,7 +118,7 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 				t.Errorf("session request %s %v", r.URL, r.Header)
 			}
 			body, _ := io.ReadAll(r.Body)
-			want := `{"snippet":{"title":"My video","description":"hello","tags":["a b"]},"status":{"privacyStatus":"public","selfDeclaredMadeForKids":true}}`
+			want := `{"snippet":{"title":"My video","description":"hello","tags":["a b"]},"status":{"privacyStatus":"public","selfDeclaredMadeForKids":true,"containsSyntheticMedia":true}}`
 			if string(body) != want {
 				t.Errorf("session body %s", body)
 			}
@@ -143,7 +143,7 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	})
 	srvURL = srv.URL
 	settings, _ := json.Marshal(map[string]any{
-		"title": "My video", "type": "public", "selfDeclaredMadeForKids": "yes",
+		"title": "My video", "type": "public", "selfDeclaredMadeForKids": "yes", "containsSyntheticMedia": true,
 		"tags":      []map[string]string{{"value": "a b", "label": "a b"}},
 		"thumbnail": map[string]string{"id": "t", "path": srv.URL + "/thumb.png"},
 	})
@@ -159,6 +159,23 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	}
 	if !thumbnailSet {
 		t.Fatal("thumbnail was not set")
+	}
+}
+
+func TestSetThumbnailReportsARefusal(t *testing.T) {
+	p, srv := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/thumb.png":
+			w.Write([]byte("png"))
+		case "/upload/youtube/v3/thumbnails/set":
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error":{"code":403,"message":"youtube.thumbnail"}}`))
+		default:
+			t.Errorf("unexpected %s %s", r.Method, r.URL)
+		}
+	})
+	if err := p.SetThumbnail(context.Background(), "tok", "vid1", srv.URL+"/thumb.png"); err == nil {
+		t.Fatal("a refused thumbnail reported success")
 	}
 }
 

@@ -103,6 +103,7 @@ export function PlatformTabs({
   versions: PlatformVersions
 }) {
   const channels = allChannels(accounts, primary)
+  const ids = React.useId()
   return (
     // The row wraps rather than scrolls, so no tab or options chip is cut off at the edge.
     <div className="flex flex-wrap items-center gap-2 px-4 py-3" data-testid="platform-tabs">
@@ -173,12 +174,23 @@ export function PlatformTabs({
               </Button>
               {account ? (
                 <span className="inline-flex" title={refusal ?? undefined}>
+                  {/* A refused switch stays focusable, so a keyboard reaches it and hears why. */}
                   <Switch
+                    aria-describedby={refusal ? `${ids}-${channel}` : undefined}
+                    aria-disabled={refusal !== null || undefined}
                     aria-label={`Publish to ${CHANNEL_META[channel].label}`}
                     checked={publishing}
-                    disabled={!canEdit || refusal !== null}
-                    onCheckedChange={(checked) => onToggle(account.id, checked === true)}
+                    className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                    disabled={!canEdit}
+                    onCheckedChange={(checked) => {
+                      if (refusal === null) onToggle(account.id, checked === true)
+                    }}
                   />
+                  {refusal ? (
+                    <span className="sr-only" id={`${ids}-${channel}`}>
+                      {refusal}
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
             </div>

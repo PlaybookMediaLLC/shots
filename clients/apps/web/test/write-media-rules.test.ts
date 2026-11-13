@@ -131,6 +131,37 @@ test('video destinations require exactly one MP4 and refuse photos', () => {
   }
 })
 
+test('a pin is one image; a Facebook Page post is text, photos or one video', () => {
+  assert.deepEqual(mediaProblems('pinterest', []), [
+    'Pinterest needs an image. Add one to the post.',
+  ])
+  assert.deepEqual(mediaProblems('pinterest', [photo]), [])
+  assert.match(mediaProblems('pinterest', [photo, png]).join(), /up to 1 attachment/)
+  // A video pin needs a cover Shots does not send yet.
+  assert.deepEqual(mediaProblems('pinterest', [mp4]), ["Pinterest doesn't take video here."])
+  assert.deepEqual(mediaProblems('facebook', []), [])
+  assert.deepEqual(mediaProblems('facebook', [photo, png]), [])
+  assert.deepEqual(mediaProblems('facebook', [mp4]), [])
+  assert.match(mediaProblems('facebook', [photo, mp4]).join(), /on its own/)
+  // The adapter recognizes MP4 only.
+  assert.match(mediaProblems('facebook', [mov]).join(), /takes MP4 video; attachment 1 is MOV/)
+})
+
+test('a Google Business post is text or one image; a Facebook story is one image or MP4', () => {
+  assert.deepEqual(mediaProblems('gmb', []), [])
+  assert.deepEqual(mediaProblems('gmb', [photo]), [])
+  assert.match(mediaProblems('gmb', [photo, png]).join(), /up to 1 attachment/)
+  assert.deepEqual(mediaProblems('gmb', [mp4]), ["Google Business doesn't take video here."])
+  assert.match(
+    mediaProblems('gmb', [{ ...photo, width: 200, height: 200 }]).join(),
+    /at least 250 pixels wide/
+  )
+  assert.deepEqual(mediaProblems('facebook', [mp4], 'story'), [])
+  assert.match(mediaProblems('facebook', [], 'story').join(), /A Facebook story needs/)
+  assert.match(mediaProblems('facebook', [photo, png], 'story').join(), /up to 1 attachment/)
+  assert.match(mediaProblems('facebook', [mov], 'story').join(), /takes MP4 video/)
+})
+
 test('a picture is named by the platform shape it is within 3% of, else by its size', () => {
   assert.equal(shapeName(1080, 1920), '9:16')
   assert.equal(shapeName(1080, 1350), '4:5')

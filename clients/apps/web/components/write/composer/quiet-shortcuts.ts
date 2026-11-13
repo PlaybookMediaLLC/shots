@@ -15,12 +15,17 @@ const KIT: AnyPlatePlugin[] = [...BasicBlocksKit, ...BasicMarksKit, ...CodeBlock
 /**
  * Those kit plugins without their shortcut or markdown input rules ("# ", "> ",
  * "```", "==", "^"), which would turn post text into formatting a post cannot
- * carry. extend() keeps their elements, break rules and options.
+ * carry. extend() keeps their elements and break rules. Old code blocks show
+ * unhighlighted: highlighting re-ran on every edit, and "Auto" tried every grammar.
  */
 export const QuietShortcutPlugins: AnyPlatePlugin[] = KIT.filter((plugin) =>
   QUIET.has(plugin.key)
 ).map((plugin) =>
   // shortcut: clears Plate 53's private __configuredInputRules (no public API does); switch
   // when Plate adds one or the "markdown typed in a post stays text" e2e fails.
-  plugin.extend(() => ({ __configuredInputRules: [], shortcuts: { toggle: null } }))
+  plugin.extend(() => ({
+    __configuredInputRules: [],
+    shortcuts: { toggle: null },
+    ...(plugin.key === 'code_block' ? { options: { lowlight: null } } : {}),
+  }))
 )

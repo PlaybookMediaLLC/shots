@@ -18,6 +18,7 @@ test('organization API keys expose only intake, artifact, draft, onboarding, and
     'draft:comment',
     'draft:write',
     'onboarding:run',
+    'post:delete',
     'post:publish',
     'post:schedule',
     'queue:write',
@@ -34,6 +35,11 @@ test('post:publish is only ever ticked by the person approving', () => {
   assert.deepEqual(preselectedAgentScopes(['artifact:read', 'post:publish']), ['artifact:read'])
   // A new connection can write a post without further setup.
   assert.ok(defaultAgentScopes.includes('draft:write'))
+})
+
+test('post:delete is only ever ticked by the person approving', () => {
+  assert.ok(!defaultAgentScopes.includes('post:delete'))
+  assert.deepEqual(preselectedAgentScopes(['draft:write', 'post:delete']), ['draft:write'])
 })
 
 test('a key over its rate limit is told to wait, not that it lacks permission', () => {

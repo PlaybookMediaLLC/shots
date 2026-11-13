@@ -65,7 +65,7 @@ func TestTextTooComplexToCountIsNotARejection(t *testing.T) {
 	caps := socialidentity.XVerifiedAccountLimits("read-write", ptr("Premium"))
 	articles := true
 	caps.Articles = &articles
-	crafted := "https://a.co/" + strings.Repeat("(a)", 8000)
+	crafted := strings.Repeat("a.", 1<<19) // a word longer than any caption
 	for _, article := range []bool{false, true} {
 		err := checkPublishingContent(caps, crafted, pendingSettings{ArticleTitle: ptr("Notes"), ArticleStatus: ptr("draft")}, 0, article)
 		if !errors.Is(err, helpers.ErrTextTooComplex) || temporalx.FailureType(err) == temporalx.TypePublicationRejected {

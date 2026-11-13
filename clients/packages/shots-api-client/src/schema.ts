@@ -1096,6 +1096,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content-draft-posts/{id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a published post from its platform
+         * @description Deletes a post that Shots published from its platform, with its thread parts, the replies Shots posted and its reposts. Each part gets a receipt; a part the platform already removed counts as deleted. Platforms without a delete call record the part as unsupported. Requires the `post:delete` scope.
+         */
+        post: operations["deleteContentDraftPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posts": {
         parameters: {
             query?: never;
@@ -2072,7 +2092,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -2082,8 +2102,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -2094,6 +2118,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -2127,6 +2171,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -2158,6 +2203,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -2181,7 +2228,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -2210,7 +2257,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -2230,6 +2277,19 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
             undo: {
                 draftId: string;
@@ -2409,7 +2469,7 @@ export interface components {
             returnPath?: string;
             socialSetId?: string;
             /** @enum {string} */
-            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom";
+            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "facebook" | "pinterest" | "gmb";
             instanceServer?: string;
         };
         SocialConnectionAttemptResponse: {
@@ -2421,7 +2481,7 @@ export interface components {
             version: 1;
             providers: {
                 /** @enum {string} */
-                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
+                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack" | "facebook" | "pinterest" | "gmb";
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
@@ -2942,7 +3002,7 @@ export interface components {
                 scheduledAt: string | null;
                 scheduledPostId: string | null;
                 /** @description Delivery state of `scheduledPostId`. */
-                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                 specVersion: number | null;
                 /** @enum {string} */
                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3001,7 +3061,7 @@ export interface components {
                     scheduledAt: string | null;
                     scheduledPostId: string | null;
                     /** @description Delivery state of `scheduledPostId`. */
-                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                     specVersion: number | null;
                     /** @enum {string} */
                     status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3051,7 +3111,7 @@ export interface components {
                 /** @description RFC 3339 timestamp of the planned publication. */
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 /** @description The content draft the post came from, when it has no variant. */
                 contentDraftId: string | null;
                 /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -3184,7 +3244,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3194,8 +3254,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3206,6 +3270,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3239,6 +3323,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3270,6 +3355,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3393,7 +3480,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3403,8 +3490,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3415,6 +3506,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3448,6 +3559,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3479,6 +3591,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3508,7 +3622,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3518,8 +3632,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3530,6 +3648,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3563,6 +3701,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3622,7 +3761,7 @@ export interface components {
             /** @enum {string} */
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
-            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
             /** Format: uuid */
             releaseId?: string;
             scratchpad?: string;
@@ -3736,7 +3875,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3746,8 +3885,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3758,6 +3901,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3791,6 +3954,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3822,6 +3986,8 @@ export interface components {
                 }[];
             };
             queuedPosts: number;
+            /** @default 0 */
+            sentToAppPosts: number;
             scratchpad: string;
             sourceDraftId: string | null;
             tagIds: string[];
@@ -3850,7 +4016,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3860,8 +4026,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3872,6 +4042,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3905,6 +4095,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3965,7 +4156,7 @@ export interface components {
             /** @enum {string} */
             status?: "draft" | "archived";
             naturalPostingTime?: boolean;
-            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube") | "";
+            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb") | "";
             plannedFor?: string | "";
         };
         ContentDraftPostList: {
@@ -3977,7 +4168,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -4006,7 +4197,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -4026,7 +4217,28 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
+        };
+        PostDeletion: {
+            deletion: {
+                organizationId: string;
+                platform: string;
+                postId: string;
+                requestedBy: string;
+            };
         };
         PostCreateRequest: {
             /** @enum {string} */
@@ -4040,8 +4252,18 @@ export interface components {
             platforms?: {
                 [key: string]: {
                     options?: {
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
                         firstComment?: string;
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -4060,6 +4282,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                     };
                     posts?: {
@@ -4188,7 +4413,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -4198,8 +4423,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -4210,6 +4439,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -4243,6 +4492,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -4274,6 +4524,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -4461,7 +4713,7 @@ export interface components {
             threadId?: string;
             anchor: {
                 /** @enum {string} */
-                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube";
+                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                 postId: string;
                 quote?: string;
             };
@@ -6439,7 +6691,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -6468,7 +6720,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -6487,6 +6739,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                             campaignId?: string | null;
                             campaignTitle?: string;
                             version: number;
@@ -8784,7 +9049,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -8885,7 +9150,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9419,7 +9684,7 @@ export interface operations {
                         scheduledAt: string | null;
                         scheduledPostId: string | null;
                         /** @description Delivery state of `scheduledPostId`. */
-                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                         specVersion: number | null;
                         /** @enum {string} */
                         status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9588,7 +9853,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9619,7 +9884,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9725,7 +9990,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -10224,6 +10489,73 @@ export interface operations {
             };
         };
     };
+    deleteContentDraftPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delete started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDeletion"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The caller may not publish to this account, or the key lacks `post:delete`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post was not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post is not live, or it was already deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createPost: {
         parameters: {
             query?: never;
@@ -10354,7 +10686,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10364,8 +10696,12 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10376,6 +10712,26 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
+                                        };
+                                        facebook?: {
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10409,6 +10765,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10440,6 +10797,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10463,7 +10822,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -10492,7 +10851,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10512,6 +10871,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */
@@ -10634,7 +11006,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10644,8 +11016,12 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10656,6 +11032,26 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
+                                        };
+                                        facebook?: {
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10689,6 +11085,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10720,6 +11117,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10743,7 +11142,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -10772,7 +11171,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10792,6 +11191,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */

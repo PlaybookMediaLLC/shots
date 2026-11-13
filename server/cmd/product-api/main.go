@@ -163,6 +163,7 @@ func main() {
 	}
 
 	configuration.WithBatchRuns(&temporalbatches.Client{Temporal: temporalClient})
+	configuration.WithPostDeletions(scheduler)
 	temporalonboarding.InitSentry("publishing-backend")
 	defer sentry.Flush(2 * time.Second)
 	// Without OPENROUTER_API_KEY the onboarding drafts come from page metadata.

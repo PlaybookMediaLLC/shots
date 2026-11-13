@@ -4,6 +4,7 @@ export const apiKeyScopes = [
   'draft:comment',
   'draft:write',
   'onboarding:run',
+  'post:delete',
   'post:publish',
   'post:schedule',
   'queue:write',
@@ -20,6 +21,7 @@ export const apiKeyScopePermissions: Record<ApiKeyScope, Record<string, string[]
   'draft:comment': { draft: ['comment'] },
   'draft:write': { draft: ['write'] },
   'onboarding:run': { onboarding: ['run'] },
+  'post:delete': { post: ['delete'] },
   'post:publish': { post: ['publish'] },
   'post:schedule': { post: ['schedule'] },
   'queue:write': { queue: ['write'] },
@@ -38,6 +40,8 @@ export const apiKeyScopeDescriptions: Record<ApiKeyScope, string> = {
   'draft:write':
     'Create, update, and delete content drafts. Posting to your accounts takes its own scope.',
   'onboarding:run': 'Read a product site into its profile and follow the run.',
+  'post:delete':
+    'Delete posts that Shots published from their platforms, with their thread parts, replies and reposts. Each delete is audited.',
   'post:publish':
     'Write and publish new posts to the accounts of your shared social sets, right away or at a time, with no review by a person unless the workspace requires approval. Cancelling them takes the scheduling scope too.',
   'post:schedule':
@@ -76,12 +80,12 @@ export const defaultAgentScopes: ApiKeyScope[] = [
 
 /**
  * What the consent page ticks for a client's request. `post:publish` puts words
- * on someone's public accounts, so only the person approving can tick it, even
- * when the client asks for it.
+ * on someone's public accounts and `post:delete` removes them, so only the
+ * person approving can tick them, even when the client asks for them.
  */
 export function preselectedAgentScopes(requested: readonly ApiKeyScope[]): ApiKeyScope[] {
   return (requested.length ? [...requested] : defaultAgentScopes).filter(
-    (scope) => scope !== 'post:publish'
+    (scope) => scope !== 'post:publish' && scope !== 'post:delete'
   )
 }
 

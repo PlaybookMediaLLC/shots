@@ -53,15 +53,20 @@ export function gridLayout({ height, width } = GRID_VIDEO) {
   return { cells, headline, panel }
 }
 
-/** The part of a source that covers a target, centred: what an image cell shows. */
+/**
+ * The part of a source that covers a target: what an image cell shows. Focus
+ * places it along each axis it does not fill, from 0 (start) to 1 (end);
+ * centred by default.
+ */
 export function coverCrop(
   source: { height: number; width: number },
-  target: { height: number; width: number }
+  target: { height: number; width: number },
+  focus: { x: number; y: number } = { x: 0.5, y: 0.5 }
 ): GridRect {
   const scale = Math.max(target.width / source.width, target.height / source.height)
   const width = target.width / scale
   const height = target.height / scale
-  return { height, width, x: (source.width - width) / 2, y: (source.height - height) / 2 }
+  return { height, width, x: (source.width - width) * focus.x, y: (source.height - height) * focus.y }
 }
 
 /** A fade-in video's frame: its headline, unless image only, above the image on the panel. */

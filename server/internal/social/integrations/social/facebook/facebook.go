@@ -212,6 +212,7 @@ func (p *Provider) ReConnect(ctx context.Context, id, requiredID, accessToken st
 		ID:          information.ID,
 		Name:        information.Name,
 		AccessToken: information.AccessToken,
+		NonExpiring: true,
 		Picture:     information.Picture,
 		Username:    information.Username,
 	}, nil
@@ -272,9 +273,11 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 		Name:         me.Name,
 		AccessToken:  accessToken,
 		RefreshToken: accessToken,
-		ExpiresIn:    ExpiresInDays(59),
-		Picture:      pic,
-		Username:     "",
+		// The long-lived user token only lists Pages; the Page token chosen
+		// next replaces it and, minted from a long-lived token, never expires.
+		NonExpiring: true,
+		Picture:     pic,
+		Username:    "",
 	}, nil
 }
 
