@@ -343,6 +343,12 @@ const orderedMenuItems = [
   },
 ];
 
+/** For an editor without the AI plugin, where Ask AI would call an API that is not there. */
+const menuItemsWithoutAI = orderedMenuItems.map((group) => ({
+  ...group,
+  items: group.items.filter((item) => item !== blockMenuItems.askAI),
+}));
+
 const mediaMenuItems = [
   {
     items: [blockMenuItems.comment, blockMenuItems.caption],
@@ -359,6 +365,7 @@ function BlockMenuItems() {
   const [searchValue] = useComboboxValueState();
   const selectedBlocks = useBlockSelectionNodes();
   const editor = useEditorRef();
+  const hasAI = Boolean(editor.plugins[AIChatPlugin.key]);
 
   const menuGroups = useMemo(() => {
     const isMedia =
@@ -367,10 +374,14 @@ function BlockMenuItems() {
         MEDIA_BLOCK_TYPES.has(String(item[0].type))
       );
 
-    const items = isMedia ? mediaMenuItems : orderedMenuItems;
+    const items = isMedia
+      ? mediaMenuItems
+      : hasAI
+        ? orderedMenuItems
+        : menuItemsWithoutAI;
 
     return filterMenuGroups(items, searchValue) || items;
-  }, [selectedBlocks, searchValue]);
+  }, [hasAI, selectedBlocks, searchValue]);
 
   return (
     <>
