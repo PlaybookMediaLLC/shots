@@ -28,10 +28,49 @@ export const GRID_HEADLINE_LIMIT = 60
 /** The most characters of a grid cell's label; Go's `batchGridTopicLimit`. */
 export const GRID_TOPIC_LIMIT = 100
 
-/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
-export const batchGridSchema = z.object({
-  headline: z.string().trim().min(1).max(GRID_HEADLINE_LIMIT),
+/** The most characters of a UGC video's overlay text; Go's `batchUGCTextLimit`. */
+export const UGC_TEXT_LIMIT = 150
+
+/** The latest a template's music may start; Go's `batchMusicStartLimit`. */
+export const MUSIC_START_LIMIT_MS = 10 * 60 * 1000
+
+/** Clip lengths a UGC video takes, to the tenth of a second; Go's `checkBatchGrid`. */
+export const UGC_CLIP_MS = { max: 60_000, min: 3_000 } as const
+
+/** Lengths of the clip shown after a UGC video. */
+export const UGC_CLOSING_MS = { max: 15_000, min: 3_000 } as const
+
+/** Where a UGC video's text sits. */
+export const overlayPositionSchema = z.enum(['top', 'middle', 'bottom'])
+
+/** Where a UGC video's text sits. */
+export type OverlayPosition = z.infer<typeof overlayPositionSchema>
+
+/** How many slots and characters of text each template takes; a grid is the default. */
+export const TEMPLATE_SHAPES = {
+  grid: { slots: 4, text: GRID_HEADLINE_LIMIT },
+  single: { slots: 1, text: GRID_HEADLINE_LIMIT },
+  ugc: { slots: 1, text: UGC_TEXT_LIMIT },
+} as const
+
+/**
+ * A template video concept. Without `kind` it is the 2x2 grid: a headline above
+ * four labelled images. `single` fades one image in under a headline, which
+ * `hideHeadline` leaves out while keeping it; `ugc` writes its text over the
+ * workspace's own clip, in its one slot, with an optional closing clip after.
+ * Music is optional and plays from `musicStartMs`.
+ */
+const conceptSchema = z.object({
+  closingAssetId: contentDraftIdSchema.optional(),
+  // Counted in code points below, as Go counts runes; this only bounds parsing.
+  headline: z
+    .string()
+    .trim()
+    .max(UGC_TEXT_LIMIT * 4),
+  hideHeadline: z.boolean().optional(),
+  kind: z.enum(['single', 'ugc']).optional(),
   musicAssetId: contentDraftIdSchema.optional(),
+  musicStartMs: z.number().int().min(0).max(MUSIC_START_LIMIT_MS).optional(),
   slots: z
     .array(
       z.object({
@@ -39,7 +78,52 @@ export const batchGridSchema = z.object({
         topic: z.string().max(GRID_TOPIC_LIMIT),
       })
     )
-    .length(4),
+    .min(1)
+    .max(4),
+  textPosition: overlayPositionSchema.optional(),
+})
+
+type ConceptFields = z.infer<typeof conceptSchema>
+
+/** Fields of other templates, which Go refuses on this one. */
+const FOREIGN_FIELDS = {
+  grid: ['hideHeadline', 'textPosition', 'closingAssetId'],
+  single: ['textPosition', 'closingAssetId'],
+  ugc: ['hideHeadline'],
+} as const
+
+/** A concept's slots and text against its kind's shape: [field, message] pairs, as Go refuses them. */
+function shapeIssues(grid: ConceptFields): [string, string][] {
+  const kind = grid.kind ?? 'grid'
+  const shape = TEMPLATE_SHAPES[kind]
+  const noun = kind === 'ugc' ? 'clip' : shape.slots === 1 ? 'image' : 'images'
+  // Counted in code points, as Go counts runes.
+  const length = [...grid.headline].length
+  return [
+    ...(grid.slots.length === shape.slots
+      ? []
+      : [['slots', `This video takes ${shape.slots} ${noun}.`] as [string, string]]),
+    ...(length > shape.text || (!length && !grid.hideHeadline)
+      ? [['headline', `A video needs text of 1 to ${shape.text} characters.`] as [string, string]]
+      : []),
+  ]
+}
+
+/** Fields that belong to another kind, and a music start without music. */
+function fieldIssues(grid: ConceptFields): [string, string][] {
+  const foreign = FOREIGN_FIELDS[grid.kind ?? 'grid'].filter((field) => grid[field])
+  return [
+    ...foreign.map((field): [string, string] => [field, `This video has no ${field}.`]),
+    ...(grid.musicStartMs && !grid.musicAssetId
+      ? [['musicStartMs', 'Music starts only with music.'] as [string, string]]
+      : []),
+  ]
+}
+
+/** {@link conceptSchema} as the API takes it, checked per kind as Go checks it. */
+export const batchGridSchema = conceptSchema.superRefine((grid, context) => {
+  for (const [path, message] of [...shapeIssues(grid), ...fieldIssues(grid)])
+    context.addIssue({ code: 'custom', message, path: [path] })
 })
 
 /** One of {@link batchGridSchema}. */

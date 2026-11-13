@@ -440,3 +440,33 @@ func TestDeleteContentDraftPost(t *testing.T) {
 		t.Fatalf("deleted post: %v, started=%v", err, starter.started)
 	}
 }
+
+// A post an API key queued publishes while the key stands, and stops once the
+// key is disabled: the key, not a person, is its scheduler.
+func TestKeyQueuedPostRechecksItsKeyWhenDue(t *testing.T) {
+	f := newPostFixture(t)
+	created, err := f.repo.CreatePost(f.ctx, f.key, f.input("Queued by an agent", f.li))
+	if err != nil || len(created.Scheduled) != 1 {
+		t.Fatalf("created=%+v err=%v", created, err)
+	}
+	post := created.Scheduled[0].ID
+	store := publishing.NewRepository(f.db.Client)
+	if claimed, err := store.Claim(f.ctx, post, "run-"+post, f.future.Add(time.Minute)); err != nil || !claimed {
+		t.Fatalf("claimed=%v err=%v", claimed, err)
+	}
+	reason := func() string {
+		t.Helper()
+		job, err := store.LoadPublishJob(f.ctx, post, "run-"+post)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return job.Ineligible
+	}
+	if got := reason(); got != "" {
+		t.Fatalf("a live key's post was refused: %q", got)
+	}
+	f.exec(t, `UPDATE apikey SET enabled=false WHERE id=$1`, f.key.KeyID)
+	if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+		t.Fatalf("a disabled key's post=%q", got)
+	}
+}

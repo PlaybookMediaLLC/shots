@@ -15,25 +15,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { normalizeAudioType } from '@/lib/animation/audio-type'
-import { MAX_AUDIO_BYTES } from '@/lib/animation/motion-schema'
 import {
   type BatchGrid,
   type BatchItem,
   type BatchItemInput,
-  type BatchRun,
   BATCH_ITEM_LIMIT,
   GRID_HEADLINE_LIMIT,
   GRID_TOPIC_LIMIT,
 } from '@/lib/api/contracts/content-batches'
-import { call } from '@/lib/content-drafts/client'
 import { assetContentUrl } from '@/lib/editor/services'
 import { runPool } from '@/lib/export/batch'
-import { zipFiles } from '@/lib/export/zip'
-import { downloadBlob } from '@/lib/image-tools/download'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { readAudioFile } from '@/lib/write/audio-trim'
 import {
   assembleConcepts,
   fillEmptySlots,
@@ -45,12 +40,16 @@ import {
   withLastCell,
   withSlot,
 } from '@/lib/write/grid-concepts'
+import { GRID_VIDEO } from '@/lib/write/grid-layout'
 import { GRID_PRESETS } from '@/lib/write/grid-presets'
-import { renderGridVideo } from '@/lib/write/grid-render'
 import { FilePicker } from './FilePicker'
+import { MusicTrim } from './MusicTrim'
+import type { ConceptRenderer } from './use-concept-render'
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
-const AUDIO_ACCEPT = 'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,audio/webm,.mp3,.m4a,.wav'
+/** Music files a template takes: what Go stores and browsers decode. */
+export const AUDIO_ACCEPT =
+  'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,audio/webm,.mp3,.m4a,.wav'
 /** Images drawn at once: quick, and well inside the per-minute AI limit. */
 const IMAGE_CONCURRENCY = 2
 /** What one image usually costs: a credit is a cent, and the fallback price is four cents. */
@@ -125,36 +124,35 @@ function LineList({
  * video being rendered. From then on it is an ordinary post of the batch.
  */
 export function GridCreator({
-  base,
   disabled,
   items,
-  lastRender,
   onAdd,
   onApply,
-  onReload,
   onUpdate,
+  renderer,
   sharedAccounts,
 }: {
-  /** The batch's API path. */
-  base: string
   disabled: boolean
   items: BatchItem[]
-  /** The batch's latest render, so its failures survive a reload. */
-  lastRender?: BatchRun
-  onReload: () => Promise<void>
   onAdd: (inputs: BatchItemInput[]) => Promise<void>
   onApply: (changes: ({ itemId: string } & Record<string, unknown>)[]) => Promise<void>
   onUpdate: (
     item: BatchItem,
     body: (latest: BatchItem) => Record<string, unknown>
   ) => Promise<unknown>
+  /** The batch's one renderer. */
+  renderer: ConceptRenderer
   sharedAccounts: string[]
 }) {
   const trpc = useTRPCClient()
-  const concepts = items.filter((item): item is Saved => Boolean(item.grid && !item.draftId))
+  const { download, downloadAll, progress, render, running, stop } = renderer
+  // Fade-in and UGC videos are template concepts too; they have their own creator.
+  const concepts = items.filter((item): item is Saved =>
+    Boolean(item.grid && !item.grid.kind && !item.draftId)
+  )
   // A saved draft's video can still be downloaded, though its concept no longer changes.
   const finished = items.filter((item): item is Saved =>
-    Boolean(item.grid && item.media.some((entry) => entry.assetId))
+    Boolean(item.grid && !item.grid.kind && item.media.some((entry) => entry.assetId))
   )
   const [stage, setStage] = React.useState<Stage>(concepts.length ? 'customize' : 'inputs')
 
@@ -353,20 +351,16 @@ export function GridCreator({
 
   const uploadMusic = async (file: File | undefined, targets: Saved[]) => {
     if (!file) return
-    const type = normalizeAudioType(file.type, file.name)
-    if (!type) {
-      toast.error('Choose an MP3, M4A/AAC, WAV, Ogg, or WebM audio file.')
-      return
-    }
-    if (file.size > MAX_AUDIO_BYTES) {
-      toast.error(`Choose an audio file under ${MAX_AUDIO_BYTES / 1024 / 1024} MB.`)
-      return
-    }
     setUploading('Uploading music…')
     try {
+      // Read as the renderer will, so a file this browser cannot play is refused now.
+      const type = await readAudioFile(file)
       const musicAssetId = await upload(new File([file], file.name, { type }))
       await onApply(
-        targets.map((item) => ({ grid: { ...item.grid, musicAssetId }, itemId: item.id }))
+        targets.map(({ grid: { musicStartMs: _start, ...grid }, id }) => ({
+          grid: { ...grid, musicAssetId },
+          itemId: id,
+        }))
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The music could not be uploaded.')
@@ -377,100 +371,16 @@ export function GridCreator({
 
   const removeMusic = () =>
     onApply(
-      concepts.map(({ grid: { musicAssetId: _gone, ...grid }, id }) => ({ grid, itemId: id }))
+      concepts.map(({ grid: { musicAssetId: _gone, musicStartMs: _start, ...grid }, id }) => ({
+        grid,
+        itemId: id,
+      }))
     )
 
   // Render: one video at a time, each saved on its item as soon as it is done.
-  const [progress, setProgress] = React.useState<Record<string, number | string>>(() =>
-    Object.fromEntries(
-      (lastRender?.items ?? []).flatMap((entry) =>
-        entry.status === 'FAILED' && entry.error ? [[entry.itemId, entry.error]] : []
-      )
-    )
-  )
-  const [running, setRunning] = React.useState(false)
-  const abort = React.useRef<AbortController | null>(null)
   const toRender = concepts.filter(
     (item) => gridReady(item.grid) && !item.media.some((entry) => entry.assetId)
   )
-
-  React.useEffect(() => {
-    if (!running) return
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [running])
-  React.useEffect(() => () => abort.current?.abort(), [])
-
-  const render = async () => {
-    const controller = new AbortController()
-    abort.current = controller
-    setRunning(true)
-    setProgress({})
-    try {
-      // The server freezes each concept, so a video cannot land on one that changed since.
-      const run = await call<BatchRun>(`${base}/renders`, {
-        body: {
-          itemIds: toRender.map((item) => item.id),
-          requestKey: `render-${crypto.randomUUID()}`,
-        },
-        method: 'POST',
-      })
-      const report = `${base}/renders/${encodeURIComponent(run.id)}/items`
-      await runPool(
-        run.items,
-        1,
-        async (entry) => {
-          const url = `${report}/${encodeURIComponent(entry.itemId)}`
-          try {
-            const blob = await renderGridVideo(entry.grid!, controller.signal, (fraction) =>
-              setProgress((current) => ({ ...current, [entry.itemId]: fraction }))
-            )
-            const item = concepts.find((candidate) => candidate.id === entry.itemId)
-            const fileName = `grid-video-${(item?.position ?? 0) + 1}.mp4`
-            const { assetId } = await saveExportToWorkspace({ blob, fileName, trpcClient: trpc })
-            await call(url, { body: { assetId, fileName }, method: 'POST' })
-            setProgress((current) => ({ ...current, [entry.itemId]: 1 }))
-            await onReload()
-          } catch (error) {
-            if (controller.signal.aborted) return
-            const message =
-              error instanceof Error ? error.message : 'This video could not be rendered.'
-            setProgress((current) => ({ ...current, [entry.itemId]: message }))
-            // Recorded so the failure is still here after a reload; losing the record is harmless.
-            await call(url, { body: { error: message }, method: 'POST' }).catch(() => undefined)
-          }
-        },
-        controller.signal
-      )
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The videos could not be rendered.')
-    } finally {
-      setRunning(false)
-    }
-  }
-
-  const fetchVideo = async (item: Saved) => {
-    const assetId = item.media.find((entry) => entry.assetId)?.assetId
-    const response = await fetch(assetContentUrl(assetId!))
-    if (!response.ok) throw new Error('A video could not be downloaded.')
-    return response.blob()
-  }
-  const videoName = (item: Saved) => `grid-video-${item.position + 1}.mp4`
-  const downloadAll = async () => {
-    try {
-      if (finished.length === 1) {
-        downloadBlob(await fetchVideo(finished[0]!), videoName(finished[0]!))
-        return
-      }
-      const entries = await Promise.all(
-        finished.map(async (item) => ({ data: await fetchVideo(item), path: videoName(item) }))
-      )
-      downloadBlob(await zipFiles(entries), 'grid-videos.zip')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The videos could not be downloaded.')
-    }
-  }
 
   const stages: { key: Stage; label: string }[] = [
     { key: 'inputs', label: 'Captions and items' },
@@ -682,7 +592,7 @@ export function GridCreator({
             <Row
               layout="stacked"
               label="Music"
-              description="Your own audio file, played from its start. Make sure you have the rights to use it. Videos without music are silent."
+              description="Your own audio file, from its start unless you trim it. Make sure you have the rights to use it. Videos without music are silent."
             >
               <div className="flex flex-wrap items-center gap-2">
                 <FilePicker
@@ -743,6 +653,21 @@ export function GridCreator({
                   >
                     {item.grid.musicAssetId ? 'Change music' : 'Add music'}
                   </FilePicker>
+                  {item.grid.musicAssetId ? (
+                    <MusicTrim
+                      key={item.grid.musicAssetId}
+                      assetId={item.grid.musicAssetId}
+                      disabled={disabled}
+                      label={`music for video ${conceptIndex + 1}`}
+                      startMs={item.grid.musicStartMs ?? 0}
+                      videoMs={GRID_VIDEO.seconds * 1000}
+                      onSave={(musicStartMs) =>
+                        onUpdate(item, (latest) => ({
+                          grid: { ...(latest.grid ?? item.grid), musicStartMs },
+                        }))
+                      }
+                    />
+                  ) : null}
                   <Button
                     aria-label={`New caption for video ${conceptIndex + 1}`}
                     disabled={disabled || regenerating === item.id}
@@ -868,12 +793,7 @@ export function GridCreator({
                               size="sm"
                               type="button"
                               variant="ghost"
-                              onClick={() =>
-                                void fetchVideo(item).then(
-                                  (blob) => downloadBlob(blob, videoName(item)),
-                                  () => toast.error('The video could not be downloaded.')
-                                )
-                              }
+                              onClick={() => void download(item)}
                             >
                               Download
                             </Button>
@@ -897,14 +817,14 @@ export function GridCreator({
           </Group>
           <div className="flex flex-wrap items-center gap-2">
             {running || toRender.length ? (
-              <Button disabled={running} onClick={() => void render()}>
+              <Button disabled={running} onClick={() => void render(toRender)}>
                 {running
                   ? 'Rendering…'
                   : `Render ${toRender.length} video${toRender.length === 1 ? '' : 's'}`}
               </Button>
             ) : null}
             {running ? (
-              <Button variant="outline" onClick={() => abort.current?.abort()}>
+              <Button variant="outline" onClick={stop}>
                 Stop
               </Button>
             ) : (
@@ -913,7 +833,11 @@ export function GridCreator({
               </Button>
             )}
             {finished.length ? (
-              <Button disabled={running} variant="outline" onClick={() => void downloadAll()}>
+              <Button
+                disabled={running}
+                variant="outline"
+                onClick={() => void downloadAll(finished, 'grid-videos.zip')}
+              >
                 Download all ({finished.length})
               </Button>
             ) : null}

@@ -1,6 +1,6 @@
 # Typefully implementation and verification record
 
-Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 32 Exists, 71 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. No live social-provider certification is claimed.
+Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 34 Exists, 69 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
 
 ## Develop integration
 
@@ -109,6 +109,19 @@ All browser commands use `/tmp/typefully-lifecycle.sh e2e <files> [--grep ...]` 
 
 The continuous test worker is compiled only with `-tags=e2e`, requires an explicitly opted-in loopback test database and isolated Temporal queues, and replaces only the last provider peer. Production account checks, commands, signing, activities, receipts, fanout and observation storage remain real. It cannot certify a native provider permission or app-review outcome. To reproduce that boundary, run `node test/e2e/fixtures/fake-social.mjs` with `SOCIAL_E2E_PORT`, the notification fixture from `test/e2e/fixtures/`, and `go test -tags=e2e ./internal/social/tenantpublishing -run '^TestTypefullyBrowserWorker$' -timeout=60m` with `TYPEFULLY_E2E_WORKER=1`, a loopback test `DATABASE_URL`, matching isolated Temporal queues, `SOCIAL_E2E_URL` and the existing storage/notification environment. The web/API/collaboration services and Playwright must target that same disposable database. Stop this fixture worker before restoring the normal app runtime.
 
+## Live provider evidence
+
+Coverage key **L1**. Each post was scheduled through Write from a local stack (not production), confirmed by its native receipt and public post, then deleted. Full records, workflow IDs and screenshots are in [social publishing verification](../../../social-publishing-verification.md).
+
+| Date (UTC) | Account | Content | Receipt | Deletion |
+|---|---|---|---|---|
+| 2026-11-03 20:36 | LinkedIn member `yoanyomba` | Image | `urn:li:share:7523483230369632256` | Removal verified by 20:38:06 |
+| 2026-11-03 20:38 | LinkedIn member `yoanyomba` | 8-second video, playback checked | `urn:li:ugcPost:7523483737280581632` | Removal verified by 20:45:43 |
+| 2026-11-03 21:59 | X `@yoanyombax` | Image | `2117738344759050285` | Removal verified by 22:00:02 |
+| 2026-11-03 22:01 | X `@yoanyombax` | 8-second video, playback checked | `2117738932251041793` | Removal verified by 22:02:11 |
+
+The same run also published to Instagram `@get.eigenn`, TikTok `@the_dark_lightskin` and YouTube `@getconduitt`; no Typefully row depends on those networks alone.
+
 ## Defects found and resolved during verification
 
 - Repurposing returned an empty editor. It now copies confirmed immutable publication text/media and posted replies, retains native PDF options, validates source visibility and excludes private later edits, approval and unfinished replies.
@@ -130,14 +143,14 @@ Initial test failures are retained in local logs. Regression checks also repaire
 
 | Boundary | Exact unresolved dependency |
 |---|---|
-| X | Registered app credentials, current access tier/read-write grant and account capability proof; Premium/Articles/video/reply restrictions cannot be inferred from a display badge. Mixed-image/video capability and provider transcoding remain unpromised. |
-| LinkedIn | Authorized member/page scopes and required app products/review for Posts, document upload, mentions, reposts, polls and analytics; no controlled live account was available. |
+| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video. Still unresolved: Premium long posts, Articles and restricted reply modes, which cannot be inferred from a display badge; native quotes, which need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`); and every other X option without a live post. Video length follows the verified `subscription_type` (20 minutes standard, 125 Premium; X docs read 2026-11-13) and needs a live long-video post. The X API does not allow photos and video in one post, and 1080p playback is X's choice. |
+| LinkedIn | Member publishing with `w_member_social` is live-verified on `yoanyomba` for images and video. Still unresolved: Page publishing, people mentions and Page analytics wait for LinkedIn's Community Management review of app 266682906; document upload, polls, reposts, first comments and company mentions have not run live. |
 | Threads / Instagram | Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
-| Mastodon | A real instance's advertised poll limits, API version/native-quote support and source quote permission; pending federation approval is not a failed root publication. |
+| Mastodon | A real instance's advertised poll limits, API version/native-quote support and source quote permission; pending federation approval is not a failed root publication. The server makes link cards and its API cannot turn them off. |
 | Bluesky | Authorized account and native record/CID resolution against a live PDS; protocol fixtures do not prove live remote behavior. |
 | Slack / email | Real workspace grant, destination access and delivery. The task verified controlled OAuth/HTTP peers with actual fanout/Temporal. |
 | AI / GIPHY | Production credentials and permitted models/search access; transcription accuracy and generated writing quality remain unverified. |
 | Native/external clients | Raycast macOS execution, Apple Shortcut import/signing, hosted Zapier workflows and ChatGPT/Claude directory approval require their external environments. |
-| Deferred products | Public analytics sharing is now implemented by develop with explicit enable and revoke. Auto-DM has a default-off ledger/adapter and still needs an accepted consent/abuse model and provider scope. Substack Notes alone remains Later because no supported official publishing contract is established. Five Typefully-specific products/releases remain Skip with reasons in coverage. |
+| Deferred products | Public analytics sharing is now implemented by develop with explicit enable and revoke. Auto-DM has a default-off ledger/adapter and still needs an accepted consent/abuse model and provider scope. Substack Notes alone remains Later: on 2026-11-13 Substack offered no public Notes publishing API, only access it grants to selected tools. Five Typefully-specific products/releases remain Skip with reasons in coverage. |
 
-Do not activate restricted provider features from fixture success. Supported local authoring, organization, media, scheduling controls, preferences, contracts and reports passed the recorded checks and can be reviewed behind current product gates. Publishing still requires a healthy authorized connection, applicable entitlement and approval. The build warnings above and the provider/native-client boundaries remain release considerations. API-key draft publishing and autonomous approval remain deliberately unavailable. No production deployment, live public post or vendor message has been performed. The user authorized a work PR and merge into develop; this does not authorize a production promotion.
+Do not activate restricted provider features from fixture success. Supported local authoring, organization, media, scheduling controls, preferences, contracts and reports passed the recorded checks and can be reviewed behind current product gates. Publishing still requires a healthy authorized connection, applicable entitlement and approval. The build warnings above and the provider/native-client boundaries remain release considerations. API-key draft publishing and autonomous approval remain deliberately unavailable. No production deployment or vendor message has been performed; the only live posts in this record are those under [Live provider evidence](#live-provider-evidence), each deleted after verification. The user authorized a work PR and merge into develop; this does not authorize a production promotion.

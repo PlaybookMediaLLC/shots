@@ -559,6 +559,7 @@ export function WriteComposer({
             maxWeightedCharacters: account.xCaptionLimit,
             articles: account.xArticles,
             xQuotes: account.xQuotes,
+            xVideoMaxSeconds: account.xVideoMaxSeconds,
             pollLimits: account.pollLimits,
             mastodonQuotes: account.mastodonQuotes,
           },
@@ -1918,8 +1919,19 @@ export function WriteComposer({
                 disabled={!canEdit}
                 onChange={(options) => setOptions(active, options)}
                 options={versionOfTab.options ?? {}}
+                uploadFile={services.uploadFile}
               />
             </section>
+          ) : null}
+          {active === 'instagram' && versionOfTab.options?.instagram?.placement === 'story' ? (
+            <p
+              className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
+              data-testid="story-notice"
+              role="status"
+            >
+              This Instagram post is a story: one image or video, shown for 24 hours, without this
+              text. The text goes to your other platforms.
+            </p>
           ) : null}
           {namedElsewhere ? (
             <p

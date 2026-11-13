@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
+import {
+  instagramOptionsSchema,
+  pinterestOptionsSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+} from 'screenshot-studio-backend-sdk'
 
 /**
  * The Write document (RFC 025): the structured parts of a content draft
@@ -17,6 +22,8 @@ export const draftChannelSchema = z.enum([
   'mastodon',
   'tiktok',
   'youtube',
+  'facebook',
+  'pinterest',
 ])
 
 /** One of {@link draftChannelSchema}. */
@@ -129,7 +136,8 @@ export const retweetRuleSchema = z.union([
   z.strictObject({ afterMinutes: z.number().int().min(1).max(43_200) }),
   z.strictObject({
     at: clockTimeSchema,
-    days: z.number().int().min(0).max(30),
+    // Older backends stored a same-day rule without days; it means 0.
+    days: z.number().int().min(0).max(30).default(0),
     timeZone: z.string().min(1).max(64),
   }),
 ])
@@ -162,6 +170,9 @@ export const automationSchema = z.strictObject({
 /** One of {@link automationSchema}. */
 export type Automation = z.infer<typeof automationSchema>
 
+/** The variables an Auto-DM message may use; Go's `autodm.Config.Validate` allows the same. */
+export const AUTO_DM_VARIABLES = ['first_name', 'full_name', 'username', 'action', 'post_url']
+
 /** Prepared Auto-DM settings. Delivery is disabled until authorized provider access is configured. */
 export const autoDmSchema = z
   .strictObject({
@@ -169,10 +180,23 @@ export const autoDmSchema = z
     reposts: z.boolean(),
     replies: z.boolean(),
     requireFollow: z.boolean(),
-    replyText: z.string().max(100).optional(),
-    message: z.string().min(1).max(10_000),
+    replyText: z.string().max(100, 'Keep the reply text to 100 characters.').optional(),
+    message: z
+      .string()
+      .min(1)
+      .max(10_000, 'Keep the message to 10,000 characters.')
+      // Not blank by Go's strings.TrimSpace: U+0085 is space there, U+FEFF is not.
+      .refine((message) => /[^\s\u0085]|\uFEFF/.test(message), 'Write the message.')
+      .refine(
+        (message) =>
+          [...message.matchAll(/\{\{([^{}]+)\}\}/g)].every(([, name]) =>
+            AUTO_DM_VARIABLES.includes(name)
+          ),
+        'Use only the listed variables.'
+      ),
   })
   .refine((value) => value.replies || value.reposts, 'Choose replies or reposts.')
+  .refine((value) => !value.replyText || value.replies, 'A reply filter needs replies.')
 /** One prepared campaign configuration. */
 export type AutoDm = z.infer<typeof autoDmSchema>
 
@@ -180,6 +204,10 @@ export type AutoDm = z.infer<typeof autoDmSchema>
 export const versionOptionsSchema = z.strictObject({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
+  /** Instagram: collaborators, tags, and a reel's cover, grid and trial. */
+  instagram: instagramOptionsSchema.optional(),
+  /** Pinterest: the pin's board, title and link. */
+  pinterest: pinterestOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),

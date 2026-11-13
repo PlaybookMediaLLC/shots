@@ -16,6 +16,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdrafttag"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
@@ -568,17 +569,56 @@ type ContentDraftActivity struct {
 	EntityID  string         `json:"entityId"`
 	ID        string         `json:"id"`
 	Metadata  map[string]any `json:"metadata"`
+	// Source is who or what made the change: person, api, mcp, workflow,
+	// callback, support, or automation for any other service.
+	Source string `json:"source"`
+}
+
+// ContentDraftActivityPage is one page of a draft's history, newest first.
+type ContentDraftActivityPage struct {
+	Items      []ContentDraftActivity `json:"items"`
+	NextCursor *string                `json:"nextCursor"`
+}
+
+// contentDraftActivityPageSize is how many events a page of history holds.
+const contentDraftActivityPageSize = 50
+
+// activitySource labels who or what made an audited change, from the row's
+// actor type and the safe source label automated writers record.
+func activitySource(row *ent.AuditLog) string {
+	switch row.ActorType {
+	case auditlog.ActorTypeUSER:
+		return "person"
+	case auditlog.ActorTypeSUPPORT:
+		return "support"
+	case auditlog.ActorTypeWEBHOOK:
+		return "callback"
+	}
+	if source, _ := row.Metadata["actorSource"].(string); slices.Contains([]string{"api", "mcp", "workflow", "callback"}, source) {
+		return source
+	}
+	// Rows written before sources were recorded name these writers.
+	if row.ActorDisplay != nil {
+		switch *row.ActorDisplay {
+		case "publishing-orchestrator":
+			return "workflow"
+		case "provider callback":
+			return "callback"
+		}
+	}
+	return "automation"
 }
 
 // activityMetadataKeys are the metadata a timeline may show.
 var activityMetadataKeys = []string{"action", "cancelledPostIds", "changed", "cleared", "fields", "from", "kind", "newDraftId",
 	"plannedFor", "posted", "reason", "revisionId", "scheduledFor", "scheduledPostIds", "socialSetId", "sourceDraftId",
-	"timeZone", "version", "enabled", "contentDraftId", "failureCode", "outcome"}
+	"timeZone", "version", "enabled", "contentDraftId", "failureCode", "outcome", "resolved"}
 
-// ListContentDraftActivity reads a draft's history from the audit log: the
-// draft's own events and those of the posts scheduled from it, newest first.
+// ListContentDraftActivity reads a page of a draft's history from the audit
+// log: the draft's own events and those of the posts scheduled from it, newest
+// first (by time, then id). cursor is the previous page's NextCursor, or empty.
 // Reading a draft writes nothing, so viewing is never activity.
-func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Actor, draftID string) ([]ContentDraftActivity, error) {
+func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Actor, draftID, cursor string) (*ContentDraftActivityPage, error) {
 	if err := c.authorizeContentDrafts(ctx, actor, false); err != nil {
 		return nil, err
 	}
@@ -590,12 +630,44 @@ func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Acto
 	if err != nil {
 		return nil, err
 	}
-	rows, err := c.client.AuditLog.Query().Where(auditlog.OrganizationID(actor.OrganizationID), auditlog.Or(
-		auditlog.And(auditlog.EntityType("content_draft"), auditlog.EntityID(draftID)),
-		auditlog.And(auditlog.EntityType("scheduled_post"), auditlog.EntityIDIn(postIDs...)))).
-		Order(ent.Desc(auditlog.FieldCreatedAt), ent.Desc(auditlog.FieldID)).Limit(200).All(ctx)
+	var after []predicate.AuditLog
+	if cursor != "" {
+		at, id, err := decodeTimeCursor(cursor)
+		if err != nil {
+			return nil, err
+		}
+		// The upper bound lets the entity index stop the scan at the cursor.
+		after = []predicate.AuditLog{auditlog.CreatedAtLTE(at), auditlog.Or(auditlog.CreatedAtLT(at), auditlog.IDLT(id))}
+	}
+	// The draft's events and its posts' are read apart, each on its entity
+	// index, and merged: one OR query walks the workspace's whole log instead.
+	branch := func(entity predicate.AuditLog) ([]*ent.AuditLog, error) {
+		return c.client.AuditLog.Query().Where(append(after, auditlog.OrganizationID(actor.OrganizationID), entity)...).
+			Order(ent.Desc(auditlog.FieldCreatedAt), ent.Desc(auditlog.FieldID)).Limit(contentDraftActivityPageSize + 1).All(ctx)
+	}
+	rows, err := branch(auditlog.And(auditlog.EntityType("content_draft"), auditlog.EntityID(draftID)))
 	if err != nil {
 		return nil, err
+	}
+	if len(postIDs) > 0 {
+		posts, err := branch(auditlog.And(auditlog.EntityType("scheduled_post"), auditlog.EntityIDIn(postIDs...)))
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, posts...)
+		slices.SortFunc(rows, func(a, b *ent.AuditLog) int {
+			if order := b.CreatedAt.Compare(a.CreatedAt); order != 0 {
+				return order
+			}
+			return strings.Compare(b.ID, a.ID)
+		})
+	}
+	page := &ContentDraftActivityPage{}
+	if len(rows) > contentDraftActivityPageSize {
+		rows = rows[:contentDraftActivityPageSize]
+		last := rows[len(rows)-1]
+		next := encodeTimeCursor(last.CreatedAt, last.ID)
+		page.NextCursor = &next
 	}
 	people := map[string]*string{}
 	for _, row := range rows {
@@ -624,7 +696,7 @@ func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Acto
 			}
 		}
 		item := ContentDraftActivity{Action: row.Action, ActorType: string(row.ActorType), ActorID: row.ActorUserID,
-			At: row.CreatedAt, ID: row.ID, Metadata: metadata}
+			At: row.CreatedAt, ID: row.ID, Metadata: metadata, Source: activitySource(row)}
 		if row.EntityID != nil {
 			item.EntityID = *row.EntityID
 		}
@@ -633,7 +705,8 @@ func (c *Configuration) ListContentDraftActivity(ctx context.Context, actor Acto
 		}
 		items = append(items, item)
 	}
-	return items, nil
+	page.Items = items
+	return page, nil
 }
 
 // ContentDraftTagRecord is a set's tag.

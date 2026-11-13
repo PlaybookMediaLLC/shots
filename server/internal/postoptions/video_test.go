@@ -3,6 +3,7 @@ package postoptions
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -82,5 +83,49 @@ func TestTikTokCreatorRechecksAccountRestrictions(t *testing.T) {
 	var missing *TikTokCreator
 	if missing.Check(o, 5000) == nil {
 		t.Fatal("missing creator accepted")
+	}
+}
+
+func TestYouTubeTagsCountAsYouTubeDoes(t *testing.T) {
+	// Two tags: 4 + "a b" quoted (3+2) + one comma.
+	if got := YouTubeTagsLength([]string{"news", "a b"}); got != 10 {
+		t.Fatalf("length = %d, want 10", got)
+	}
+	if YouTubeTagsLength(nil) != 0 {
+		t.Fatal("no tags have no length")
+	}
+	no := false
+	base := YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no}
+	full := make([]string, 100) // 100×4 + 99 commas = 499
+	for i := range full {
+		full[i] = fmt.Sprintf("t%03d", i)
+	}
+	over := append(append([]string{}, full...), "x")
+	draft := base
+	draft.Tags = over
+	if err := ValidateVideoOptions("youtube", &draft, nil, false); err != nil {
+		t.Fatalf("a draft over the tag limit must still save: %v", err)
+	}
+	for _, tc := range []struct {
+		name  string
+		tags  []string
+		valid bool
+	}{
+		{"499 characters", full, true},
+		{"501 characters", append(append([]string{}, full...), "x"), false},
+		{"500 with a quoted tag", append(append([]string{}, full[:99]...), "a b"), true},
+		{"comma inside a tag", []string{"a,b"}, false},
+		{"blank tag", []string{" "}, false},
+		{"padded tag", []string{" launch"}, false},
+		{"repeated tag", []string{"Launch", "launch"}, false},
+		{"angle bracket", []string{"<b>"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := base
+			options.Tags = tc.tags
+			if err := ValidateVideoOptions("youtube", &options, nil, true); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
 	}
 }

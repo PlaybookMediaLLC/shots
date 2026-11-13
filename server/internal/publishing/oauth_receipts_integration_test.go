@@ -69,7 +69,7 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 			return
 		}
 		for _, workspace := range []string{org, other} {
-			for _, table := range []string{"audit_log", "outbox_event", "social_oauth_start", "channel_connection", "social_set"} {
+			for _, table := range []string{"audit_log", "outbox_event", "social_oauth_start", "content_draft", "channel_connection", "social_set"} {
 				if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE "organizationId"=$1`, workspace); err != nil {
 					t.Errorf("cleanup %s: %v", table, err)
 				}
@@ -446,6 +446,234 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 			t.Fatal("revoked authority prepared reconnect")
 		}
 		exec(`UPDATE member SET role='admin' WHERE "organizationId"=$1 AND "userId"=$2`, org, user)
+	})
+
+	connect := func(set *ent.SocialSet) (*ent.ChannelConnection, string) {
+		t.Helper()
+		state := begin(set, nil)
+		external := "external-" + state
+		exchange(state, external)
+		connection, err := finish(state, external)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return connection, external
+	}
+	t.Run("an account in another set is refused and a failed check changes nothing", func(t *testing.T) {
+		first, second := makeSet(false), makeSet(true)
+		connection, external := connect(first)
+		draft, err := db.Client.ContentDraft.Create().SetID(cuid.New()).SetOrganizationID(org).SetTitle("Kept").SetBody([]any{}).
+			SetPlainText("Kept").SetAssetIds([]string{}).SetChannelConnectionIds([]string{connection.ID}).SetSocialSetID(first.ID).Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot := func() string {
+			t.Helper()
+			var row string
+			if err := db.SQL.QueryRowContext(ctx, `SELECT row_to_json(s)::text || row_to_json(c)::text || row_to_json(d)::text ||
+				(SELECT count(*) FROM audit_log WHERE "organizationId"=$4)::text || (SELECT count(*) FROM outbox_event WHERE "organizationId"=$4)::text
+				FROM social_set s, channel_connection c, content_draft d WHERE s.id=$1 AND c.id=$2 AND d.id=$3`,
+				first.ID, connection.ID, draft.ID, org).Scan(&row); err != nil {
+				t.Fatal(err)
+			}
+			return row
+		}
+		before, sets := snapshot(), setCount()
+		add := begin(second, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); !errors.Is(err, ErrAccountInAnotherSet) {
+			t.Fatalf("account joined a second set: %v", err)
+		}
+		create := beginCreation("PRIVATE")
+		exchange(create, external)
+		if _, err := finish(create, external); !errors.Is(err, ErrAccountInAnotherSet) {
+			t.Fatalf("account created a second set: %v", err)
+		}
+		// A failed credential check stops before any product write.
+		failed := begin(second, nil)
+		if _, err := repo.ClaimOAuthExchange(ctx, actor, sessionID, failed, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SaveOAuthExchange(ctx, actor, sessionID, failed, "x", schema.SocialOAuthExchange{ID: external}); !errors.Is(err, ErrConflict) {
+			t.Fatalf("unverified receipt=%v", err)
+		}
+		if _, err := finish(failed, external); !errors.Is(err, ErrConflict) {
+			t.Fatalf("failed verification completed: %v", err)
+		}
+		if after := snapshot(); after != before || setCount() != sets {
+			t.Fatalf("refused connections changed content:\n%s\n%s", before, after)
+		}
+		if count, err := db.Client.ChannelConnection.Query().Where(channelconnection.SocialSetID(second.ID)).Count(ctx); err != nil || count != 0 {
+			t.Fatalf("second set accounts=%d %v", count, err)
+		}
+	})
+	reread := func(id string) *ent.ChannelConnection {
+		t.Helper()
+		row, err := db.Client.ChannelConnection.Get(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row
+	}
+	inSet := func(row *ent.ChannelConnection, set string) bool {
+		return row.SocialSetID != nil && *row.SocialSetID == set && row.Status == channelconnection.StatusACTIVE
+	}
+	restoredAudits := func(id string) int {
+		t.Helper()
+		var count int
+		if err := db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM audit_log WHERE "entityId"=$1 AND action='post.connection_restored'`, id).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	// remove mirrors removing an account from its set: disabled, and gone from the set's defaults.
+	remove := func(connection *ent.ChannelConnection) {
+		t.Helper()
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "defaultPlatforms"='[]'::jsonb, "primaryPlatform"=NULL WHERE id=$1`, *connection.SocialSetID)
+	}
+	t.Run("an account no set holds joins the set it is connected to", func(t *testing.T) {
+		gone, next := makeSet(false), makeSet(false)
+		connection, external := connect(gone)
+		// Deleting a set disables its accounts and keeps the set row.
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "deletedAt"=now() WHERE id=$1`, gone.ID)
+		add := begin(next, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); err != nil {
+			t.Fatal(err)
+		}
+		if row := reread(connection.ID); !inSet(row, next.ID) || restoredAudits(connection.ID) != 1 {
+			t.Fatalf("account stayed with its deleted set: %+v", row)
+		}
+		if set := db.Client.SocialSet.GetX(ctx, next.ID); len(set.DefaultPlatforms) != 1 || set.DefaultPlatforms[0] != "x" || set.PrimaryPlatform == nil || *set.PrimaryPlatform != "x" {
+			t.Fatalf("joined set did not default to the account: %+v", set)
+		}
+		// An active account with no set joins the set it is added to.
+		exec(`UPDATE channel_connection SET "socialSetId"=NULL WHERE id=$1`, connection.ID)
+		third := makeSet(false)
+		add = begin(third, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); err != nil || !inSet(reread(connection.ID), third.ID) {
+			t.Fatalf("set-less account did not join: %v", err)
+		}
+		// Creating a profile with an account no set holds puts it in the new profile.
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "deletedAt"=now() WHERE id=$1`, third.ID)
+		sets := setCount()
+		create := beginCreation("PRIVATE")
+		exchange(create, external)
+		if _, err := finish(create, external); err != nil || setCount() != sets+1 {
+			t.Fatalf("creation did not adopt the account: %v", err)
+		}
+		row := reread(connection.ID)
+		target, err := repo.ResolveOAuthContext(ctx, user, sessionID, create, "x")
+		if err != nil || row.SocialSetID == nil || !target.Completed || target.SocialSetID == nil || *target.SocialSetID != *row.SocialSetID {
+			t.Fatalf("creation receipt=%+v row=%+v %v", target, row, err)
+		}
+		if created := db.Client.SocialSet.GetX(ctx, *row.SocialSetID); created.Visibility != socialset.VisibilityPRIVATE || created.OwnerUserID == nil || *created.OwnerUserID != user {
+			t.Fatalf("adopting profile lost its owner: %+v", created)
+		}
+	})
+	t.Run("another person's deleted private set keeps its account", func(t *testing.T) {
+		theirs, mine := makeSet(true), makeSet(false)
+		connection, external := connect(theirs)
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "ownerUserId"=$2, "deletedAt"=now() WHERE id=$1`, theirs.ID, "other-"+user)
+		add := begin(mine, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); !errors.Is(err, ErrAccountRemovedFromAnotherSet) {
+			t.Fatalf("private history moved with the account: %v", err)
+		}
+		if row := reread(connection.ID); row.SocialSetID == nil || *row.SocialSetID != theirs.ID || row.Status != channelconnection.StatusDISABLED {
+			t.Fatalf("refused account changed: %+v", row)
+		}
+	})
+	t.Run("an account removed from a live set reconnects only from that set", func(t *testing.T) {
+		home, other := makeSet(false), makeSet(false)
+		connection, external := connect(home)
+		remove(connection)
+		add := begin(other, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); !errors.Is(err, ErrAccountRemovedFromAnotherSet) {
+			t.Fatalf("removed account moved sets: %v", err)
+		}
+		sets := setCount()
+		create := beginCreation("PRIVATE")
+		exchange(create, external)
+		if _, err := finish(create, external); !errors.Is(err, ErrAccountRemovedFromAnotherSet) || setCount() != sets {
+			t.Fatalf("removed account created a profile: %v", err)
+		}
+		back := begin(home, &connection.ID)
+		exchange(back, external)
+		if _, err := finish(back, external); err != nil {
+			t.Fatal(err)
+		}
+		if row := reread(connection.ID); !inSet(row, home.ID) || restoredAudits(connection.ID) != 1 {
+			t.Fatalf("home reconnect=%+v", row)
+		}
+		if set := db.Client.SocialSet.GetX(ctx, home.ID); len(set.DefaultPlatforms) != 1 || set.DefaultPlatforms[0] != "x" {
+			t.Fatalf("restored account is not a default again: %+v", set.DefaultPlatforms)
+		}
+		// Another X account in its slot keeps it out until that one is removed.
+		remove(connection)
+		blocker, _ := connect(home)
+		back = begin(home, &connection.ID)
+		exchange(back, external)
+		if _, err := finish(back, external); !errors.Is(err, ErrSocialSetSlotTaken) {
+			t.Fatalf("restore took an occupied slot: %v", err)
+		}
+		if row := reread(connection.ID); row.Status != channelconnection.StatusDISABLED || !inSet(reread(blocker.ID), home.ID) {
+			t.Fatalf("slot conflict changed accounts: %+v", row)
+		}
+	})
+	t.Run("a legacy twitter account reconnects through x", func(t *testing.T) {
+		set := makeSet(false)
+		connection, external := connect(set)
+		exec(`UPDATE channel_connection SET platform='twitter' WHERE id=$1`, connection.ID)
+		options := OAuthStartOptions{Operation: "RECONNECT", SocialSetID: &set.ID, ExpectedConnectionID: &connection.ID}
+		if original, err := repo.PrepareOAuth(ctx, actor, sessionID, "x", options); err != nil || original != external {
+			t.Fatalf("twitter account could not prepare an X reconnect: %q %v", original, err)
+		}
+		state := begin(set, &connection.ID)
+		exchange(state, external)
+		if _, err := finish(state, external); err != nil || reread(connection.ID).Platform != "x" {
+			t.Fatalf("active twitter reconnect: %v", err)
+		}
+		// A removed legacy account is restored and renamed too.
+		exec(`UPDATE channel_connection SET platform='twitter', status='DISABLED' WHERE id=$1`, connection.ID)
+		state = begin(set, &connection.ID)
+		exchange(state, external)
+		if _, err := finish(state, external); err != nil {
+			t.Fatal(err)
+		}
+		if row := reread(connection.ID); row.Platform != "x" || !inSet(row, set.ID) {
+			t.Fatalf("restored twitter account=%+v", row)
+		}
+	})
+	t.Run("another workspace connects the same account with its own grant", func(t *testing.T) {
+		mine := makeSet(false)
+		_, external := connect(mine)
+		elsewhere := Actor{Organization: other, UserID: user, Type: "USER", RequestID: id}
+		exec(`UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, sessionID, other)
+		theirs, err := db.Client.SocialSet.Create().SetID(cuid.New()).SetOrganizationID(other).SetName("Other workspace").SetPublicSlug(cuid.New()).Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state := cuid.New()
+		if err := repo.StartOAuth(ctx, elsewhere, sessionID, state, "x", "SOCIAL_OAUTH_FIXTURE", OAuthStartOptions{SocialSetID: &theirs.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.ClaimOAuthExchange(ctx, elsewhere, sessionID, state, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SaveOAuthExchange(ctx, elsewhere, sessionID, state, "x", verifiedXReceipt(external)); err != nil {
+			t.Fatal(err)
+		}
+		connection, err := repo.FinishOAuth(ctx, elsewhere, sessionID, state, "x", external)
+		if err != nil || connection.OrganizationID != other || !inSet(connection, theirs.ID) {
+			t.Fatalf("second workspace=%+v %v", connection, err)
+		}
 	})
 
 }

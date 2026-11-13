@@ -24,10 +24,19 @@ const secretReference = 'SOCIAL_API_KEY_GATE'
 const fakeURL = process.env.E2E_SOCIAL_GATE_FAKE_URL ?? 'http://127.0.0.1:5680'
 
 const fakeStateSchema = z.object({
+  actions: z.array(
+    z.object({
+      kind: z.string(),
+      postId: z.string(),
+      media: z.object({ sha256: z.string() }).optional(),
+      text: z.string().optional(),
+    })
+  ),
   posts: z.array(
     z.object({
       caption: z.string(),
       id: z.string(),
+      platform: z.string().optional(),
       media: z.array(
         z.object({
           bytes: z.number(),
@@ -37,6 +46,15 @@ const fakeStateSchema = z.object({
           signedAt: z.string(),
         })
       ),
+      settings: z
+        .object({
+          board: z.string().optional(),
+          containsSyntheticMedia: z.boolean().optional(),
+          link: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          title: z.string().optional(),
+        })
+        .optional(),
     })
   ),
   requests: z.number(),
@@ -46,7 +64,9 @@ async function fakeState() {
   return fakeStateSchema.parse(await (await fetch(`${fakeURL}/state`)).json())
 }
 
-async function resetFake(mode: 'normal' | 'throttle-once' | 'server-error-once'): Promise<void> {
+async function resetFake(
+  mode: 'normal' | 'throttle-once' | 'server-error-once' | 'refuse-thumbnail'
+): Promise<void> {
   const response = await fetch(`${fakeURL}/control`, {
     body: JSON.stringify({ mode }),
     headers: { 'Content-Type': 'application/json' },
@@ -68,7 +88,9 @@ async function readBootstrap() {
     .object({
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
+      facebookDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
+      pinterestDestinationId: z.string().min(1),
       tiktokDestinationId: z.string().min(1),
       youtubeDestinationId: z.string().min(1),
     })
@@ -337,7 +359,14 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         media: [clip],
         connectionId: youtubeConnection,
         channel: 'youtube',
-        options: { youtube: { title: 'Fixture video', privacy: 'private', madeForKids: false } },
+        options: {
+          youtube: {
+            title: 'Fixture video',
+            privacy: 'private',
+            madeForKids: false,
+            thumbnailAssetId: expect.any(String),
+          },
+        },
       },
       // Not the upload order, so the post's order is the draft's.
       { caption: 'Three images, in order.', media: [first, photo, last] },
@@ -392,6 +421,11 @@ test('the backend worker publishes draft photos, video, and ordered images once 
           await page.getByRole('option', { name: 'Private', exact: true }).click()
           await page.getByRole('combobox', { name: 'YouTube audience' }).click()
           await page.getByRole('option', { name: 'Not made for kids', exact: true }).click()
+          // The thumbnail is chosen beside the other settings and set once the video is live.
+          await page
+            .getByLabel('Custom thumbnail')
+            .setInputFiles({ name: 'thumbnail.png', mimeType: 'image/png', buffer: png })
+          await expect(page.getByTestId('required-options')).toContainText('Custom thumbnail added')
         } else {
           await page.getByRole('combobox', { name: 'TikTok privacy' }).click()
           await page.getByRole('option', { name: 'Only me', exact: true }).click()
@@ -464,7 +498,235 @@ test('the backend worker publishes draft photos, video, and ordered images once 
       const [attempt, ...extraAttempts] = await attemptsOf(postIds[index]!)
       expect(extraAttempts).toHaveLength(0)
       expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+      if (draft.channel === 'youtube') {
+        // PB-03: the thumbnail follow-up set the uploaded image on the live video.
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.row<{ status: string }>(
+                  `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+                  [postIds[index]]
+                )
+              )?.status,
+            { intervals: [1_000], timeout: 120_000 }
+          )
+          .toBe('done')
+        const set = (await fakeState()).actions.filter(
+          (action) => action.kind === 'thumbnail' && action.postId === received?.id
+        )
+        expect(set).toEqual([
+          expect.objectContaining({ media: expect.objectContaining({ sha256: sha256(png) }) }),
+        ])
+      }
     }
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('PB-03: a refused YouTube thumbnail leaves the video published and shows the failed follow-up', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('refuse-thumbnail')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const youtube = await connect(page, bootstrap.youtubeDestinationId, 'youtube')
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
+    const clip = await createUploadedAsset(page, mp4, 'video/mp4', 'clip.mp4')
+    const thumbnail = await createUploadedAsset(page, png, 'image/png', 'thumbnail.png')
+    const options = {
+      youtube: {
+        title: 'Fixture video',
+        privacy: 'private',
+        madeForKids: false,
+        tags: ['launch', 'product demo'],
+        containsSyntheticMedia: true,
+        thumbnailAssetId: thumbnail,
+      },
+    }
+    const caption = 'A video whose thumbnail YouTube refuses.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [clip],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: clip,
+            children: [{ text: '' }],
+            mimeType: 'video/mp4',
+            type: 'video',
+            url: `/api/v1/assets/${clip}/content`,
+          },
+        ],
+        channelConnectionIds: [youtube],
+        primaryPlatform: 'youtube',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [{ channel: 'youtube', mode: 'synced', options }],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const draft = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+    const response = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      body: {
+        channelConnectionIds: [youtube],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version: draft.version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const postId = z.object({ posts: z.array(z.object({ id: z.string() })) }).parse(response.body)
+      .posts[0]!.id
+    await awaitStatus(postId, 'PUBLISHED')
+    // The tags and disclosure went with the upload.
+    const received = (await fakeState()).posts.find((post) => post.caption === caption)
+    expect(received?.settings).toEqual({
+      containsSyntheticMedia: true,
+      tags: ['launch', 'product demo'],
+      title: 'Fixture video',
+    })
+    // The thumbnail is its own follow-up: refused and recorded, the video still live.
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.row<{ status: string }>(
+              `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+              [postId]
+            )
+          )?.status,
+        { intervals: [1_000], timeout: 120_000 }
+      )
+      .toBe('failed')
+    expect(await statusOf(postId)).toBe('PUBLISHED')
+    await page.goto(`/publish/${draft.id}`)
+    const followUp = page.getByTestId('follow-up').filter({ hasText: 'Custom thumbnail' })
+    await expect(followUp).toContainText('failed')
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a pin goes to the board chosen in the composer, and a Facebook Page post takes its first comment', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const pinterest = await connect(page, bootstrap.pinterestDestinationId, 'pinterest')
+    const image = await createUploadedAsset(page, png, 'image/png', 'pin.png')
+    const caption = 'Launch day, on the page and the board.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, pinterest],
+        primaryPlatform: 'facebook',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [
+            {
+              channel: 'facebook',
+              mode: 'synced',
+              options: { firstComment: 'Link in the comments' },
+            },
+            // A board saved earlier that the account no longer has.
+            { channel: 'pinterest', mode: 'synced', options: { pinterest: { boardId: '9999' } } },
+          ],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The board comes from the Pinterest account's own list, read through Go. A
+    // failed read says so and offers to try again; it never shows an empty list.
+    const boards = '**/api/v1/social-sets/*/pinterest-boards'
+    await page.route(boards, (route) =>
+      route.fulfill({ status: 502, json: { error: 'Pinterest did not answer.' } })
+    )
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-pinterest').click()
+    await page.getByTestId('options-chip').click()
+    const options = page.getByTestId('pinterest-options')
+    await expect(options.getByRole('alert')).toBeVisible()
+    await page.unroute(boards)
+    await options.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(options).toContainText('no longer on this Pinterest account')
+    await chooseOption(options.getByRole('combobox', { name: 'Pinterest board' }), 'Launch ideas')
+    await expect(options).not.toContainText('no longer on this Pinterest account')
+    await options.getByLabel('Pin title').fill('Launch day')
+    await options.getByLabel('Link').fill('https://shots.example/launch')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, pinterest],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const state = await fakeState()
+    const received = state.posts.filter((post) => post.caption === caption)
+    expect(received).toHaveLength(2)
+    expect(received.map((post) => post.media.length)).toEqual([1, 1])
+    const pin = received.find((post) => post.platform === 'pinterest')
+    const pagePost = received.find((post) => post.platform === 'facebook')
+    expect(pin?.settings).toEqual({
+      board: '1001',
+      link: 'https://shots.example/launch',
+      title: 'Launch day',
+    })
+    expect(pagePost?.settings).toEqual({})
+    // The first comment is the Page post's follow-up, on that live post only.
+    await expect
+      .poll(async () => (await fakeState()).actions.filter((action) => action.kind === 'comment'), {
+        intervals: [1_000],
+        timeout: 120_000,
+      })
+      .toEqual([expect.objectContaining({ postId: pagePost?.id, text: 'Link in the comments' })])
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

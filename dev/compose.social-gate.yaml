@@ -43,6 +43,10 @@ services:
       TIKTOK_CLIENT_SECRET: fixture
       YOUTUBE_CLIENT_ID: fixture
       YOUTUBE_CLIENT_SECRET: fixture
+      FACEBOOK_APP_ID: fixture
+      FACEBOOK_APP_SECRET: fixture
+      PINTEREST_CLIENT_ID: fixture
+      PINTEREST_CLIENT_SECRET: fixture
       R2_ENDPOINT: http://rustfs:9000
       R2_DELIVERY_ENDPOINT: http://rustfs:9000
       R2_BROWSER_ENDPOINT: http://localhost:9013
@@ -72,6 +76,10 @@ services:
       TIKTOK_CLIENT_SECRET: fixture
       YOUTUBE_CLIENT_ID: fixture
       YOUTUBE_CLIENT_SECRET: fixture
+      FACEBOOK_APP_ID: fixture
+      FACEBOOK_APP_SECRET: fixture
+      PINTEREST_CLIENT_ID: fixture
+      PINTEREST_CLIENT_SECRET: fixture
       R2_ENDPOINT: http://rustfs:9000
       R2_DELIVERY_ENDPOINT: http://rustfs:9000
       R2_BROWSER_ENDPOINT: http://localhost:9013
