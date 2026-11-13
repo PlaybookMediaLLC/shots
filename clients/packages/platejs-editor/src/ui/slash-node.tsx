@@ -104,6 +104,7 @@ function AIIcon({ className, ...props }: IconProps) {
 const groups: Group[] = [
   {
     group: "AI",
+    when: (editor) => Boolean(editor.plugins[KEYS.aiChat]),
     items: [
       {
         description: "Use AI to generate content.",
