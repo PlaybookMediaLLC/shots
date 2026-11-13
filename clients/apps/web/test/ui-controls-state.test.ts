@@ -898,5 +898,8 @@ test('the paste dialog splits in a reused worker, replaced only while busy, and 
   assert.equal(workers.length, 4)
   await act(async () => root!.unmount())
   root = null
+  // Radix's focus scope dispatches its unmount event from a 0 ms timer: run it
+  // while jsdom's globals are still installed, not after the file restores them.
+  await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(workers[3].terminated, true)
 })
