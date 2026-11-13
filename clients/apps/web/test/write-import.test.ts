@@ -21,6 +21,8 @@ test('thread split uses weighted URLs and preserves grapheme sequences', () => {
     family.repeat(25),
     family.repeat(10),
   ])
+  // Mastodon counts a short link as 23, so it does not fit beside other text at 23.
+  assert.deepEqual(splitThread('a https://x.com', 'mastodon', 23), ['a', 'https://x.com'])
   // LinkedIn counts UTF-16 units: a family is 11, and is never cut.
   assert.deepEqual(splitThread(family.repeat(5), 'linkedin', 23), [
     family.repeat(2),

@@ -31,9 +31,10 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  // No count is above UTF-16 units but X's: within the limit in units, a text fits without measuring.
+  // Only X's and Mastodon's counts (a short link is 23) exceed UTF-16 units: elsewhere, a text within the limit in units fits.
   const fits = (value: string) =>
-    (channel !== 'x' && value.length <= limit) || platformCaptionLength(channel, value) <= limit
+    (channel !== 'x' && channel !== 'mastodon' && value.length <= limit) ||
+    platformCaptionLength(channel, value) <= limit
   const posts: string[] = []
   let current = ''
   const push = () => {
