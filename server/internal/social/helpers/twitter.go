@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/dlclark/regexp2"
 	"golang.org/x/text/unicode/norm"
@@ -68,7 +69,9 @@ func unshiftSurrogates(runes []rune) []rune {
 }
 
 var (
-	extractURLRe             = jsRegexp(extractURLSource, regexp2.IgnoreCase)
+	// \G makes an attempt match only at the index it is given.
+	extractURLAtRe           = jsRegexp(`\G(?:`+extractURLSource+`)`, regexp2.IgnoreCase)
+	validTLDAtRe             = jsRegexp(`\G`+validTLDSource(), regexp2.IgnoreCase)
 	validASCIIDomainRe       = jsRegexp(validASCIIDomainSource, regexp2.IgnoreCase)
 	validTcoURLRe            = jsRegexp(validTcoURLSource, regexp2.IgnoreCase)
 	invalidURLWithoutProtoRe = jsRegexp(invalidURLWithoutProtocolPrecedingCharsSource, 0)
@@ -185,7 +188,7 @@ type urlEntity struct {
 // protocol: twitter-text's extractUrlsWithIndices with
 // extractUrlsWithoutProtocol: false, as Mastodon finds the links it counts.
 func LinkSpans(text string) [][2]int {
-	// Only a link with a protocol counts, and the scan is slow on long runs.
+	// Only a link with a protocol counts.
 	if !strings.Contains(text, "://") {
 		return nil
 	}
@@ -212,7 +215,8 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 	}
 
 	var urls []*urlEntity
-	for m, _ := extractURLRe.FindRunesMatch(text); m != nil; m, _ = extractURLRe.FindNextMatch(m) {
+	next := urlMatches(text)
+	for m := next(0); m != nil; m = next(m.Index + m.Length) {
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
@@ -278,6 +282,106 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 		urls = append(urls, &urlEntity{url: url, start: startPosition, end: endPosition})
 	}
 	return urls
+}
+
+// urlMatches returns extractUrl's matches in the order its scan from index 0
+// finds them, but tries the regex only where urlStarts says one starts.
+// Scanning from every index is quadratic on long runs of letters, which is
+// any CJK text, because each start rescans the run.
+func urlMatches(text []rune) func(from int) *regexp2.Match {
+	starts := urlStarts(text)
+	return func(from int) *regexp2.Match {
+		for s := from; s < len(text); s++ {
+			if !starts[s] {
+				continue
+			}
+			if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); m != nil {
+				return m
+			}
+		}
+		return nil
+	}
+}
+
+// urlStarts reports at each index whether extractUrl matches from there.
+func urlStarts(text []rune) []bool {
+	domains := domainStarts(text)
+	domainAt := func(i int) bool { return domains[i] || domains[i+protocolLength(text, i)] }
+	starts := make([]bool, len(text))
+	for s, c := range text {
+		// validUrlPrecedingChars is one character or the start of text.
+		starts[s] = urlPrecedingChar(c) && domainAt(s+1) || s == 0 && domainAt(0)
+	}
+	return starts
+}
+
+// domainStarts reports at each index whether validDomain matches there:
+// labels of domain characters, - and _ that each end in a dot, then a TLD.
+// What follows a label's dot does not depend on where the label starts, so
+// one right-to-left pass settles each dot once.
+func domainStarts(text []rune) []bool {
+	starts := make([]bool, len(text)+1)
+	for dot := len(text) - 1; dot > 0; dot-- {
+		if text[dot] != '.' || !domainChar(text[dot-1]) {
+			continue
+		}
+		// The label is a subdomain when a domain follows, or the domain name,
+		// which has no _, when a TLD follows.
+		subdomain, name := starts[dot+1], false
+		if !subdomain && dot+1 < len(text) {
+			m, _ := validTLDAtRe.FindRunesMatchStartingAt(text, dot+1)
+			name = m != nil
+		}
+		underscore := false
+		for x := dot - 1; x >= 0 && (text[x] == '-' || text[x] == '_' || domainChar(text[x])); x-- {
+			underscore = underscore || text[x] == '_'
+			starts[x] = domainChar(text[x]) && (subdomain || name && !underscore)
+		}
+	}
+	return starts
+}
+
+// notDomainChars is what validDomainChars excludes: ASCII punctuation but
+// " and `, spaces, the invalid characters and the directional marks.
+const notDomainChars = "\t\n\v\f\r !#$%&'()*+,-./:;<=>?@[\\]^_{|}~\u0085\u00a0\u061c\u1680\u180e" +
+	"\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u200e\u200f\u2028\u2029" +
+	"\u202a\u202b\u202c\u202d\u202e\u202f\u205f\u2066\u2067\u2068\u2069\u3000\ufeff\ufffe\uffff"
+
+func domainChar(c rune) bool { return !strings.ContainsRune(notDomainChars, c) }
+
+// urlPrecedingChar is validUrlPrecedingChars' character class as regexp2's
+// IgnoreCase reads it: on the lowercased character.
+func urlPrecedingChar(c rune) bool {
+	c = unicode.ToLower(c)
+	return !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || strings.ContainsRune("@$#\uff20\uff03\ufeff\ufffe\uffff", c))
+}
+
+// protocolLength is the length of the https?:// extractUrl reads at i, or 0.
+func protocolLength(text []rune, i int) int {
+next:
+	for _, protocol := range [...]string{"https://", "http://"} {
+		if i+len(protocol) > len(text) {
+			continue
+		}
+		for j := range len(protocol) {
+			if unicode.ToLower(text[i+j]) != rune(protocol[j]) {
+				continue next
+			}
+		}
+		return len(protocol)
+	}
+	return 0
+}
+
+// validTLDSource is validDomain's TLD alternatives, cut from extractURLSource
+// after the last label's dot.
+func validTLDSource() string {
+	const lastLabelEnd, tldEnd = `\.)(?:(?:(?:`, `|(?:xn--[\-0-9a-z]+))`
+	start, end := strings.Index(extractURLSource, lastLabelEnd), strings.Index(extractURLSource, tldEnd)
+	if start < 0 || end < start {
+		panic("twitter-text: no TLD alternatives in extractURLSource")
+	}
+	return extractURLSource[start+len(`\.)`) : end+len(tldEnd)]
 }
 
 func indexRunes(s, sub []rune, from int) int {

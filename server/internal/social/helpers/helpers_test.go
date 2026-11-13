@@ -2,9 +2,16 @@ package helpers
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/rand/v2"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
+
+	"github.com/dlclark/regexp2"
 )
 
 // Readable spot checks; the exhaustive comparison against the npm packages
@@ -64,6 +71,96 @@ func TestWeightedLength(t *testing.T) {
 	}
 	if got := CountLength("linkedin", "é😀"); got != 3 {
 		t.Errorf("others count UTF-16 units, got %d", got)
+	}
+}
+
+// urlMatches must find what scanning the URL regex from every index finds.
+func TestURLMatchesAreTheFullScans(t *testing.T) {
+	// The classes urlMatches reads without the regex, as extractUrl spells them.
+	class := func(source string) func(rune) bool {
+		if !strings.Contains(extractURLSource, source) {
+			t.Fatalf("extractUrl has no %s", source)
+		}
+		re := jsRegexp(`^`+source+`$`, regexp2.IgnoreCase)
+		return func(c rune) bool { ok, _ := re.MatchRunes([]rune{c}); return ok }
+	}
+	domain := class(`[^/\!'#%&'\(\)*\+,\\\-\.\/:;<=>\?@\[\]\^_{|}~\$//\x09-\x0D\x20\x85\xA0\u1680\u180E\u2000-\u200A\u2028\u2029\u202F\u205F\u3000//\uFFFE\uFEFF\uFFFF//\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069/]`)
+	preceding := class(`[^A-Za-z0-9@\uff20$#\uff03\uFFFE\uFEFF\uFFFF]`)
+	directional := class(`[\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069]`)
+	for unit := rune(0); unit <= 0xffff; unit++ {
+		c := unit
+		if 0xd800 <= c && c <= 0xdfff {
+			c += surrogateShift
+		}
+		if domainChar(c) != domain(c) {
+			t.Errorf("domainChar(%U) = %v", c, domainChar(c))
+		}
+		if urlPrecedingChar(c) != (preceding(c) || directional(c)) {
+			t.Errorf("urlPrecedingChar(%U) = %v", c, urlPrecedingChar(c))
+		}
+	}
+
+	full := jsRegexp(extractURLSource, regexp2.IgnoreCase)
+	describe := func(m *regexp2.Match) string {
+		var b strings.Builder
+		for _, g := range m.Groups() {
+			fmt.Fprintf(&b, "%d+%d ", g.Index, g.Length)
+		}
+		return b.String()
+	}
+	tokens := []string{"a", "Z", "7", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+		"http://", "HTTPS://", "https:/", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
+		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
+	rng := rand.New(rand.NewPCG(1, 2))
+	found := 0
+	for range 5000 {
+		var b strings.Builder
+		for range 1 + rng.IntN(16) {
+			b.WriteString(tokens[rng.IntN(len(tokens))])
+		}
+		text := shiftSurrogates(utf16Units(b.String()))
+		var want, got []string
+		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
+			want = append(want, describe(m))
+		}
+		next := urlMatches(text)
+		for m := next(0); m != nil; m = next(m.Index + m.Length) {
+			got = append(got, describe(m))
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("urlMatches(%q)\n got %v\nwant %v", b.String(), got, want)
+		}
+		// A start the regex rejects would be skipped, so check every index.
+		for s, start := range urlStarts(text) {
+			if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); start != (m != nil) {
+				t.Errorf("urlStarts(%q)[%d] = %v", b.String(), s, start)
+			}
+		}
+		found += len(want)
+	}
+	if found < 1000 {
+		t.Fatalf("only %d matches: the cases miss the regex", found)
+	}
+}
+
+// X Articles run to 100,000 characters.
+func TestWeightedLengthOfLongText(t *testing.T) {
+	prose := strings.Repeat("日本語の文章です。", 5556)
+	japanese := prose + "3.5 https://sample.com/a " + prose
+	for _, c := range []struct {
+		text string
+		want int
+	}{
+		{japanese, 2*2*utf8.RuneCountInString(prose) + len("3.5 ") + 23 + len(" ")},
+		{strings.Repeat("a.", 5000), 10000},
+	} {
+		start := time.Now()
+		if got := WeightedLength(c.text); got != c.want {
+			t.Errorf("WeightedLength(%.20q…) = %d, want %d", c.text, got, c.want)
+		}
+		if took := time.Since(start); took > time.Second {
+			t.Errorf("WeightedLength(%.20q…) took %v", c.text, took)
+		}
 	}
 }
 
