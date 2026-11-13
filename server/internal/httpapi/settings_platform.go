@@ -32,6 +32,7 @@ type SettingsPlatformStore interface {
 	AssignSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
 	RemoveSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	ChannelAccountStates(context.Context, string, []*ent.ChannelConnection) (map[string]product.ChannelAccountState, error)
+	VisibleConnections(context.Context, product.Actor, []*ent.ChannelConnection) ([]*ent.ChannelConnection, error)
 	RemoveChannelAccount(context.Context, product.Actor, string) (*product.SocialSetRemoval, error)
 	AuthorizeChannelManage(context.Context, product.Actor) error
 	AuthorizeSocialSetConnection(context.Context, product.Actor, string) error
@@ -294,6 +295,10 @@ func (s *Server) refreshChannelConnection(w http.ResponseWriter, r *http.Request
 		return
 	}
 	connections, err := s.store.ListConnections(r.Context(), actor.OrganizationID)
+	if err == nil {
+		// Another member's private account is not found, as in the list.
+		connections, err = s.configuration.VisibleConnections(r.Context(), actor, connections)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return

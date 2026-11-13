@@ -7,6 +7,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
@@ -70,6 +71,18 @@ func (c *Configuration) RecordAuthEvent(ctx context.Context, event AuthEvent) er
 		if _, err := tx.Session.Delete().Where(session.ActiveOrganizationID(event.OrganizationID),
 			session.UserID(event.RemovedUserID)).Exec(ctx); err != nil {
 			return err
+		}
+		// So do their queued posts and agent keys (SCIM and enterprise removals),
+		// unless a late event finds them a member again.
+		rejoined, err := tx.Member.Query().Where(member.OrganizationID(event.OrganizationID), member.UserID(event.RemovedUserID)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		service := Actor{OrganizationID: event.OrganizationID, Kind: "service", RequestID: event.RequestID, Display: "membership provisioning"}
+		if !rejoined {
+			if err := revokeDeparted(ctx, tx, service, event.OrganizationID, event.RemovedUserID, event.EntityID); err != nil {
+				return err
+			}
 		}
 	}
 	actor := publishing.Actor{Organization: event.OrganizationID, RequestID: event.RequestID, Type: "SERVICE"}

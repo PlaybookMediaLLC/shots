@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftsettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -219,6 +221,27 @@ func (c *Configuration) visibleSocialSetIDs(ctx context.Context, actor Actor) ([
 		ids = append(ids, set.ID)
 	}
 	return ids, nil
+}
+
+// VisibleConnections drops the accounts of private sets the actor does not
+// own: a private set's accounts are its owner's alone, and an API key sees no
+// private set (RFC 024).
+func (c *Configuration) VisibleConnections(ctx context.Context, actor Actor, connections []*ent.ChannelConnection) ([]*ent.ChannelConnection, error) {
+	query := c.client.SocialSet.Query().Where(socialset.OrganizationID(actor.OrganizationID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE))
+	if actor.IsSession() {
+		query.Where(socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(actor.UserID)))
+	}
+	hidden, err := query.IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]*ent.ChannelConnection, 0, len(connections))
+	for _, connection := range connections {
+		if connection.SocialSetID == nil || !slices.Contains(hidden, *connection.SocialSetID) {
+			visible = append(visible, connection)
+		}
+	}
+	return visible, nil
 }
 
 // visibleSocialSet loads one set actor may see; any other set is not found.
@@ -1067,16 +1090,25 @@ func cancelQueuedPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionI
 
 // cancelPosts cancels the posts still waiting to publish on these accounts.
 func cancelPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionIDs []string, reason string) ([]string, error) {
-	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
-		scheduledpost.ChannelConnectionIDIn(connectionIDs...),
+	return cancelQueued(ctx, tx, actor, scheduledpost.ChannelConnectionIDIn(connectionIDs...), reason, "")
+}
+
+// cancelQueued cancels the workspace's queued posts that match, with failureCode
+// when it is set. A cancelled post's workflow ends at its claim, which needs SCHEDULED.
+func cancelQueued(ctx context.Context, tx *ent.Tx, actor Actor, match predicate.ScheduledPost, reason, failureCode string) ([]string, error) {
+	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID), match,
 		scheduledpost.StatusIn(scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	cancelled := make([]string, 0, len(queued))
 	for _, post := range queued {
-		count, err := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
-			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED).Save(ctx)
+		update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
+			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED)
+		if failureCode != "" {
+			update.SetFailureCode(failureCode)
+		}
+		count, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
 		}
