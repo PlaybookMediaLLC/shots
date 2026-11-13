@@ -129,7 +129,8 @@ export const retweetRuleSchema = z.union([
   z.strictObject({ afterMinutes: z.number().int().min(1).max(43_200) }),
   z.strictObject({
     at: clockTimeSchema,
-    days: z.number().int().min(0).max(30),
+    // Older backends stored a same-day rule without days; it means 0.
+    days: z.number().int().min(0).max(30).default(0),
     timeZone: z.string().min(1).max(64),
   }),
 ])

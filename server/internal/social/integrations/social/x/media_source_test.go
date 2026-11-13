@@ -300,8 +300,9 @@ func TestMediaSourceRejectsRedirectsSSRFAndCancellation(t *testing.T) {
 		t.Fatalf("redirect permitted or leaked: %v", err)
 	}
 	t.Setenv("DISABLE_SSRF_PROTECTION", "false")
-	if _, err := stageMedia(context.Background(), target.URL, caps, false); err == nil {
-		t.Fatal("private network permitted")
+	// An unreadable source fails before any X call, so it is a definite rejection, not an unknown delivery.
+	if _, err := stageMedia(context.Background(), target.URL, caps, false); temporalx.FailureType(err) != temporalx.TypePublicationRejected {
+		t.Fatalf("private network permitted or not a definite rejection: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
