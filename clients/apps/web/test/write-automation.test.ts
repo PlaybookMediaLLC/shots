@@ -66,6 +66,15 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
   assert.ok(autoDmSchema.safeParse(valid).success)
   // Go's TrimSpace keeps U+FEFF: a draft it stored must still load here.
   assert.ok(autoDmSchema.safeParse({ ...valid, message: '\uFEFF' }).success)
+  // Lengths count characters (code points), as Go's runes do: an emoji is one, not two units.
+  const emoji = '\u{1F600}'
+  assert.ok(
+    autoDmSchema.safeParse({
+      ...valid,
+      message: emoji.repeat(10_000),
+      replyText: emoji.repeat(100),
+    }).success
+  )
   for (const [name, change] of Object.entries({
     variable: { message: 'Hi {{email}}' },
     blank: { message: ' \u0085\u3000 ' },
@@ -73,6 +82,8 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
     'reply filter without replies': { replies: false, reposts: true },
     'long message': { message: 'x'.repeat(10_001) },
     'long reply filter': { replyText: 'x'.repeat(101) },
+    'long emoji message': { message: '\u{1F600}'.repeat(10_001) },
+    'long emoji reply filter': { replyText: '\u{1F600}'.repeat(101) },
   })) {
     assert.equal(autoDmSchema.safeParse({ ...valid, ...change }).success, false, name)
   }

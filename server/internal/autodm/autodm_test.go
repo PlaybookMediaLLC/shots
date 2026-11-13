@@ -3,6 +3,7 @@ package autodm
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -191,6 +192,9 @@ func TestConfigRefusesUnknownVariablesAndEmptyMessages(t *testing.T) {
 		"no actions": func(c *Config) { c.Replies, c.Reposts = false, false },
 		"filter":     func(c *Config) { c.Replies, c.Reposts = false, true },
 		"match":      func(c *Config) { c.Match = "some" },
+		// Lengths count characters (runes), as the composer does: an emoji is one.
+		"long message": func(c *Config) { c.Message = strings.Repeat("😀", 10_001) },
+		"long filter":  func(c *Config) { c.ReplyText = strings.Repeat("😀", 101) },
 	} {
 		config := c.Config
 		change(&config)
@@ -200,5 +204,10 @@ func TestConfigRefusesUnknownVariablesAndEmptyMessages(t *testing.T) {
 	}
 	if err := c.Config.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	full := c.Config
+	full.Message, full.ReplyText = strings.Repeat("😀", 10_000), strings.Repeat("😀", 100)
+	if err := full.Validate(); err != nil {
+		t.Fatal("refused a message at the limit:", err)
 	}
 }
