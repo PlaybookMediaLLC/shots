@@ -477,7 +477,8 @@ func TestWritePublishing(t *testing.T) {
 			t.Fatalf("%d draft.published events for the reconciled post, want 1", len(events))
 		}
 		data, _ := events[0].Payload["data"].(map[string]any)
-		if post, _ := data["post"].(map[string]any); post["id"] != unknown || post["remotePostId"] != "urn:li:share:7100000000000000000" {
+		if post, _ := data["post"].(map[string]any); post["id"] != unknown || post["remotePostId"] != "urn:li:share:7100000000000000000" ||
+			post["url"] != "https://www.linkedin.com/feed/update/urn:li:share:7100000000000000000" {
 			t.Fatalf("event data %+v", data)
 		}
 		other := draft(ContentDraftInput{})
@@ -493,8 +494,21 @@ func TestWritePublishing(t *testing.T) {
 		if events := published(other.ID); len(events) != 0 {
 			t.Fatalf("a post reconciled as not live emitted %d draft.published events", len(events))
 		}
-		if _, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID); err != nil {
+		retriedAgain, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID)
+		if err != nil {
 			t.Fatalf("a post reconciled as not live cannot be retried: %v", err)
+		}
+		// Confirmed live without its URL: subscribers hear of it with no remote id.
+		w.exec(t, `UPDATE scheduled_post SET status='UNKNOWN_DELIVERY',"failureCode"='UNKNOWN_DELIVERY' WHERE id=$1`, retriedAgain.Post.ID)
+		if _, err := repo.ReconcileContentDraftPost(ctx, owner, retriedAgain.Post.ID, ReconcileInput{Live: true}); err != nil {
+			t.Fatal(err)
+		}
+		if events = published(other.ID); len(events) != 1 {
+			t.Fatalf("%d draft.published events for the post confirmed live without a URL, want 1", len(events))
+		}
+		data, _ = events[0].Payload["data"].(map[string]any)
+		if post, _ := data["post"].(map[string]any); post["id"] != retriedAgain.Post.ID || post["remotePostId"] != nil || post["url"] != nil {
+			t.Fatalf("event data %+v", data)
 		}
 		if n, err := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).Count(ctx); err != nil || n != 4 {
 			t.Fatalf("the draft has %d posts, want the two and two retries: %v", n, err)

@@ -124,7 +124,7 @@ func enableDefaultPlatform(ctx context.Context, tx *ent.Tx, setID *string, platf
 // EmitDraftPublished writes a draft.published webhook event (RFC 024) in the
 // transaction that marks a draft's post live: the draft's identity and the
 // live post, never its text. post must be the stored row; providerPostID may
-// be empty when a person confirmed the post live without its URL.
+// be empty, and is then sent as null.
 func EmitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost, providerPostID string) error {
 	if post.ContentDraftID == nil {
 		return nil
