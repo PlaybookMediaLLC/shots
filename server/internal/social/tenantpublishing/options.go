@@ -112,6 +112,9 @@ func instagramSettings(platform string, settings map[string]any, o *postoptions.
 	if o == nil {
 		return nil
 	}
+	if o.Story() {
+		settings["post_type"] = "story"
+	}
 	if len(o.Collaborators) > 0 {
 		labels := make([]map[string]string, len(o.Collaborators))
 		for i, name := range o.Collaborators {

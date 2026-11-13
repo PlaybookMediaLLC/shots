@@ -75,7 +75,29 @@ func checkDraftMedia(channel string, rows []*ent.Asset) error {
 	if !ok {
 		return nil
 	}
+	return checkMedia(draftChannelLabels[channel], rules, rows)
+}
+
+// checkStoryMedia checks a story's attachment against its destination's story rules.
+func checkStoryMedia(channel string, rows []*ent.Asset) error {
+	rules := medialimits.Limits.Destinations[channel].Story
+	if rules == nil {
+		return invalid(draftChannelLabels[channel] + " takes no stories.")
+	}
+	return checkMedia(storyLabel(channel), *rules, rows)
+}
+
+// storyLabel names a channel's story as the composer does: "An Instagram story".
+func storyLabel(channel string) string {
 	label := draftChannelLabels[channel]
+	if strings.ContainsAny(label[:1], "AEIOU") {
+		return "An " + label + " story"
+	}
+	return "A " + label + " story"
+}
+
+// checkMedia checks attachments, in order, against one set of rules.
+func checkMedia(label string, rules medialimits.Destination, rows []*ent.Asset) error {
 	if len(rows) == 0 {
 		if rules.RequiresMedia {
 			if len(rules.Images) == 0 {

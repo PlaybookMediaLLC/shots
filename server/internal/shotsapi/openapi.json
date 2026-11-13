@@ -12872,6 +12872,12 @@
                                               "MANUAL",
                                               "SS_PERFORMANCE"
                                             ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
                                           }
                                         },
                                         "additionalProperties": false
@@ -14148,6 +14154,12 @@
                                             "enum": [
                                               "MANUAL",
                                               "SS_PERFORMANCE"
+                                            ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
                                             ]
                                           }
                                         },
@@ -22775,6 +22787,12 @@
                                       "MANUAL",
                                       "SS_PERFORMANCE"
                                     ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -27832,6 +27850,12 @@
                                       "MANUAL",
                                       "SS_PERFORMANCE"
                                     ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -28797,6 +28821,12 @@
                                       "MANUAL",
                                       "SS_PERFORMANCE"
                                     ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -29413,6 +29443,12 @@
                               "enum": [
                                 "MANUAL",
                                 "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
                               ]
                             }
                           },
@@ -30406,6 +30442,12 @@
                                 "MANUAL",
                                 "SS_PERFORMANCE"
                               ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
                             }
                           },
                           "additionalProperties": false
@@ -31013,6 +31055,12 @@
                               "enum": [
                                 "MANUAL",
                                 "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
                               ]
                             }
                           },
@@ -32547,6 +32595,12 @@
                                   "enum": [
                                     "MANUAL",
                                     "SS_PERFORMANCE"
+                                  ]
+                                },
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "story"
                                   ]
                                 }
                               },

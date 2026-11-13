@@ -23,7 +23,13 @@ type InstagramOptions struct {
 	// TrialGraduation says how it reaches followers: MANUAL or SS_PERFORMANCE.
 	TrialReel       bool   `json:"trialReel,omitempty"`
 	TrialGraduation string `json:"trialGraduation,omitempty"`
+	// Placement "story" posts one image or video as a story: no caption, and
+	// none of the settings above.
+	Placement string `json:"placement,omitempty"`
 }
+
+// Story reports whether the post is an Instagram story.
+func (o *InstagramOptions) Story() bool { return o != nil && o.Placement == "story" }
 
 // Instagram's documented and product limits.
 const (
@@ -65,6 +71,12 @@ func (o *InstagramOptions) Validate() error {
 	}
 	if o.TrialGraduation != "" && (!o.TrialReel || !slices.Contains([]string{"MANUAL", "SS_PERFORMANCE"}, o.TrialGraduation)) {
 		return fmt.Errorf("a trial reel graduates manually (MANUAL) or on performance (SS_PERFORMANCE)")
+	}
+	if o.Placement != "" && o.Placement != "story" {
+		return fmt.Errorf("an Instagram post goes to the feed or, with placement story, to stories")
+	}
+	if o.Story() && (len(o.Collaborators) > 0 || len(o.UserTags) > 0 || o.Reel()) {
+		return fmt.Errorf("a story takes no collaborators, tags, cover, grid choice or trial")
 	}
 	return nil
 }

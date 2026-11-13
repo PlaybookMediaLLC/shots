@@ -629,7 +629,7 @@ func (p *Provider) PostPendingOn(ctx context.Context, id, token string, posts []
 	medias, err := facebook.All(order, func(index int) (string, error) {
 		m := firstPost.Media[index]
 		caption := ""
-		if single {
+		if single && !isStory { // a story has no caption
 			caption = "&caption=" + facebook.EncodeURIComponent(firstPost.Message)
 		}
 		isCarousel := ""

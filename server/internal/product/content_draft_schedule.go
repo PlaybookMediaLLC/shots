@@ -434,7 +434,16 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := checkDraftMedia(channel, rows); err != nil {
+		story := target.Options != nil && target.Options.Instagram.Story()
+		if story {
+			if err := checkStory(channel, target); err != nil {
+				return nil, nil, err
+			}
+			err = checkStoryMedia(channel, rows)
+		} else {
+			err = checkDraftMedia(channel, rows)
+		}
+		if err != nil {
 			return nil, nil, err
 		}
 		if err := checkOptionMedia(ctx, tx.Client(), organizationID, channel, target.Options, rows); err != nil {
@@ -497,6 +506,18 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		}
 	}
 	return connections, images, nil
+}
+
+// checkStory checks what a story leaves out: its text, which goes to the
+// draft's other platforms, and a first comment.
+func checkStory(channel string, target ContentDraftScheduleTarget) error {
+	if strings.TrimSpace(target.Caption) != "" || len(target.Replies) > 0 {
+		return invalid(storyLabel(channel) + " has no caption. Its text goes to your other platforms.")
+	}
+	if strings.TrimSpace(target.Options.FirstComment) != "" {
+		return invalid(storyLabel(channel) + " takes no first comment.")
+	}
+	return nil
 }
 
 // checkDraftExtras checks a target's follow-ups: X only, and sensible.

@@ -108,102 +108,125 @@ export function InstagramOptions({
 }) {
   const options = value ?? {}
   const change = (next: Partial<Options>) => onChange({ ...options, ...next })
+  const story = options.placement === 'story'
   return (
     <div
       className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
       data-option-rows
       data-testid="instagram-options"
     >
-      <Handles
-        disabled={disabled}
-        hint="Invited as co-authors: the post shows on their profile once they accept. Use public accounts: Instagram refuses the whole post for a private or misspelled one."
-        id="instagram-collaborators"
-        label="Collaborators"
-        limit={3}
-        onChange={(collaborators) => change({ collaborators })}
-        value={options.collaborators}
-      />
-      <Handles
-        disabled={disabled}
-        hint="Tagged on the first photo, or on the reel. Tag public accounts."
-        id="instagram-tags"
-        label="Tag accounts"
-        limit={20}
-        onChange={(userTags) => change({ userTags })}
-        value={options.userTags}
-      />
-      <p className="text-ui-lg font-medium text-foreground">
-        Reel settings: for a post of one video
-      </p>
-      {uploadFile ? (
-        <CoverUpload
-          assetId={options.coverAssetId}
-          channel="instagram"
-          disabled={disabled}
-          hint="JPEG up to 8 MB; 9:16 works best. Instagram takes the cover with the reel."
-          label="Reel cover"
-          onChange={(coverAssetId) => change({ coverAssetId })}
-          uploadFile={uploadFile}
-        />
-      ) : null}
       <div className="flex items-start gap-2">
         <Checkbox
-          checked={options.shareToFeed !== false}
+          checked={story}
           disabled={disabled}
-          id="instagram-grid"
+          id="instagram-story"
+          // A story takes none of the settings below, so turning it on clears them.
           onCheckedChange={(checked) =>
-            change({ shareToFeed: checked === true ? undefined : false })
+            onChange(checked === true ? { placement: 'story' } : undefined)
           }
         />
         <div className="grid gap-0.5">
-          <Label htmlFor="instagram-grid">Show on the profile grid</Label>
-          <p>Off keeps the reel in the Reels tab only.</p>
-        </div>
-      </div>
-      <div className="flex items-start gap-2">
-        <Checkbox
-          checked={options.trialReel ?? false}
-          disabled={disabled}
-          id="instagram-trial"
-          onCheckedChange={(checked) =>
-            change(
-              checked === true
-                ? { trialReel: true, trialGraduation: options.trialGraduation ?? 'MANUAL' }
-                : { trialReel: undefined, trialGraduation: undefined }
-            )
-          }
-        />
-        <div className="grid gap-0.5">
-          <Label htmlFor="instagram-trial">Trial reel</Label>
+          <Label htmlFor="instagram-story">Post as a story</Label>
           <p>
-            Shown to non-followers first. Instagram allows it for public professional accounts with
-            at least 1,000 followers, up to five a day, and refuses it otherwise.
+            One image or video, shown for 24 hours, without a caption: the text goes to your other
+            platforms. Collaborators, tags and reel settings don&apos;t apply to stories.
           </p>
         </div>
       </div>
-      {options.trialReel ? (
-        <div>
-          <Select
+      {story ? null : (
+        <>
+          <Handles
             disabled={disabled}
-            onValueChange={(graduation) =>
-              change({
-                trialGraduation: graduation === 'SS_PERFORMANCE' ? 'SS_PERFORMANCE' : 'MANUAL',
-              })
-            }
-            value={options.trialGraduation ?? 'MANUAL'}
-          >
-            <SelectTrigger aria-label="Share the trial with followers">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MANUAL">Share with followers myself</SelectItem>
-              <SelectItem value="SS_PERFORMANCE">
-                Share with followers if it performs well
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
+            hint="Invited as co-authors: the post shows on their profile once they accept. Use public accounts: Instagram refuses the whole post for a private or misspelled one."
+            id="instagram-collaborators"
+            label="Collaborators"
+            limit={3}
+            onChange={(collaborators) => change({ collaborators })}
+            value={options.collaborators}
+          />
+          <Handles
+            disabled={disabled}
+            hint="Tagged on the first photo, or on the reel. Tag public accounts."
+            id="instagram-tags"
+            label="Tag accounts"
+            limit={20}
+            onChange={(userTags) => change({ userTags })}
+            value={options.userTags}
+          />
+          <p className="text-ui-lg font-medium text-foreground">
+            Reel settings: for a post of one video
+          </p>
+          {uploadFile ? (
+            <CoverUpload
+              assetId={options.coverAssetId}
+              channel="instagram"
+              disabled={disabled}
+              hint="JPEG up to 8 MB; 9:16 works best. Instagram takes the cover with the reel."
+              label="Reel cover"
+              onChange={(coverAssetId) => change({ coverAssetId })}
+              uploadFile={uploadFile}
+            />
+          ) : null}
+          <div className="flex items-start gap-2">
+            <Checkbox
+              checked={options.shareToFeed !== false}
+              disabled={disabled}
+              id="instagram-grid"
+              onCheckedChange={(checked) =>
+                change({ shareToFeed: checked === true ? undefined : false })
+              }
+            />
+            <div className="grid gap-0.5">
+              <Label htmlFor="instagram-grid">Show on the profile grid</Label>
+              <p>Off keeps the reel in the Reels tab only.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <Checkbox
+              checked={options.trialReel ?? false}
+              disabled={disabled}
+              id="instagram-trial"
+              onCheckedChange={(checked) =>
+                change(
+                  checked === true
+                    ? { trialReel: true, trialGraduation: options.trialGraduation ?? 'MANUAL' }
+                    : { trialReel: undefined, trialGraduation: undefined }
+                )
+              }
+            />
+            <div className="grid gap-0.5">
+              <Label htmlFor="instagram-trial">Trial reel</Label>
+              <p>
+                Shown to non-followers first. Instagram allows it for public professional accounts
+                with at least 1,000 followers, up to five a day, and refuses it otherwise.
+              </p>
+            </div>
+          </div>
+          {options.trialReel ? (
+            <div>
+              <Select
+                disabled={disabled}
+                onValueChange={(graduation) =>
+                  change({
+                    trialGraduation: graduation === 'SS_PERFORMANCE' ? 'SS_PERFORMANCE' : 'MANUAL',
+                  })
+                }
+                value={options.trialGraduation ?? 'MANUAL'}
+              >
+                <SelectTrigger aria-label="Share the trial with followers">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MANUAL">Share with followers myself</SelectItem>
+                  <SelectItem value="SS_PERFORMANCE">
+                    Share with followers if it performs well
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }

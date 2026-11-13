@@ -33,6 +33,7 @@ Recorded with the owner on 13 November 2026.
 - A cover or thumbnail is an uploaded asset of the workspace and stays in use while a draft or an unfinished post names it.
 - A YouTube thumbnail missing when the video goes out never stops the video: its follow-up is recorded as skipped (`media_unavailable`). A missing Instagram cover cancels the reel, as a missing document cancels a LinkedIn post, because the cover is part of it.
 - Instagram refuses the whole post for a private or misspelled collaborator, because collaborators travel with the media. The composer says so beside the field.
+- A story is the Instagram version's `placement: "story"`. Its media follow the story rules in `limits.json` (`destinations.instagram.story`), not the feed's; it carries no caption, so the draft's text goes to its other platforms; and it takes no collaborators, tags, reel settings or first comment. Turning a story on clears those settings.
 
 ### Known limit
 
@@ -66,6 +67,7 @@ Weekly scheduled posts that use an Instagram or YouTube option, and the share of
 ## Rollback
 
 - Slice 1 rolls forward only. Deploy the migration, then the API and worker together, then the web. The previous code ignores the new options rather than refusing them: an older worker would publish a scheduled trial reel, or a reel kept off the grid, as an ordinary reel, and a YouTube video without its tags, disclosure or thumbnail; the previous web cannot read a post with a `thumbnail` follow-up. Before any redeploy of older code, hold the queued posts that set them (`"publishOptions" ? 'instagram'`, or `"publishOptions"->'youtube' ?| array['tags','containsSyntheticMedia','thumbnailAssetId']`). The migration's constraint and function can stay; the old constraint cannot be restored while `thumbnail` rows exist.
+- Slice 2 has no migration. It rolls forward only for the same reason as Slice 1: older code ignores `placement` and would publish a queued story as a feed post. Before redeploying older code, hold the queued posts with `"publishOptions"->'instagram'->>'placement' = 'story'`.
 - Later slices: redeploy the previous web and API; each records its own migration order here when it has one.
 
 ## Verification

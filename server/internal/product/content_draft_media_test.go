@@ -162,3 +162,51 @@ func TestInstagramOptionsBelongToInstagram(t *testing.T) {
 		t.Fatal("a draft stored four collaborators")
 	}
 }
+
+// A story is one image or video in its own limits: a 9:16 photo the feed
+// refuses, a video up to a minute, never two files or a caption.
+func TestStoriesFollowTheirOwnRules(t *testing.T) {
+	portrait := mediaRow("image/jpeg", 300_000, 1080, 1920, 0)
+	short := mediaRow("video/mp4", 20_000_000, 1080, 1920, 30_000)
+	long := mediaRow("video/mp4", 20_000_000, 1080, 1920, 61_000)
+	if checkDraftMedia("instagram", []*ent.Asset{portrait}) == nil {
+		t.Fatal("the feed took a 9:16 photo")
+	}
+	for _, tc := range []struct {
+		name  string
+		rows  []*ent.Asset
+		valid bool
+	}{
+		{"a 9:16 photo", []*ent.Asset{portrait}, true},
+		{"a 30-second video", []*ent.Asset{short}, true},
+		{"a 61-second video", []*ent.Asset{long}, false},
+		{"two photos", []*ent.Asset{portrait, portrait}, false},
+		{"a photo and a video", []*ent.Asset{portrait, short}, false},
+		{"nothing", nil, false},
+	} {
+		if err := checkStoryMedia("instagram", tc.rows); (err == nil) != tc.valid {
+			t.Fatalf("%s: valid=%v error=%v", tc.name, tc.valid, err)
+		}
+	}
+	if err := checkStoryMedia("instagram", []*ent.Asset{portrait, portrait}); err == nil || !strings.HasPrefix(err.Error(), "An Instagram story takes") {
+		t.Fatalf("story wording: %v", err)
+	}
+	if checkStoryMedia("x", []*ent.Asset{portrait}) == nil {
+		t.Fatal("X took a story")
+	}
+	story := &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}}
+	for _, tc := range []struct {
+		name   string
+		target ContentDraftScheduleTarget
+		valid  bool
+	}{
+		{"no caption", ContentDraftScheduleTarget{Options: story}, true},
+		{"a caption", ContentDraftScheduleTarget{Caption: "Hello", Options: story}, false},
+		{"a first comment", ContentDraftScheduleTarget{Options: &postoptions.PublishOptions{FirstComment: "Link",
+			Instagram: &postoptions.InstagramOptions{Placement: "story"}}}, false},
+	} {
+		if err := checkStory("instagram", tc.target); (err == nil) != tc.valid {
+			t.Fatalf("%s: valid=%v error=%v", tc.name, tc.valid, err)
+		}
+	}
+}

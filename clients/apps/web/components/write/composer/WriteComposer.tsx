@@ -1922,6 +1922,16 @@ export function WriteComposer({
               />
             </section>
           ) : null}
+          {active === 'instagram' && versionOfTab.options?.instagram?.placement === 'story' ? (
+            <p
+              className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
+              data-testid="story-notice"
+              role="status"
+            >
+              This Instagram post is a story: one image or video, shown for 24 hours, without this
+              text. The text goes to your other platforms.
+            </p>
+          ) : null}
           {namedElsewhere ? (
             <p
               className="mx-4 mb-3 rounded-lg border border-amber-400/30 bg-amber-400/[0.05] px-3 py-2 text-xs text-amber-700 dark:text-amber-200"

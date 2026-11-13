@@ -383,6 +383,35 @@ func TestMediaScheduling(t *testing.T) {
 		}
 	})
 
+	t.Run("an Instagram story is one image or video with no caption", func(t *testing.T) {
+		story := func() *postoptions.PublishOptions {
+			return &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}}
+		}
+		d := draft("Story day", photo)
+		if _, err := schedule(d, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: instagram, Caption: "Story day",
+			AssetIDs: []string{photo}, Options: story()}}}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("a story with a caption: %v", err)
+		}
+		if _, err := schedule(d, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: instagram,
+			AssetIDs: []string{photo, video}, Options: story()}}}); err == nil {
+			t.Fatal("a story of two files was scheduled")
+		}
+		result, err := schedule(d, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: instagram,
+			AssetIDs: []string{photo}, Options: story()}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		post := w.db.Client.ScheduledPost.GetX(ctx, result.Posts[0].ID)
+		if post.Caption != "" || post.PublishOptions.Instagram == nil || !post.PublishOptions.Instagram.Story() {
+			t.Fatalf("story post = caption %q options %+v", post.Caption, post.PublishOptions.Instagram)
+		}
+		// Facebook Login accounts stay blocked, story or not.
+		if _, err := schedule(draft("Story blocked", photo), ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: facebookInstagram,
+			AssetIDs: []string{photo}, Options: story()}}}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("a Facebook Login story: %v", err)
+		}
+	})
+
 	t.Run("asking for changes after scheduling stops the queued post", func(t *testing.T) {
 		required := true
 		if _, err := repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &required}); err != nil {

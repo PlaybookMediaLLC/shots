@@ -10,7 +10,7 @@ import { draftChannelSchema, type DraftChannel } from '@/lib/write/document'
  * (an X subscription, a Mastodon server, Bluesky upload rights) are checked
  * by the backend against the account's verified capabilities.
  */
-const destinationSchema = z.object({
+const rulesSchema = z.object({
   maxMedia: z.number().int().positive(),
   requiresMedia: z.boolean().optional(),
   mixed: z.boolean(),
@@ -35,6 +35,11 @@ const destinationSchema = z.object({
     .optional(),
   docs: z.array(z.url()),
   verifiedOn: z.string(),
+})
+
+const destinationSchema = rulesSchema.extend({
+  /** What one story takes, where the destination has stories. */
+  story: rulesSchema.optional(),
 })
 
 /** One destination's media rules. */
@@ -97,13 +102,22 @@ export function clock(ms: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+/** A channel's story as Go names it (`storyLabel`): "An Instagram story". */
+export function storyLabel(channel: DraftChannel): string {
+  return `${/^[AEIOU]/.test(LABELS[channel]) ? 'An' : 'A'} ${LABELS[channel]} story`
+}
+
 /**
  * Why one post's attachments, in order, cannot go to a channel, as the
  * backend words it; empty when they can. Only known facts are checked.
  */
-export function mediaProblems(channel: DraftChannel, media: MediaFacts[]): string[] {
-  const rules = DESTINATION_MEDIA[channel]
-  const label = LABELS[channel]
+export function mediaProblems(
+  channel: DraftChannel,
+  media: MediaFacts[],
+  placement?: 'story'
+): string[] {
+  const rules = (placement === 'story' && DESTINATION_MEDIA[channel].story) || DESTINATION_MEDIA[channel]
+  const label = placement === 'story' ? storyLabel(channel) : LABELS[channel]
   if (media.length === 0)
     return rules.requiresMedia
       ? [
