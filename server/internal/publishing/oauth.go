@@ -10,6 +10,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialoauthstart"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
 	"github.com/lucsky/cuid"
 )
@@ -209,13 +210,11 @@ func (r *Repository) FinishOAuth(ctx context.Context, actor Actor, sessionID, st
 		}
 	} else if err != nil {
 		return nil, err
-	} else if start.Operation == socialoauthstart.OperationCREATE_SET {
-		return nil, ErrAccountInAnotherSet
 	} else if start.ExpectedConnectionID != nil && connection.ID != *start.ExpectedConnectionID {
 		return nil, ErrOAuthIdentityMismatch
-	} else if connection.Platform != provider || connection.SecretReference != start.SecretReference {
+	} else if socialplatform.Adapter(connection.Platform) != provider || connection.SecretReference != start.SecretReference {
 		return nil, ErrConflict
-	} else if connection, err = reconnect(ctx, tx, actor, connection, start.SocialSetID); err != nil {
+	} else if connection, err = reconnect(ctx, tx, actor, connection, provider, start); err != nil {
 		return nil, err
 	}
 	if account := start.ExchangeReceipt.Account; account != nil {
@@ -241,25 +240,48 @@ func (r *Repository) FinishOAuth(ctx context.Context, actor Actor, sessionID, st
 	return connection.Unwrap(), nil
 }
 
-// reconnect renews an account the workspace already holds. An active account
-// stays in its set, and asking to add it to a different set is refused rather
-// than silently moving it. A removed account keeps its original set and
-// lineage; choosing another set requires an explicit transfer.
-func reconnect(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection, requested *string) (*ent.ChannelConnection, error) {
-	if requested != nil && (connection.SocialSetID == nil || *connection.SocialSetID != *requested) {
-		return nil, ErrAccountInAnotherSet
-	}
-	if err := authorizeOAuthTarget(ctx, tx.Client(), actor, connection.SocialSetID); err != nil {
-		return nil, err
-	}
-	if connection.Status == channelconnection.StatusACTIVE {
-		return connection, nil
-	}
-	setID, err := targetSocialSet(ctx, tx, actor.Organization, connection.Platform, connection.SocialSetID)
+// reconnect renews an account the workspace already holds. An account in a
+// live set stays there: adding it to another set, or creating a set with it,
+// is refused rather than silently moving it, because that set's drafts and
+// history name it. An account whose set was deleted, or that never had one,
+// joins the set it is being connected to. A legacy platform name is renamed
+// to the adapter that renewed it.
+func reconnect(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection, provider string, start *ent.SocialOAuthStart) (*ent.ChannelConnection, error) {
+	current, err := liveSocialSet(ctx, tx, connection)
 	if err != nil {
 		return nil, err
 	}
-	update := tx.ChannelConnection.UpdateOneID(connection.ID).SetStatus(channelconnection.StatusACTIVE)
+	requested := start.SocialSetID
+	creating := start.Operation == socialoauthstart.OperationCREATE_SET
+	if current != nil && (creating || (requested != nil && *current != *requested)) {
+		if connection.Status == channelconnection.StatusACTIVE {
+			return nil, ErrAccountInAnotherSet
+		}
+		return nil, ErrAccountRemovedFromAnotherSet
+	}
+	if creating {
+		if requested, err = createOAuthSocialSet(ctx, tx, actor, start); err != nil {
+			return nil, err
+		}
+	}
+	target := current
+	if target == nil {
+		target = requested
+	}
+	if err := authorizeOAuthTarget(ctx, tx.Client(), actor, target); err != nil {
+		return nil, err
+	}
+	if connection.Status == channelconnection.StatusACTIVE && (current != nil || requested == nil) {
+		if connection.Platform == provider {
+			return connection, nil
+		}
+		return tx.ChannelConnection.UpdateOne(connection).SetPlatform(provider).Save(ctx)
+	}
+	setID, err := targetSocialSet(ctx, tx, actor.Organization, provider, target)
+	if err != nil {
+		return nil, err
+	}
+	update := tx.ChannelConnection.UpdateOneID(connection.ID).SetStatus(channelconnection.StatusACTIVE).SetPlatform(provider)
 	if setID == nil {
 		update.ClearSocialSetID()
 	} else {
@@ -272,7 +294,7 @@ func reconnect(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.Cha
 		}
 		return nil, err
 	}
-	if err := enableDefaultPlatform(ctx, tx, setID, connection.Platform); err != nil {
+	if err := enableDefaultPlatform(ctx, tx, setID, provider); err != nil {
 		return nil, err
 	}
 	if err := appendAudit(ctx, tx, auditInput{

@@ -24,7 +24,24 @@ var ErrSocialSetSlotTaken = errors.New("this social set already has an account o
 
 // ErrAccountInAnotherSet refuses connecting an account that is already
 // active in a different social set of the workspace.
-var ErrAccountInAnotherSet = errors.New("this account is already in another social set of the workspace")
+var ErrAccountInAnotherSet = errors.New("this account is already connected to another social set in this workspace; remove it there first, then add it here")
+
+// ErrAccountRemovedFromAnotherSet refuses moving an account that was removed
+// from a set that still exists: that set's drafts and history name it.
+var ErrAccountRemovedFromAnotherSet = errors.New("this account was removed from another social set in this workspace; reconnect it from that set")
+
+// liveSocialSet is the connection's set while that set exists, or nil.
+func liveSocialSet(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection) (*string, error) {
+	if connection.SocialSetID == nil {
+		return nil, nil
+	}
+	live, err := tx.SocialSet.Query().Where(socialset.ID(*connection.SocialSetID), socialset.OrganizationID(connection.OrganizationID),
+		socialset.DeletedAtIsNil()).Exist(ctx)
+	if err != nil || !live {
+		return nil, err
+	}
+	return connection.SocialSetID, nil
+}
 
 // targetSocialSet picks the set a new or reconnected account joins: the one
 // the connection started from, or else the workspace's default set when it

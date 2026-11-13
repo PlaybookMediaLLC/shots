@@ -462,6 +462,28 @@ func TestCreateConnectionAppliesSocialDefaults(t *testing.T) {
 	if verifier.input.DestinationID != "account-1" || verifier.input.ExpectedGoOrganizationID != "go-org-1" {
 		t.Fatalf("destination was not verified against the tenant binding: %#v", verifier.input)
 	}
+	// Twitter is X's legacy name: it is verified and stored as the one X provider.
+	request = httptest.NewRequest(http.MethodPost, "/v1/channel-connections", strings.NewReader(`{"externalAccountId":"account-2","platform":"Twitter"}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org-1")
+	request.Header.Set("X-User-ID", "user-1")
+	request.Header.Set("X-Session-ID", "session-1")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || store.connection.Platform != "x" || verifier.input.Platform != "x" {
+		t.Fatalf("twitter alias kept a second provider: status=%d stored=%q verified=%q", response.Code, store.connection.Platform, verifier.input.Platform)
+	}
+}
+
+func TestAccountConflictsAreExplicitAndNameNoSet(t *testing.T) {
+	for _, conflict := range []error{publishing.ErrAccountInAnotherSet, publishing.ErrAccountRemovedFromAnotherSet} {
+		response := httptest.NewRecorder()
+		writeStoreError(response, fmt.Errorf("finish oauth: %w", conflict))
+		// The message is fixed text: it names neither the other set nor its owner.
+		if response.Code != http.StatusConflict || response.Body.String() != `{"error":"`+conflict.Error()+`"}`+"\n" {
+			t.Fatalf("%v: status=%d body=%q", conflict, response.Code, response.Body.String())
+		}
+	}
 }
 
 func TestCreateScheduledPostRejectsPastTime(t *testing.T) {

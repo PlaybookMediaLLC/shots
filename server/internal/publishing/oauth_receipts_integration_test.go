@@ -69,7 +69,7 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 			return
 		}
 		for _, workspace := range []string{org, other} {
-			for _, table := range []string{"audit_log", "outbox_event", "social_oauth_start", "channel_connection", "social_set"} {
+			for _, table := range []string{"audit_log", "outbox_event", "social_oauth_start", "content_draft", "channel_connection", "social_set"} {
 				if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE "organizationId"=$1`, workspace); err != nil {
 					t.Errorf("cleanup %s: %v", table, err)
 				}
@@ -448,4 +448,116 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 		exec(`UPDATE member SET role='admin' WHERE "organizationId"=$1 AND "userId"=$2`, org, user)
 	})
 
+	connect := func(set *ent.SocialSet) (*ent.ChannelConnection, string) {
+		t.Helper()
+		state := begin(set, nil)
+		external := "external-" + state
+		exchange(state, external)
+		connection, err := finish(state, external)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return connection, external
+	}
+	t.Run("an account in another set is refused and a failed check changes nothing", func(t *testing.T) {
+		first, second := makeSet(false), makeSet(true)
+		connection, external := connect(first)
+		draft, err := db.Client.ContentDraft.Create().SetID(cuid.New()).SetOrganizationID(org).SetTitle("Kept").SetBody([]any{}).
+			SetPlainText("Kept").SetAssetIds([]string{}).SetChannelConnectionIds([]string{connection.ID}).SetSocialSetID(first.ID).Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot := func() string {
+			t.Helper()
+			var row string
+			if err := db.SQL.QueryRowContext(ctx, `SELECT row_to_json(s)::text || row_to_json(c)::text || row_to_json(d)::text ||
+				(SELECT count(*) FROM audit_log WHERE "organizationId"=$4)::text || (SELECT count(*) FROM outbox_event WHERE "organizationId"=$4)::text
+				FROM social_set s, channel_connection c, content_draft d WHERE s.id=$1 AND c.id=$2 AND d.id=$3`,
+				first.ID, connection.ID, draft.ID, org).Scan(&row); err != nil {
+				t.Fatal(err)
+			}
+			return row
+		}
+		before, sets := snapshot(), setCount()
+		add := begin(second, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); !errors.Is(err, ErrAccountInAnotherSet) {
+			t.Fatalf("account joined a second set: %v", err)
+		}
+		create := beginCreation("PRIVATE")
+		exchange(create, external)
+		if _, err := finish(create, external); !errors.Is(err, ErrAccountInAnotherSet) {
+			t.Fatalf("account created a second set: %v", err)
+		}
+		// A failed credential check stops before any product write.
+		failed := begin(second, nil)
+		if _, err := repo.ClaimOAuthExchange(ctx, actor, sessionID, failed, "x"); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SaveOAuthExchange(ctx, actor, sessionID, failed, "x", schema.SocialOAuthExchange{ID: external}); !errors.Is(err, ErrConflict) {
+			t.Fatalf("unverified receipt=%v", err)
+		}
+		if _, err := finish(failed, external); err == nil {
+			t.Fatal("failed verification completed")
+		}
+		if after := snapshot(); after != before || setCount() != sets {
+			t.Fatalf("refused connections changed content:\n%s\n%s", before, after)
+		}
+		if count, err := db.Client.ChannelConnection.Query().Where(channelconnection.SocialSetID(second.ID)).Count(ctx); err != nil || count != 0 {
+			t.Fatalf("second set accounts=%d %v", count, err)
+		}
+	})
+	t.Run("an account whose set was deleted joins the set it is connected to", func(t *testing.T) {
+		gone, next := makeSet(false), makeSet(false)
+		connection, external := connect(gone)
+		// Deleting a set disables its accounts and keeps the set row.
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "deletedAt"=now() WHERE id=$1`, gone.ID)
+		add := begin(next, nil)
+		exchange(add, external)
+		adopted, err := finish(add, external)
+		if err != nil || adopted.ID != connection.ID || adopted.SocialSetID == nil || *adopted.SocialSetID != next.ID || adopted.Status != channelconnection.StatusACTIVE {
+			t.Fatalf("account stayed with its deleted set: %+v %v", adopted, err)
+		}
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		exec(`UPDATE social_set SET "deletedAt"=now() WHERE id=$1`, next.ID)
+		sets := setCount()
+		create := beginCreation("PRIVATE")
+		exchange(create, external)
+		created, err := finish(create, external)
+		if err != nil || created.ID != connection.ID || created.SocialSetID == nil || *created.SocialSetID == next.ID || setCount() != sets+1 {
+			t.Fatalf("creation did not adopt the account: %+v %v", created, err)
+		}
+	})
+	t.Run("an account removed from a live set reconnects only from that set", func(t *testing.T) {
+		home, other := makeSet(false), makeSet(false)
+		connection, external := connect(home)
+		exec(`UPDATE channel_connection SET status='DISABLED' WHERE id=$1`, connection.ID)
+		add := begin(other, nil)
+		exchange(add, external)
+		if _, err := finish(add, external); !errors.Is(err, ErrAccountRemovedFromAnotherSet) {
+			t.Fatalf("removed account moved sets: %v", err)
+		}
+		back := begin(home, &connection.ID)
+		exchange(back, external)
+		restored, err := finish(back, external)
+		if err != nil || restored.ID != connection.ID || *restored.SocialSetID != home.ID || restored.Status != channelconnection.StatusACTIVE {
+			t.Fatalf("home reconnect=%+v %v", restored, err)
+		}
+	})
+	t.Run("a legacy twitter account reconnects through x", func(t *testing.T) {
+		set := makeSet(false)
+		connection, external := connect(set)
+		exec(`UPDATE channel_connection SET platform='twitter' WHERE id=$1`, connection.ID)
+		options := OAuthStartOptions{Operation: "RECONNECT", SocialSetID: &set.ID, ExpectedConnectionID: &connection.ID}
+		if original, err := repo.PrepareOAuth(ctx, actor, sessionID, "x", options); err != nil || original != external {
+			t.Fatalf("twitter account could not prepare an X reconnect: %q %v", original, err)
+		}
+		state := begin(set, &connection.ID)
+		exchange(state, external)
+		renewed, err := finish(state, external)
+		if err != nil || renewed.ID != connection.ID || renewed.Platform != "x" {
+			t.Fatalf("twitter reconnect=%+v %v", renewed, err)
+		}
+	})
 }

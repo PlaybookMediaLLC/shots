@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { ScreenshotStudioBackendSDK } from '../../../packages/screenshot-studio-backend-sdk/src/index'
+import { socialConnectionProviderSchema } from '../../../packages/screenshot-studio-backend-sdk/src/bluesky-connections'
 import { socialOAuthBeginRequestSchema } from '../../../packages/screenshot-studio-backend-sdk/src/social-oauth'
+import { providerFor } from '@/components/settings/social-sets/api'
 
 test('first connection requires explicit ownership and cannot mix creation with reconnect', () => {
   assert.equal(
@@ -149,4 +151,24 @@ test('custom Mastodon requires a safe server and carries it with the original cr
     creationVisibility: 'PRIVATE',
     instanceServer: 'example.social',
   })
+})
+
+test('every stored account platform offers Reconnect through its own provider', () => {
+  for (const [platform, provider] of [
+    ['x', 'x'],
+    ['twitter', 'x'],
+    ['bluesky', 'bluesky'],
+    ['mastodon', 'mastodon'],
+    ['mastodon-custom', 'mastodon-custom'],
+    ['linkedin', 'linkedin'],
+    ['linkedin-page', 'linkedin-page'],
+    ['instagram', 'instagram'],
+    ['instagram-standalone', 'instagram-standalone'],
+    ['threads', 'threads'],
+    ['tiktok', 'tiktok'],
+    ['youtube', 'youtube'],
+  ]) {
+    assert.equal(providerFor(platform), provider, platform)
+    assert.equal(socialConnectionProviderSchema.safeParse(providerFor(platform)).success, true)
+  }
 })
