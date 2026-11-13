@@ -1,7 +1,6 @@
 package tenantpublishing
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -59,7 +58,7 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			}
 			settings["containsSyntheticMedia"] = options.YouTube.ContainsSyntheticMedia
 		case "instagram", "instagram-standalone":
-			if err := instagramSettings(settings, options.Instagram); err != nil {
+			if err := instagramSettings(platform, settings, options.Instagram); err != nil {
 				return nil, err
 			}
 		case "tiktok":
@@ -106,8 +105,8 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 
 // instagramSettings writes a post's Instagram options as the adapter reads
 // them; the cover travels with the media (Publish).
-func instagramSettings(settings map[string]any, o *postoptions.InstagramOptions) error {
-	if err := o.Validate(); err != nil {
+func instagramSettings(platform string, settings map[string]any, o *postoptions.InstagramOptions) error {
+	if err := postoptions.ValidateInstagramOptions(platform, o); err != nil {
 		return err
 	}
 	if o == nil {
@@ -127,8 +126,11 @@ func instagramSettings(settings map[string]any, o *postoptions.InstagramOptions)
 		settings["share_to_feed"] = *o.ShareToFeed
 	}
 	if o.TrialReel {
+		// Without a graduation the adapter sends MANUAL, Instagram's default.
 		settings["is_trial_reel"] = true
-		settings["graduation_strategy"] = cmp.Or(o.TrialGraduation, "MANUAL")
+		if o.TrialGraduation != "" {
+			settings["graduation_strategy"] = o.TrialGraduation
+		}
 	}
 	return nil
 }

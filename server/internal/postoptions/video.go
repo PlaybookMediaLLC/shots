@@ -40,9 +40,13 @@ func YouTubeTagsLength(tags []string) int {
 	return total
 }
 
-// checkYouTubeTags checks each tag always, and their combined length only
-// for a scheduled snapshot, so a draft saves while it is being edited.
+// checkYouTubeTags checks a scheduled snapshot's tags only, so a draft saves
+// while it is being edited: Go and the composer can read a tag's case and
+// spaces differently, and a draft must never stop saving over it.
 func checkYouTubeTags(tags []string, complete bool) error {
+	if !complete {
+		return nil
+	}
 	seen := map[string]bool{}
 	for _, tag := range tags {
 		key := strings.ToLower(tag)
@@ -51,7 +55,7 @@ func checkYouTubeTags(tags []string, complete bool) error {
 		}
 		seen[key] = true
 	}
-	if complete && YouTubeTagsLength(tags) > YouTubeTagsLimit {
+	if YouTubeTagsLength(tags) > YouTubeTagsLimit {
 		return fmt.Errorf("keep YouTube tags under %d characters together", YouTubeTagsLimit)
 	}
 	return nil

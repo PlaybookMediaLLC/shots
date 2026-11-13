@@ -63,9 +63,20 @@ test(
       },
     })
     // A trial reel on a photo blocks scheduling with the reason.
-    await page.getByTestId('schedule-button').click()
-    await expect(page.getByTestId('schedule-dialog')).toContainText('is for a reel')
-    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('blockers')).toContainText('is for a reel')
+    // A reel's cover is a JPEG of the workspace, chosen in the same place.
+    const cover = await sharp({
+      create: { width: 1080, height: 1920, channels: 3, background: '#aa5533' },
+    })
+      .jpeg()
+      .toBuffer()
+    await options
+      .getByLabel('Reel cover')
+      .setInputFiles({ name: 'cover.jpg', mimeType: 'image/jpeg', buffer: cover })
+    await expect(options).toContainText('Reel cover added')
+    await expectSaved(page)
+    const withCover = await savedOptions(page, id, 'instagram')
+    expect(withCover).toMatchObject({ instagram: { coverAssetId: expect.any(String) } })
 
     await app.reload()
     await page.getByTestId('platform-tab-instagram').click()
@@ -111,8 +122,7 @@ test(
     await expect(reloaded.getByTestId('youtube-tags-count')).toHaveText('504/500')
     await expect(reloaded.getByLabel('YouTube tags')).toHaveAttribute('aria-invalid', 'true')
     await expectSaved(page)
-    await page.getByTestId('schedule-button').click()
-    await expect(page.getByTestId('schedule-dialog')).toContainText(
+    await expect(page.getByTestId('blockers')).toContainText(
       'Keep YouTube tags under 500 characters together.'
     )
   }
@@ -150,7 +160,13 @@ test(
     await app.open(`/publish/${z.object({ id: z.string() }).parse(created.body).id}`)
     await expect(draftEditor(page)).toBeVisible()
     const refused = page.getByRole('switch', { name: 'Publish to LinkedIn', exact: true })
-    await expect(refused).toBeDisabled()
+    await expect(refused).toHaveAttribute('aria-disabled', 'true')
     await expect(refused).toHaveAccessibleDescription('LinkedIn does not take this kind of draft.')
+    // It stays in the tab order, so a keyboard reaches it, and Space changes nothing.
+    await page.getByTestId('platform-tab-linkedin').click()
+    await page.keyboard.press('Tab')
+    await expect(refused).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect(refused).toHaveAttribute('aria-checked', 'false')
   }
 )

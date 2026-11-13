@@ -149,7 +149,7 @@ func TestCoversAndThumbnailsStayInUse(t *testing.T) {
 			id, w.org, "org/"+w.org+"/input/"+id+"/1/a.jpg")
 		return id
 	}
-	cover, thumbnail, postCover := uploaded(), uploaded(), uploaded()
+	cover, thumbnail, postCover, postThumbnail := uploaded(), uploaded(), uploaded(), uploaded()
 	draft, err := repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Reel", PlainText: "Reel"})
 	if err != nil {
 		t.Fatal(err)
@@ -175,12 +175,13 @@ func TestCoversAndThumbnailsStayInUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The snapshot alone names this cover; its draft is archived.
-	w.exec(t, `UPDATE scheduled_post SET "publishOptions"=jsonb_build_object('instagram',jsonb_build_object('coverAssetId',$2::text)) WHERE id=$1`, scheduled.Posts[0].ID, postCover)
+	w.exec(t, `UPDATE scheduled_post SET "publishOptions"=jsonb_build_object('instagram',jsonb_build_object('coverAssetId',$2::text),
+		'youtube',jsonb_build_object('thumbnailAssetId',$3::text)) WHERE id=$1`, scheduled.Posts[0].ID, postCover, postThumbnail)
 	archived := "archived"
 	if _, err := repo.UpdateContentDraft(w.ctx, w.owner, queued.ID, ContentDraftUpdate{BaseVersion: scheduled.Draft.Version, Status: &archived}); err != nil {
 		t.Fatal(err)
 	}
-	for name, id := range map[string]string{"draft cover": cover, "draft thumbnail": thumbnail, "queued cover": postCover} {
+	for name, id := range map[string]string{"draft cover": cover, "draft thumbnail": thumbnail, "queued cover": postCover, "queued thumbnail": postThumbnail} {
 		if result, err := repo.DeleteAsset(w.ctx, w.owner, id); err != nil || result != AssetInUse {
 			t.Fatalf("%s: %s %v", name, result, err)
 		}

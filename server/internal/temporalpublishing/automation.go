@@ -107,7 +107,7 @@ func automationPlan(job PreparedPublication, publishedAt time.Time) []Automation
 		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram")) {
 		steps = append(steps, AutomationStep{At: publishedAt, Key: "first-comment", Kind: AutomationFirstComment})
 	}
-	if job.Platform == "youtube" && job.Cover != nil && job.Options != nil && job.Options.YouTube != nil && job.Options.YouTube.ThumbnailAssetID != "" {
+	if job.Platform == "youtube" && job.Options != nil && job.Options.YouTube != nil && job.Options.YouTube.ThumbnailAssetID != "" {
 		steps = append(steps, AutomationStep{At: publishedAt, Key: "thumbnail", Kind: AutomationThumbnail})
 	}
 	actions := job.AutoActions
@@ -227,6 +227,10 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 			request.Text = input.Job.Options.FirstComment
 		}
 	case AutomationThumbnail:
+		if input.Job.Cover == nil {
+			// The image was gone when the post went out; the video is live without it.
+			return settle(ReceiptSkipped, "", "media_unavailable")
+		}
 		request.Media = input.Job.Cover
 	case AutomationUnretweet:
 		repost, _, err := store.AutomationReceipt(ctx, postID, "retweet:"+strconv.Itoa(step.Rule))

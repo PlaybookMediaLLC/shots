@@ -158,7 +158,7 @@ function postOptions(
 }
 
 /** Instagram's settings that do something, or undefined when none is on. */
-export function instagramChoices(
+function instagramChoices(
   options: InstagramOptions | undefined
 ): InstagramOptions | undefined {
   if (!options) return undefined
@@ -169,14 +169,9 @@ export function instagramChoices(
   if (options.shareToFeed === false) chosen.shareToFeed = false
   if (options.trialReel) {
     chosen.trialReel = true
-    chosen.trialGraduation = options.trialGraduation ?? 'MANUAL'
+    if (options.trialGraduation) chosen.trialGraduation = options.trialGraduation
   }
   return Object.keys(chosen).length > 0 ? chosen : undefined
-}
-
-/** Whether Instagram settings need the post to be a reel: one video. */
-export function instagramReelOnly(options: InstagramOptions): boolean {
-  return Boolean(options.coverAssetId || options.shareToFeed === false || options.trialReel)
 }
 
 /** Follow-ups that do something, or undefined when none is on. */
@@ -273,7 +268,8 @@ export function buildPublication(
   if (instagram) {
     const media = first?.media ?? []
     const reel = media.length === 1 && media[0]?.kind === 'video'
-    if (instagramReelOnly(instagram) && !reel)
+    // A cover, the grid choice and a trial need a reel (Go: InstagramOptions.Reel).
+    if ((instagram.coverAssetId || instagram.shareToFeed === false || instagram.trialReel) && !reel)
       optionProblems.push(
         'A cover, grid setting or trial is for a reel. Post one video, or turn them off.'
       )

@@ -1,4 +1,9 @@
-import type { YouTubeOptions, TikTokOptions, PublicationReceipt } from './video-publishing.ts'
+import type {
+  YouTubeOptions,
+  TikTokOptions,
+  InstagramOptions,
+  PublicationReceipt,
+} from './video-publishing.ts'
 export {
   publicationReceiptSchema,
   youtubeOptionsSchema,
@@ -1342,6 +1347,7 @@ export type BackendContentDraftScheduleTarget = {
 export type BackendPublishOptions = {
   youtube?: YouTubeOptions
   tiktok?: TikTokOptions
+  instagram?: InstagramOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string

@@ -53,8 +53,13 @@ function Handles({
     (handles ?? []).map((handle) => `@${handle}`).join(' ')
   const [text, setText] = React.useState(() => shown(value))
   const { handles, refused } = handlesFrom(text, limit)
-  // A co-editor's change replaces the text; typing never differs from what it saved.
-  if (handles.join(' ') !== (value ?? []).join(' ')) setText(shown(value))
+  // A co-editor's change replaces the text, once per saved value: a stored
+  // handle this parser reads differently must not set the text on every render.
+  const [synced, setSynced] = React.useState(value)
+  if (value !== synced) {
+    setSynced(value)
+    if (handles.join(' ') !== (value ?? []).join(' ')) setText(shown(value))
+  }
   return (
     <div className="grid gap-2">
       <div className="flex justify-between">
@@ -111,7 +116,7 @@ export function InstagramOptions({
     >
       <Handles
         disabled={disabled}
-        hint="Invited as co-authors: the post shows on their profile once they accept. Public accounts only."
+        hint="Invited as co-authors: the post shows on their profile once they accept. Use public accounts: Instagram refuses the whole post for a private or misspelled one."
         id="instagram-collaborators"
         label="Collaborators"
         limit={3}
@@ -120,7 +125,7 @@ export function InstagramOptions({
       />
       <Handles
         disabled={disabled}
-        hint="Tagged on the first photo, or on the reel. Instagram drops accounts that don't allow tags."
+        hint="Tagged on the first photo, or on the reel. Tag public accounts."
         id="instagram-tags"
         label="Tag accounts"
         limit={20}

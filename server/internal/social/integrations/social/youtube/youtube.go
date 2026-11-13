@@ -667,9 +667,7 @@ func (p *Provider) FinalizePost(ctx context.Context, accessToken string, raw jso
 	}
 
 	if data.Thumbnail != "" {
-		if _, err := integrations.RunInConcurrent(p.Base, func() (any, error) {
-			return nil, setThumbnail(ctx, accessToken, id, data.Thumbnail)
-		}); err != nil {
+		if err := p.SetThumbnail(ctx, accessToken, id, data.Thumbnail); err != nil {
 			return nil, err
 		}
 	}

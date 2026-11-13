@@ -568,15 +568,23 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if post.ReplyTo != nil {
 		job.ReplyTo = *post.ReplyTo
 	}
-	// A document or cover that was deleted cancels the post too.
+	// A document or cover that was deleted cancels the post too. A YouTube
+	// thumbnail does not: it is a follow-up, and its step reports it missing.
 	options := post.PublishOptions
+	thumbnail := options.YouTube != nil && options.YouTube.ThumbnailAssetID != ""
 	for _, id := range []string{options.DocumentAssetID, options.ArticleCoverAssetID, postoptions.CoverAsset(options.YouTube, options.Instagram)} {
 		if id == "" {
 			continue
 		}
 		media, missing, err := r.draftMedia(ctx, post.OrganizationID, []string{id})
-		if err != nil || missing {
+		if err != nil {
 			return inactive, err
+		}
+		if missing && thumbnail && id == options.YouTube.ThumbnailAssetID {
+			continue
+		}
+		if missing {
+			return inactive, nil
 		}
 		if id == options.DocumentAssetID {
 			job.Document = &media[0]

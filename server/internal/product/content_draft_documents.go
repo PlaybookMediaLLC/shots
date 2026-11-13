@@ -228,13 +228,8 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	if err := postoptions.ValidateVideoOptions(channel, clean.YouTube, clean.TikTok, false); err != nil {
 		return nil, invalid(err.Error())
 	}
-	if clean.Instagram != nil {
-		if channel != "instagram" {
-			return nil, invalid("Collaborators, tags, covers and trial reels are Instagram settings.")
-		}
-		if err := clean.Instagram.Validate(); err != nil {
-			return nil, invalid(err.Error())
-		}
+	if err := postoptions.ValidateInstagramOptions(channel, clean.Instagram); err != nil {
+		return nil, invalid(err.Error())
 	}
 	if len(clean.LinkPreviews) > 25 {
 		return nil, invalid("A draft can store at most 25 link previews.")

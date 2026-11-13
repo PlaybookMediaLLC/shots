@@ -174,14 +174,18 @@ export function PlatformTabs({
               </Button>
               {account ? (
                 <span className="inline-flex" title={refusal ?? undefined}>
+                  {/* A refused switch stays focusable, so a keyboard reaches it and hears why. */}
                   <Switch
                     aria-describedby={refusal ? `${ids}-${channel}` : undefined}
+                    aria-disabled={refusal !== null || undefined}
                     aria-label={`Publish to ${CHANNEL_META[channel].label}`}
                     checked={publishing}
-                    disabled={!canEdit || refusal !== null}
-                    onCheckedChange={(checked) => onToggle(account.id, checked === true)}
+                    className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                    disabled={!canEdit}
+                    onCheckedChange={(checked) => {
+                      if (refusal === null) onToggle(account.id, checked === true)
+                    }}
                   />
-                  {/* The hover title alone never reaches a keyboard or a screen reader. */}
                   {refusal ? (
                     <span className="sr-only" id={`${ids}-${channel}`}>
                       {refusal}

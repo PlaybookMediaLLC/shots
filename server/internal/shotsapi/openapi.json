@@ -12764,12 +12764,9 @@
                                             "type": "boolean"
                                           },
                                           "tags": {
-                                            "maxItems": 500,
                                             "type": "array",
                                             "items": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 500
+                                              "type": "string"
                                             }
                                           },
                                           "containsSyntheticMedia": {
@@ -12845,7 +12842,8 @@
                                             "type": "array",
                                             "items": {
                                               "type": "string",
-                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                             }
                                           },
                                           "userTags": {
@@ -12853,7 +12851,8 @@
                                             "type": "array",
                                             "items": {
                                               "type": "string",
-                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                             }
                                           },
                                           "coverAssetId": {
@@ -14042,12 +14041,9 @@
                                             "type": "boolean"
                                           },
                                           "tags": {
-                                            "maxItems": 500,
                                             "type": "array",
                                             "items": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 500
+                                              "type": "string"
                                             }
                                           },
                                           "containsSyntheticMedia": {
@@ -14123,7 +14119,8 @@
                                             "type": "array",
                                             "items": {
                                               "type": "string",
-                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                             }
                                           },
                                           "userTags": {
@@ -14131,7 +14128,8 @@
                                             "type": "array",
                                             "items": {
                                               "type": "string",
-                                              "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                             }
                                           },
                                           "coverAssetId": {
@@ -22669,12 +22667,9 @@
                                     "type": "boolean"
                                   },
                                   "tags": {
-                                    "maxItems": 500,
                                     "type": "array",
                                     "items": {
-                                      "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 500
+                                      "type": "string"
                                     }
                                   },
                                   "containsSyntheticMedia": {
@@ -22750,7 +22745,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "userTags": {
@@ -22758,7 +22754,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "coverAssetId": {
@@ -27727,12 +27724,9 @@
                                     "type": "boolean"
                                   },
                                   "tags": {
-                                    "maxItems": 500,
                                     "type": "array",
                                     "items": {
-                                      "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 500
+                                      "type": "string"
                                     }
                                   },
                                   "containsSyntheticMedia": {
@@ -27808,7 +27802,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "userTags": {
@@ -27816,7 +27811,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "coverAssetId": {
@@ -28693,12 +28689,9 @@
                                     "type": "boolean"
                                   },
                                   "tags": {
-                                    "maxItems": 500,
                                     "type": "array",
                                     "items": {
-                                      "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 500
+                                      "type": "string"
                                     }
                                   },
                                   "containsSyntheticMedia": {
@@ -28774,7 +28767,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "userTags": {
@@ -28782,7 +28776,8 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                     }
                                   },
                                   "coverAssetId": {
@@ -29311,12 +29306,9 @@
                               "type": "boolean"
                             },
                             "tags": {
-                              "maxItems": 500,
                               "type": "array",
                               "items": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
+                                "type": "string"
                               }
                             },
                             "containsSyntheticMedia": {
@@ -29392,7 +29384,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "userTags": {
@@ -29400,7 +29393,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "coverAssetId": {
@@ -30304,12 +30298,9 @@
                               "type": "boolean"
                             },
                             "tags": {
-                              "maxItems": 500,
                               "type": "array",
                               "items": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
+                                "type": "string"
                               }
                             },
                             "containsSyntheticMedia": {
@@ -30385,7 +30376,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "userTags": {
@@ -30393,7 +30385,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "coverAssetId": {
@@ -30913,12 +30906,9 @@
                               "type": "boolean"
                             },
                             "tags": {
-                              "maxItems": 500,
                               "type": "array",
                               "items": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
+                                "type": "string"
                               }
                             },
                             "containsSyntheticMedia": {
@@ -30994,7 +30984,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "userTags": {
@@ -31002,7 +30993,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                               }
                             },
                             "coverAssetId": {
@@ -31906,12 +31898,9 @@
                           "type": "boolean"
                         },
                         "tags": {
-                          "maxItems": 500,
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 500
+                            "type": "string"
                           }
                         },
                         "containsSyntheticMedia": {
@@ -32451,12 +32440,9 @@
                                   "type": "boolean"
                                 },
                                 "tags": {
-                                  "maxItems": 500,
                                   "type": "array",
                                   "items": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 500
+                                    "type": "string"
                                   }
                                 },
                                 "containsSyntheticMedia": {
@@ -32532,7 +32518,8 @@
                                   "type": "array",
                                   "items": {
                                     "type": "string",
-                                    "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                   }
                                 },
                                 "userTags": {
@@ -32540,7 +32527,8 @@
                                   "type": "array",
                                   "items": {
                                     "type": "string",
-                                    "pattern": "^[A-Za-z0-9._]{1,30}$"
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
                                   }
                                 },
                                 "coverAssetId": {

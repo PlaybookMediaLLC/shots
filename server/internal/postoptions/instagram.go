@@ -32,8 +32,8 @@ const (
 )
 
 // instagramUsername is a handle without its @: letters, digits, dots and
-// underscores, up to 30.
-var instagramUsername = regexp.MustCompile(`^[A-Za-z0-9._]{1,30}$`)
+// underscores, up to 30, with no dot first, last or twice in a row.
+var instagramUsername = regexp.MustCompile(`^[A-Za-z0-9_](?:[A-Za-z0-9_]|\.[A-Za-z0-9_])*$`)
 
 // Reel reports whether a setting needs the post to be a reel: one video.
 func (o *InstagramOptions) Reel() bool {
@@ -57,7 +57,7 @@ func (o *InstagramOptions) Validate() error {
 		seen := map[string]bool{}
 		for _, name := range list.names {
 			key := strings.ToLower(name)
-			if !instagramUsername.MatchString(name) || seen[key] {
+			if len(name) > 30 || !instagramUsername.MatchString(name) || seen[key] {
 				return fmt.Errorf("name distinct Instagram %s by username, without the @", list.what)
 			}
 			seen[key] = true
@@ -67,6 +67,18 @@ func (o *InstagramOptions) Validate() error {
 		return fmt.Errorf("a trial reel graduates manually (MANUAL) or on performance (SS_PERFORMANCE)")
 	}
 	return nil
+}
+
+// ValidateInstagramOptions checks Instagram settings belong to an Instagram
+// post and hold on their own; scheduling checks them against its media.
+func ValidateInstagramOptions(channel string, o *InstagramOptions) error {
+	if o == nil {
+		return nil
+	}
+	if channel != "instagram" && channel != "instagram-standalone" {
+		return fmt.Errorf("collaborators, tags, covers and trial reels are Instagram settings")
+	}
+	return o.Validate()
 }
 
 // CoverAsset is the image a video post sets as its cover: an Instagram

@@ -24,6 +24,13 @@ const secretReference = 'SOCIAL_API_KEY_GATE'
 const fakeURL = process.env.E2E_SOCIAL_GATE_FAKE_URL ?? 'http://127.0.0.1:5680'
 
 const fakeStateSchema = z.object({
+  actions: z.array(
+    z.object({
+      kind: z.string(),
+      postId: z.string(),
+      media: z.object({ sha256: z.string() }).optional(),
+    })
+  ),
   posts: z.array(
     z.object({
       caption: z.string(),
@@ -346,7 +353,14 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         media: [clip],
         connectionId: youtubeConnection,
         channel: 'youtube',
-        options: { youtube: { title: 'Fixture video', privacy: 'private', madeForKids: false } },
+        options: {
+          youtube: {
+            title: 'Fixture video',
+            privacy: 'private',
+            madeForKids: false,
+            thumbnailAssetId: expect.any(String),
+          },
+        },
       },
       // Not the upload order, so the post's order is the draft's.
       { caption: 'Three images, in order.', media: [first, photo, last] },
@@ -401,6 +415,11 @@ test('the backend worker publishes draft photos, video, and ordered images once 
           await page.getByRole('option', { name: 'Private', exact: true }).click()
           await page.getByRole('combobox', { name: 'YouTube audience' }).click()
           await page.getByRole('option', { name: 'Not made for kids', exact: true }).click()
+          // The thumbnail is chosen beside the other settings and set once the video is live.
+          await page
+            .getByLabel('Custom thumbnail')
+            .setInputFiles({ name: 'thumbnail.png', mimeType: 'image/png', buffer: png })
+          await expect(page.getByTestId('required-options')).toContainText('Custom thumbnail added')
         } else {
           await page.getByRole('combobox', { name: 'TikTok privacy' }).click()
           await page.getByRole('option', { name: 'Only me', exact: true }).click()
@@ -473,6 +492,27 @@ test('the backend worker publishes draft photos, video, and ordered images once 
       const [attempt, ...extraAttempts] = await attemptsOf(postIds[index]!)
       expect(extraAttempts).toHaveLength(0)
       expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+      if (draft.channel === 'youtube') {
+        // PB-03: the thumbnail follow-up set the uploaded image on the live video.
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.row<{ status: string }>(
+                  `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+                  [postIds[index]]
+                )
+              )?.status,
+            { intervals: [1_000], timeout: 120_000 }
+          )
+          .toBe('done')
+        const set = (await fakeState()).actions.filter(
+          (action) => action.kind === 'thumbnail' && action.postId === received?.id
+        )
+        expect(set).toEqual([
+          expect.objectContaining({ media: expect.objectContaining({ sha256: sha256(png) }) }),
+        ])
+      }
     }
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [

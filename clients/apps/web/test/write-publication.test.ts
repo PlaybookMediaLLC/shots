@@ -687,7 +687,6 @@ test('Instagram settings go to Instagram only, and reel settings need one video'
     coverAssetId: 'ccover000001',
     shareToFeed: false,
     trialReel: true,
-    trialGraduation: 'MANUAL',
   })
   assert.deepEqual(reel.optionProblems, [])
   // Instagram's defaults send nothing.
@@ -717,6 +716,11 @@ test('handles are typed with or without @, kept when Instagram takes them, and c
     refused: [],
   })
   assert.deepEqual(handlesFrom('@a @A b! c d', 2), { handles: ['a', 'c'], refused: ['b!', 'd'] })
+  // Instagram takes no dot first, last or twice in a row.
+  assert.deepEqual(handlesFrom('.x a..b x. ok.go', 3), {
+    handles: ['ok.go'],
+    refused: ['.x', 'a..b', 'x.'],
+  })
 })
 
 test('a platform chip names its options in words, and option problems open the options', () => {

@@ -8,16 +8,19 @@ export const youtubeOptionsSchema = z.strictObject({
     .refine((value) => !/[<>]/.test(value)),
   privacy: z.enum(['', 'public', 'private', 'unlisted']),
   madeForKids: z.boolean().optional(),
-  /** snippet.tags; Go checks their combined length (YouTubeTagsLength). */
-  tags: z.array(z.string().min(1).max(500)).max(500).optional(),
+  /** snippet.tags; Go checks them when the post is scheduled, so a draft always saves. */
+  tags: z.array(z.string()).optional(),
   /** status.containsSyntheticMedia: realistic altered or synthetic content. */
   containsSyntheticMedia: z.boolean().optional(),
   /** Set as the custom thumbnail once the video is live, as its own follow-up. */
   thumbnailAssetId: z.string().min(1).max(64).optional(),
 })
 
-/** An Instagram username without its @. */
-export const instagramUsernameSchema = z.string().regex(/^[A-Za-z0-9._]{1,30}$/)
+/** An Instagram username without its @: up to 30 letters, digits, dots and underscores, no dot first, last or twice in a row. */
+export const instagramUsernameSchema = z
+  .string()
+  .max(30)
+  .regex(/^[A-Za-z0-9_](?:[A-Za-z0-9_]|\.[A-Za-z0-9_])*$/)
 
 /** Instagram settings beyond the caption, sent as media container parameters. */
 export const instagramOptionsSchema = z.strictObject({

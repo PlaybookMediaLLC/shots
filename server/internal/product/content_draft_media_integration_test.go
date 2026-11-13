@@ -2,12 +2,14 @@ package product
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
+	"image/png"
 	"os"
 	"strings"
 	"sync"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
@@ -298,6 +302,84 @@ func TestMediaScheduling(t *testing.T) {
 		}
 		if after := w.db.Client.ScheduledPost.GetX(ctx, post.ID); !after.ScheduledFor.Equal(post.ScheduledFor) || after.Status != scheduledpost.StatusSCHEDULED || after.Caption != "Zoned" {
 			t.Fatalf("edit changed the queued post: %+v", after)
+		}
+	})
+
+	t.Run("Instagram and YouTube options follow the media, and a missing thumbnail never stops the video", func(t *testing.T) {
+		youtube := connect("youtube")
+		off, no := false, false
+		reelOnly := ContentDraftScheduleTarget{ChannelConnectionID: instagram, Caption: "Trial", AssetIDs: []string{photo},
+			Options: &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{TrialReel: true}}}
+		if _, err := schedule(draft("Trial", photo), ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{reelOnly}}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("a trial on a photo: %v", err)
+		}
+		reel := draft("Options reel", video)
+		result, err := schedule(reel, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: instagram, Caption: "Options reel", AssetIDs: []string{video},
+			Options: &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: photo, ShareToFeed: &off, UserTags: []string{"brand"}}}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		load := func(id string) publishing.PublishJob {
+			t.Helper()
+			w.exec(t, `UPDATE scheduled_post SET status='PROCESSING', "triggerRunId"='run-options' WHERE id=$1`, id)
+			job, err := publishing.NewRepository(w.db.Client).LoadPublishJob(ctx, id, "run-options")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return job
+		}
+		if job := load(result.Posts[0].ID); job.Cover == nil || job.Cover.AssetID != photo || job.Options.Instagram == nil || *job.Options.Instagram.ShareToFeed {
+			t.Fatalf("reel job = %+v", job)
+		}
+
+		// A thumbnail over YouTube's 2 MB is refused before scheduling.
+		noise := image.NewRGBA(image.Rect(0, 0, 1280, 720))
+		if _, err := rand.Read(noise.Pix); err != nil {
+			t.Fatal(err)
+		}
+		var big bytes.Buffer
+		if err := png.Encode(&big, noise); err != nil {
+			t.Fatal(err)
+		}
+		if big.Len() <= 2_097_152 {
+			t.Fatalf("the fixture is %d bytes, not over 2 MB", big.Len())
+		}
+		large := upload("large.png", "image/png", big.Bytes())
+		options := func(thumbnail string) *postoptions.PublishOptions {
+			return &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Launch", Privacy: "private", MadeForKids: &no,
+				Tags: []string{"launch"}, ThumbnailAssetID: thumbnail}}
+		}
+		clip := draft("Options clip", video)
+		if _, err := schedule(clip, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: youtube, Caption: "Options clip", AssetIDs: []string{video},
+			Options: options(large)}}}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("an oversized thumbnail: %v", err)
+		}
+		scheduled, err := schedule(clip, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: youtube, Caption: "Options clip", AssetIDs: []string{video},
+			Options: options(photo)}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The thumbnail is gone by the time the video goes out: the video still does.
+		w.exec(t, `UPDATE asset SET status='DELETED' WHERE id=$1`, photo)
+		t.Cleanup(func() { w.exec(t, `UPDATE asset SET status='UPLOADED' WHERE id=$1`, photo) })
+		if job := load(scheduled.Posts[0].ID); !job.WorkspaceActive || job.Ineligible != "" || job.Cover != nil || len(job.Assets) != 1 {
+			t.Fatalf("a missing thumbnail stopped the video: %+v", job)
+		}
+		w.exec(t, `UPDATE asset SET status='UPLOADED' WHERE id=$1`, photo)
+
+		// A cover from another workspace is refused when the draft is saved.
+		other := newTestWorkspace(t)
+		foreign := "foreign-" + other.id
+		other.exec(t, `INSERT INTO asset (id,"organizationId","objectKey","mediaType",bytes,status,width,height,"updatedAt") VALUES ($1,$2,$3,'image/jpeg',10,'UPLOADED',1080,1920,now())`,
+			foreign, other.org, "org/"+other.org+"/input/"+foreign+"/1/a.jpg")
+		versions := &draftdoc.PlatformVersions{SchemaVersion: draftdoc.SchemaVersion, Versions: []draftdoc.PlatformVersion{{Channel: "instagram", Mode: draftdoc.ModeSynced,
+			Options: &draftdoc.VersionOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: foreign}}}}}
+		current, err := repo.GetContentDraft(ctx, owner, reel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.UpdateContentDraft(ctx, owner, reel.ID, ContentDraftUpdate{BaseVersion: current.Version, PlatformVersions: versions}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("another workspace's cover: %v", err)
 		}
 	})
 

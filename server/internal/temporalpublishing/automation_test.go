@@ -229,4 +229,24 @@ func TestYouTubeThumbnailIsAFollowUp(t *testing.T) {
 	if call := provider.calls[0]; call.Kind != AutomationThumbnail || call.RemotePostID != "vid1" || call.Media != cover {
 		t.Fatalf("thumbnail request = %+v", call)
 	}
+
+	// The image was gone when the video went out: skipped and named, nothing sent.
+	gone := job
+	gone.Cover = nil
+	if steps := automationPlan(gone, published); len(steps) != 1 || steps[0].Kind != AutomationThumbnail {
+		t.Fatalf("a missing thumbnail was not reported: %+v", steps)
+	}
+	store.receipts["thumbnail"] = &receipt{status: ReceiptPending}
+	if _, err := NewActivities(store, provider).RunAutomation(context.Background(), AutomationInput{Job: gone, ProviderID: "vid1", Step: steps[0]}); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.receipts["thumbnail"]; got.status != ReceiptSkipped || got.code != "media_unavailable" || len(provider.calls) != 1 {
+		t.Fatalf("missing thumbnail: %+v, calls %d", got, len(provider.calls))
+	}
+	// An Instagram reel's cover goes with the reel: no thumbnail step.
+	reel := PreparedPublication{PostID: "post-2", Platform: "instagram-standalone", Cover: cover,
+		Options: &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "thumb-1"}}}
+	if steps := automationPlan(reel, published); len(steps) != 0 {
+		t.Fatalf("an Instagram cover planned %+v", steps)
+	}
 }

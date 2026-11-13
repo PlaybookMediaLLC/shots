@@ -31,6 +31,12 @@ Recorded with the owner on 13 November 2026.
 - An Instagram reel's cover travels in the same request as the reel, because Instagram takes no cover afterwards. Shots checks it before scheduling (JPEG up to 8 MB), so the provider either takes the reel with its cover or refuses both.
 - Instagram's trial-reel account rules (a public professional account, 1,000 followers, five a day) are shown beside the switch. Shots cannot read the daily count, so Instagram's refusal reaches the post as its failure reason.
 - A cover or thumbnail is an uploaded asset of the workspace and stays in use while a draft or an unfinished post names it.
+- A YouTube thumbnail missing when the video goes out never stops the video: its follow-up is recorded as skipped (`media_unavailable`). A missing Instagram cover cancels the reel, as a missing document cancels a LinkedIn post, because the cover is part of it.
+- Instagram refuses the whole post for a private or misspelled collaborator, because collaborators travel with the media. The composer says so beside the field.
+
+### Known limit
+
+A thumbnail deleted in the moments between the video going live and its follow-up is recorded as a failed follow-up; the video is unaffected.
 
 ## Acceptance
 
@@ -59,7 +65,7 @@ Weekly scheduled posts that use an Instagram or YouTube option, and the share of
 
 ## Rollback
 
-- Slice 1: deploy the migration, then the API and worker together, then the web. To roll back, redeploy the previous code: the new follow-up kind and the wider retention function are additive and can stay. A thumbnail step planned before a rollback is skipped as unsupported by the older worker.
+- Slice 1 rolls forward only. Deploy the migration, then the API and worker together, then the web. The previous code ignores the new options rather than refusing them: an older worker would publish a scheduled trial reel, or a reel kept off the grid, as an ordinary reel, and a YouTube video without its tags, disclosure or thumbnail; the previous web cannot read a post with a `thumbnail` follow-up. Before any redeploy of older code, hold the queued posts that set them (`"publishOptions" ? 'instagram'`, or `"publishOptions"->'youtube' ?| array['tags','containsSyntheticMedia','thumbnailAssetId']`). The migration's constraint and function can stay; the old constraint cannot be restored while `thumbnail` rows exist.
 - Later slices: redeploy the previous web and API; each records its own migration order here when it has one.
 
 ## Verification

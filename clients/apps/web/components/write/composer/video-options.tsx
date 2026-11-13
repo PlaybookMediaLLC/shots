@@ -70,7 +70,7 @@ function durationLabel(seconds: number): string {
 }
 
 /** Upload a file to the workspace; the composer's upload service. */
-export type UploadFile = (file: File) => Promise<{ assetId: string }>
+export type UploadFile = (file: File) => Promise<{ assetId?: string }>
 
 /**
  * A video's cover or thumbnail: one image in a format and size its
@@ -94,6 +94,12 @@ export function CoverUpload({
   uploadFile: UploadFile
 }) {
   const [busy, setBusy] = React.useState(false)
+  // The upload can take a while: its result goes into the options as they are
+  // when it finishes, not as they were when the file was dropped.
+  const latest = React.useRef(onChange)
+  React.useEffect(() => {
+    latest.current = onChange
+  })
   const rules = DESTINATION_MEDIA[channel].cover
   if (!rules) return null
   return (
@@ -110,7 +116,7 @@ export function CoverUpload({
           if (!file) return
           setBusy(true)
           try {
-            onChange((await uploadFile(file)).assetId || undefined)
+            latest.current((await uploadFile(file)).assetId || undefined)
           } catch {
             toast.error(`The ${label.toLowerCase()} could not be uploaded.`)
           } finally {
@@ -151,8 +157,14 @@ function YouTubeExtras({
   value: NonNullable<VersionOptions['youtube']>
 }) {
   const [text, setText] = React.useState(() => (value.tags ?? []).join(', '))
-  // A co-editor's change replaces the text; typing never differs from what it saved.
-  if (tagsFrom(text).join(',') !== (value.tags ?? []).join(',')) setText((value.tags ?? []).join(', '))
+  // A co-editor's change replaces the text, once per saved value: a stored tag
+  // this parser reads differently must not set the text on every render.
+  const [synced, setSynced] = React.useState(value.tags)
+  if (value.tags !== synced) {
+    setSynced(value.tags)
+    if (tagsFrom(text).join(',') !== (value.tags ?? []).join(','))
+      setText((value.tags ?? []).join(', '))
+  }
   const length = youtubeTagsLength(value.tags ?? [])
   return (
     <>
