@@ -277,6 +277,14 @@ export function buildPublication(
     if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
+  // Go refuses X video until the account's video length is verified (socialidentity.CheckXMedia).
+  if (
+    channel === 'x' &&
+    account.standing &&
+    !account.standing.xVideoMaxSeconds &&
+    serialized.posts.some((post) => post.videos > 0)
+  )
+    accountProblems.push("Reconnect X to verify this account's video limits.")
   problems.push(...accountProblems, ...optionProblems)
   if (channel === 'x')
     settings.forEach((setting, index) => {
@@ -302,12 +310,11 @@ export function buildPublication(
     if (!quote.available) problems.push(quote.reason)
   }
 
+  // Only Bluesky publishes Shots' card; other platforms make or omit their own (TF-029).
   const cardFor = (caption: string, media: number) => {
+    if (channel !== 'bluesky') return undefined
     const card = options.linkPreviews?.find((card) => caption.includes(card.url))
     if (!card) return undefined
-    if (card.removed && channel !== 'bluesky')
-      problems.push('This provider has no verified API control for link preview removal.')
-    if (channel !== 'bluesky') return undefined
     if (!card.removed && media > 0)
       problems.push('Remove the link preview or media before publishing to Bluesky.')
     return card

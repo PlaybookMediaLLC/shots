@@ -27,6 +27,15 @@ type VideoRules struct {
 	MinMs    int      `json:"minMs"`
 	MaxMs    int      `json:"maxMs"`
 	MaxBytes int      `json:"maxBytes"`
+	// Accounts holds the provider's own limits per verified account tier
+	// ("standard", "premium"); MaxBytes above stays Shots' upload ceiling.
+	Accounts map[string]AccountVideo `json:"accounts"`
+}
+
+// AccountVideo is one account tier's video limit at the provider.
+type AccountVideo struct {
+	MaxMs    int   `json:"maxMs"`
+	MaxBytes int64 `json:"maxBytes"`
 }
 
 // Destination is one draft channel's media rules, shared with the composer

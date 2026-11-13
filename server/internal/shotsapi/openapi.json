@@ -2497,6 +2497,18 @@
                                 "xQuotes": {
                                   "type": "boolean"
                                 },
+                                "xVideoMaxSeconds": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "mastodonQuotes": {
                                   "type": [
                                     "boolean",
@@ -2991,6 +3003,18 @@
                           "xQuotes": {
                             "type": "boolean"
                           },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "mastodonQuotes": {
                             "type": [
                               "boolean",
@@ -3331,6 +3355,18 @@
                           },
                           "xQuotes": {
                             "type": "boolean"
+                          },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "mastodonQuotes": {
                             "type": [
@@ -4066,6 +4102,18 @@
                           },
                           "xQuotes": {
                             "type": "boolean"
+                          },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "mastodonQuotes": {
                             "type": [

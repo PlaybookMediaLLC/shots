@@ -21,7 +21,7 @@ import { importedBody } from '@/lib/write/import-text'
 test.use({ actionTimeout: 30_000 })
 const fixture = (name: string) => `test/fixtures/typefully-media/${name}`
 test(
-  'phone previews fit the sidebar, weighted long text expands, and link cards dismiss without removing the URL',
+  'phone previews fit the sidebar, weighted long text expands, and link cards offer only real controls',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     const errors: string[] = []
@@ -43,16 +43,23 @@ test(
     const id = await openNewDraft(page)
     await draftEditor(page).fill(text)
     await expectSaved(page)
+    // X makes the card itself and its API cannot remove it, so no removal control is offered.
+    const links = page.getByRole('region', { name: 'Link previews' })
+    await expect(links).toContainText('X makes this card from the link itself')
+    await expect(links.getByRole('button', { name: 'Remove preview' })).toHaveCount(0)
+    // LinkedIn makes no card from the text and Shots sends none.
+    await page.getByTestId('platform-tab-linkedin').click()
+    await expect(page.getByTestId('plain-links')).toBeVisible()
+    await expect(links).not.toContainText('Linked resource')
+    await page.getByTestId('platform-tab-x').click()
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const preview = page.getByTestId('preview-x')
     await expect(preview.getByRole('button', { name: 'Show more', exact: true })).toHaveCount(0)
     await expect(preview.getByTestId('post-link-preview')).toContainText('Linked resource')
-    await preview.getByTestId('post-link-preview').hover()
-    await preview.getByRole('button', { name: 'Hide link preview', exact: true }).click()
-    await expect(preview.getByTestId('post-link-preview')).toHaveCount(0)
-    await expect(preview).toContainText('The platform may still show a link card')
-    await preview.getByRole('button', { name: 'Show link preview', exact: true }).click()
-    await expect(preview.getByTestId('post-link-preview')).toBeVisible()
+    await expect(preview.getByRole('button', { name: 'Hide link preview' })).toHaveCount(0)
+    await expect(page.getByTestId('preview-linkedin').getByTestId('post-link-preview')).toHaveCount(
+      0
+    )
     // Preview takes the draft's place, so editing means going back to it; the URL stayed in the text.
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(draftEditor(page)).toContainText(url)

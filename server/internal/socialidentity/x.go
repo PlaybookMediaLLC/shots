@@ -3,6 +3,8 @@ package socialidentity
 import (
 	"regexp"
 	"strconv"
+
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
 )
 
 var xAccountID = regexp.MustCompile(`^[1-9][0-9]{0,19}$`)
@@ -45,17 +47,19 @@ func XVerifiedAccountLimits(accessLevel string, subscriptionType *string) XCapab
 		return caps
 	}
 	var articles bool
-	videoBytes, videoSeconds := int64(8000000000), 20*60
+	// X's documented post-video limits per tier live in limits.json.
+	video := medialimits.Limits.Destinations["x"].Video.Accounts["standard"]
 	switch *subscriptionType {
 	case "None":
 	case "Basic", "Premium", "PremiumPlus":
 		long := 25000
 		caps.LongPostMaxWeightedCharacters = &long
 		articles = *subscriptionType != "Basic"
-		videoBytes, videoSeconds = 16000000000, 125*60
+		video = medialimits.Limits.Destinations["x"].Video.Accounts["premium"]
 	default:
 		return caps
 	}
+	videoBytes, videoSeconds := video.MaxBytes, video.MaxMs/1000
 	caps.Articles, caps.VideoMaxBytes, caps.VideoMaxDurationSeconds = &articles, &videoBytes, &videoSeconds
 	return caps
 }

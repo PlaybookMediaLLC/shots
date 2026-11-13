@@ -201,6 +201,8 @@ export const accountStandingSchema = z.object({
   maxWeightedCharacters: z.union([z.literal(280), z.literal(25_000)]).nullish(),
   articles: z.boolean().nullish(),
   xQuotes: z.boolean().optional(),
+  /** The verified X video length in seconds; null or absent is unverified. */
+  xVideoMaxSeconds: z.number().int().positive().nullish(),
   mastodonQuotes: z.boolean().nullish(),
   pollLimits: z
     .object({

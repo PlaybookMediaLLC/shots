@@ -97,6 +97,27 @@ test('each chosen account is checked apart, with what Shots would change', () =>
   assert.match(mixed.get('li')!.problems.join(), /goes alone/)
 })
 
+test("an X video longer than the account's verified length is refused in Go's words", () => {
+  const video = (durationMs: number) =>
+    item({
+      channelConnectionIds: ['x'],
+      media: [
+        { ...item().media[0], mediaType: 'video/mp4', durationMs, width: 1920, height: 1080 },
+      ],
+    })
+  const standard = [{ ...accounts[2], xVideoMaxSeconds: 1200 }]
+  assert.deepEqual(stagedChecks(video(600_000), standard).get('x')!.problems, [])
+  assert.deepEqual(stagedChecks(video(1_200_000), standard).get('x')!.problems, [])
+  assert.deepEqual(stagedChecks(video(1_200_999), standard).get('x')!.problems, [
+    'This X account takes videos up to 20 minutes; this one is 20:00. Trim it before scheduling.',
+  ])
+  // Premium length passes; the unverified case is refused by the publication check.
+  assert.deepEqual(
+    stagedChecks(video(3_600_000), [{ ...accounts[2], xVideoMaxSeconds: 7500 }]).get('x')!.problems,
+    []
+  )
+})
+
 test('a local time is read in its own zone, refusing skipped and unchosen repeated times', () => {
   const now = new Date('2026-01-01T00:00:00Z')
   const exact = readTiming(

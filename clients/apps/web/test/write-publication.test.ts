@@ -340,7 +340,7 @@ test('Threads polls use native single-choice text-only rules', () => {
   )
 })
 
-test('link preview removal is persisted and cannot be silently ignored by a provider', () => {
+test('link preview removal is persisted for Bluesky, the only provider that takes it', () => {
   const card = { url: 'https://example.com/story', title: 'Story', removed: true }
   let versions = withOptions(readVersions(undefined), 'bluesky', { linkPreviews: [card] })
   const value = draft({ body: [p('Read https://example.com/story')], platformVersions: versions })
@@ -349,17 +349,41 @@ test('link preview removal is persisted and cannot be silently ignored by a prov
       ?.linkPreview?.removed,
     true
   )
+  // X makes its own card; an old removal choice neither travels nor blocks scheduling.
   versions = withOptions(versions, 'x', { linkPreviews: [card] })
-  assert.ok(
-    buildPublication({ ...value, platformVersions: versions }, x).problems.some((problem) =>
-      problem.includes('preview removal')
-    )
-  )
+  const onX = buildPublication({ ...value, platformVersions: versions }, x)
+  assert.deepEqual(onX.problems, [])
+  assert.equal(onX.target.options?.linkPreview, undefined)
   const unrelated = draft({ body: [p('A different post')], platformVersions: versions })
   assert.equal(
     buildPublication(unrelated, { channel: 'bluesky', connectionId: 'cb0000000001' }).target.options
       ?.linkPreview,
     undefined
+  )
+})
+
+test("X video needs the account's verified video length, as Go requires", () => {
+  const value = draft({
+    body: [p('Clip'), { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }],
+  })
+  const reconnect = "Reconnect X to verify this account's video limits."
+  assert.ok(buildPublication(value, { ...x, standing: {} }).accountProblems.includes(reconnect))
+  assert.ok(
+    buildPublication(value, { ...x, standing: { xVideoMaxSeconds: null } }).problems.includes(
+      reconnect
+    )
+  )
+  assert.ok(
+    !buildPublication(value, { ...x, standing: { xVideoMaxSeconds: 1200 } }).problems.includes(
+      reconnect
+    )
+  )
+  // The account-free preview and images alone are not judged.
+  assert.ok(!buildPublication(value, x).problems.includes(reconnect))
+  assert.ok(
+    !buildPublication(draft({ body: [p('Text')] }), { ...x, standing: {} }).problems.includes(
+      reconnect
+    )
   )
 })
 
