@@ -3,6 +3,7 @@ package product
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 )
 
 // The composer's platformCaptionLength reads the same cases
@@ -39,7 +41,7 @@ func TestDraftPostLengthMatchesTheComposer(t *testing.T) {
 				t.Fatalf("case covers %d of %d channels", len(item.Lengths), len(draftChannelLimits))
 			}
 			for channel, want := range item.Lengths {
-				if got, err := draftPostLength(channel, item.Text); err != nil || got != want {
+				if got, err := draftPostLength(channel, item.Text, nil); err != nil || got != want {
 					t.Errorf("%s: draftPostLength(%q) = %d, %v, want %d", channel, item.Text, got, err, want)
 				}
 			}
@@ -59,33 +61,50 @@ func TestFitsXPost(t *testing.T) {
 		{strings.Repeat("a", 281), 0, false},
 		{strings.Repeat("a", 256), 1 + xLinkLength, true},
 		{strings.Repeat("a", 257), 1 + xLinkLength, false},
-		{strings.Repeat("a.", 5000), 0, false}, // too complex to count
+		{"https://a.co/" + strings.Repeat("(a)", 8000), 0, false}, // too complex to count
 	}
 	for _, c := range cases {
-		if got := fitsXPost(c.text, c.extra); got != c.want {
+		if got := fitsXPost(c.text, c.extra, nil); got != c.want {
 			t.Errorf("fitsXPost(%.12q…, %d) = %v, want %v", c.text, c.extra, got, c.want)
 		}
 	}
 }
 
-// Crafted domain-like runs used to cost minutes of backtracking; now the link
+// 10 X targets of 25 posts, each slow to count but within its own limit,
+// counted the way draftTargetConnections counts them (CheckXText, then
+// draftPostLength, stopping at the first refusal): the shared budget refuses
+// the request after about 2 s, where counting them all would take many more.
+func TestOneRequestCountsWithinItsBudget(t *testing.T) {
+	caps := socialidentity.XVerifiedAccountLimits("read-write", nil)
+	budget := helpers.NewScanBudget(draftCountBudget)
+	start := time.Now()
+	var err error
+	for i := 0; i < 250 && err == nil; i++ {
+		text := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 1000))
+		if err = socialidentity.CheckXText(caps, text, budget); err == nil {
+			_, err = draftPostLength("x", text, budget)
+		}
+	}
+	if !errors.Is(err, helpers.ErrTextTooComplex) {
+		t.Fatalf("counted every post: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("counting took %v, want about the %v budget", elapsed, draftCountBudget)
+	}
+}
+
+// A URL path of parenthesised groups costs seconds of backtracking; the link
 // scan gives up within its budget and the caller refuses the text.
 func TestDraftPostLengthRefusesTextTooComplexToCount(t *testing.T) {
-	for _, text := range []string{strings.Repeat("a.", 5000), "https://" + strings.Repeat("a.", 5000)} {
-		for _, channel := range []string{"x", "mastodon"} {
-			start := time.Now()
-			length, err := draftPostLength(channel, text)
-			if elapsed := time.Since(start); elapsed > time.Second {
-				t.Errorf("%s: took %v", channel, elapsed)
-			}
-			// Mastodon counts only links with a protocol, so it never scans "a.a.…".
-			if channel == "mastodon" && !strings.Contains(text, "://") {
-				if err != nil || length != len(text) {
-					t.Errorf("mastodon: draftPostLength(%.12q…) = %d, %v, want %d", text, length, err, len(text))
-				}
-			} else if !errors.Is(err, helpers.ErrTextTooComplex) {
-				t.Errorf("%s: draftPostLength(%.12q…) error = %v, want ErrTextTooComplex", channel, text, err)
-			}
+	text := "https://a.co/" + strings.Repeat("(a)", 8000)
+	for _, channel := range []string{"x", "mastodon"} {
+		start := time.Now()
+		_, err := draftPostLength(channel, text, nil)
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Errorf("%s: took %v", channel, elapsed)
+		}
+		if !errors.Is(err, helpers.ErrTextTooComplex) {
+			t.Errorf("%s: draftPostLength(%.12q…) error = %v, want ErrTextTooComplex", channel, text, err)
 		}
 	}
 }

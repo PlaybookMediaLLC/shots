@@ -1,11 +1,14 @@
 package product
 
 import (
+	"context"
+
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -13,16 +16,39 @@ import (
 // xLinkLength is X's length for one link, whatever its real length.
 const xLinkLength = 23
 
+// draftCountBudget is the time one request may spend counting the posts of
+// the targets it checks (draftTargetConnections), up to 10 targets of 25 posts
+// each. Ordinary posts take milliseconds, and a caption repeated across targets
+// or checks is counted once.
+const draftCountBudget = 2 * time.Second
+
+type draftCountBudgetKey struct{}
+
+// withDraftCountBudget gives every target check under ctx one shared budget,
+// for a request that checks targets more than once.
+func withDraftCountBudget(ctx context.Context) context.Context {
+	return context.WithValue(ctx, draftCountBudgetKey{}, helpers.NewScanBudget(draftCountBudget))
+}
+
+// draftCountBudgetOf is the budget ctx shares, or a new one.
+func draftCountBudgetOf(ctx context.Context) *helpers.ScanBudget {
+	if budget, ok := ctx.Value(draftCountBudgetKey{}).(*helpers.ScanBudget); ok {
+		return budget
+	}
+	return helpers.NewScanBudget(draftCountBudget)
+}
+
 // xLength uses the same twitter-text v3 parser as the X adapter, including
 // NFC normalization, bare-domain URLs, and complete emoji sequences.
-func xLength(text string) (int, error) {
-	return helpers.WeightedLength(text)
+func xLength(text string, budget *helpers.ScanBudget) (int, error) {
+	length, _, err := budget.ParseTweet(text, 280)
+	return length, err
 }
 
 // fitsXPost reports whether text, plus extra characters, fits in one X post.
 // Blank text does not, nor does text too complex to count.
-func fitsXPost(text string, extra int) bool {
-	length, err := xLength(text)
+func fitsXPost(text string, extra int, budget *helpers.ScanBudget) bool {
+	length, err := xLength(text, budget)
 	return strings.TrimSpace(text) != "" && err == nil && length+extra <= 280
 }
 
@@ -44,13 +70,13 @@ var mastodonMentionEndRe = regexp.MustCompile(`^(?:[@＠\x{C0}-\x{D6}\x{D8}-\x{F
 
 // mastodonLength is Mastodon's StatusLengthValidator: grapheme clusters once
 // each link with a protocol is 23 characters and each mention drops its domain.
-func mastodonLength(text string) (int, error) {
+func mastodonLength(text string, budget *helpers.ScanBudget) (int, error) {
 	type entity struct {
 		start, end int
 		text       string
 	}
 	var entities []entity
-	spans, err := helpers.LinkSpans(text)
+	spans, err := budget.LinkSpans(text)
 	if err != nil {
 		return 0, err
 	}
@@ -85,13 +111,14 @@ func mastodonLength(text string) (int, error) {
 // X, Mastodon's on Mastodon, grapheme clusters on Bluesky, and UTF-16 units
 // elsewhere. The composer's platformCaptionLength is the same rule; both are
 // tested against testdata/caption-length-cases.json. X and Mastodon fail with
-// helpers.ErrTextTooComplex on text their link scan cannot finish in time.
-func draftPostLength(channel, text string) (int, error) {
+// helpers.ErrTextTooComplex on text their link scan cannot finish in time, or
+// within budget (nil bounds each text alone).
+func draftPostLength(channel, text string, budget *helpers.ScanBudget) (int, error) {
 	if channel == "x" {
-		return xLength(strings.TrimSpace(text))
+		return xLength(strings.TrimSpace(text), budget)
 	}
 	if channel == "mastodon" {
-		return mastodonLength(text)
+		return mastodonLength(text, budget)
 	}
 	if channel == "bluesky" {
 		return socialidentity.GraphemeLength(text), nil

@@ -112,6 +112,11 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
   await expect(dialog.getByText('Café 東京 is ready.', { exact: false })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Connect social accounts' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Invite members' })).toBeEnabled()
+  // Moving a profile is its own step: it starts from a profile in the current workspace.
+  await expect(dialog.getByRole('link', { name: 'Move a profile here' })).toHaveAttribute(
+    'href',
+    /\/settings\/publishing-brands$/
+  )
   expect(await getActiveOrganizationId(page)).toBe(originalId)
   await page.screenshot({
     animations: 'disabled',

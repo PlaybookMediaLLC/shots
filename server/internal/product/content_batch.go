@@ -915,6 +915,7 @@ type BatchValidationResult struct {
 // resolved in its zone so a skipped or repeated hour is named per item; the
 // queue's slots are rechecked when each item is scheduled.
 func (c *Configuration) ValidateContentBatch(ctx context.Context, actor Actor, batchID string, rows []BatchValidationRow) ([]BatchValidationResult, error) {
+	ctx = withDraftCountBudget(ctx) // one check for each target of each row
 	if err := c.authorizeDecision(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
 	}
