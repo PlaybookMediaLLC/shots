@@ -43,6 +43,8 @@ type AssetObjectStore interface {
 	Put(context.Context, string, string, io.Reader) error
 	Read(context.Context, string) ([]byte, error)
 	Delete(context.Context, string) error
+	// Copy duplicates an object under a new key on the storage side.
+	Copy(ctx context.Context, from, to string) error
 }
 
 type GeneratedAssetInput struct {

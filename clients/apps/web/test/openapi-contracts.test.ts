@@ -50,6 +50,7 @@ import * as socialConnections from '@/lib/api/contracts/social-connections'
 import * as socialAvailability from '@/lib/api/contracts/social-availability'
 import * as socialInstances from '@/lib/api/contracts/social-instances'
 import * as socialSets from '@/lib/api/contracts/social-sets'
+import * as socialSetTransfer from '@/lib/api/contracts/social-set-transfer'
 import * as socialSetQueue from '@/lib/api/contracts/social-set-queue'
 import * as sourceApps from '@/lib/api/contracts/source-apps'
 import * as storePublishing from '@/lib/api/contracts/store-publishing'
@@ -114,6 +115,7 @@ const contracts = new Map<string, RouteContract>(
     socialAvailability,
     socialInstances,
     socialSets,
+    socialSetTransfer,
     socialSetQueue,
     sourceApps,
     storePublishing,

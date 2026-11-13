@@ -39,6 +39,7 @@ export function ConfirmDialog({
   confirmText?: string
   description: ReactNode
   destructive?: boolean
+  /** Disables the trigger and the confirm button, such as while the action cannot run. */
   disabled?: boolean
   /** Resolves to an error message, or null when it succeeded. */
   onConfirm: (typed: string) => Promise<string | null>
@@ -116,7 +117,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={running}>Cancel</AlertDialogCancel>
           <Button
-            disabled={locked || running}
+            disabled={disabled || locked || running}
             onClick={() => void confirm()}
             type="button"
             variant={destructive ? 'destructive' : 'default'}
