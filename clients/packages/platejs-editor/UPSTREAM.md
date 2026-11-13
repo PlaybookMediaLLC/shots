@@ -132,6 +132,13 @@ Post editor (the Write brief: one look with the app, a social slash menu):
 - `src/ui/slash-node.tsx`, `src/ui/floating-toolbar-buttons.tsx`,
   `src/ui/block-menu.tsx`: the multicolor 512-viewBox AI mark (three copies
   sharing one gradient id) is Phosphor's `Sparkle` in `text-primary`.
+- `src/ui/slash-node.tsx`, `src/ui/floating-toolbar-buttons.tsx`,
+  `src/ui/block-menu.tsx`: an entry that calls an optional plugin's API shows
+  only when the editor loads that plugin. The slash menu's AI group, the
+  toolbar's Ask AI and the block menu's Ask AI need `aiChat`; the block menu's
+  Comment needs `comment`. Upstream shows them always, so an editor without
+  AIKit or CommentKit threw. `src/ui/optional-plugin-entries.test.ts` (new)
+  renders them in jsdom, which `test/dom.ts` (new) sets up.
 
 ## Pulling a later fix from oppulence-canvas
 
