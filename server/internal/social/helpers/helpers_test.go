@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"github.com/dlclark/regexp2"
 )
 
 // Readable spot checks; the exhaustive comparison against the npm packages
@@ -54,6 +58,7 @@ func TestWeightedLength(t *testing.T) {
 		"go to https://sample.com/a/b now": 33, // URLs count as 23
 		"see sample.com":                   27, // bare domains too
 		"mail a@sample.com":                17, // not emails
+		"é.com x":                          25, // a domain from the start of text
 	}
 	for in, want := range cases {
 		if got, err := WeightedLength(in); err != nil || got != want {
@@ -71,30 +76,36 @@ func TestWeightedLength(t *testing.T) {
 	}
 }
 
-// regexp2 backtracks quadratically through domain-like words: without the
-// budget each of these took seconds to minutes.
+// regexp2 backtracked quadratically through domain-like words, which now
+// count, and still does through a URL path of parenthesised groups, which the
+// budget refuses: without the budget it took seconds.
 func TestLinkScanStopsOnCraftedText(t *testing.T) {
 	scans := map[string]func(string) error{
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
 		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
 	}
-	cases := map[string]string{
-		"a.":         strings.Repeat("a.", 5000),
-		"https://a.": "https://" + strings.Repeat("a.", 5000),
-		// Each word is far below a call's timeout: only the text's deadline stops them.
-		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+	cases := map[string]struct {
+		text    string
+		refused bool
+	}{
+		"a.":         {strings.Repeat("a.", 5000), false},
+		"https://a.": {"https://" + strings.Repeat("a.", 5000), false},
+		"many words": {strings.Repeat(" https://"+strings.Repeat("a.", 25), 200), false},
+		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), true},
 	}
-	for name, text := range cases {
+	for name, c := range cases {
 		for scan, run := range scans {
 			start := time.Now()
-			err := run(text)
+			err := run(c.text)
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("%s(%s) took %v", scan, name, elapsed)
 			}
-			// Without "://" LinkSpans has no link to find and skips the scan.
-			noProtocol := scan == "LinkSpans" && !strings.Contains(text, "://")
-			if noProtocol && err != nil || !noProtocol && !errors.Is(err, ErrTextTooComplex) {
-				t.Errorf("%s(%s) error = %v", scan, name, err)
+			var want error
+			if c.refused {
+				want = ErrTextTooComplex
+			}
+			if !errors.Is(err, want) {
+				t.Errorf("%s(%s) error = %v, want %v", scan, name, err, want)
 			}
 		}
 	}
@@ -132,7 +143,7 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	}
 	start := time.Now()
 	for i := range 20 {
-		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 1000)) // seconds unbounded
+		crafted := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 8000)) // seconds unbounded
 		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("crafted %d: %v", i, err)
 		}
@@ -160,6 +171,131 @@ func TestLinkScanCountsALongArticle(t *testing.T) {
 	article := strings.Repeat(paragraph, 850) // 90,950 characters weighing 95,200
 	if valid, err := ValidTweetText(article, 100000); err != nil || !valid {
 		t.Fatalf("ValidTweetText(article) = %v, %v", valid, err)
+	}
+}
+
+// urlMatches must find what scanning the URL regex from every index finds.
+func TestURLMatchesAreTheFullScans(t *testing.T) {
+	// The classes urlMatches reads without the regex, as extractUrl spells them.
+	class := func(source string) func(rune) bool {
+		if !strings.Contains(extractURLSource, source) {
+			t.Fatalf("extractUrl has no %s", source)
+		}
+		re := jsRegexp(`^`+source+`$`, regexp2.IgnoreCase)
+		return func(c rune) bool { ok, _ := re.MatchRunes([]rune{c}); return ok }
+	}
+	domain := class(`[^/\!'#%&'\(\)*\+,\\\-\.\/:;<=>\?@\[\]\^_{|}~\$//\x09-\x0D\x20\x85\xA0\u1680\u180E\u2000-\u200A\u2028\u2029\u202F\u205F\u3000//\uFFFE\uFEFF\uFFFF//\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069/]`)
+	preceding := class(`[^A-Za-z0-9@\uff20$#\uff03\uFFFE\uFEFF\uFFFF]`)
+	directional := class(`[\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069]`)
+	for unit := rune(0); unit <= 0xffff; unit++ {
+		c := unit
+		if 0xd800 <= c && c <= 0xdfff {
+			c += surrogateShift
+		}
+		if domainChar(c) != domain(c) {
+			t.Errorf("domainChar(%U) = %v", c, domainChar(c))
+		}
+		if urlPrecedingChar(c) != (preceding(c) || directional(c)) {
+			t.Errorf("urlPrecedingChar(%U) = %v", c, urlPrecedingChar(c))
+		}
+	}
+
+	full := jsRegexp(extractURLSource, regexp2.IgnoreCase)
+	asciiDomainAt := jsRegexp(`\G(?:`+validASCIIDomainSource+`)`, regexp2.IgnoreCase)
+	if !strings.HasSuffix(validASCIIDomainSource, validTLDSource()) {
+		t.Fatal("validAsciiDomain's TLDs are not validDomain's")
+	}
+	// matchEnd is where group of re's match at s ends, or -1.
+	matchEnd := func(re *regexp2.Regexp, text []rune, s, group int) int {
+		m, _ := re.FindRunesMatchStartingAt(text, s)
+		if m == nil {
+			return -1
+		}
+		return m.GroupByNumber(group).Index + m.GroupByNumber(group).Length
+	}
+	describe := func(m *regexp2.Match) string {
+		var b strings.Builder
+		for _, g := range m.Groups() {
+			fmt.Fprintf(&b, "%d+%d ", g.Index, g.Length)
+		}
+		return b.String()
+	}
+	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
+		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
+	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
+	rng := rand.New(rand.NewPCG(1, 2))
+	for range 5000 {
+		var b strings.Builder
+		for range 1 + rng.IntN(16) {
+			b.WriteString(tokens[rng.IntN(len(tokens))])
+		}
+		texts = append(texts, b.String())
+	}
+	found := 0
+	for _, raw := range texts {
+		text := shiftSurrogates(utf16Units(raw))
+		var want, got []string
+		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
+			want = append(want, describe(m))
+		}
+		matches, err := urlMatches(text, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range matches {
+			got = append(got, describe(m))
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
+		}
+		// A start the regex rejects would be skipped, so check every index.
+		for s, end := range urlEnds(text) {
+			if want := matchEnd(extractURLAtRe, text, s, 5); end != want {
+				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
+		for s, end := range asciiDomainEnds(text) {
+			if want := matchEnd(asciiDomainAt, text, s, 0); end != want {
+				t.Errorf("asciiDomainEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
+		found += len(want)
+	}
+	if found < 1000 {
+		t.Fatalf("only %d matches: the cases miss the regex", found)
+	}
+}
+
+// X Articles run to 100,000 characters.
+func TestWeightedLengthOfLongText(t *testing.T) {
+	prose := strings.Repeat("日本語の文章です。", 5556)
+	japanese := prose + "3.5 https://sample.com/a " + prose
+	var distinct strings.Builder // punycode's cost grows with distinct characters
+	for c := rune(0x4e00); c < 0x4e00+20000; c++ {
+		distinct.WriteRune(c)
+	}
+	for _, c := range []struct {
+		text string
+		want int
+	}{
+		{japanese, 2*2*utf8.RuneCountInString(prose) + len("3.5 ") + 23 + len(" ")},
+		{strings.Repeat("a.", 5000), 10000},
+		// Each "_b.co" matches, and is no link after "_", in one long chain.
+		{"a.com." + strings.Repeat("a_b.co.", 2000), 24 + 7*2000},
+		// A bare domain without an ASCII-only domain inside, plain and punycode.
+		{strings.Repeat("a.", 2000) + "日本.com", 2*2000 + 8},
+		{"xn--a." + strings.Repeat("a.", 2000) + "日本.com", 6 + 2*2000 + 8},
+		{distinct.String() + ".com", 2*20000 + 4},
+	} {
+		start := time.Now()
+		if got, err := WeightedLength(c.text); err != nil || got != c.want {
+			t.Errorf("WeightedLength(%.20q…) = %d, %v, want %d", c.text, got, err, c.want)
+		}
+		// The full scan took minutes here; the bound leaves room for -race.
+		if took := time.Since(start); took > 10*time.Second {
+			t.Errorf("WeightedLength(%.20q…) took %v", c.text, took)
+		}
 	}
 }
 

@@ -61,7 +61,7 @@ func TestFitsXPost(t *testing.T) {
 		{strings.Repeat("a", 281), 0, false},
 		{strings.Repeat("a", 256), 1 + xLinkLength, true},
 		{strings.Repeat("a", 257), 1 + xLinkLength, false},
-		{strings.Repeat("a.", 5000), 0, false}, // too complex to count
+		{"https://a.co/" + strings.Repeat("(a)", 8000), 0, false}, // too complex to count
 	}
 	for _, c := range cases {
 		if got := fitsXPost(c.text, c.extra, nil); got != c.want {
@@ -80,7 +80,7 @@ func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	start := time.Now()
 	var err error
 	for i := 0; i < 250 && err == nil; i++ {
-		text := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 60))
+		text := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 1000))
 		if err = socialidentity.CheckXText(caps, text, budget); err == nil {
 			_, err = draftPostLength("x", text, budget)
 		}
@@ -93,24 +93,18 @@ func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	}
 }
 
-// Crafted domain-like runs used to cost minutes of backtracking; now the link
+// A URL path of parenthesised groups costs seconds of backtracking; the link
 // scan gives up within its budget and the caller refuses the text.
 func TestDraftPostLengthRefusesTextTooComplexToCount(t *testing.T) {
-	for _, text := range []string{strings.Repeat("a.", 5000), "https://" + strings.Repeat("a.", 5000)} {
-		for _, channel := range []string{"x", "mastodon"} {
-			start := time.Now()
-			length, err := draftPostLength(channel, text, nil)
-			if elapsed := time.Since(start); elapsed > time.Second {
-				t.Errorf("%s: took %v", channel, elapsed)
-			}
-			// Mastodon counts only links with a protocol, so it never scans "a.a.…".
-			if channel == "mastodon" && !strings.Contains(text, "://") {
-				if err != nil || length != len(text) {
-					t.Errorf("mastodon: draftPostLength(%.12q…) = %d, %v, want %d", text, length, err, len(text))
-				}
-			} else if !errors.Is(err, helpers.ErrTextTooComplex) {
-				t.Errorf("%s: draftPostLength(%.12q…) error = %v, want ErrTextTooComplex", channel, text, err)
-			}
+	text := "https://a.co/" + strings.Repeat("(a)", 8000)
+	for _, channel := range []string{"x", "mastodon"} {
+		start := time.Now()
+		_, err := draftPostLength(channel, text, nil)
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Errorf("%s: took %v", channel, elapsed)
+		}
+		if !errors.Is(err, helpers.ErrTextTooComplex) {
+			t.Errorf("%s: draftPostLength(%.12q…) error = %v, want ErrTextTooComplex", channel, text, err)
 		}
 	}
 }
