@@ -484,6 +484,9 @@ test('an old draft’s code block and heading keep the kit’s layout, and markd
   const leadBox = await editor.getByText(lead).boundingBox()
   const endBox = await editor.getByText('a bold end', { exact: true }).boundingBox()
   expect(endBox!.y).toBeGreaterThan(leadBox!.y)
+  // Nor does it offer the kit's copy-link control, whose anchor no Write page opens.
+  await editor.getByRole('heading', { level: 1 }).hover()
+  await expect(page.getByRole('button', { name: 'Copy link to heading' })).toBeHidden()
 
   // A post cannot carry headings or quotes, so their markdown stays literal text.
   await caretAtEndOf(page, editor.getByText('Old text', { exact: true }))
