@@ -291,7 +291,7 @@ func TestContentBatches(t *testing.T) {
 			t.Fatalf("draft before rendering: %v", err)
 		}
 		// What a concept shows stays in use, and is not retired, while the batch is open.
-		image, music := upload("slot.jpg", "image/jpeg", photoBytes.Bytes()), upload("music.jpg", "image/jpeg", photoBytes.Bytes())
+		image, music := upload("slot.jpg", "image/jpeg", photoBytes.Bytes()), upload("music.wav", "audio/wav", []byte("RIFF\x24\x00\x00\x00WAVEfmt "))
 		filled := &schema.BatchGrid{Headline: "Four tools", Slots: slots(image), MusicAssetID: music}
 		video := []schema.BatchMedia{{AssetID: videos[0], FileName: "grid.mp4"}}
 		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: filled, Media: &video}); err != nil {
@@ -334,6 +334,106 @@ func TestContentBatches(t *testing.T) {
 		}
 		if inUse(image) || inUse(music) {
 			t.Fatal("a closed batch still holds its concept's image and music")
+		}
+	})
+
+	t.Run("fade-in and UGC templates take their own media, clip lengths and fields", func(t *testing.T) {
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Studio"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A clip's length is what the upload probe recorded; set it to the boundary under test.
+		clipOf := func(name string, ms int) string {
+			t.Helper()
+			id := upload(name, "video/mp4", clip)
+			if _, err := w.db.SQL.ExecContext(ctx, `UPDATE asset SET "durationMs"=$2 WHERE id=$1`, id, ms); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		image, music := photos[0], upload("tune.mp3", "audio/mpeg", []byte("ID3\x03\x00\x00\x00\x00\x00\x00"))
+		short, three, fifteen, long := clipOf("short.mp4", 2900), clipOf("three.mp4", 3000), clipOf("fifteen.mp4", 15049), clipOf("long.mp4", 15100)
+		minute, over := clipOf("minute.mp4", 60000), clipOf("over.mp4", 60100)
+		one := func(id string) []schema.BatchGridSlot { return []schema.BatchGridSlot{{AssetID: id}} }
+
+		single := item("studio", 0, "")
+		single.Media = nil
+		single.Grid = &schema.BatchGrid{Kind: "single", Headline: "Before and after", Slots: one("")}
+		ugc := item("studio", 1, "")
+		ugc.Media = nil
+		ugc.Grid = &schema.BatchGrid{Kind: "ugc", Headline: "POV: you finally\nfound it", Slots: one("")}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, []ContentBatchItemInput{single, ugc}); err != nil {
+			t.Fatal(err)
+		}
+		singleID, ugcID := batch.Items[0].ID, batch.Items[1].ID
+		// In order: each kind's last accepted state is what the rest of the test starts from.
+		accepted := []struct {
+			name string
+			id   string
+			grid *schema.BatchGrid
+		}{
+			{"image only, its headline kept", singleID, &schema.BatchGrid{Kind: "single", Headline: "Kept", HideHeadline: true, Slots: one(image)}},
+			{"image only with no headline", singleID, &schema.BatchGrid{Kind: "single", HideHeadline: true, Slots: one(image), MusicAssetID: music, MusicStartMs: 24100}},
+			{"a three-second clip", ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", TextPosition: "top", Slots: one(three)}},
+			{"a minute-long clip, 15 s closing", ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", TextPosition: "bottom", Slots: one(minute), ClosingAssetID: fifteen}},
+			{"a 3 s closing clip", ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(three), ClosingAssetID: three}},
+		}
+		for _, c := range accepted {
+			if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, c.id, ContentBatchItemUpdate{Grid: c.grid}); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+		}
+		refused := map[string]struct {
+			id   string
+			grid *schema.BatchGrid
+		}{
+			"an unknown kind":             {singleID, &schema.BatchGrid{Kind: "slideshow", Headline: "Text", Slots: one("")}},
+			"a fade-in with four images":  {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: make([]schema.BatchGridSlot, 4)}},
+			"no headline, not image only": {singleID, &schema.BatchGrid{Kind: "single", Headline: " ", Slots: one(image)}},
+			"a video as the image":        {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: one(three)}},
+			"a fade-in with a closing":    {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: one(image), ClosingAssetID: three}},
+			"an image as music":           {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: one(image), MusicAssetID: image}},
+			"a start with no music":       {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: one(image), MusicStartMs: 1000}},
+			"a start past ten minutes":    {singleID, &schema.BatchGrid{Kind: "single", Headline: "Text", Slots: one(image), MusicAssetID: music, MusicStartMs: 600001}},
+			"a grid with a closing clip":  {singleID, &schema.BatchGrid{Headline: "Text", Slots: make([]schema.BatchGridSlot, 4), ClosingAssetID: three}},
+			"UGC text that is too long":   {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: strings.Repeat("a", batchUGCTextLimit+1), Slots: one(three)}},
+			"UGC without text":            {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "\n ", Slots: one(three)}},
+			"UGC text at the side":        {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", TextPosition: "left", Slots: one(three)}},
+			"an image as the clip":        {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(image)}},
+			"a clip under 3 s":            {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(short)}},
+			"a clip over a minute":        {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(over)}},
+			"a closing clip under 3 s":    {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(three), ClosingAssetID: short}},
+			"a closing clip over 15 s":    {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(three), ClosingAssetID: long}},
+			"an image as closing clip":    {ugcID, &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(three), ClosingAssetID: image}},
+		}
+		for name, c := range refused {
+			if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, c.id, ContentBatchItemUpdate{Grid: c.grid}); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+		// A video keeps its template: a fade-in cannot turn into a UGC video.
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, singleID, ContentBatchItemUpdate{
+			Grid: &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(three)}}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("kind change: %v", err)
+		}
+		// The closing clip is in use while the batch is open, like the clip and the music.
+		var used bool
+		if err := w.db.SQL.QueryRowContext(ctx, `SELECT platform_asset_in_use_v1($1,$2,false)`, w.org, fifteen).Scan(&used); err != nil || used {
+			t.Fatalf("an unused closing clip is in use: %v %v", used, err)
+		}
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, ugcID, ContentBatchItemUpdate{
+			Grid: &schema.BatchGrid{Kind: "ugc", Headline: "Text", Slots: one(minute), ClosingAssetID: fifteen}}); err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range []string{fifteen, minute} {
+			if err := w.db.SQL.QueryRowContext(ctx, `SELECT platform_asset_in_use_v1($1,$2,false)`, w.org, id).Scan(&used); err != nil || !used {
+				t.Fatalf("a UGC concept's clip %s can be retired: %v %v", id, used, err)
+			}
+		}
+		// Both kinds render through the batch's render runs.
+		run, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, BatchRenderInput{ItemIDs: []string{singleID, ugcID}, RequestKey: "studio-render-0000001"})
+		if err != nil || len(run.Items) != 2 || run.Items[1].Grid.ClosingAssetID != fifteen {
+			t.Fatalf("render: %+v %v", run, err)
 		}
 	})
 

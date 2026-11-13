@@ -88,6 +88,8 @@ type SocialAccount struct {
 	XCaptionLimit *int  `json:"xCaptionLimit"`
 	XArticles     *bool `json:"xArticles"`
 	XQuotes       bool  `json:"xQuotes"`
+	// XVideoMaxSeconds is the verified account's X video length; nil is unverified.
+	XVideoMaxSeconds *int `json:"xVideoMaxSeconds"`
 }
 
 // WritingAssistantRecord is a set's assistant with its derived status:
@@ -547,7 +549,7 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 				standing, account := c.accountStanding(ctx, connection), &built[i]
 				account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
 				account.MastodonQuotes = standing.MastodonQuotes
-				account.XQuotes = standing.XQuotes
+				account.XQuotes, account.XVideoMaxSeconds = standing.XQuotes, standing.XVideoMaxSeconds
 				account.TikTokCreator = standing.TikTokCreator
 			})
 		}

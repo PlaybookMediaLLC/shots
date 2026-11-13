@@ -86,6 +86,11 @@ export function decodeAudioSource(src: string, context: BaseAudioContext): Promi
   return buffer
 }
 
+/** Drop a decoded source, such as a blob URL about to be revoked, so its samples can be freed. */
+export function forgetAudioSource(src: string) {
+  decoded.delete(src)
+}
+
 /** Sample rate of mixed audio: what AAC encoders and MP4 players expect. */
 export const MIX_SAMPLE_RATE = 48_000
 

@@ -194,6 +194,8 @@ type AccountStanding struct {
 	XCaptionLimit  *int                       `json:"xCaptionLimit"`
 	XArticles      *bool                      `json:"xArticles"`
 	XQuotes        bool                       `json:"xQuotes"`
+	// XVideoMaxSeconds is the verified account's X video length; nil is unverified.
+	XVideoMaxSeconds *int `json:"xVideoMaxSeconds"`
 }
 
 // AccountStandingReader reads an account's standing from its platform
