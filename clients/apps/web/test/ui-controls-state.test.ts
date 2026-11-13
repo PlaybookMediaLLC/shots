@@ -892,16 +892,22 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
         : { batches: [], items: [] }
     )
   )
-  const [{ createTRPCClient, httpLink }, { AppRouterContext }, { TRPCProvider }, sheet] =
-    await Promise.all([
-      import('@trpc/client'),
-      import('next/dist/shared/lib/app-router-context.shared-runtime'),
-      import('@/lib/trpc/react'),
-      import('@/components/workspace/PrepareScreenshotPost'),
-    ])
+  const [
+    { createTRPCClient, httpLink },
+    { default: superjson },
+    { AppRouterContext },
+    { TRPCProvider },
+    sheet,
+  ] = await Promise.all([
+    import('@trpc/client'),
+    import('superjson'),
+    import('next/dist/shared/lib/app-router-context.shared-runtime'),
+    import('@/lib/trpc/react'),
+    import('@/components/workspace/PrepareScreenshotPost'),
+  ])
   const queryClient = new QueryClient()
   const trpcClient = createTRPCClient<import('@/lib/trpc/router').AppRouter>({
-    links: [httpLink({ url: 'http://localhost/api/trpc' })],
+    links: [httpLink({ url: 'http://localhost/api/trpc', transformer: superjson })],
   })
   const router = { back() {}, forward() {}, prefetch() {}, push() {}, refresh() {}, replace() {} }
   await mount(
