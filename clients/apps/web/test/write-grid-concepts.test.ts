@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  batchGridSchema,
+  GRID_HEADLINE_LIMIT,
+  UGC_CLIP_MS,
+  UGC_CLOSING_MS,
+  UGC_TEXT_LIMIT,
+} from '@/lib/api/contracts/content-batches'
+import {
   assembleConcepts,
+  clipLengthProblem,
   fillEmptySlots,
   gridInputProblem,
   gridReady,
@@ -119,4 +127,56 @@ test('every preset can make concepts as it stands', () => {
       preset.name
     )
   }
+})
+
+test('each template kind has its own shape: slots, text and music start', () => {
+  const ok = (grid: unknown) => batchGridSchema.safeParse(grid).success
+  const four = [{ topic: 'a' }, { topic: 'b' }, { topic: 'c' }, { topic: 'd' }]
+  // A stored grid has no kind and still reads.
+  assert.ok(ok({ headline: 'Four tools', slots: four }))
+  assert.ok(!ok({ headline: 'Four tools', slots: four.slice(0, 1) }))
+  assert.ok(!ok({ headline: ' ', slots: four }))
+  assert.ok(!ok({ headline: 'a'.repeat(GRID_HEADLINE_LIMIT + 1), slots: four }))
+  // A fade-in takes one image; image only may leave the headline empty.
+  assert.ok(ok({ headline: 'One', kind: 'single', slots: [{ topic: '' }] }))
+  assert.ok(ok({ headline: '', hideHeadline: true, kind: 'single', slots: [{ topic: '' }] }))
+  assert.ok(!ok({ headline: '', kind: 'single', slots: [{ topic: '' }] }))
+  assert.ok(!ok({ headline: 'One', kind: 'single', slots: four }))
+  // UGC text is longer and multiline, and sits at a named position.
+  const ugc = { headline: 'POV:\nyou found it', kind: 'ugc', slots: [{ topic: '' }] }
+  assert.ok(ok({ ...ugc, textPosition: 'bottom' }))
+  assert.ok(ok({ ...ugc, headline: 'a'.repeat(UGC_TEXT_LIMIT) }))
+  assert.ok(!ok({ ...ugc, headline: 'a'.repeat(UGC_TEXT_LIMIT + 1) }))
+  assert.ok(!ok({ ...ugc, textPosition: 'left' }))
+  // Text is counted as Go counts it, in code points: 150 emoji fit, 151 do not.
+  assert.ok(ok({ ...ugc, headline: '👍'.repeat(UGC_TEXT_LIMIT) }))
+  assert.ok(!ok({ ...ugc, headline: '👍'.repeat(UGC_TEXT_LIMIT + 1) }))
+  // A kind takes only its own fields, as Go refuses the others.
+  const clip = 'cclosingclip00000000000000'
+  assert.ok(!ok({ headline: 'Four tools', slots: four, closingAssetId: clip }))
+  assert.ok(!ok({ headline: 'Four tools', slots: four, hideHeadline: true }))
+  assert.ok(!ok({ headline: 'One', kind: 'single', slots: [{ topic: '' }], textPosition: 'top' }))
+  assert.ok(!ok({ headline: 'One', kind: 'single', slots: [{ topic: '' }], closingAssetId: clip }))
+  assert.ok(!ok({ ...ugc, hideHeadline: true }))
+  assert.ok(ok({ ...ugc, closingAssetId: clip }))
+  // A music start needs music.
+  assert.ok(!ok({ ...ugc, musicStartMs: 1000 }))
+  assert.ok(ok({ ...ugc, musicAssetId: 'cmusicasset0000000000000000', musicStartMs: 24_100 }))
+})
+
+test('clip lengths are checked to the tenth of a second, at both ends (ST-044)', () => {
+  const closing = UGC_CLOSING_MS
+  assert.equal(clipLengthProblem(3000, closing, 'The closing clip'), null)
+  assert.equal(clipLengthProblem(15_049, closing, 'The closing clip'), null)
+  assert.equal(clipLengthProblem(2950, closing, 'The closing clip'), null)
+  assert.match(clipLengthProblem(2900, closing, 'The closing clip') ?? '', /3 to 15 seconds.*2\.9/)
+  assert.match(clipLengthProblem(15_100, closing, 'The closing clip') ?? '', /15\.1/)
+  assert.ok(clipLengthProblem(Number.NaN, closing, 'The closing clip'))
+})
+
+test("a UGC video's own clip takes 3 to 60 seconds", () => {
+  assert.equal(clipLengthProblem(3000, UGC_CLIP_MS, 'The clip'), null)
+  assert.equal(clipLengthProblem(60_049, UGC_CLIP_MS, 'The clip'), null)
+  assert.match(clipLengthProblem(60_100, UGC_CLIP_MS, 'The clip') ?? '', /3 to 60 seconds/)
+  assert.match(clipLengthProblem(2000, UGC_CLIP_MS, 'The clip') ?? '', /this one is 2\.0/)
 })

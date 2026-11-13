@@ -3,6 +3,7 @@ package autodm
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +42,39 @@ func TestEligibilityNeverInfersConsentAndStopsAtExpiryOrOptOut(t *testing.T) {
 	r.Reposted = false
 	if !Eligible(c, r, now) {
 		t.Fatal("any refused reply")
+	}
+}
+
+func TestConfigRefusesUnknownVariablesAndEmptyMessages(t *testing.T) {
+	c, _, _ := fixture()
+	if err := c.Config.Validate(); err != nil {
+		t.Fatalf("valid config refused: %v", err)
+	}
+	// Lengths count runes, as the web's zod schema counts code points: an emoji
+	// counts once though it is two UTF-16 units.
+	for name, accept := range map[string]func(*Config){
+		"10,000 emoji": func(c *Config) { c.Message = strings.Repeat("😀", 10000) },
+		"100 emoji":    func(c *Config) { c.ReplyText = strings.Repeat("😀", 100) },
+	} {
+		cc := c.Config
+		accept(&cc)
+		if err := cc.Validate(); err != nil {
+			t.Errorf("refused %s: %v", name, err)
+		}
+	}
+	for name, refuse := range map[string]func(*Config){
+		"unknown variable":  func(c *Config) { c.Message = "Hi {{email}}" },
+		"empty message":     func(c *Config) { c.Message = "" },
+		"blank message":     func(c *Config) { c.Message = " \n\t" },
+		"10,001 emoji":      func(c *Config) { c.Message = strings.Repeat("😀", 10001) },
+		"101 emoji filter":  func(c *Config) { c.ReplyText = strings.Repeat("😀", 101) },
+		"filter on reposts": func(c *Config) { c.Replies = false },
+	} {
+		cc := c.Config
+		refuse(&cc)
+		if cc.Validate() == nil {
+			t.Errorf("accepted %s", name)
+		}
 	}
 }
 

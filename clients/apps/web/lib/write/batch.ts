@@ -32,6 +32,8 @@ export type BatchAccount = {
   tiktokCreator?: AccountStanding['tiktokCreator']
   /** An X account's own limit, which the preview counts against. */
   xCaptionLimit?: AccountStanding['maxWeightedCharacters']
+  /** An X account's verified video length in seconds. */
+  xVideoMaxSeconds?: AccountStanding['xVideoMaxSeconds']
 }
 
 /**
@@ -62,6 +64,18 @@ function documentProblems(channel: DraftChannel, facts: MediaFacts[]) {
   return []
 }
 
+/** A video longer than the X account's verified length, in Go's words (socialidentity.CheckXMedia). */
+function xVideoLength(account: BatchAccount, facts: MediaFacts[]) {
+  const max = account.xVideoMaxSeconds
+  if (account.channel !== 'x' || !max) return []
+  const ms = facts.find((fact) => fact.mimeType.startsWith('video/'))?.durationMs
+  if (!ms || ms <= max * 1000) return []
+  const seconds = Math.ceil(ms / 1000)
+  return [
+    `This X account takes videos up to ${Math.floor(max / 60)} minutes; this one is ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}. Trim it before scheduling.`,
+  ]
+}
+
 /**
  * For each chosen account: what blocks the item there, from the media rules
  * Go also applies, and what Shots would change before sending it.
@@ -82,10 +96,40 @@ export function stagedChecks(item: BatchItem, accounts: readonly BatchAccount[])
               ? ['Finish uploading this item’s files first.']
               : pdf
                 ? documentProblems(account.channel, facts)
-                : mediaProblems(account.channel, facts),
+                : [...mediaProblems(account.channel, facts), ...xVideoLength(account, facts)],
         },
       ])
   )
+}
+
+/**
+ * A preview row's files against its accounts' platforms before anything
+ * uploads, on the facts the browser has: type and size. A row no account can
+ * take needs fixing; one that only some refuse is added, with a note saying
+ * what they refuse. Length and shape are known once uploaded, so Check judges
+ * those, and a row with a library asset or an untyped file is left to it.
+ */
+export function intakeChecks(
+  channels: readonly DraftChannel[],
+  files: readonly ({ size: number; type: string } | undefined)[]
+): { notes: string[]; problems: string[] } {
+  const facts: MediaFacts[] = []
+  for (const file of files) {
+    if (!file?.type) return { notes: [], problems: [] }
+    facts.push({ bytes: file.size, mimeType: file.type })
+  }
+  const pdf = facts.some((fact) => fact.mimeType === 'application/pdf')
+  const platforms = [...new Set(channels)]
+  const refusals = facts.length
+    ? platforms.flatMap((channel) =>
+        (pdf ? documentProblems(channel, facts) : mediaProblems(channel, facts)).slice(0, 1)
+      )
+    : []
+  // A PDF's refusal reads the same for every platform but LinkedIn: say it once.
+  const said = [...new Set(refusals)]
+  return refusals.length && refusals.length === platforms.length
+    ? { notes: [], problems: said }
+    : { notes: said, problems: [] }
 }
 
 /**
@@ -212,6 +256,7 @@ export function previewPublications(
         standing: {
           maxWeightedCharacters: account.xCaptionLimit,
           tiktokCreator: account.tiktokCreator,
+          xVideoMaxSeconds: account.xVideoMaxSeconds,
         },
       }),
     })),

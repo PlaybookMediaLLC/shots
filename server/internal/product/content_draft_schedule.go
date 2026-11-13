@@ -194,6 +194,8 @@ type AccountStanding struct {
 	XCaptionLimit  *int                       `json:"xCaptionLimit"`
 	XArticles      *bool                      `json:"xArticles"`
 	XQuotes        bool                       `json:"xQuotes"`
+	// XVideoMaxSeconds is the verified account's X video length; nil is unverified.
+	XVideoMaxSeconds *int `json:"xVideoMaxSeconds"`
 }
 
 // AccountStandingReader reads an account's standing from its platform
@@ -681,6 +683,10 @@ func replayDraftSchedule(ctx context.Context, tx *ent.Tx, draft *ent.ContentDraf
 			return nil, conflict("This version was already scheduled for another time. Reload to see the current schedule, then change it.")
 		}
 	}
+	// A replay answers in the targets' order, as the first answer did; the query has none.
+	slices.SortFunc(existing, func(a, b *ent.ScheduledPost) int {
+		return slices.Index(keys, a.IdempotencyKey) - slices.Index(keys, b.IdempotencyKey)
+	})
 	return existing, nil
 }
 
