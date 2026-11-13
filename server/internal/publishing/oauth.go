@@ -240,14 +240,13 @@ func (r *Repository) FinishOAuth(ctx context.Context, actor Actor, sessionID, st
 	return connection.Unwrap(), nil
 }
 
-// reconnect renews an account the workspace already holds. An account in a
-// live set stays there: adding it to another set, or creating a set with it,
-// is refused rather than silently moving it, because that set's drafts and
-// history name it. An account whose set was deleted, or that never had one,
-// joins the set it is being connected to. A legacy platform name is renamed
-// to the adapter that renewed it.
+// reconnect renews an account the workspace already holds. An account a set
+// still holds stays there: adding it to another set, or creating a set with
+// it, is refused rather than silently moving it, because that set's drafts and
+// history name it. An account no set holds joins the set it is being
+// connected to. A legacy platform name is renamed to the adapter that renewed it.
 func reconnect(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection, provider string, start *ent.SocialOAuthStart) (*ent.ChannelConnection, error) {
-	current, err := liveSocialSet(ctx, tx, connection)
+	current, err := holdingSocialSet(ctx, tx, actor, connection)
 	if err != nil {
 		return nil, err
 	}
@@ -281,17 +280,26 @@ func reconnect(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.Cha
 	if err != nil {
 		return nil, err
 	}
-	update := tx.ChannelConnection.UpdateOneID(connection.ID).SetStatus(channelconnection.StatusACTIVE).SetPlatform(provider)
+	// The row was read unlocked: an assignment committed since then wins.
+	unchanged := channelconnection.SocialSetIDIsNil()
+	if connection.SocialSetID != nil {
+		unchanged = channelconnection.SocialSetID(*connection.SocialSetID)
+	}
+	update := tx.ChannelConnection.UpdateOneID(connection.ID).Where(channelconnection.StatusEQ(connection.Status), unchanged).
+		SetStatus(channelconnection.StatusACTIVE).SetPlatform(provider)
 	if setID == nil {
 		update.ClearSocialSetID()
 	} else {
 		update.SetSocialSetID(*setID)
 	}
 	restored, err := update.Save(ctx)
+	if ent.IsConstraintError(err) {
+		return nil, ErrSocialSetSlotTaken
+	}
+	if ent.IsNotFound(err) {
+		return nil, ErrConflict
+	}
 	if err != nil {
-		if ent.IsConstraintError(err) {
-			return nil, ErrSocialSetSlotTaken
-		}
 		return nil, err
 	}
 	if err := enableDefaultPlatform(ctx, tx, setID, provider); err != nil {

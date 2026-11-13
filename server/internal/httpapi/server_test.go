@@ -476,7 +476,7 @@ func TestCreateConnectionAppliesSocialDefaults(t *testing.T) {
 }
 
 func TestAccountConflictsAreExplicitAndNameNoSet(t *testing.T) {
-	for _, conflict := range []error{publishing.ErrAccountInAnotherSet, publishing.ErrAccountRemovedFromAnotherSet} {
+	for _, conflict := range []error{publishing.ErrAccountInAnotherSet, publishing.ErrAccountRemovedFromAnotherSet, publishing.ErrSocialSetSlotTaken} {
 		response := httptest.NewRecorder()
 		writeStoreError(response, fmt.Errorf("finish oauth: %w", conflict))
 		// The message is fixed text: it names neither the other set nor its owner.

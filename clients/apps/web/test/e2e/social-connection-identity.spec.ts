@@ -101,10 +101,16 @@ async function connectedWorkspace(
   const exchanges = () =>
     provider.calls.filter((call) => call.url.startsWith('/integrations/social-connect/')).length
   const cleanup = async () => {
-    await db.query('DELETE FROM "Integration" WHERE "organizationId"=$1', [`go-${organizationId}`])
-    await db.query('DELETE FROM "Organization" WHERE id=$1', [`go-${organizationId}`])
-    await unbindTestGoOrganization(organizationId)
-    await provider.close()
+    try {
+      await db.query('DELETE FROM "Integration" WHERE "organizationId"=$1', [
+        `go-${organizationId}`,
+      ])
+      await db.query('DELETE FROM "Organization" WHERE id=$1', [`go-${organizationId}`])
+      await unbindTestGoOrganization(organizationId)
+    } finally {
+      // The mock holds this worker's port; the next test needs it free.
+      await provider.close()
+    }
   }
   try {
     await createWorkspace(identity, page)
@@ -141,7 +147,8 @@ async function connectedWorkspace(
     const created = socialSetSchema.parse((await sets()).find((set) => set.accounts.length > 0))
     return { begin, cleanup, created, exchanges, externalId, sets, xCallback }
   } catch (error) {
-    await cleanup()
+    // Keep the setup failure, not a cleanup one, as the test's error.
+    await cleanup().catch(() => undefined)
     throw error
   }
 }
@@ -246,6 +253,15 @@ test(
           'The account’s credentials could not be verified. Reconnect it before publishing.'
         )
       ).toBeVisible()
+      // The workspace accounts page reconnects through the account's own adapter too.
+      await app.open('/settings/channels')
+      await expect(
+        page.getByRole('link', { name: 'Reconnect', exact: true }).first()
+      ).toHaveAttribute(
+        'href',
+        `/integrations/social/x/start?socialSet=${created.id}&reconnect=${account?.id}`
+      )
+      await app.open(`/settings/publishing-brands/${created.id}`)
       await page.getByRole('button', { name: 'Reconnect', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog.getByRole('heading', { name: 'Reconnect X account' })).toBeVisible()

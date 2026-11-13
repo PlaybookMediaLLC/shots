@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
@@ -24,20 +25,25 @@ var ErrSocialSetSlotTaken = errors.New("this social set already has an account o
 
 // ErrAccountInAnotherSet refuses connecting an account that is already
 // active in a different social set of the workspace.
-var ErrAccountInAnotherSet = errors.New("this account is already connected to another social set in this workspace; remove it there first, then add it here")
+var ErrAccountInAnotherSet = errors.New("this account is already connected to another social set in this workspace; manage it from that set")
 
-// ErrAccountRemovedFromAnotherSet refuses moving an account that was removed
-// from a set that still exists: that set's drafts and history name it.
-var ErrAccountRemovedFromAnotherSet = errors.New("this account was removed from another social set in this workspace; reconnect it from that set")
+// ErrAccountRemovedFromAnotherSet refuses moving an account that another set
+// still holds while it is removed or revoked there: that set's drafts and
+// history name it.
+var ErrAccountRemovedFromAnotherSet = errors.New("this account is not active in another social set of this workspace; whoever manages that set can reconnect it")
 
-// liveSocialSet is the connection's set while that set exists, or nil.
-func liveSocialSet(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection) (*string, error) {
+// holdingSocialSet locks and returns the set that still holds an account: its
+// live set, or a deleted private set of another person, whose history stays
+// theirs. An account no set holds may join the set it is connected to.
+func holdingSocialSet(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection) (*string, error) {
 	if connection.SocialSetID == nil {
 		return nil, nil
 	}
-	live, err := tx.SocialSet.Query().Where(socialset.ID(*connection.SocialSetID), socialset.OrganizationID(connection.OrganizationID),
-		socialset.DeletedAtIsNil()).Exist(ctx)
-	if err != nil || !live {
+	holds := false
+	err := tx.PlatformQuery(ctx, `SELECT "deletedAt" IS NULL OR (visibility='PRIVATE' AND "ownerUserId" IS DISTINCT FROM $3)
+		FROM social_set WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, []any{*connection.SocialSetID, connection.OrganizationID, actor.UserID},
+		func(row entsql.ColumnScanner) error { return row.Scan(&holds) })
+	if err != nil || !holds {
 		return nil, err
 	}
 	return connection.SocialSetID, nil
