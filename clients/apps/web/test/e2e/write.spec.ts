@@ -510,6 +510,66 @@ test(
   }
 )
 
+test('an old draft’s code block and heading keep the kit’s layout, and markdown typed in a post stays text', async ({
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ channels: ['x'] })
+  // Long enough to wrap in the post column, so the bold run after it starts on a later line.
+  const lead =
+    'An older heading that runs long enough to wrap onto another line of the post column, written before posts lost headings, and then'
+  await openNewDraft(page, {
+    body: [
+      { type: 'h1', children: [{ text: `${lead} ` }, { bold: true, text: 'a bold end' }] },
+      {
+        type: 'code_block',
+        lang: 'javascript',
+        children: [{ type: 'code_line', children: [{ text: 'const answer = 42' }] }],
+      },
+      { type: 'p', children: [{ text: 'Old text' }] },
+    ],
+  })
+  const editor = draftEditor(page)
+
+  // Write turns off their shortcuts, not the kit's elements: old code keeps its bordered box.
+  const boxed = await editor.getByText('const answer = 42', { exact: true }).evaluate((code) => {
+    for (let node: Element | null = code; node; node = node.parentElement) {
+      if (node.hasAttribute('data-slate-editor')) return false
+      if (parseFloat(getComputedStyle(node).borderLeftWidth) > 0) return true
+    }
+    return false
+  })
+  expect(boxed).toBe(true)
+  // Its block menu leaves out Ask AI: Write's editor has no AI plugin, so the item threw.
+  // Comment stays: Write loads the comment plugin.
+  await editor.getByText('const answer = 42', { exact: true }).hover()
+  await editor.getByRole('button', { name: 'Block actions' }).click()
+  const actions = page.getByRole('listbox')
+  await expect(actions.getByRole('option', { name: /^Delete/ })).toBeVisible()
+  await expect(actions.getByRole('option', { name: /^Comment/ })).toBeVisible()
+  await expect(actions.getByRole('option', { name: /Ask AI/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(actions).toHaveCount(0)
+  // The heading's text flows as one paragraph; the kit's flex row would set the bold run beside it.
+  const leadBox = await editor.getByText(lead).boundingBox()
+  const endBox = await editor.getByText('a bold end', { exact: true }).boundingBox()
+  expect(endBox!.y).toBeGreaterThan(leadBox!.y)
+  // Nor does it offer the kit's copy-link control, whose anchor no Write page opens.
+  await editor.getByRole('heading', { level: 1 }).hover()
+  await expect(page.getByRole('button', { name: 'Copy link to heading' })).toBeHidden()
+
+  // A post cannot carry headings or quotes, so their markdown stays literal text.
+  await caretAtEndOf(page, editor.getByText('Old text', { exact: true }))
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('# Not a heading')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('> Not a quote')
+  await expect(editor).toContainText('# Not a heading')
+  await expect(editor).toContainText('> Not a quote')
+  await expect(editor.getByRole('heading')).toHaveCount(1)
+  await expect(editor.locator('blockquote')).toHaveCount(0)
+})
+
 test(
   'on a phone the library is the page, panels are sheets, and the review keeps the account identity',
   { tag: '@journey' },

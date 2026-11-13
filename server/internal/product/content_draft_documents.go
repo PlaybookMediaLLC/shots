@@ -296,7 +296,7 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 		}
 	}
 	if clean.Automation != nil {
-		if err := checkDraftExtras(channel, ContentDraftScheduleTarget{AutoActions: clean.Automation}); err != nil {
+		if err := checkDraftExtras(channel, ContentDraftScheduleTarget{AutoActions: clean.Automation}, nil); err != nil {
 			return nil, err
 		}
 	}

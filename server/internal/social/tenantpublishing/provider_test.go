@@ -15,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/instagram"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -473,6 +474,18 @@ func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
 	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
 	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
 		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// Shots running out of time counting a post's text sent nothing and blames
+// neither the platform nor the text, which passed the same count when it was
+// scheduled: the post retries.
+func TestTextTooComplexToCountRetries(t *testing.T) {
+	var retry *socialapi.Error
+	err := publicationOutcome(fmt.Errorf("x: %w", helpers.ErrTextTooComplex))
+	if !errors.As(err, &retry) || retry.UnknownDelivery || retry.Status != http.StatusTooManyRequests ||
+		retry.Code != publishing.FailurePublisherError || !strings.Contains(retry.ProviderMessage, "nothing was sent") {
+		t.Fatalf("too complex = %#v", err)
 	}
 }
 

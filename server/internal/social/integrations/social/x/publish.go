@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/upload"
@@ -449,6 +450,10 @@ func (p *Provider) FinalizePost(ctx context.Context, accessToken string, raw jso
 		return nil, err
 	}
 	if err := checkPublishingContent(caps, pending.Message, pending.Settings, len(pending.MediaIDs), str(pending.Settings.PostType) == "article"); err != nil {
+		if pending.ArticleDraftID != "" && errors.Is(err, helpers.ErrTextTooComplex) {
+			// The draft is saved on X: a whole-post retry would create another.
+			return nil, temporalx.UnknownDelivery(identifier, "Shots could not finish checking the Article's text in time; its draft is saved on X. Publish it from X, then mark this post.")
+		}
 		return nil, err
 	}
 	poll, err := checkedPoll(pending.Poll, len(pending.MediaIDs), str(pending.Settings.PostType) == "article")

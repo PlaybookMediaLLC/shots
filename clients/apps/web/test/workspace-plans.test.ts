@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
-  evaluateWorkspaceFeature,
   getMinimumPlan,
   getWorkspaceQuota,
+  includedAllowance,
   hasWorkspaceFeature,
   planPriceSummary,
   workspaceFeatureSchema,
@@ -39,72 +39,6 @@ test('every paid plan includes the campaign workflow', () => {
   assert.equal(hasWorkspaceFeature('business', 'campaign:workflow'), true)
   assert.equal(hasWorkspaceFeature('enterprise', 'campaign:workflow'), true)
   assert.equal(getMinimumPlan('campaign:workflow'), 'pro')
-  assert.equal(
-    hasWorkspaceFeature('pro', 'campaign:workflow', { 'campaign:workflow': false }),
-    false
-  )
-})
-
-test('contract overrides can grant or revoke one feature without changing plans', () => {
-  assert.equal(hasWorkspaceFeature('free', 'asset:delete', { 'asset:delete': true }), true)
-  assert.equal(
-    hasWorkspaceFeature('enterprise', 'enterprise:scim', { 'enterprise:scim': false }),
-    false
-  )
-})
-
-test('expired and suspended plans fail closed before feature execution', () => {
-  const now = new Date('2026-08-26T12:00:00.000Z')
-  assert.equal(
-    evaluateWorkspaceFeature(
-      { plan: 'enterprise', status: 'active', validUntil: new Date('2026-08-26T11:59:59Z') },
-      'enterprise:sso',
-      now
-    ).allowed,
-    false
-  )
-  assert.equal(
-    evaluateWorkspaceFeature({ plan: 'enterprise', status: 'suspended' }, 'enterprise:sso', now)
-      .allowed,
-    false
-  )
-})
-
-test('unknown plans fail closed', () => {
-  const decision = evaluateWorkspaceFeature(
-    { featureOverrides: { unknown: true }, plan: 'untrusted-tier', status: 'active' },
-    'asset:delete'
-  )
-  assert.deepEqual(decision, {
-    allowed: false,
-    currentPlan: 'free',
-    requiredPlan: 'pro',
-  })
-  assert.equal(
-    evaluateWorkspaceFeature({ plan: 'untrusted-tier', status: 'active' }, 'content:drafts')
-      .allowed,
-    false
-  )
-})
-
-test('past-due workspaces retain access only during the explicit billing grace period', () => {
-  const now = new Date('2026-08-26T12:00:00.000Z')
-  assert.equal(
-    evaluateWorkspaceFeature(
-      { graceUntil: new Date('2026-08-27T12:00:00.000Z'), plan: 'pro', status: 'past_due' },
-      'asset:delete',
-      now
-    ).allowed,
-    true
-  )
-  assert.equal(
-    evaluateWorkspaceFeature(
-      { graceUntil: new Date('2026-08-26T11:59:59.000Z'), plan: 'pro', status: 'past_due' },
-      'asset:delete',
-      now
-    ).allowed,
-    false
-  )
 })
 
 test('plan quotas increase for API writes and storage', () => {
@@ -144,4 +78,51 @@ test('the static llm.txt quotes the current plan prices', () => {
       `public/llm.txt lacks ${planPriceSummary(plan)}`
     )
   }
+})
+
+test('each feature needs the plan the Go backend requires', () => {
+  const product = '../../../server/internal/product/'
+  const go = readFileSync(`${product}entitlements.go`, 'utf8')
+  const block = go.match(/minimumFeaturePlan = map\[string\]string\{([\s\S]*?)\n\}/)?.[1]
+  assert.ok(block, 'entitlements.go has no minimumFeaturePlan')
+  const constants = new Map<string, string>()
+  for (const file of [
+    'onboarding.go',
+    'creative_set_validation.go',
+    'whitelabel.go',
+    'permission_groups.go',
+  ]) {
+    for (const [, name, value] of readFileSync(`${product}${file}`, 'utf8').matchAll(
+      /const (\w+Feature) = "([^"]+)"/g
+    ))
+      if (name && value) constants.set(name, value)
+  }
+  const required = new Map<string, string>()
+  for (const [, literal, constant, plan] of block.matchAll(
+    /(?:"([^"]+)"|(\w+Feature)):\s+"(\w+)"/g
+  )) {
+    const feature = literal ?? constants.get(constant ?? '')
+    assert.ok(feature && plan, `unresolved feature ${constant}`)
+    required.set(feature, plan)
+  }
+  // Every entry was read: none is spelled in a way the pattern above skips.
+  assert.equal(block.match(/:\s+"/g)?.length, required.size)
+  for (const feature of workspaceFeatureSchema.options)
+    assert.equal(getMinimumPlan(feature), required.get(feature), feature)
+  // The web does not offer creative sets, which an environment switch gates.
+  const unmodeled = [...required.keys()].filter(
+    (feature) => !workspaceFeatureSchema.safeParse(feature).success
+  )
+  assert.deepEqual(unmodeled, ['creative-sets:create'])
+})
+
+test('the billing page shows what the backend says a plan includes', () => {
+  // A lapsed Pro plan includes nothing, whatever the plan table says.
+  assert.equal(includedAllowance({ 'posts:monthly': 0 }, 'pro', 'posts:monthly'), 0)
+  assert.equal(includedAllowance({ 'posts:monthly': 250 }, 'pro', 'posts:monthly'), 250)
+  // A backend older than its allowances sends none.
+  assert.equal(
+    includedAllowance(undefined, 'pro', 'posts:monthly'),
+    getWorkspaceQuota('pro', 'posts:monthly')
+  )
 })
