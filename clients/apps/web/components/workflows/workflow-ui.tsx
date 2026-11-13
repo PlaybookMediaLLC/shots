@@ -80,6 +80,7 @@ export const FAILURE_CODES: Record<string, string> = {
   not_entitled: 'The workspace plan does not include this action.',
   prohibited_terms: 'Copy used a term the brand prohibits.',
   model_unavailable: 'No worker had an AI model configured.',
+  model_output_invalid: 'The model returned incomplete or invalid content. Retry this step.',
   renderer_unavailable: 'No worker could reach the design renderer.',
   capture_missing: 'No product page has a current capture to put in the creatives.',
   capture_unavailable: 'No worker could capture and store product pages.',

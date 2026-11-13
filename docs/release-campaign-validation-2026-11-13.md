@@ -1,7 +1,7 @@
 # Release-to-campaign production validation
 
 Target: Shots production, capturing `https://verifier.playbookmedia.io` with the
-existing signed-in account, per the user's revised fixture on November 13.
+email account requested by the user, per the revised fixture on November 13.
 Its canonical repository is `Oppulence-Engineering/paperless-check-if-email-exists`
 (verified through GitHub and the local Verifier checkout's remote). All generated
 content remains unpublished drafts. Read-only product navigation only; no email
@@ -36,8 +36,8 @@ needed to prove original screenshot attachment without a render step.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | RC-001 | P1 | Capture configuration | Open production Automate → Signed-in capture: "Signed-in capture is not set up" | Infisical `/screenshot-studio` lacks PLATFORM_CAPTURE_CDP_URL, PLATFORM_CAPTURE_CDP_TOKEN and PLATFORM_CAPTURE_STATE_KEY | Provisioned capture URL, encryption key and (explicitly authorized) renderer token in Infisical; verified read-back without exposing values | Real Cloudflare session test passed | Config deployment 43498556650 succeeded; production UI shows capture forms |
 | RC-002 | P1 | Feature navigation | Request a feature objective through authenticated capture | Runner supports fixed CSS recipes only; no model-guided navigation path | Extend existing bounded runner, preserving network, identity and write restrictions | Pending | Not available |
-| RC-003 | P1 | Campaign generation | Model returns missing, unknown, duplicate or invalid posts; node can complete | Response filtering silently drops invalid entries and accepts an empty generation | Reproduce and require complete validated output | Pending | Not tested |
-| RC-005 | P1 | Staging deployment attribution | A configured staging workflow accepts its deployment event, but capture cannot find its deployment record | CollectAutomationChange records only production deployments; downstream public capture hardcodes production and direct capture lacks an environment boundary | Record pinned automation-mode deployments through existing ingestion; preserve legacy production policy; scope public captures and release-tag lookup to the surface environment | Reproduced missing record, cross-environment capture and wrong release lookup; focused regressions and final full check pass; final independent review passed | Not deployed |
+| RC-003 | P1 | Campaign generation | Model returns missing, unknown, duplicate or invalid posts; node can complete | Response filtering silently drops invalid entries and accepts an empty generation | Require the exact requested post count and a valid unique result for every post before storing a generation; expose model_output_invalid | Six malformed-output cases reproduced; retry regressions, full Go and client checks pass; six review perspectives completed | Not deployed |
+| RC-005 | P1 | Staging deployment attribution | A configured staging workflow accepts its deployment event, but capture cannot find its deployment record | CollectAutomationChange records only production deployments; downstream public capture hardcodes production and direct capture lacks an environment boundary | Record pinned automation-mode deployments through existing ingestion; preserve legacy production policy; scope public captures and release-tag lookup to the surface environment | Reproduced missing record, cross-environment capture and wrong release lookup; focused regressions and final full check pass; final independent review passed | Deployed at a5b3696; health verified, real staging capture pending |
 | RC-004 | P1 | Draft preservation | Edit a generated draft, then replay its incomplete generation receipt | Replay uses current copy as ExpectedCopy instead of the copy the generation was based on | Persist original copy and draft timestamp; conditionally apply through existing revision owner | PostgreSQL regressions and full Go check passed; six independent reviews passed | Deployed at f6779502; campaign replay not yet verified |
 
 ## Production observations
@@ -194,3 +194,51 @@ isolated database with the same Founder Hub prerequisites used by CI.
   A separate manual capture connection is being set up through the production
   UI to validate browser sign-in independently. It will not establish release
   intake or whole-workflow acceptance.
+
+## Code deployment cycle 3: staging attribution
+
+- Commit `259af1e452e0cc4c2c2c37001c5fb715bf0a0142`, work PR
+  https://github.com/PlaybookMediaLLC/shots/pull/586, squash merged into develop
+  as `8346132e8c14bf11cb73e1968220ee941dafb612`.
+- Release https://github.com/PlaybookMediaLLC/shots/pull/587 merged develop into
+  main with merge commit `a5b36961752f724b7668d6ebdd9301354a73c6a1`. The complete
+  release tree matched the locally validated tree; live rules were checked,
+  and no bypass was used. Both PRs merged with CI pending.
+- Backend deployment https://github.com/PlaybookMediaLLC/shots/actions/runs/43507225749
+  succeeded. Deploy job `132170432387` asserted the expected backend image tag
+  and ACTIVE deployment. Production health returned `{"status":"ok"}`.
+- Develop full-suite run `43506823833` and main run `43507225609` both succeeded.
+  The prior intermittent X OAuth failure is being
+  corrected separately: dismiss the account-assignment menu before checking
+  the row's Add another link, retaining the existing assertions. Full client
+  quality checks passed for that change; all 14 browser cases passed across two
+  runs against the exact CI-built application images for develop `8346132e`.
+- Production UI saved `Verifier manual validation`, staging, no repository,
+  and opened a real Cloudflare sign-in browser. Google authentication reached
+  `/v3/signin/challenge/dp`, then displayed Error 500. The user confirmed the
+  sign-in failure. Asked them to use Verifier's normal email-code sign-in in
+  that private browser. No session has been verified and no image exists yet.
+- Release intake still waits on organization-owner installation access. These
+  results establish deployment health and connection persistence, not campaign
+  or screenshot acceptance.
+
+## RC-003 validation and review
+
+- Six malformed model replies (empty, missing, unknown, duplicate, blank, and
+  over-limit) failed before the fix and pass with it. Each regression checks
+  persisted failure, no generation receipt or charge, unchanged drafts, and a
+  successful valid retry for both destinations.
+- Full Go checks passed against the isolated PostgreSQL fixture, including race,
+  vet, generated-code and module-drift checks. Full client quality checks passed.
+  The initial worktree type check lacked workspace-local dependencies; a clean
+  `npm ci` corrected the setup without changing dependency files.
+- Independent structure, performance, chaos, QA, lean and Go reviews completed.
+  The Go review identified copy-specific wording on a shared model schema error;
+  the message now describes invalid content for both classification and copy.
+  No new error abstraction was needed. Provider generation remains unverified.
+- The user requested an email account instead of Google authentication. Saved
+  `Verifier email staging validation` through the production UI, with staging
+  selected explicitly and the expected email identity. Revoked the unused
+  production-environment test connection. The user reported successful email
+  sign-in; Shots session confirmation is pending while native browser control
+  reports macOS ScreenCaptureKit failures. No capture artifact exists yet.

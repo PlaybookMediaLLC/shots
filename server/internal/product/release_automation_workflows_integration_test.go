@@ -37,6 +37,7 @@ type scriptedCopyModel struct {
 	prompts     []string
 	systems     []string
 	beforeReply func()
+	replyPosts  func([]map[string]string) []map[string]string
 }
 
 func (m *scriptedCopyModel) Structured(_ context.Context, request platformai.Request, out any) (platformai.Usage, error) {
@@ -47,6 +48,9 @@ func (m *scriptedCopyModel) Structured(_ context.Context, request platformai.Req
 		if id, ok := strings.CutPrefix(line, "- postId "); ok {
 			posts = append(posts, map[string]string{"postId": strings.SplitN(id, ":", 2)[0], "copy": "Exports now finish faster. Try them today."})
 		}
+	}
+	if m.replyPosts != nil {
+		posts = m.replyPosts(posts)
 	}
 	body, _ := json.Marshal(map[string]any{"posts": posts})
 	if m.beforeReply != nil {
@@ -267,6 +271,68 @@ func TestAutomationGenerationRefusesWithoutCredits(t *testing.T) {
 	node := f.db.Client.ReleaseAutomationNode.Query().Where(releaseautomationnode.RunID(runID), releaseautomationnode.NodeID("copy")).OnlyX(f.ctx)
 	if node.Status != "failed" || node.FailureCode != "insufficient_credits" || node.Charged {
 		t.Fatalf("node=%+v", node)
+	}
+}
+
+func TestAutomationGenerationRejectsIncompleteOrInvalidCopy(t *testing.T) {
+	for _, kind := range []string{"empty", "missing", "unknown", "duplicate", "blank", "over limit"} {
+		t.Run(kind, func(t *testing.T) {
+			f, model, _ := generationFixture(t)
+			second := f.db.Client.ChannelConnection.Create().SetID("second" + f.id).SetOrganizationID(f.org).SetExternalAccountID("second-fixture").SetSecretReference("fixture-only").SetCreatedByUserID(f.owner.UserID).SaveX(f.ctx)
+			f.graph.Nodes[3].Action.DestinationIDs = append(f.graph.Nodes[3].Action.DestinationIDs, second.ID)
+			if err := f.repo.AdvertiseReleaseAutomationExecutor(f.ctx, "ai-"+f.id, f.repo.AutomationCapabilities()...); err != nil {
+				t.Fatal(err)
+			}
+			runID, err := f.runUntil(t, f.activate(t), "invalid-copy", 25, "release", "campaign")
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := f.db.Client.CampaignPost.Query().Where(campaignpost.OrganizationID(f.org)).AllX(f.ctx)
+			if len(before) != 2 {
+				t.Fatalf("expected two draft posts, got %d", len(before))
+			}
+			model.replyPosts = func(posts []map[string]string) []map[string]string {
+				switch kind {
+				case "empty":
+					return nil
+				case "missing":
+					return posts[:1]
+				case "unknown":
+					posts[0]["postId"] = "not-a-requested-post"
+				case "duplicate":
+					posts[1] = posts[0]
+				case "blank":
+					posts[0]["copy"] = " \n\t "
+				case "over limit":
+					posts[0]["copy"] = strings.Repeat("x", 4000)
+				}
+				return posts
+			}
+			if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "copy", nil, 0); !errors.Is(err, platformai.ErrSchema) || PermanentAutomationError(err) {
+				t.Fatalf("invalid response should fail retryably: %v", err)
+			}
+			receipt := f.db.Client.ReleaseAutomationNode.Query().Where(releaseautomationnode.RunID(runID), releaseautomationnode.NodeID("copy")).OnlyX(f.ctx)
+			if receipt.Status != "failed" || receipt.FailureCode != "model_output_invalid" || receipt.Generation != nil || receipt.Charged {
+				t.Fatalf("invalid response was recorded as success: %+v", receipt)
+			}
+			for _, post := range before {
+				if got := f.db.Client.CampaignPost.GetX(f.ctx, post.ID); got.Copy != post.Copy || got.Status != campaignpost.StatusDRAFT {
+					t.Fatalf("invalid generation changed a draft: %+v", got)
+				}
+			}
+			model.replyPosts = nil
+			if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "copy", nil, 0); err != nil {
+				t.Fatalf("valid retry: %v", err)
+			}
+			for _, post := range before {
+				if got := f.db.Client.CampaignPost.GetX(f.ctx, post.ID); got.Copy != "Exports now finish faster. Try them today." || got.Status != campaignpost.StatusDRAFT {
+					t.Fatalf("valid retry did not persist a draft: %+v", got)
+				}
+			}
+			if model.calls != 2 {
+				t.Fatalf("model calls=%d", model.calls)
+			}
+		})
 	}
 }
 
