@@ -148,7 +148,7 @@ Checks without a post:
 - The LinkedIn lookup of the Page `getsolomonai` (106498803) returned HTTP 500 (TF-077), so no mention post was sent.
 - The cross-post (TF-035) did not run. X and LinkedIn are in different profiles, and moving a connection disables it.
 
-Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots has no control to delete a published post; a delete API is being built separately.
+Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots had no control to delete a published post; draft PR #557 adds one.
 
 ### Open defects found by L2
 
