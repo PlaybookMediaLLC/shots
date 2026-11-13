@@ -18,11 +18,11 @@ const QUIET = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code_b
 // Typed as any plugin: checking calls on a union of the kits' plugin types is costly.
 const KIT: AnyPlatePlugin[] = [...BasicBlocksKit, ...BasicMarksKit, ...CodeBlockKit]
 
-/** The kit's plugins for those keys, unchanged except for their shortcut. */
+/** Kit plugins re-configured without the shortcuts Write owns. */
 export const QuietShortcutPlugins: EditorKitPlugin[] = [
   ...KIT.filter((plugin) => QUIET.has(plugin.key)).map((plugin) =>
     plugin.configure({ shortcuts: { toggle: null } })
   ),
-  // ⌘⇧↵ opens the publish review, so the exit break no longer inserts a block above on it.
-  ...ExitBreakKit.map((plugin) => plugin.configure({ shortcuts: { insertBefore: null } })),
+  // ⌘⇧↵ opens the publish review. extend() keeps the kit's ⌘↵; configure() would drop it.
+  ...ExitBreakKit.map((plugin) => plugin.extend(() => ({ shortcuts: { insertBefore: null } }))),
 ]

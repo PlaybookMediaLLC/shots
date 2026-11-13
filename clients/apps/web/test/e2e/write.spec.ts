@@ -428,7 +428,7 @@ test('⌘⇧↵ with the caret in the editor opens the publish review and adds n
   startWorkspace,
 }) => {
   await startWorkspace({ channels: ['x'] })
-  await newDraft(page)
+  const draftId = await newDraft(page)
   const editor = draftEditor(page)
   await editor.click()
   await settleSelection(page)
@@ -443,6 +443,8 @@ test('⌘⇧↵ with the caret in the editor opens the publish review and adds n
   // The modal review hides the editor from the accessibility tree; count once it closes.
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('publish-review')).toHaveCount(0)
+  // The shortcut only opens the review; it never publishes.
+  expect(await draftPosts(draftId)).toEqual([])
   await expect(blocks).toHaveCount(before)
   // The post header comes first; the exit break used to put an empty block between it and the text.
   await expect(blocks.nth(1)).toContainText('Reviewed from the keyboard')
