@@ -1096,6 +1096,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content-draft-posts/{id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a published post from its platform
+         * @description Deletes a post that Shots published from its platform, with its thread parts, the replies Shots posted and its reposts. Each part gets a receipt; a part the platform already removed counts as deleted. Platforms without a delete call record the part as unsupported. Requires the `post:delete` scope.
+         */
+        post: operations["deleteContentDraftPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posts": {
         parameters: {
             query?: never;
@@ -2230,6 +2250,19 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
             undo: {
                 draftId: string;
@@ -4026,7 +4059,28 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
+        };
+        PostDeletion: {
+            deletion: {
+                organizationId: string;
+                platform: string;
+                postId: string;
+                requestedBy: string;
+            };
         };
         PostCreateRequest: {
             /** @enum {string} */
@@ -6480,6 +6534,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                             campaignId?: string | null;
                             campaignTitle?: string;
                             version: number;
@@ -10217,6 +10284,73 @@ export interface operations {
             };
         };
     };
+    deleteContentDraftPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delete started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDeletion"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The caller may not publish to this account, or the key lacks `post:delete`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post was not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post is not live, or it was already deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createPost: {
         parameters: {
             query?: never;
@@ -10505,6 +10639,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */
@@ -10785,6 +10932,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */

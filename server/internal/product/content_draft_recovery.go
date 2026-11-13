@@ -29,7 +29,14 @@ var (
 
 // draftPostForRecovery loads a draft post the actor may see, for a publisher.
 func (c *Configuration) draftPostForRecovery(ctx context.Context, tx *ent.Tx, actor Actor, postID string) (*ent.ScheduledPost, error) {
-	if err := c.authorizeScheduling(ctx, actor); err != nil {
+	return c.draftPostWithAccess(ctx, tx, actor, postID, c.authorizeScheduling)
+}
+
+// draftPostWithAccess loads a draft post of the actor's workspace after
+// authorize, for an action on a post that is already scheduled or live.
+func (c *Configuration) draftPostWithAccess(ctx context.Context, tx *ent.Tx, actor Actor, postID string,
+	authorize func(context.Context, Actor) error) (*ent.ScheduledPost, error) {
+	if err := authorize(ctx, actor); err != nil {
 		return nil, err
 	}
 	if err := c.requireWorkspaceFeature(ctx, actor.OrganizationID, contentDraftFeature); err != nil {

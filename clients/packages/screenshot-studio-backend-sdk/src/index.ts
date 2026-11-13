@@ -3655,6 +3655,13 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Start deleting a published post from its platform; the workflow keeps receipts. */
+  async deleteContentDraftPost(id: string) {
+    return this.request<{
+      deletion: { organizationId: string; platform: string; postId: string; requestedBy: string }
+    }>(`v1/content-draft-posts/${encodeURIComponent(id)}/delete`, { body: {}, method: 'POST' })
+  }
+
   /** Stop a live post's pending follow-ups; removals of automatic reposts still run. */
   async cancelContentDraftPostAutomations(id: string) {
     return this.request<{ post: BackendContentDraftPost }>(

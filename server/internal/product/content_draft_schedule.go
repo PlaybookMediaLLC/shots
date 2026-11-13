@@ -251,6 +251,10 @@ type ContentDraftPost struct {
 	// worker), and when its provider confirmed it.
 	FailureCode *string    `json:"failureCode"`
 	PublishedAt *time.Time `json:"publishedAt"`
+	// When it was deleted from its platform through Shots; it stays PUBLISHED.
+	DeletedAt *time.Time `json:"deletedAt"`
+	// Each part of a requested delete, with its receipt.
+	Deletions []PostDeletionReceipt `json:"deletions"`
 }
 
 // livePostURL is a live post's address on its platform, where one can be
@@ -321,7 +325,7 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		URL: postURL, Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
 		NaturalOffsetSeconds: post.NaturalOffsetSeconds, ScheduleMode: mode, ScheduleTimeZone: post.ScheduleTimeZone,
 		SlotAt: post.SlotAt, SocialSetID: post.SocialSetID, Automations: []PostAutomation{},
-		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt}
+		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt, Deletions: []PostDeletionReceipt{}}
 }
 
 // validateDraftTargets checks the shape of a schedule before any lookup.
@@ -1126,11 +1130,18 @@ func (c *Configuration) ListContentDraftPosts(ctx context.Context, actor Actor, 
 	if err != nil {
 		return nil, err
 	}
+	deletions, err := c.deletionReceipts(ctx, posts...)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]ContentDraftPost, 0, len(posts))
 	for _, post := range posts {
 		item := contentDraftPost(post, post.Edges.ChannelConnection.Platform)
 		if found := automations[post.ID]; found != nil {
 			item.Automations = found
+		}
+		if found := deletions[post.ID]; found != nil {
+			item.Deletions = found
 		}
 		items = append(items, item)
 	}

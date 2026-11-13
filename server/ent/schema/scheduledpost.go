@@ -44,6 +44,9 @@ func (ScheduledPost) Fields() []ent.Field {
 		// Engagement, as last read from the platform.
 		field.JSON("metrics", postoptions.Metrics{}).StorageKey("metrics").Optional(),
 		field.Time("published_at").StorageKey("publishedAt").Optional().Nillable(),
+		// When the live post was deleted from its platform through Shots; the
+		// parts are receipted in post_deletion. The post stays PUBLISHED.
+		field.Time("deleted_at").StorageKey("deletedAt").Optional().Nillable(),
 		field.Time("metrics_at").StorageKey("metricsAt").Optional().Nillable(),
 		// Follow-ups once the post is live (X: repost, plug, quote).
 		field.JSON("auto_actions", postoptions.AutoActions{}).StorageKey("autoActions").Optional().Immutable(),

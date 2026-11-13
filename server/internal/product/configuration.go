@@ -55,6 +55,7 @@ func (a Actor) auditActor() publishing.Actor {
 type Configuration struct {
 	// batchRuns starts bulk batch submit workflows.
 	batchRuns                          BatchRunStarter
+	postDeletions                      PostDeletionStarter
 	notifications                      *notifications.Service
 	client                             *ent.Client
 	authStore                          *authstore.Store

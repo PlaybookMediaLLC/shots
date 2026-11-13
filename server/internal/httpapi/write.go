@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -35,6 +36,7 @@ type WriteStore interface {
 	RetryContentDraftPost(context.Context, product.Actor, string) (*product.MovedDraftPost, error)
 	ReconcileContentDraftPost(context.Context, product.Actor, string, product.ReconcileInput) (*product.ContentDraftPost, error)
 	CancelContentDraftPostAutomations(context.Context, product.Actor, string) (*product.ContentDraftPost, error)
+	DeleteContentDraftPost(context.Context, product.Actor, string) (*product.DeletionRequest, error)
 }
 
 func (s *Server) registerWrite(mux *http.ServeMux) {
@@ -59,6 +61,7 @@ func (s *Server) registerWrite(mux *http.ServeMux) {
 	mux.Handle("POST /v1/content-draft-posts/{id}/retry", s.authenticateProduct(http.HandlerFunc(s.retryContentDraftPost)))
 	mux.Handle("POST /v1/content-draft-posts/{id}/reconcile", s.authenticateProduct(http.HandlerFunc(s.reconcileContentDraftPost)))
 	mux.Handle("POST /v1/content-draft-posts/{id}/automations/cancel", s.authenticateProduct(http.HandlerFunc(s.cancelContentDraftPostAutomations)))
+	mux.Handle("POST /v1/content-draft-posts/{id}/delete", s.authenticateProduct(http.HandlerFunc(s.deleteContentDraftPost)))
 }
 
 // pathIDs reads path values that must be resource IDs.
@@ -293,6 +296,25 @@ func (s *Server) cancelContentDraftPostAutomations(w http.ResponseWriter, r *htt
 	}
 	post, err := s.configuration.CancelContentDraftPostAutomations(r.Context(), workspaceActor(r), ids[0])
 	respond(w, http.StatusOK, map[string]any{"post": post}, err)
+}
+
+// deleteContentDraftPost starts deleting a live post from its platform. The
+// workflow removes its parts with receipts; 202 means it was started.
+func (s *Server) deleteContentDraftPost(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	request, err := s.configuration.DeleteContentDraftPost(r.Context(), workspaceActor(r), ids[0])
+	if errors.Is(err, product.ErrPostDeletionNotStarted) {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"deletion": request})
 }
 
 // lookupMentions finds what the set's account for a channel can mention.

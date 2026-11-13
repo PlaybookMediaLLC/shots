@@ -218,6 +218,8 @@ type Tx struct {
 	PlatformWorkspaceCreation *PlatformWorkspaceCreationClient
 	// PostAutomationRun is the client for interacting with the PostAutomationRun builders.
 	PostAutomationRun *PostAutomationRunClient
+	// PostDeletion is the client for interacting with the PostDeletion builders.
+	PostDeletion *PostDeletionClient
 	// ProductProfile is the client for interacting with the ProductProfile builders.
 	ProductProfile *ProductProfileClient
 	// ProductSurface is the client for interacting with the ProductSurface builders.
@@ -542,6 +544,7 @@ func (tx *Tx) init() {
 	tx.PlatformSocialObservation = NewPlatformSocialObservationClient(tx.config)
 	tx.PlatformWorkspaceCreation = NewPlatformWorkspaceCreationClient(tx.config)
 	tx.PostAutomationRun = NewPostAutomationRunClient(tx.config)
+	tx.PostDeletion = NewPostDeletionClient(tx.config)
 	tx.ProductProfile = NewProductProfileClient(tx.config)
 	tx.ProductSurface = NewProductSurfaceClient(tx.config)
 	tx.Project = NewProjectClient(tx.config)

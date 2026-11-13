@@ -278,6 +278,57 @@ export function DraftPosts({
                   Confirmed live <LocalTime value={post.publishedAt} zone={shownZone(post)} />
                 </p>
               ) : null}
+              {post.status === 'PUBLISHED' && post.deletedAt ? (
+                <p className="text-xs text-muted-foreground" role="status">
+                  Deleted from {label} <LocalTime value={post.deletedAt} zone={shownZone(post)} />
+                </p>
+              ) : null}
+              {post.deletions.length > 0 ? <DeleteParts post={post} /> : null}
+              {canSchedule &&
+              !history &&
+              post.status === 'PUBLISHED' &&
+              (!post.deletedAt || post.deletions.some((part) => part.status === 'failed')) ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      className="w-fit"
+                      disabled={busy === post.id}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Delete from {label}…
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this post from {label}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Shots deletes the post, its thread parts and the replies Shots posted, and
+                        undoes its reposts. This cannot be undone on {label}. Shots keeps its record
+                        and a receipt for each part. A part that {label} cannot delete through its
+                        API stays up and is marked not supported.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep it</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          setBusy(post.id)
+                          void writeApi
+                            .deletePost(post.id)
+                            .then(() =>
+                              toast.success(`Deleting from ${label}. Reload to see when it is done.`)
+                            )
+                            .catch((error: unknown) => toast.error(message(error)))
+                            .finally(() => setBusy(null))
+                        }}
+                      >
+                        Delete from {label}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
               {post.status === 'CANCELLED' && reason ? (
                 <p className="text-xs text-muted-foreground" role="status">
                   Cancelled before sending. {reason}
@@ -564,6 +615,44 @@ const FOLLOW_UP_STATUS: Record<DraftPostWire['automations'][number]['status'], s
   failed: 'failed',
   pending: 'waiting',
   skipped: 'skipped',
+}
+
+/** Where a part of a delete is. */
+const DELETE_PART_STATUS: Record<DraftPostWire['deletions'][number]['status'], string> = {
+  done: 'deleted',
+  failed: 'failed',
+  pending: 'waiting',
+  unsupported: 'not supported',
+}
+
+/** What a delete part is, from its key: the root, a thread part, a repost or a reply. */
+function deletePartLabel(key: string): string {
+  if (key === 'root') return 'Post'
+  if (key.startsWith('thread:')) return 'Thread part'
+  if (key.startsWith('repost:')) return 'Repost'
+  return 'Reply'
+}
+
+/** The parts of a delete from the platform and their receipts. */
+function DeleteParts({ post }: { post: DraftPostWire }) {
+  return (
+    <ul className="grid gap-0.5 text-xs text-muted-foreground" data-testid="delete-parts">
+      {post.deletions.map((part) => (
+        <li className="flex items-center gap-2" key={part.key}>
+          <span className="text-foreground">{deletePartLabel(part.key)}</span>
+          <span
+            className={cn(
+              part.status === 'failed' && 'text-red-700 dark:text-red-300',
+              part.status === 'done' && 'text-emerald-700 dark:text-emerald-300'
+            )}
+          >
+            {DELETE_PART_STATUS[part.status]}
+            {part.failureCode && part.status !== 'done' ? ` (${part.failureCode})` : ''}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /** A live post's follow-ups and their receipts (RFC 025). */

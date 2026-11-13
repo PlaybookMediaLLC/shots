@@ -146,6 +146,20 @@ func (_c *ScheduledPostCreate) SetNillablePublishedAt(v *time.Time) *ScheduledPo
 	return _c
 }
 
+// SetDeletedAt sets the "deleted_at" field.
+func (_c *ScheduledPostCreate) SetDeletedAt(v time.Time) *ScheduledPostCreate {
+	_c.mutation.SetDeletedAt(v)
+	return _c
+}
+
+// SetNillableDeletedAt sets the "deleted_at" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillableDeletedAt(v *time.Time) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetDeletedAt(*v)
+	}
+	return _c
+}
+
 // SetMetricsAt sets the "metrics_at" field.
 func (_c *ScheduledPostCreate) SetMetricsAt(v time.Time) *ScheduledPostCreate {
 	_c.mutation.SetMetricsAt(v)
@@ -619,6 +633,10 @@ func (_c *ScheduledPostCreate) createSpec() (*ScheduledPost, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.PublishedAt(); ok {
 		_spec.SetField(scheduledpost.FieldPublishedAt, field.TypeTime, value)
 		_node.PublishedAt = &value
+	}
+	if value, ok := _c.mutation.DeletedAt(); ok {
+		_spec.SetField(scheduledpost.FieldDeletedAt, field.TypeTime, value)
+		_node.DeletedAt = &value
 	}
 	if value, ok := _c.mutation.MetricsAt(); ok {
 		_spec.SetField(scheduledpost.FieldMetricsAt, field.TypeTime, value)

@@ -122,4 +122,8 @@ export const writeApi = {
     call<{ post: DraftPostWire }>(`${post(id)}/automations/cancel`, { method: 'POST' }),
   reconcilePost: (id: string, input: { live: boolean; url?: string }) =>
     call<{ post: DraftPostWire }>(`${post(id)}/reconcile`, { body: input, method: 'POST' }),
+  deletePost: (id: string) =>
+    call<{ deletion: { platform: string; postId: string } }>(`${post(id)}/delete`, {
+      method: 'POST',
+    }),
 }

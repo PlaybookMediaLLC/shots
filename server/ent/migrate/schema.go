@@ -3023,6 +3023,34 @@ var (
 			},
 		},
 	}
+	// PostDeletionColumns holds the columns for the "post_deletion" table.
+	PostDeletionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "scheduledPostId", Type: field.TypeString},
+		{Name: "key", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"post", "repost"}},
+		{Name: "remoteId", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "done", "failed", "unsupported"}, Default: "pending"},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "requestedBy", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PostDeletionTable holds the schema information for the "post_deletion" table.
+	PostDeletionTable = &schema.Table{
+		Name:       "post_deletion",
+		Columns:    PostDeletionColumns,
+		PrimaryKey: []*schema.Column{PostDeletionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "postdeletion_scheduledPostId_key",
+				Unique:  true,
+				Columns: []*schema.Column{PostDeletionColumns[2], PostDeletionColumns[3]},
+			},
+		},
+	}
 	// ProductProfileColumns holds the columns for the "product_profile" table.
 	ProductProfileColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -3494,6 +3522,7 @@ var (
 		{Name: "remotePostId", Type: field.TypeString, Nullable: true},
 		{Name: "metrics", Type: field.TypeJSON, Nullable: true},
 		{Name: "publishedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "deletedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "metricsAt", Type: field.TypeTime, Nullable: true},
 		{Name: "autoActions", Type: field.TypeJSON, Nullable: true},
 		{Name: "poll", Type: field.TypeJSON, Nullable: true},
@@ -3525,7 +3554,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "scheduled_post_channel_connection_scheduled_posts",
-				Columns:    []*schema.Column{ScheduledPostColumns[33]},
+				Columns:    []*schema.Column{ScheduledPostColumns[34]},
 				RefColumns: []*schema.Column{ChannelConnectionColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3534,17 +3563,17 @@ var (
 			{
 				Name:    "scheduledpost_channelConnectionId_idempotencyKey",
 				Unique:  true,
-				Columns: []*schema.Column{ScheduledPostColumns[33], ScheduledPostColumns[19]},
+				Columns: []*schema.Column{ScheduledPostColumns[34], ScheduledPostColumns[20]},
 			},
 			{
 				Name:    "scheduledpost_organizationId_status_scheduledFor",
 				Unique:  false,
-				Columns: []*schema.Column{ScheduledPostColumns[1], ScheduledPostColumns[17], ScheduledPostColumns[16]},
+				Columns: []*schema.Column{ScheduledPostColumns[1], ScheduledPostColumns[18], ScheduledPostColumns[17]},
 			},
 			{
 				Name:    "scheduledpost_status_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ScheduledPostColumns[17], ScheduledPostColumns[32]},
+				Columns: []*schema.Column{ScheduledPostColumns[18], ScheduledPostColumns[33]},
 			},
 			{
 				Name:    "scheduledpost_contentDraftId",
@@ -4540,6 +4569,7 @@ var (
 		PlatformSocialObservationTable,
 		PlatformWorkspaceCreationTable,
 		PostAutomationRunTable,
+		PostDeletionTable,
 		ProductProfileTable,
 		ProductSurfaceTable,
 		ProjectTable,
@@ -4899,6 +4929,9 @@ func init() {
 	}
 	PostAutomationRunTable.Annotation = &entsql.Annotation{
 		Table: "post_automation_run",
+	}
+	PostDeletionTable.Annotation = &entsql.Annotation{
+		Table: "post_deletion",
 	}
 	ProductProfileTable.Annotation = &entsql.Annotation{
 		Table: "product_profile",
