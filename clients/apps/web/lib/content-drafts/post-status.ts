@@ -92,8 +92,7 @@ export const POST_STATE_TONE: Record<PostState, PillTone> = {
   Published: 'green',
   Publishing: 'blue',
   Scheduled: 'blue',
-  // The person still has to post it in the app.
-  'Sent to app': 'yellow',
+  'Sent to app': 'purple',
 }
 
 /** Which state a draft shows first: the one that needs a person soonest. */
@@ -101,10 +100,10 @@ const ATTENTION: PostState[] = [
   'Needs check',
   'Failed',
   'Overdue',
-  // The person still has to post it in the app.
-  'Sent to app',
   'Publishing',
   'Scheduled',
+  // Ahead of what went live: the person still finishes it in the app.
+  'Sent to app',
   'Published',
 ]
 
@@ -184,7 +183,7 @@ export function listedAttention(counts: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
-  sentToAppPosts?: number
+  sentToAppPosts: number
 }): { state: PostState; count: number; total: number } | null {
   if (counts.attentionPosts === 0) return null
   const check = counts.checkPosts > 0
@@ -192,10 +191,7 @@ export function listedAttention(counts: {
     count: check ? counts.checkPosts : counts.attentionPosts,
     state: check ? 'Needs check' : 'Failed',
     total:
-      counts.attentionPosts +
-      counts.queuedPosts +
-      counts.publishedPosts +
-      (counts.sentToAppPosts ?? 0),
+      counts.attentionPosts + counts.queuedPosts + counts.publishedPosts + counts.sentToAppPosts,
   }
 }
 
@@ -205,15 +201,15 @@ export function listedStatus(draft: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
-  sentToAppPosts?: number
+  sentToAppPosts: number
   status: string
 }): string {
   const attention = listedAttention(draft)
   if (attention) return attention.state
   if (draft.status === 'archived') return 'Archived'
-  // Posting it in the app is still to do, as in draftPostsState.
-  if ((draft.sentToAppPosts ?? 0) > 0) return 'Sent to app'
   if (draft.queuedPosts > 0) return 'Scheduled'
+  // Posting it in the app is still to do, as in draftPostsState.
+  if (draft.sentToAppPosts > 0) return 'Sent to app'
   return draft.publishedPosts > 0 ? 'Published' : 'Draft'
 }
 

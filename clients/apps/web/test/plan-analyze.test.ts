@@ -596,12 +596,16 @@ test('a status filter saved before the finer states still shows every post in it
     'Failed',
     'Needs check',
     'Planned',
+    'Sent to app',
   ].map((status) => ({ ...base, id: status, status }))
   const shown = (statuses: string[]) =>
     visibleItems(items, planPreferencesSchema.parse({ statuses })).map((item) => item.id)
   assert.deepEqual(STATUS_GROUPS, ['Planned', 'Scheduled', 'Published', 'Sent to app', 'Failed'])
   assert.deepEqual(shown(['Scheduled']), ['Scheduled', 'Overdue', 'Publishing'])
   assert.deepEqual(shown(['Failed']), ['Failed', 'Needs check'])
+  // A post sent to an app is its own group, never with what was published.
+  assert.deepEqual(shown(['Sent to app']), ['Sent to app'])
+  assert.deepEqual(shown(['Published']), ['Published'])
   assert.equal(shown([]).length, items.length)
 })
 
@@ -678,6 +682,7 @@ test('every surface reads a draft with the same status words, from its current p
     checkPosts: 0,
     publishedPosts: 0,
     queuedPosts: 0,
+    sentToAppPosts: 0,
   })
   assert.equal(listed?.state, 'Failed')
   // A successful retry replaces the failure it followed; a cancelled one does not.
@@ -702,11 +707,23 @@ test('every surface reads a draft with the same status words, from its current p
   ]
   assert.equal(draftPostsState(currentPosts(unconfirmed), now)?.state, 'Needs check')
   assert.equal(
-    listedAttention({ attentionPosts: 2, checkPosts: 1, publishedPosts: 1, queuedPosts: 0 })?.state,
+    listedAttention({
+      attentionPosts: 2,
+      checkPosts: 1,
+      publishedPosts: 1,
+      queuedPosts: 0,
+      sentToAppPosts: 0,
+    })?.state,
     'Needs check'
   )
   assert.equal(
-    listedAttention({ attentionPosts: 0, checkPosts: 0, publishedPosts: 1, queuedPosts: 0 }),
+    listedAttention({
+      attentionPosts: 0,
+      checkPosts: 0,
+      publishedPosts: 1,
+      queuedPosts: 0,
+      sentToAppPosts: 0,
+    }),
     null
   )
   assert.deepEqual(draftStatus({ plannedFor: null, status: 'archived' }, null), {
@@ -856,6 +873,7 @@ test('Home names a listed post by how far it has gone, not as a draft', () => {
     checkPosts: 0,
     publishedPosts: 0,
     queuedPosts: 0,
+    sentToAppPosts: 0,
     status: 'draft',
   }
   assert.equal(listedStatus(counts), 'Draft')
@@ -863,11 +881,12 @@ test('Home names a listed post by how far it has gone, not as a draft', () => {
   assert.equal(listedStatus({ ...counts, queuedPosts: 1 }), 'Scheduled')
   assert.equal(listedStatus({ ...counts, publishedPosts: 1, attentionPosts: 1 }), 'Failed')
   assert.equal(listedStatus({ ...counts, status: 'archived' }), 'Archived')
-  // Posting it in the app is still to do, so it reads before what went out or is queued.
+  // Posting it in the app is still to do, so it reads before what went out, after what is queued.
   assert.equal(listedStatus({ ...counts, sentToAppPosts: 1 }), 'Sent to app')
+  assert.equal(listedStatus({ ...counts, publishedPosts: 1, sentToAppPosts: 1 }), 'Sent to app')
   assert.equal(
     listedStatus({ ...counts, publishedPosts: 1, queuedPosts: 1, sentToAppPosts: 1 }),
-    'Sent to app'
+    'Scheduled'
   )
   assert.equal(listedStatus({ ...counts, attentionPosts: 1, sentToAppPosts: 1 }), 'Failed')
   assert.equal(

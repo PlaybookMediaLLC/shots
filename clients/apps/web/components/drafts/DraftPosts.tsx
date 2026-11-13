@@ -343,7 +343,7 @@ export function DraftPosts({
                 </div>
               ) : null}
               {post.status === 'SENT_TO_APP' ? (
-                <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
+                <p className="text-xs text-muted-foreground" role="status">
                   Sent to the {label} app as a draft. Finish and post it there: Shots does not see
                   when it goes live.
                 </p>

@@ -136,12 +136,14 @@ type testProvider struct {
 	posts []receivedPost
 	calls int
 	fail  error
+	// live answers an app draft (UPLOAD) with a live video receipt, as TikTok must not.
+	live bool
 }
 
 func (p *testProvider) Post(ctx context.Context, _, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
 	p.mu.Lock()
 	p.calls++
-	fail := p.fail
+	fail, live := p.fail, p.live
 	p.mu.Unlock()
 	if token != "valid" || len(posts) != 1 {
 		return nil, errors.New("unexpected provider input")
@@ -179,7 +181,7 @@ func (p *testProvider) Post(ctx context.Context, _, token string, posts []integr
 		id = "7234567890123456789"
 		receiptURL = "https://www.tiktok.com/@fixture/video/" + id
 		// TikTok's receipt for a draft sent to the app (the adapter's SEND_TO_USER_INBOX).
-		if received.settings["content_posting_method"] == "UPLOAD" {
+		if received.settings["content_posting_method"] == "UPLOAD" && !live {
 			id, receiptURL = "missing", "https://www.tiktok.com/messages?lang=en#v_inbox_file~v2.7234567890123456789"
 		}
 	}
@@ -507,6 +509,31 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		run(posts[0].ID)
 		if provider.calls != before {
 			t.Fatal("an app draft was sent twice")
+		}
+		// It is delivered: it cannot be cancelled, and the account cannot be added again.
+		if _, err := repository.CancelScheduledPost(ctx, publishing.Actor{Organization: org, UserID: user, RequestID: owner.RequestID, Type: "USER"}, posts[0].ID); !errors.Is(err, publishing.ErrInvalidState) {
+			t.Fatalf("cancel err=%v", err)
+		}
+		draft := db.Client.ContentDraft.GetX(ctx, *posts[0].ContentDraftID)
+		if _, err := store.ScheduleContentDraft(ctx, owner, draft.ID, product.ScheduleContentDraftInput{Add: true, Version: draft.Version, ScheduledFor: time.Now().Add(2 * time.Minute),
+			Targets: []product.ContentDraftScheduleTarget{{ChannelConnectionID: connection, Caption: "Finish me in TikTok", AssetIDs: []string{asset}, Options: &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{SendToApp: true}}}}}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("adding the account again err=%v", err)
+		}
+	})
+
+	t.Run("an app draft TikTok answers with a live video is of unknown delivery", func(t *testing.T) {
+		connection := connect("tiktok")
+		asset, _ := upload("live.mp4", "video/mp4", read("portrait.mp4"))
+		posts := schedule("Not a draft", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: connection, Caption: "Answered as live",
+			AssetIDs: []string{asset}, Options: &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{SendToApp: true}}})
+		provider.mu.Lock()
+		provider.live, provider.calls = true, 0
+		provider.mu.Unlock()
+		t.Cleanup(func() { provider.live = false })
+		run(posts[0].ID)
+		current := db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+		if current.Status != scheduledpost.StatusUNKNOWN_DELIVERY || current.PublishedAt != nil || provider.calls != 1 {
+			t.Fatalf("status=%s published=%v calls=%d", current.Status, current.PublishedAt, provider.calls)
 		}
 	})
 

@@ -288,10 +288,7 @@ export function VideoOptions({
               change({ privacy: youtubeOptionsSchema.shape.privacy.parse(privacy) })
             }
           >
-            <SelectTrigger
-              aria-label="YouTube privacy"
-              data-option-missing={missing === 'privacy' || undefined}
-            >
+            <SelectTrigger aria-label="YouTube privacy" data-option-missing={missing === 'privacy' || undefined}>
               <SelectValue placeholder="Choose privacy" />
             </SelectTrigger>
             <SelectContent>
@@ -309,10 +306,7 @@ export function VideoOptions({
             disabled={disabled}
             onValueChange={(audience) => change({ madeForKids: audience === 'true' })}
           >
-            <SelectTrigger
-              aria-label="YouTube audience"
-              data-option-missing={missing === 'audience' || undefined}
-            >
+            <SelectTrigger aria-label="YouTube audience" data-option-missing={missing === 'audience' || undefined}>
               <SelectValue placeholder="Choose audience" />
             </SelectTrigger>
             <SelectContent>

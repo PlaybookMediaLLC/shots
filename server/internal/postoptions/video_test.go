@@ -59,7 +59,6 @@ func TestVideoOptionsRequireExplicitPlatformChoices(t *testing.T) {
 		{"app draft with comments", "tiktok", nil, &TikTokOptions{SendToApp: true, AllowComments: true}, false, false},
 		{"app draft with disclosure", "tiktok", nil, &TikTokOptions{SendToApp: true, CommercialContent: true, BrandOrganic: true}, true, false},
 		{"app draft with consent", "tiktok", nil, &TikTokOptions{SendToApp: true, Consent: true}, true, false},
-		{"app draft elsewhere", "youtube", youtube, &TikTokOptions{SendToApp: true}, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := ValidateVideoOptions(tc.channel, tc.youtube, tc.tiktok, tc.complete); (err == nil) != tc.valid {

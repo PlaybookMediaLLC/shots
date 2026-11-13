@@ -119,7 +119,7 @@ func beginDraftReuse(ctx context.Context, tx *ent.Tx, actor Actor, source, key s
 
 func hasDraftPublicationCommitment(ctx context.Context, client *ent.Client, id string) (bool, error) {
 	return client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(id), scheduledpost.Or(
-		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP),
+		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusUNKNOWN_DELIVERY, scheduledpost.StatusPUBLISHED),
 		scheduledpost.RemotePostIDNEQ(""),
 	)).Exist(ctx)
 }

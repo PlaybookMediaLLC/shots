@@ -865,15 +865,30 @@ test('PB-05: a TikTok video sent to the app as a draft is never published, and s
     expect(created.status, JSON.stringify(created.body)).toBe(201)
     const id = z.object({ id: z.string() }).parse(created.body).id
 
-    // An app draft needs none of what TikTok asks for in the app: no privacy, no consent.
+    // Direct-post choices first, so turning the app draft on has something to clear.
     await page.goto(`/publish/${id}`)
+    const privacy = page.getByRole('combobox', { name: 'TikTok privacy' })
+    await privacy.click()
+    await page.getByRole('option', { name: 'Only me', exact: true }).click()
+    await page
+      .getByRole('checkbox', {
+        name: 'I consent to send this video to TikTok at the scheduled time.',
+      })
+      .check()
+    await expectSaved(page)
+    // An app draft needs none of what TikTok asks for in the app: no privacy, no consent.
     await page.getByLabel('Send to the TikTok app as a draft').check()
-    await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveCount(0)
+    await expect(privacy).toHaveCount(0)
     await expectSaved(page)
     const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
     expect(saved.body).toMatchObject({
       platformVersions: {
-        versions: [{ channel: 'tiktok', options: { tiktok: { sendToApp: true, privacy: '' } } }],
+        versions: [
+          {
+            channel: 'tiktok',
+            options: { tiktok: { sendToApp: true, privacy: '', consent: false } },
+          },
+        ],
       },
     })
     const version = z.object({ version: z.number() }).parse(saved.body).version
