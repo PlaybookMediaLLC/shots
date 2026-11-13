@@ -440,7 +440,7 @@ func destinationPages(ctx context.Context, provider integrations.Provider, name,
 	if len(pages) == 0 {
 		return nil, socialapi.NewError(http.StatusConflict, false, "no eligible account was found for this provider")
 	}
-	if name == "linkedin-page" || name == "youtube" || name == "facebook" {
+	if name == "linkedin-page" || name == "youtube" || name == "facebook" || name == "gmb" {
 		for i := range pages {
 			pages[i].PageID = pages[i].ID
 		}

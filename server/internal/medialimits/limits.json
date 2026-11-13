@@ -46,6 +46,11 @@
       "maxBytes": 20000000,
       "maxEdge": 4096,
       "formats": ["image/jpeg", "image/png"]
+    },
+    "gmb": {
+      "maxBytes": 5000000,
+      "maxEdge": 2048,
+      "formats": ["image/jpeg", "image/png"]
     }
   },
   "destinations": {
@@ -97,7 +102,7 @@
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/images-api",
         "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/multiimage-post-api"
       ],
-      "verifiedOn": "2026-10-28"
+      "verifiedOn": "2026-11-13"
     },
     "instagram": {
       "maxMedia": 20,
@@ -241,6 +246,24 @@
         "maxMs": 1200000,
         "maxBytes": 1000000000
       },
+      "story": {
+        "maxMedia": 1,
+        "requiresMedia": true,
+        "mixed": false,
+        "images": ["image/jpeg", "image/png", "image/webp"],
+        "converts": {
+          "image/webp": "image/png"
+        },
+        "video": {
+          "formats": ["video/mp4"],
+          "alone": true,
+          "minMs": 3000,
+          "maxMs": 60000,
+          "maxBytes": 1000000000
+        },
+        "docs": ["https://developers.facebook.com/docs/page-stories-api"],
+        "verifiedOn": "2026-11-13"
+      },
       "docs": [
         "https://developers.facebook.com/docs/graph-api/reference/page/photos/",
         "https://developers.facebook.com/docs/video-api/guides/publishing"
@@ -256,6 +279,20 @@
         "image/webp": "image/png"
       },
       "docs": ["https://developers.pinterest.com/docs/api/v5/pins-create/"],
+      "verifiedOn": "2026-11-13"
+    },
+    "gmb": {
+      "maxMedia": 1,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "minImageWidth": 250,
+      "docs": [
+        "https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts",
+        "https://support.google.com/business/answer/6103862"
+      ],
       "verifiedOn": "2026-11-13"
     }
   }

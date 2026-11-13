@@ -59,8 +59,22 @@ export const pinterestOptionsSchema = z.strictObject({
 /** Pinterest metadata stored with a scheduled snapshot. */
 export type PinterestOptions = z.infer<typeof pinterestOptionsSchema>
 
+/** A Facebook Page post's settings: "story" posts one image or video as a Page story, with no text. */
+export const facebookOptionsSchema = z.strictObject({
+  placement: z.enum(['story']).optional(),
+})
+
+/** Facebook metadata stored with a scheduled snapshot. */
+export type FacebookOptions = z.infer<typeof facebookOptionsSchema>
+
 /** TikTok settings selected by the creator for direct publishing. */
 export const tiktokOptionsSchema = z.strictObject({
+  /**
+   * Send the video to the TikTok app as a draft, for the person to finish and
+   * post there. TikTok takes only the caption then, so the controls below
+   * stay unset.
+   */
+  sendToApp: z.boolean().optional(),
   privacy: z.enum([
     '',
     'PUBLIC_TO_EVERYONE',

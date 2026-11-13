@@ -138,6 +138,8 @@ type PublishOptions struct {
 	Instagram *InstagramOptions `json:"instagram,omitempty"`
 	// Pinterest: the pin's board, title and link.
 	Pinterest *PinterestOptions `json:"pinterest,omitempty"`
+	// Facebook: a Page story instead of a feed post.
+	Facebook *FacebookOptions `json:"facebook,omitempty"`
 	// X: up to ten numeric user IDs tagged in attached photos.
 	PhotoTagIDs   []string     `json:"photoTagIds,omitempty"`
 	LinkPreview   *LinkPreview `json:"linkPreview,omitempty"`
@@ -168,6 +170,12 @@ type PublishOptions struct {
 	DocumentTitle   string `json:"documentTitle,omitempty"`
 	// LinkedIn: a poll's question (X polls ask the post's text).
 	PollQuestion string `json:"pollQuestion,omitempty"`
+}
+
+// Story reports whether the post is a story, on Instagram or a Facebook Page:
+// one image or video, with no text.
+func (o *PublishOptions) Story() bool {
+	return o != nil && (o.Instagram.Story() || o.Facebook.Story())
 }
 
 // Empty reports whether no option is set.

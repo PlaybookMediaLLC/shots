@@ -72,7 +72,6 @@ import {
   type CaptionOverLimit,
   captionFor,
   carriedFollowUps,
-  explanationPosts,
   platformAcceptsSize,
   type PostMedia,
   postRenders,
@@ -83,6 +82,7 @@ import {
   screenshotPostVersions,
   screenshotPrompts,
 } from '@/lib/write/screenshot-post'
+import { useThreadPosts } from '@/lib/write/use-thread-posts'
 import { useWorkerAnswer } from '@/lib/write/use-worker-answer'
 import { buildExportFileName, WorkspaceSaveError } from '@/lib/workspace/save-export'
 
@@ -452,20 +452,13 @@ export function PrepareScreenshotPost({
         )
       )
     : []
-  const thread = React.useMemo(() => {
-    if (!explanation.trim()) return { error: '', posts: [] as string[] }
-    try {
-      return {
-        error: '',
-        posts: explanationPosts(explanation, channel, bySize ? length : undefined),
-      }
-    } catch (failure) {
-      return {
-        error: failure instanceof Error ? failure.message : 'This text cannot be split.',
-        posts: [] as string[],
-      }
-    }
-  }, [bySize, channel, explanation, length])
+  // The composer's paste-as-thread split, so both break a thread in the same
+  // places. A blank explanation has nothing to split by length.
+  const thread = useThreadPosts(
+    explanation,
+    channel,
+    bySize && explanation.trim() ? length : undefined
+  )
   // A batch item is one caption and its media; a thread belongs to a draft.
   const threading = destination === 'draft' && thread.posts.length > 0
   // The caption is the opening post, so the explanation fills the rest.
@@ -951,6 +944,11 @@ export function PrepareScreenshotPost({
                         </Label>
                       ) : null}
                     </div>
+                    {thread.pending ? (
+                      <p className="text-caption text-muted-foreground" role="status">
+                        Splitting into posts…
+                      </p>
+                    ) : null}
                     {thread.posts.length > 0 ? (
                       <div className="grid gap-2">
                         <p className="text-caption text-muted-foreground">
@@ -1259,6 +1257,8 @@ export function PrepareScreenshotPost({
               disabled={
                 Boolean(busy) ||
                 Boolean(blocked) ||
+                // Until the explanation's split arrives, its posts are an older text's.
+                thread.pending ||
                 (destination === 'batch' && chosenBatch === NEW_BATCH && !batchTitle.trim())
               }
               onClick={() => void submit()}

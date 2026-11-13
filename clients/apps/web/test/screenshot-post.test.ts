@@ -4,7 +4,8 @@ import { POST_BREAK } from '@/lib/content-drafts/serialize'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
-import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
+import { importedPosts, THREAD_POST_LIMIT } from '@/lib/write/import-text'
+import type { SplitMessage, SplitRequest } from '@/lib/write/import-text.worker'
 import { platformVersionsSchema } from '@/lib/write/document'
 import type { DesignCopy } from '@/lib/captions/channels'
 import {
@@ -14,7 +15,6 @@ import {
   captionFor,
   captionsOverLimit,
   carriedFollowUps,
-  explanationPosts,
   isCaptionedChannel,
   platformAcceptsSize,
   platformTarget,
@@ -73,18 +73,43 @@ test('media with no body to lead opens its own post', () => {
 test('a screenshot thread stays inside the one thread limit', () => {
   const posts = Array.from({ length: THREAD_POST_LIMIT }, (_, index) => `Post ${index + 1}`)
   assert.equal(THREAD_POST_LIMIT, 25)
-  assert.throws(() => explanationPosts(posts.concat('One too many').join('\n---\n'), 'x'))
-  assert.equal(explanationPosts(posts.join('\n---\n'), 'x').length, THREAD_POST_LIMIT)
+  assert.throws(() => importedPosts(posts.concat('One too many').join('\n---\n')))
+  assert.equal(importedPosts(posts.join('\n---\n')).length, THREAD_POST_LIMIT)
 })
 
-test('an explanation splits the way the composer splits a paste', () => {
-  assert.deepEqual(explanationPosts('First\n---\nSecond', 'x'), ['First', 'Second'])
-  assert.deepEqual(explanationPosts('alpha bravo charlie delta echo foxtrot', 'x', 23), [
-    'alpha bravo charlie',
-    'delta echo foxtrot',
-  ])
+// Both screens split through useThreadPosts: `---` on the page, a length in
+// the composer's split worker, which answers each request by its id.
+test('an explanation splits the way the composer splits a paste', async (t) => {
+  const replies: SplitMessage[] = []
+  const scope = {
+    onmessage: null as ((event: { data: SplitRequest }) => void) | null,
+    postMessage: (message: SplitMessage) => replies.push(message),
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'self')
+  Object.defineProperty(globalThis, 'self', { configurable: true, value: scope })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'self', previous)
+    else Reflect.deleteProperty(globalThis, 'self')
+  })
+  await import('@/lib/write/import-text.worker')
+  // It says when it has loaded, so the page knows a request will start at once.
+  assert.deepEqual(replies, [{ ready: true }])
+  const split = (id: number, text: string, limit: number) => {
+    scope.onmessage!({ data: { channel: 'x', id, limit, text } })
+    return replies.at(-1)
+  }
+  assert.deepEqual(importedPosts('First\n---\nSecond'), ['First', 'Second'])
+  assert.deepEqual(split(1, 'alpha bravo charlie delta echo foxtrot', 23), {
+    error: '',
+    id: 1,
+    posts: ['alpha bravo charlie', 'delta echo foxtrot'],
+  })
   // The composer's own bounds apply here too, rather than a second rule.
-  assert.throws(() => explanationPosts('alpha', 'x', 1))
+  assert.deepEqual(split(2, 'alpha', 1), {
+    error: 'Choose a post length between 23 and 25,000.',
+    id: 2,
+    posts: [],
+  })
 })
 
 test('kept follow-ups travel as the X version the backend already reads', () => {
@@ -187,8 +212,9 @@ test('every account a draft can post from is offered, under its channel', () => 
       account('old', 'twitter'),
       account('masto', 'mastodon'),
       account('fb', 'facebook'),
-      // Google Business is not a draft channel yet, so its account is not offered.
       account('local', 'gmb'),
+      // Reddit is not a draft channel, so its account is not offered.
+      account('forum', 'reddit'),
     ]).map((item) => [item.id, item.channel]),
     [
       ['page', 'linkedin'],
@@ -196,6 +222,7 @@ test('every account a draft can post from is offered, under its channel', () => 
       ['old', 'x'],
       ['masto', 'mastodon'],
       ['fb', 'facebook'],
+      ['local', 'gmb'],
     ]
   )
   const accounts = postAccounts([account('a', 'x'), account('b', 'linkedin')])

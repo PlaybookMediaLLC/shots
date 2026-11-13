@@ -63,6 +63,10 @@ func checkYouTubeTags(tags []string, complete bool) error {
 
 // TikTokOptions contains the consent and controls required for direct video posts.
 type TikTokOptions struct {
+	// SendToApp sends the video to the TikTok app as a draft (the Content
+	// Posting API's UPLOAD, under video.upload) for the person to finish and
+	// post there. TikTok ignores the controls below then, so none is set.
+	SendToApp         bool   `json:"sendToApp,omitempty"`
 	CommercialContent bool   `json:"commercialContent,omitempty"`
 	Privacy           string `json:"privacy"`
 	AllowComments     bool   `json:"allowComments"`
@@ -91,7 +95,11 @@ func ValidateVideoOptions(channel string, youtube *YouTubeOptions, tiktok *TikTo
 			return fmt.Errorf("choose a YouTube title, privacy and audience before scheduling")
 		}
 	}
-	if tiktok != nil {
+	if tiktok != nil && tiktok.SendToApp {
+		if *tiktok != (TikTokOptions{SendToApp: true}) {
+			return fmt.Errorf("a TikTok app draft takes its privacy, interactions and disclosures in the TikTok app")
+		}
+	} else if tiktok != nil {
 		if tiktok.Privacy != "" && !slices.Contains([]string{"PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"}, tiktok.Privacy) {
 			return fmt.Errorf("choose a permitted TikTok privacy setting")
 		}
@@ -137,7 +145,8 @@ func (c *TikTokCreator) Check(o *TikTokOptions, durationMs int) error {
 	if c == nil || o == nil || c.MaxDurationSeconds <= 0 {
 		return ErrCreatorPermissions
 	}
-	if !slices.Contains(c.PrivacyLevels, o.Privacy) {
+	// An app draft's privacy is chosen in TikTok; its length still counts.
+	if !o.SendToApp && !slices.Contains(c.PrivacyLevels, o.Privacy) {
 		return fmt.Errorf("the TikTok account no longer offers the chosen privacy")
 	}
 	if durationMs <= 0 || durationMs > c.MaxDurationSeconds*1000 {

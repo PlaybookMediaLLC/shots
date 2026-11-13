@@ -131,6 +131,7 @@ export const CONNECT_PROVIDERS = [
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },
   { label: 'Facebook Page', platform: 'facebook', provider: 'facebook' },
   { label: 'Pinterest', platform: 'pinterest', provider: 'pinterest' },
+  { label: 'Google Business', platform: 'gmb', provider: 'gmb' },
 ] as const
 
 /**

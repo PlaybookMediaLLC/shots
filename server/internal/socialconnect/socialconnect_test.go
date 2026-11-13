@@ -223,10 +223,13 @@ func TestAnAccountWithNoPageIsNotConnected(t *testing.T) {
 	if _, err := destinationPages(ctx, pagesProvider{fakeProvider: base, err: errors.New("graph down")}, "facebook", "token"); !errors.As(err, &failed) || failed.Status != http.StatusBadGateway {
 		t.Fatalf("discovery failure = %v", err)
 	}
-	pages, err := destinationPages(ctx, pagesProvider{fakeProvider: base, pages: []map[string]string{{"id": "page-1", "name": "Acme", "access_token": "secret"}}}, "facebook", "token")
-	if err != nil || len(pages) != 1 || pages[0].ID != "page-1" || pages[0].PageID != "page-1" {
-		t.Fatalf("pages = %+v, %v", pages, err)
+	for _, name := range []string{"facebook", "gmb"} {
+		pages, err := destinationPages(ctx, pagesProvider{fakeProvider: base, pages: []map[string]string{{"id": "page-1", "name": "Acme", "access_token": "secret"}}}, name, "token")
+		if err != nil || len(pages) != 1 || pages[0].ID != "page-1" || pages[0].PageID != "page-1" {
+			t.Fatalf("%s pages = %+v, %v", name, pages, err)
+		}
 	}
+	pages, _ := destinationPages(ctx, pagesProvider{fakeProvider: base, pages: []map[string]string{{"id": "page-1", "access_token": "secret"}}}, "facebook", "token")
 	if data, _ := json.Marshal(pages); strings.Contains(string(data), "secret") {
 		t.Fatal("a page token left Go")
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"regexp"
 	"slices"
@@ -76,37 +77,36 @@ func TestWeightedLength(t *testing.T) {
 	}
 }
 
-// regexp2 backtracked quadratically through domain-like words, which now
-// count, and still does through a URL path of parenthesised groups, which one
-// regex call's budget refuses: without it that took seconds.
+// regexp2 backtracked quadratically through domain-like words and through a
+// URL path of parenthesised groups: without the budget each took seconds, and
+// now each counts.
 func TestLinkScanStopsOnCraftedText(t *testing.T) {
 	liftTextBudget(t)
 	scans := map[string]func(string) error{
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
 		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
 	}
-	cases := map[string]struct {
-		text    string
-		refused bool
-	}{
-		"a.":         {strings.Repeat("a.", 5000), false},
-		"https://a.": {"https://" + strings.Repeat("a.", 5000), false},
-		"many words": {strings.Repeat(" https://"+strings.Repeat("a.", 25), 200), false},
-		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), true},
+	cases := map[string]string{
+		"a.":         strings.Repeat("a.", 5000),
+		"https://a.": "https://" + strings.Repeat("a.", 5000),
+		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+		"(a)":        "https://a.co/" + strings.Repeat("(a)", 8000),
+		// Ending characters between the groups, and a port, or a colon
+		// without one, before the path: each path is still read in one pass.
+		"a(a)":     "https://a.co/" + strings.Repeat("a(a)", 8000),
+		"port (a)": "https://a.co:80/" + strings.Repeat("(a)", 8000),
+		"no port":  strings.Repeat("a.co:/(a)", 3000),
+		// A long xn-- domain: its ASCII-only scan waits for the length check.
+		"xn--": "https://xn--a." + strings.Repeat("a.日", 40000) + ".com",
 	}
-	for name, c := range cases {
+	for name, text := range cases {
 		for scan, run := range scans {
 			start := time.Now()
-			err := run(c.text)
+			if err := run(text); err != nil {
+				t.Errorf("%s(%s) error = %v", scan, name, err)
+			}
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("%s(%s) took %v", scan, name, elapsed)
-			}
-			var want error
-			if c.refused {
-				want = ErrTextTooComplex
-			}
-			if !errors.Is(err, want) {
-				t.Errorf("%s(%s) error = %v, want %v", scan, name, err, want)
 			}
 		}
 	}
@@ -125,13 +125,20 @@ func liftTextBudget(t *testing.T) {
 // A text longer than any caption gets no more time than the longest one: 1 MiB
 // of slow words took 21 s while the budget grew with length.
 func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
-	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
-	start := time.Now()
-	if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
-		t.Fatalf("WeightedLength error = %v", err)
-	}
-	if elapsed := time.Since(start); elapsed > 4*time.Second {
-		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	// Many words; one word, whose TLD checks stop too; and many bare domains,
+	// each with an ASCII-only scan of a TLD check per label.
+	for _, text := range []string{
+		strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59),
+		strings.Repeat("a.", 1<<19),
+		strings.Repeat("!"+strings.Repeat("`a.", 1333)+"com", 1<<20/4003),
+	} {
+		start := time.Now()
+		if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
+			t.Fatalf("WeightedLength(%.12q…) error = %v", text, err)
+		}
+		if elapsed := time.Since(start); elapsed > 4*time.Second {
+			t.Errorf("%.12q… took %v, want about the 2.2 s budget of a 100,000-unit text", text, elapsed)
+		}
 	}
 }
 
@@ -154,7 +161,7 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	}
 	start := time.Now()
 	for i := range 20 {
-		crafted := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 8000)) // seconds unbounded
+		crafted := fmt.Sprintf("%d.%s", i, strings.Repeat("a.", 100_000)) // seconds unbounded
 		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("crafted %d: %v", i, err)
 		}
@@ -231,12 +238,15 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		return b.String()
 	}
+	// The path's segments: validUrlPath, cut from extractURLSource.
+	pathAt := jsRegexp(`\G`+strings.TrimSuffix(sourceSpan(`\/(?:(?:`, `*)?(\?`), `)?(\?`), regexp2.IgnoreCase)
 	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+		"(a)", "((a)b)", ")", "!", "Ж", "é", ":80", "a.co:80/",
 		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
 	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
 	rng := rand.New(rand.NewPCG(1, 2))
-	for range 5000 {
+	for range 6000 {
 		var b strings.Builder
 		for range 1 + rng.IntN(16) {
 			b.WriteString(tokens[rng.IntN(len(tokens))])
@@ -250,9 +260,10 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
 			want = append(want, describe(m))
 		}
+		written := slices.Clone(text)
 		matches, err := urlMatches(text, time.Now().Add(time.Hour))
-		if err != nil {
-			t.Fatal(err)
+		if err != nil || !slices.Equal(text, written) {
+			t.Fatalf("urlMatches(%q) changed the text or failed: %v", raw, err)
 		}
 		for _, m := range matches {
 			got = append(got, describe(m))
@@ -261,9 +272,21 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
 		}
 		// A start the regex rejects would be skipped, so check every index.
-		for s, end := range urlEnds(text) {
+		ends, err := urlEnds(text, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for s, end := range ends {
 			if want := matchEnd(extractURLAtRe, text, s, 5); end != want {
 				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
+		for s, c := range text {
+			if c != '/' {
+				continue
+			}
+			if got, want := urlPathEnd(text, s+1), matchEnd(pathAt, text, s, 0); got != want {
+				t.Errorf("urlPathEnd(%q, %d) = %d, want %d", raw, s+1, got, want)
 			}
 		}
 		for s, end := range asciiDomainEnds(text) {
@@ -299,6 +322,14 @@ func TestWeightedLengthOfLongText(t *testing.T) {
 		{strings.Repeat("a.", 2000) + "日本.com", 2*2000 + 8},
 		{"xn--a." + strings.Repeat("a.", 2000) + "日本.com", 6 + 2*2000 + 8},
 		{distinct.String() + ".com", 2*20000 + 4},
+		// A path of parenthesised groups, which regexp2 rescanned after each
+		// one: one link, and past 4,096 characters no link at all.
+		{"https://a.co/" + strings.Repeat("(a)", 1300), 23},
+		// The longest link, and one character more.
+		{"https://a.co/" + strings.Repeat("a", 4075), 23},
+		{"https://a.co/" + strings.Repeat("a", 4076), 13 + 4076},
+		{"https://a.co/" + strings.Repeat("(a)", 8000), 13 + 3*8000},
+		{"https://a.co/" + strings.Repeat("((a))", 19000), 13 + 5*19000},
 	} {
 		start := time.Now()
 		if got, err := WeightedLength(c.text); err != nil || got != c.want {
@@ -388,5 +419,104 @@ func TestMinifyPostsList(t *testing.T) {
 	want := `{"hm":false,"l":10,"p":[{"c":"c","extra":1,"i":"p1","n":{"i":"i1","p":"pic","pi":"x"}},{"i":"p2","n":null,"tg":[{"t":{"i":"t","n":"n","o":"o"}}]}],"pg":1,"t":2}`
 	if string(raw) != want {
 		t.Errorf("got %s", raw)
+	}
+}
+
+// emojiMatches must find what one scan of the twemoji regex finds, whatever
+// the window.
+func TestEmojiMatchesAreTheFullScan(t *testing.T) {
+	if n := longestMatch(t, twemojiSource); n > twemojiMaxLength {
+		t.Fatalf("a twemoji match spans up to %d units, over twemojiMaxLength", n)
+	}
+	tokens := []string{"\U0001F600", "\U0001F44D\U0001F3FD", "\U0001F1EB\U0001F1F7", "#\ufe0f\u20e3",
+		"\U0001F468\u200d\U0001F469\u200d\U0001F467\u200d\U0001F466",             // a family, 11 units
+		"\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F", // England's flag, 14
+		"\U0001F468\u200d\u2764\ufe0f\u200d\U0001F468", "\u2764", "\u2642", "\u00a9", "7", "#",
+		"\u20e3", "\ufe0f", "\ufe0e", "\u200d", "a", " "}
+	rng := rand.New(rand.NewPCG(3, 4))
+	found := 0
+	for range 2000 {
+		var b strings.Builder
+		for range 1 + rng.IntN(40) {
+			b.WriteString(tokens[rng.IntN(len(tokens))])
+		}
+		text := shiftSurrogates(utf16Units(b.String()))
+		want := map[int]int{}
+		for m, _ := twemojiRe.FindRunesMatch(text); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
+			want[m.Index] = m.Length
+		}
+		for _, window := range []int{twemojiMaxLength + 2, 23, 40, emojiScanWindow} {
+			if got, err := emojiMatches(text, window, time.Now().Add(time.Hour)); err != nil || !maps.Equal(got, want) {
+				t.Fatalf("emojiMatches(%q, %d) = %v, %v, want %v", b.String(), window, got, err, want)
+			}
+		}
+		found += len(want)
+	}
+	if found < 10000 {
+		t.Fatalf("only %d matches: the tokens miss the regex", found)
+	}
+}
+
+// longestMatch is the most units a match of source can span, for a regex of
+// \u escapes, classes, groups, alternation, ? and negative lookaheads only,
+// as twemojiSource is: with no repetition, its longest path.
+func longestMatch(t *testing.T, source string) int {
+	i := 0
+	var alternation func() int
+	alternation = func() int {
+		longest, n := 0, 0
+		for i < len(source) {
+			switch {
+			case source[i] == '|':
+				longest, n = max(longest, n), 0
+				i++
+			case source[i] == ')':
+				i++
+				return max(longest, n)
+			case source[i] == '?':
+				i++ // optional: no longer
+			case strings.HasPrefix(source[i:], "(?!"):
+				i += 3
+				alternation() // spans nothing
+			case strings.HasPrefix(source[i:], "(?:"):
+				i += 3
+				n += alternation()
+			case source[i] == '(':
+				i++
+				n += alternation()
+			case source[i] == '[':
+				for i++; source[i] != ']'; i++ {
+					if source[i] == '\\' {
+						i++
+					}
+				}
+				i++
+				n++
+			case strings.HasPrefix(source[i:], `\u`):
+				i += len(`\u0000`)
+				n++
+			default:
+				t.Fatalf("longestMatch cannot read %q", source[i:min(i+10, len(source))])
+			}
+		}
+		return max(longest, n)
+	}
+	return alternation()
+}
+
+// The emoji scan checks the budget between its regex calls: one call over
+// 1 MiB of digits took 1.5 s, and 1 MiB of emoji 0.5 s, whatever the budget.
+func TestEmojiScanStopsWithinItsBudget(t *testing.T) {
+	for name, text := range map[string]string{
+		"digits": strings.Repeat("7", 1<<20),
+		"emoji":  strings.Repeat("\U0001F600", 1<<18),
+	} {
+		start := time.Now()
+		if _, _, err := NewScanBudget(100*time.Millisecond).ParseTweet(text, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Errorf("%s: error = %v", name, err)
+		}
+		if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+			t.Errorf("%s took %v of a 100 ms budget", name, elapsed)
+		}
 	}
 }

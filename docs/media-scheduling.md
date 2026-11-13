@@ -156,6 +156,7 @@ single write-once PUT.
 | A draft request whose response was lost | The batch item's import key makes the retry return the same draft. |
 | One item of a batch fails to schedule | The others stay scheduled; the failed one shows its reason and can be corrected and sent again with `add`, which schedules only the accounts without a live post. |
 | Provider gives no answer | `UNKNOWN_DELIVERY`; never retried automatically. |
+| A TikTok video sent to the app as a draft | `SENT_TO_APP` once it reaches the TikTok inbox: delivered, never published; the person finishes and posts it in TikTok. |
 
 ## Bulk tools
 
@@ -313,13 +314,13 @@ account back through reconnect.
 
 | Destination | Content | Uploadable | Convertible | Implemented | Test-verified | Live-verified |
 | --- | --- | --- | --- | --- | --- | --- |
-| X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. |
+| X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. Two images with alt text on `@yoanyombax`, 2026-11-13: a 7.9 MB PNG went as a recorded 4.08 MB resized derivative, then a 13 KB PNG. Draft order and ALT text verified, then deleted. |
 | X | GIF, alone, ≤ 15 MB | Yes | — | Yes | Adapter (`TestGIFFullAnimationLimits`) | No |
 | X | Photos and a video in one post | — | — | No | Refused before scheduling, with the reason (`write-media-rules.test.ts`, `TestDraftMediaFollowsEachDestination`) | Blocked: the X API takes 4 photos, 1 GIF or 1 video (read 2026-11-13) |
 | X | MP4 video, alone, ≥ 0.5 s, within the account's verified length (20 min standard, 125 min Premium; 1080p sent unchanged) | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`, `TestTenMinute1080pSourcePreservedWithoutPremium`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
 | LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | Yes: image on `yoanyomba`, 2026-11-03; receipt and deletion recorded |
 | LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | Yes: 8-second video on `yoanyomba`, 2026-11-03; playback and deletion verified |
-| LinkedIn | PDF document, alone, ≤ 100 MB, ≤ 300 pages | Yes | — | Yes | Upload checks; publish via the document option | No |
+| LinkedIn | PDF document, alone, ≤ 100 MB, ≤ 300 pages | Yes | — | Yes | Upload checks; publish via the document option | Yes: 2-page PDF titled "Shots live test PDF" on `yoanyomba`, 2026-11-13; both pages shown, then deleted |
 | LinkedIn | GIF ≤ 20 MB | Yes | — | Yes | Adapter (`TestLinkedInRejectsIncompatibleGIFBeforeProviderMutation`) | No |
 | Instagram (Instagram Login) | Image, aspect 4:5–1.91:1, width ≥ 320 | Yes | PNG/WebP → JPEG, transparency to white | Yes | Adapter (`TestCarouselPendingFlow`), `TestJPEGOnlyProfileFlattensTransparency` | Yes: feed image on `@get.eigenn`, 2026-11-03; receipt and deletion recorded |
 | Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | Yes: 8-second Reel on `@get.eigenn`, 2026-11-03; playback and deletion verified |
@@ -334,10 +335,12 @@ account back through reconnect.
 | Mastodon | 1–4 images ≤ 16 MiB | Yes | — | Yes | Adapter (`TestDynamicPostWaitsForMediaThenPublishes`) | No |
 | Mastodon | Video (MP4, MOV, WebM) or GIF, alone, ≤ 99 MiB | Yes | — | Yes (generic media upload) | Rules only; no adapter video test | No. Server-specific limits beyond mastodon.social defaults are not read per instance. |
 | Any | Audio, or a file other than a PDF, as an attachment | Uploadable for design timelines | — | No | Refused before scheduling, with the reason | Blocked |
-| TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
+| TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures; or a draft sent to the TikTok app (`UPLOAD`), finished there | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
 | YouTube | One MP4, ≤ 512 MiB; explicit title, privacy and audience | Yes | — | Resumable upload with processing confirmation | Adapter, options, worker and social gate | No: @getconduitt private video scheduled for 2026-11-04 00:20 UTC; receipt and playback pending |
 | YouTube | Tags (500 characters together), synthetic-content disclosure; custom thumbnail (JPEG or PNG ≤ 2 MB) set after the video is live, as a follow-up whose failure never fails the video | Yes | — | Yes | Adapter (`TestSetThumbnailReportsARefusal`), `TestYouTubeThumbnailIsAFollowUp`, social gate | No. A thumbnail needs a verified channel; Shorts ignore it. |
 | Facebook Pages | Text, up to 10 images (JPEG, PNG; WebP → PNG; > 4 MB or 2,048 px → derivative), or one MP4 ≤ 20 min, ≤ 1 GB; first comment as a follow-up | Yes | WebP → PNG | Yes | `TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard`, social gate | No. Behind its availability check until the Meta app's Pages permissions are deployed. |
+| Facebook Pages | Story: one image (JPEG, PNG; WebP → PNG) or one MP4 of 3–60 s; no text or first comment | Yes | WebP → PNG | Yes: `post_type=story` | `TestStoriesFollowTheirOwnRules`, social gate | No. Behind Facebook's availability check. |
+| Google Business | Text up to 1,500 characters, or text and one image (JPEG, PNG; WebP → PNG; at least 250 px wide; > 5 MB or 2,048 px → derivative), to one location | Yes | WebP → PNG | Yes (standard posts) | `TestDraftMediaFollowsEachDestination`, `TestALocationChosenInShotsIsFoundByItsID`, social gate | No. Events, offers and call-to-action buttons are not offered. Behind its availability check until the Business Profile API keys are deployed. |
 | Pinterest | One image per pin (JPEG, PNG; WebP → PNG), on a board of the account, with an optional title (100) and link | Yes | WebP → PNG | Yes | `TestPinterestOptionsRefuseWhatPinterestWould`, `TestPinterestBoardsUseTheAccountsOwnAuthorization`, social gate | No. Video pins need a separate cover and are refused before scheduling. Behind its availability check until the Pinterest app's keys are deployed. |
 
 Nothing is silently dropped. Content a destination cannot take is refused

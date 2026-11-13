@@ -61,6 +61,13 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			if err := instagramSettings(platform, settings, options.Instagram); err != nil {
 				return nil, err
 			}
+		case "facebook":
+			if err := postoptions.ValidateFacebookOptions(platform, options.Facebook); err != nil {
+				return nil, err
+			}
+			if options.Facebook.Story() {
+				settings["post_type"] = "story"
+			}
 		case "pinterest":
 			o := options.Pinterest
 			if err := postoptions.ValidatePinterestOptions(platform, o, true); err != nil {
@@ -75,6 +82,11 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			}
 		case "tiktok":
 			o := options.TikTok
+			if o.SendToApp {
+				// TikTok takes only the caption with an app draft (UPLOAD).
+				settings["content_posting_method"] = "UPLOAD"
+				break
+			}
 			settings["content_posting_method"] = "DIRECT_POST"
 			settings["privacy_level"] = o.Privacy
 			settings["comment"], settings["duet"], settings["stitch"] = o.AllowComments, o.AllowDuet, o.AllowStitch

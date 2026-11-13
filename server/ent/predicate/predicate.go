@@ -315,6 +315,9 @@ type PlatformWorkspaceCreation func(*sql.Selector)
 // PostAutomationRun is the predicate function for postautomationrun builders.
 type PostAutomationRun func(*sql.Selector)
 
+// PostDeletion is the predicate function for postdeletion builders.
+type PostDeletion func(*sql.Selector)
+
 // ProductProfile is the predicate function for productprofile builders.
 type ProductProfile func(*sql.Selector)
 

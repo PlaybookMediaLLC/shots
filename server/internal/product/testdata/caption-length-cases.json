@@ -2,6 +2,7 @@
   "limits": {
     "bluesky": 300,
     "facebook": 63206,
+    "gmb": 1500,
     "instagram": 2200,
     "linkedin": 3000,
     "mastodon": 500,
@@ -18,6 +19,7 @@
       "lengths": {
         "bluesky": 5,
         "facebook": 5,
+        "gmb": 5,
         "instagram": 5,
         "linkedin": 5,
         "mastodon": 5,
@@ -34,6 +36,7 @@
       "lengths": {
         "bluesky": 52,
         "facebook": 52,
+        "gmb": 52,
         "instagram": 52,
         "linkedin": 52,
         "mastodon": 28,
@@ -50,6 +53,7 @@
       "lengths": {
         "bluesky": 15,
         "facebook": 15,
+        "gmb": 15,
         "instagram": 15,
         "linkedin": 15,
         "mastodon": 15,
@@ -66,6 +70,7 @@
       "lengths": {
         "bluesky": 11,
         "facebook": 11,
+        "gmb": 11,
         "instagram": 11,
         "linkedin": 11,
         "mastodon": 11,
@@ -82,6 +87,7 @@
       "lengths": {
         "bluesky": 3,
         "facebook": 3,
+        "gmb": 3,
         "instagram": 3,
         "linkedin": 3,
         "mastodon": 3,
@@ -98,6 +104,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 2,
+        "gmb": 2,
         "instagram": 2,
         "linkedin": 2,
         "mastodon": 1,
@@ -114,6 +121,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 4,
+        "gmb": 4,
         "instagram": 4,
         "linkedin": 4,
         "mastodon": 1,
@@ -130,6 +138,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 8,
+        "gmb": 8,
         "instagram": 8,
         "linkedin": 8,
         "mastodon": 1,
@@ -146,6 +155,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 4,
+        "gmb": 4,
         "instagram": 4,
         "linkedin": 4,
         "mastodon": 1,
@@ -162,6 +172,7 @@
       "lengths": {
         "bluesky": 2,
         "facebook": 8,
+        "gmb": 8,
         "instagram": 8,
         "linkedin": 8,
         "mastodon": 2,
@@ -178,6 +189,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 3,
+        "gmb": 3,
         "instagram": 3,
         "linkedin": 3,
         "mastodon": 1,
@@ -194,6 +206,7 @@
       "lengths": {
         "bluesky": 15,
         "facebook": 15,
+        "gmb": 15,
         "instagram": 15,
         "linkedin": 15,
         "mastodon": 15,
@@ -210,6 +223,7 @@
       "lengths": {
         "bluesky": 4,
         "facebook": 5,
+        "gmb": 5,
         "instagram": 5,
         "linkedin": 5,
         "mastodon": 4,
@@ -226,6 +240,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 5,
+        "gmb": 5,
         "instagram": 5,
         "linkedin": 5,
         "mastodon": 1,
@@ -242,6 +257,7 @@
       "lengths": {
         "bluesky": 3,
         "facebook": 6,
+        "gmb": 6,
         "instagram": 6,
         "linkedin": 6,
         "mastodon": 3,
@@ -258,6 +274,7 @@
       "lengths": {
         "bluesky": 29,
         "facebook": 29,
+        "gmb": 29,
         "instagram": 29,
         "linkedin": 29,
         "mastodon": 29,
@@ -274,6 +291,7 @@
       "lengths": {
         "bluesky": 3,
         "facebook": 4,
+        "gmb": 4,
         "instagram": 4,
         "linkedin": 4,
         "mastodon": 3,
@@ -290,6 +308,7 @@
       "lengths": {
         "bluesky": 9,
         "facebook": 9,
+        "gmb": 9,
         "instagram": 9,
         "linkedin": 9,
         "mastodon": 9,
@@ -306,6 +325,7 @@
       "lengths": {
         "bluesky": 85,
         "facebook": 86,
+        "gmb": 86,
         "instagram": 86,
         "linkedin": 86,
         "mastodon": 45,
@@ -322,6 +342,7 @@
       "lengths": {
         "bluesky": 18,
         "facebook": 18,
+        "gmb": 18,
         "instagram": 18,
         "linkedin": 18,
         "mastodon": 18,
@@ -338,6 +359,7 @@
       "lengths": {
         "bluesky": 13,
         "facebook": 13,
+        "gmb": 13,
         "instagram": 13,
         "linkedin": 13,
         "mastodon": 23,
@@ -354,6 +376,7 @@
       "lengths": {
         "bluesky": 58,
         "facebook": 58,
+        "gmb": 58,
         "instagram": 58,
         "linkedin": 58,
         "mastodon": 23,
@@ -370,6 +393,7 @@
       "lengths": {
         "bluesky": 25,
         "facebook": 25,
+        "gmb": 25,
         "instagram": 25,
         "linkedin": 25,
         "mastodon": 9,
@@ -386,6 +410,7 @@
       "lengths": {
         "bluesky": 34,
         "facebook": 34,
+        "gmb": 34,
         "instagram": 34,
         "linkedin": 34,
         "mastodon": 34,
@@ -402,6 +427,7 @@
       "lengths": {
         "bluesky": 43,
         "facebook": 43,
+        "gmb": 43,
         "instagram": 43,
         "linkedin": 43,
         "mastodon": 23,
@@ -418,6 +444,7 @@
       "lengths": {
         "bluesky": 20,
         "facebook": 20,
+        "gmb": 20,
         "instagram": 20,
         "linkedin": 20,
         "mastodon": 20,
@@ -434,6 +461,7 @@
       "lengths": {
         "bluesky": 41,
         "facebook": 41,
+        "gmb": 41,
         "instagram": 41,
         "linkedin": 41,
         "mastodon": 42,
@@ -450,6 +478,7 @@
       "lengths": {
         "bluesky": 30,
         "facebook": 30,
+        "gmb": 30,
         "instagram": 30,
         "linkedin": 30,
         "mastodon": 29,
@@ -466,6 +495,7 @@
       "lengths": {
         "bluesky": 43,
         "facebook": 43,
+        "gmb": 43,
         "instagram": 43,
         "linkedin": 43,
         "mastodon": 43,
@@ -482,6 +512,7 @@
       "lengths": {
         "bluesky": 19,
         "facebook": 19,
+        "gmb": 19,
         "instagram": 19,
         "linkedin": 19,
         "mastodon": 19,
@@ -498,6 +529,7 @@
       "lengths": {
         "bluesky": 514,
         "facebook": 514,
+        "gmb": 514,
         "instagram": 514,
         "linkedin": 514,
         "mastodon": 260,
@@ -514,6 +546,7 @@
       "lengths": {
         "bluesky": 29,
         "facebook": 29,
+        "gmb": 29,
         "instagram": 29,
         "linkedin": 29,
         "mastodon": 13,
@@ -530,6 +563,7 @@
       "lengths": {
         "bluesky": 52,
         "facebook": 52,
+        "gmb": 52,
         "instagram": 52,
         "linkedin": 52,
         "mastodon": 31,
@@ -546,6 +580,7 @@
       "lengths": {
         "bluesky": 32,
         "facebook": 32,
+        "gmb": 32,
         "instagram": 32,
         "linkedin": 32,
         "mastodon": 24,
@@ -562,6 +597,7 @@
       "lengths": {
         "bluesky": 29,
         "facebook": 29,
+        "gmb": 29,
         "instagram": 29,
         "linkedin": 29,
         "mastodon": 28,
@@ -578,6 +614,7 @@
       "lengths": {
         "bluesky": 37,
         "facebook": 37,
+        "gmb": 37,
         "instagram": 37,
         "linkedin": 37,
         "mastodon": 29,
@@ -594,6 +631,7 @@
       "lengths": {
         "bluesky": 1,
         "facebook": 41,
+        "gmb": 41,
         "instagram": 41,
         "linkedin": 41,
         "mastodon": 1,

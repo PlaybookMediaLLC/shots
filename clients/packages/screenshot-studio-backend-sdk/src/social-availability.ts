@@ -16,6 +16,7 @@ export const connectionProviderSchema = z.enum([
   'substack',
   'facebook',
   'pinterest',
+  'gmb',
 ])
 
 /** Readiness is configuration only; it does not establish account authorization. */

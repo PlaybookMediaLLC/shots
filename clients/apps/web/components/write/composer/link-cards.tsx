@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { linkPreviewSchema, type DraftChannel, type LinkPreview } from '@/lib/write/document'
 
 /** Platforms whose posts show no link card, where looking one up would mislead. */
-export const NO_LINK_CARDS: readonly DraftChannel[] = ['instagram', 'tiktok', 'youtube', 'pinterest']
+export const NO_LINK_CARDS: readonly DraftChannel[] = ['instagram', 'tiktok', 'youtube', 'pinterest', 'gmb']
 
 /** HTTPS links in the visible platform version, in document order. */
 export function previewLinks(text: string): string[] {

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { StoryToggle } from './story-toggle'
 import { CoverUpload, type UploadFile } from './video-options'
 
 /** Handles written with or without @, split on commas or spaces: the valid ones, distinct, and the rest. */
@@ -115,24 +116,14 @@ export function InstagramOptions({
       data-option-rows
       data-testid="instagram-options"
     >
-      <div className="flex items-start gap-2">
-        <Checkbox
-          checked={story}
-          disabled={disabled}
-          id="instagram-story"
-          // A story takes none of the settings below, so turning it on clears them.
-          onCheckedChange={(checked) =>
-            onChange(checked === true ? { placement: 'story' } : undefined)
-          }
-        />
-        <div className="grid gap-0.5">
-          <Label htmlFor="instagram-story">Post as a story</Label>
-          <p>
-            One image or video, shown for 24 hours, without a caption: the text goes to your other
-            platforms. Collaborators, tags and reel settings don&apos;t apply to stories.
-          </p>
-        </div>
-      </div>
+      <StoryToggle
+        checked={story}
+        disabled={disabled}
+        id="instagram-story"
+        note="Collaborators, tags and reel settings don't apply to stories."
+        // A story takes none of the settings below, so turning it on clears them.
+        onCheckedChange={(checked) => onChange(checked ? { placement: 'story' } : undefined)}
+      />
       {story ? null : (
         <>
           <Handles

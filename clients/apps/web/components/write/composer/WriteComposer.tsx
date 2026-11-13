@@ -101,7 +101,7 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
-import { buildPublication } from '@/lib/write/publication'
+import { buildPublication, isStory } from '@/lib/write/publication'
 import { splitThread } from '@/lib/write/split-thread'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
@@ -704,9 +704,12 @@ export function WriteComposer({
   }, [mediaState])
   const setOptions = (channel: DraftChannel, options: VersionOptions) =>
     update((current) => ({ versions: withOptions(current.versions, channel, options) }))
-  // A destination that is live is done: scheduling again would post it twice.
+  // A destination that is live, or sent to its app to finish, is done: scheduling
+  // again would post it twice (Go's liveDraftChannels refuses it too).
   const live = new Set(
-    posts.filter((post) => post.status === 'PUBLISHED').map((post) => post.channelConnectionId)
+    posts
+      .filter((post) => post.status === 'PUBLISHED' || post.status === 'SENT_TO_APP')
+      .map((post) => post.channelConnectionId)
   )
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
@@ -762,7 +765,9 @@ export function WriteComposer({
     // a cancel, needs no fresh sign-in. It refuses a draft with published
     // results, so such a draft offers no Undo. It keeps the posts' time as a
     // plan, so Undo puts back the plan the draft had before.
-    undoSchedule: posts.some((post) => post.status === 'PUBLISHED' || post.url)
+    undoSchedule: posts.some(
+      (post) => post.status === 'PUBLISHED' || post.status === 'SENT_TO_APP' || post.url
+    )
       ? undefined
       : async (before, postId) => {
           try {
@@ -1209,11 +1214,17 @@ export function WriteComposer({
     canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
   // A tab that follows the main platform has no editor of its own: its media lives on that tab.
   const ownEditor = active === primary || versionOfTab.mode === 'manual'
-  const liveOn = [
-    ...new Set(
-      posts.filter((post) => post.status === 'PUBLISHED').map((post) => platformLabel(post.platform))
-    ),
-  ].join(', ')
+  const doneOn = (status: string) =>
+    [
+      ...new Set(
+        posts.filter((post) => post.status === status).map((post) => platformLabel(post.platform))
+      ),
+    ].join(', ')
+  const liveOn = doneOn('PUBLISHED')
+  const appOn = doneOn('SENT_TO_APP')
+  const done = [liveOn && `live on ${liveOn}`, appOn && `in the ${appOn} app to finish`]
+    .filter(Boolean)
+    .join(' and ')
   const editorProps = {
     draftId: initial.id,
     extraPlugins: WRITE_PLUGINS,
@@ -1923,14 +1934,14 @@ export function WriteComposer({
               />
             </section>
           ) : null}
-          {active === 'instagram' && versionOfTab.options?.instagram?.placement === 'story' ? (
+          {isStory(active, versionOfTab.options) ? (
             <p
               className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
               data-testid="story-notice"
               role="status"
             >
-              This Instagram post is a story: one image or video, shown for 24 hours, without this
-              text. The text goes to your other platforms.
+              This {CHANNEL_META[active].label} post is a story: one image or video, shown for 24
+              hours, without this text. The text goes to your other platforms.
             </p>
           ) : null}
           {namedElsewhere ? (
@@ -1943,15 +1954,15 @@ export function WriteComposer({
               you mean to say here.
             </p>
           ) : null}
-          {liveOn ? (
+          {done ? (
             <p
               className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
               data-testid="live-notice"
               role="status"
             >
               {locked
-                ? `This post is live on ${liveOn}. Changes here would not reach it, so its text is locked. To send a changed version, post it again as new.`
-                : `Already live on ${liveOn}. Changes here only reach the platforms not sent yet.`}
+                ? `This post is ${done}. Changes here would not reach it, so its text is locked. To send a changed version, post it again as new.`
+                : `Already ${done}. Changes here only reach the platforms not sent yet.`}
             </p>
           ) : null}
           <TargetBanner draft={server} />

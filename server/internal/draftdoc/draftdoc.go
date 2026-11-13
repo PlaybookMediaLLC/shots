@@ -47,9 +47,11 @@ type VersionOptions struct {
 	// Instagram: collaborators, tags, and a reel's cover, grid and trial.
 	Instagram *postoptions.InstagramOptions `json:"instagram,omitempty"`
 	// Pinterest: the pin's board, title and link.
-	Pinterest    *postoptions.PinterestOptions `json:"pinterest,omitempty"`
-	LinkPreviews []postoptions.LinkPreview     `json:"linkPreviews,omitempty"`
-	AutoDM       *autodm.Config                `json:"autoDm,omitempty"`
+	Pinterest *postoptions.PinterestOptions `json:"pinterest,omitempty"`
+	// Facebook: a Page story instead of a feed post.
+	Facebook     *postoptions.FacebookOptions `json:"facebook,omitempty"`
+	LinkPreviews []postoptions.LinkPreview    `json:"linkPreviews,omitempty"`
+	AutoDM       *autodm.Config               `json:"autoDm,omitempty"`
 	// Preferred length when making a thread; publication still checks account limits.
 	SplitLimit   int  `json:"splitLimit,omitempty"`
 	SplitOnPaste bool `json:"splitOnPaste,omitempty"`

@@ -3,6 +3,7 @@ import type {
   TikTokOptions,
   InstagramOptions,
   PinterestOptions,
+  FacebookOptions,
   PublicationReceipt,
 } from './video-publishing.ts'
 export {
@@ -12,6 +13,7 @@ export {
   tiktokCreatorSchema,
   instagramOptionsSchema,
   pinterestOptionsSchema,
+  facebookOptionsSchema,
   instagramUsernameSchema,
 } from './video-publishing.ts'
 export type {
@@ -19,6 +21,7 @@ export type {
   TikTokOptions,
   InstagramOptions,
   PinterestOptions,
+  FacebookOptions,
 } from './video-publishing.ts'
 import { z } from 'zod'
 import {
@@ -297,8 +300,16 @@ export type ScheduledPost = {
   variantId: string | null
 }
 
+/** SENT_TO_APP: sent to the network's app as a draft; the person posts it there. */
 export type ScheduledPostStatus =
-  'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED' | 'UNKNOWN_DELIVERY'
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'PROCESSING'
+  | 'PUBLISHED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'UNKNOWN_DELIVERY'
+  | 'SENT_TO_APP'
 
 export type ChannelConnection = {
   createdAt: string
@@ -1047,6 +1058,8 @@ export type BackendContentDraft = {
   platformVersions: BackendPlatformVersions
   /** Posts waiting to go out (lists only). */
   queuedPosts: number
+  /** Posts sent to an app as drafts, finished there; never published (lists only). */
+  sentToAppPosts: number
   /** Internal notes; never part of a post. */
   scratchpad: string
   sourceDraftId: string | null
@@ -1358,6 +1371,7 @@ export type BackendPublishOptions = {
   tiktok?: TikTokOptions
   instagram?: InstagramOptions
   pinterest?: PinterestOptions
+  facebook?: FacebookOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string
@@ -3692,6 +3706,13 @@ export class ScreenshotStudioBackendSDK {
       `v1/content-draft-posts/${encodeURIComponent(id)}/reconcile`,
       { body: input, method: 'POST' }
     )
+  }
+
+  /** Start deleting a published post from its platform; the workflow keeps receipts. */
+  async deleteContentDraftPost(id: string) {
+    return this.request<{
+      deletion: { organizationId: string; platform: string; postId: string; requestedBy: string }
+    }>(`v1/content-draft-posts/${encodeURIComponent(id)}/delete`, { body: {}, method: 'POST' })
   }
 
   /** Stop a live post's pending follow-ups; removals of automatic reposts still run. */

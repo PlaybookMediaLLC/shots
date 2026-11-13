@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
@@ -51,6 +52,8 @@ const fakeStateSchema = z.object({
           board: z.string().optional(),
           containsSyntheticMedia: z.boolean().optional(),
           link: z.string().optional(),
+          postType: z.string().optional(),
+          postingMethod: z.string().optional(),
           tags: z.array(z.string()).optional(),
           title: z.string().optional(),
         })
@@ -89,6 +92,7 @@ async function readBootstrap() {
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
       facebookDestinationId: z.string().min(1),
+      gmbDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
       pinterestDestinationId: z.string().min(1),
       tiktokDestinationId: z.string().min(1),
@@ -727,6 +731,201 @@ test('a pin goes to the board chosen in the composer, and a Facebook Page post t
         timeout: 120_000,
       })
       .toEqual([expect.objectContaining({ postId: pagePost?.id, text: 'Link in the comments' })])
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a Facebook story chosen in the composer and a Google Business post publish once through Go', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const gmb = await connect(page, bootstrap.gmbDestinationId, 'gmb')
+    // Google Business takes images at least 250 pixels wide; the shared fixture is 1×1.
+    const photo = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: '#2e6f40' },
+    })
+      .png()
+      .toBuffer()
+    const image = await createUploadedAsset(page, photo, 'image/png', 'story.png')
+    const caption = 'Open late on Fridays.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, gmb],
+        primaryPlatform: 'gmb',
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The story is chosen in the Facebook version's settings, and the composer says what it leaves out.
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-facebook').click()
+    await page.getByTestId('options-chip').click()
+    await page.getByTestId('facebook-options').getByLabel('Post as a story').check()
+    await expect(page.getByTestId('story-notice')).toContainText('This Facebook post is a story')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, gmb],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const received = (await fakeState()).posts
+    const story = received.find((post) => post.platform === 'facebook')
+    const local = received.find((post) => post.platform === 'gmb')
+    // The story carries the image alone; the text went to the location's post.
+    expect(story).toMatchObject({ caption: '', settings: { postType: 'story' } })
+    expect(story?.media).toHaveLength(1)
+    expect(local?.caption).toBe(caption)
+    // Nothing story-like reached Google Business.
+    expect(local?.settings).toEqual({})
+    expect(local?.media).toHaveLength(1)
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('PB-05: a TikTok video sent to the app as a draft is never published, and says to finish it in TikTok', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const tiktok = await connect(page, bootstrap.tiktokDestinationId, 'tiktok')
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
+    const clip = await createUploadedAsset(page, mp4, 'video/mp4', 'clip.mp4')
+    const caption = 'Finish me in TikTok.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [clip],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: clip,
+            children: [{ text: '' }],
+            mimeType: 'video/mp4',
+            type: 'video',
+            url: `/api/v1/assets/${clip}/content`,
+          },
+        ],
+        channelConnectionIds: [tiktok],
+        primaryPlatform: 'tiktok',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [{ channel: 'tiktok', mode: 'synced', options: {} }],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // Direct-post choices first, so turning the app draft on has something to clear.
+    await page.goto(`/publish/${id}`)
+    const privacy = page.getByRole('combobox', { name: 'TikTok privacy' })
+    await privacy.click()
+    await page.getByRole('option', { name: 'Only me', exact: true }).click()
+    await page
+      .getByRole('checkbox', {
+        name: 'I consent to send this video to TikTok at the scheduled time.',
+      })
+      .check()
+    await expectSaved(page)
+    // An app draft needs none of what TikTok asks for in the app: no privacy, no consent.
+    await page.getByLabel('Send to the TikTok app as a draft').check()
+    await expect(privacy).toHaveCount(0)
+    await expectSaved(page)
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    expect(saved.body).toMatchObject({
+      platformVersions: {
+        versions: [
+          {
+            channel: 'tiktok',
+            options: { tiktok: { sendToApp: true, privacy: '', consent: false } },
+          },
+        ],
+      },
+    })
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [tiktok],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const [post] = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    await awaitStatus(post!.id, 'SENT_TO_APP')
+
+    // TikTok got the video and caption alone, as an inbox upload, once.
+    const remote = await fakeState()
+    const sent = remote.posts.filter((item) => item.caption === caption)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ platform: 'tiktok', settings: { postingMethod: 'UPLOAD' } })
+    expect(sent[0]?.media).toHaveLength(1)
+    expect(await attemptsOf(post!.id)).toEqual([
+      { outcome: 'SUCCEEDED', providerPostId: `v_inbox_file~v2.${sent[0]?.id}` },
+    ])
+    const stored = await db.row<{ publishedAt: Date | null }>(
+      'SELECT "publishedAt" FROM scheduled_post WHERE id = $1',
+      [post!.id]
+    )
+    expect(stored?.publishedAt).toBeNull()
+
+    // The draft says where it is and what is left to do.
+    await page.reload()
+    const row = page.getByTestId('draft-post')
+    await expect(row).toContainText('Sent to app')
+    await expect(row).toContainText('Sent to the TikTok app as a draft. Finish and post it there')
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

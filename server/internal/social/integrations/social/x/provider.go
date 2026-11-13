@@ -290,6 +290,11 @@ func (p *Provider) UnretweetPost(ctx context.Context, integration *ent.Integrati
 	return newClient(integration.Token).unretweet(ctx, integration.InternalID, id)
 }
 
+// DeletePost deletes a post the account published: a post, a thread part or a reply.
+func (p *Provider) DeletePost(ctx context.Context, integration *ent.Integration, id string) error {
+	return newClient(integration.Token).deleteTweet(ctx, id)
+}
+
 // PostEngagement is a post's public like and repost counts.
 func (p *Provider) PostEngagement(ctx context.Context, integration *ent.Integration, id string) (int, int, error) {
 	return newClient(integration.Token).tweetEngagement(ctx, id)

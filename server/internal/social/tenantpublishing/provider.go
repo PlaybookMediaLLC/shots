@@ -380,6 +380,15 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		response[0].Status != "posted" && response[0].Status != "success" && response[0].Status != "completed" {
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "provider returned no confirmed post receipt")
 	}
+	if input.Platform == "tiktok" && tiktokOptions.SendToApp {
+		// TikTok gives an app draft no post id until the person posts it in the
+		// app; its publish id rides in the inbox address instead.
+		_, publishID, _ := strings.Cut(response[0].ReleaseURL, "#")
+		if response[0].PostID != "missing" || !strings.Contains(publishID, "_inbox_") {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "TikTok has not confirmed the draft reached the app")
+		}
+		return socialapi.Receipt{PostID: publishID}, nil
+	}
 	if input.Platform == "tiktok" {
 		id := response[0].PostID
 		if id == "" || strings.Trim(id, "0123456789") != "" || !strings.Contains(response[0].ReleaseURL, "/video/"+id) {
@@ -387,10 +396,10 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 	}
 	var publication *postoptions.PublicationReceipt
-	// Threads, Instagram, Facebook and Pinterest ids do not make a link, so the
-	// provider's own address is kept.
+	// Threads, Instagram, Facebook, Pinterest and Google Business ids do not make
+	// a link, so the provider's own address is kept.
 	if input.Platform == "tiktok" || input.Platform == "youtube" || input.Platform == "threads" ||
-		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" {
+		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" || input.Platform == "gmb" {
 		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
 	}
 	if input.Platform == "youtube" {

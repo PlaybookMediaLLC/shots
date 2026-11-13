@@ -14,7 +14,7 @@ import (
 
 // VideoProvider substitutes only the remote peer in the isolated social gate,
 // standing in for a platform the gate connects by name: TikTok, YouTube, a
-// Facebook Page or Pinterest.
+// Facebook Page, Pinterest or a Google Business location.
 type VideoProvider struct {
 	*Provider
 	platform string
@@ -27,7 +27,7 @@ func NewVideo(endpoint, platform string) *VideoProvider {
 // fixturePages are the destinations a platform with page selection offers.
 // Each has its own id, fixturePageID, as real networks' pages do: a social
 // organization keeps one integration per id, so a shared id would merge them.
-var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page"}
+var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page", "gmb": "Fixture business location"}
 
 func (p *VideoProvider) Info() integrations.Info {
 	_, pages := fixturePages[p.platform]

@@ -2,6 +2,7 @@ import { articleContent } from '@/lib/write/article'
 import type { Engagement, InstagramOptions, PinterestOptions } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import {
+  facebookOptionsSchema,
   instagramOptionsSchema,
   pinterestOptionsSchema,
   youtubeOptionsSchema,
@@ -34,6 +35,7 @@ import {
   type PlateBody,
   type PlatformVersions,
   type PostSettings,
+  type VersionOptions,
   postSettingsSchema,
   replySettingsSchema,
   linkPreviewSchema,
@@ -53,6 +55,7 @@ export const publishOptionsSchema = z.object({
   tiktok: tiktokOptionsSchema.optional(),
   instagram: instagramOptionsSchema.optional(),
   pinterest: pinterestOptionsSchema.optional(),
+  facebook: facebookOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -182,6 +185,17 @@ function webAddress(value: string): boolean {
   }
 }
 
+/**
+ * Whether a version posts as a story: one image or video with no text, on
+ * Instagram or a Facebook Page (Go: PublishOptions.Story).
+ */
+export function isStory(channel: DraftChannel, options: VersionOptions | undefined): boolean {
+  return (
+    (channel === 'instagram' && options?.instagram?.placement === 'story') ||
+    (channel === 'facebook' && options?.facebook?.placement === 'story')
+  )
+}
+
 /** Instagram's settings that do something, or undefined when none is on. */
 function instagramChoices(
   options: InstagramOptions | undefined
@@ -270,7 +284,7 @@ export function buildPublication(
   const options = version.options ?? {}
   const article = draft.kind === 'article'
   // A story carries no text: the draft's text goes to its other platforms.
-  const story = channel === 'instagram' && options.instagram?.placement === 'story'
+  const story = isStory(channel, options)
   const serialized = serializeDraft(body, channel, blockImages, undefined, {
     story,
     limit: article || story ? 100_000 : captionLimit(channel, account.standing),
@@ -315,11 +329,14 @@ export function buildPublication(
     optionProblems.push("A pin's link is a web address starting with https:// or http://.")
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
+    // An app draft is finished in TikTok: its privacy, interactions, disclosures
+    // and consent are chosen there (postoptions.ValidateVideoOptions).
+    const direct = !options.tiktok?.sendToApp
     if (!creator)
       accountProblems.push(
         'TikTok account permissions are unavailable. Refresh the account before scheduling.'
       )
-    else if (options.tiktok) {
+    else if (options.tiktok && direct) {
       const choice = options.tiktok
       if (!creator.privacyLevels.some((privacy) => privacy === choice.privacy))
         optionProblems.push('Choose a privacy setting permitted by this TikTok account.')
@@ -331,6 +348,7 @@ export function buildPublication(
         optionProblems.push('TikTok account settings do not permit the selected interactions.')
     }
     if (
+      direct &&
       options.tiktok?.commercialContent &&
       !options.tiktok.brandOrganic &&
       !options.tiktok.brandedContent
@@ -339,17 +357,18 @@ export function buildPublication(
         'Indicate whether this TikTok content promotes your brand or another brand.'
       )
     if (
+      direct &&
       (options.tiktok?.brandOrganic || options.tiktok?.brandedContent) &&
       !options.tiktok.commercialContent
     )
       optionProblems.push('Enable commercial content disclosure for promotional content.')
-    if (!options.tiktok?.privacy)
+    if (direct && !options.tiktok?.privacy)
       optionProblems.push('Choose who can see this TikTok post in its options before scheduling.')
-    if (!options.tiktok?.consent)
+    if (direct && !options.tiktok?.consent)
       optionProblems.push(
         'Confirm consent to send this video to TikTok in its options before scheduling.'
       )
-    if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
+    if (direct && options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
   // Go refuses X video until the account's video length is verified (socialidentity.CheckXMedia).
@@ -439,6 +458,7 @@ export function buildPublication(
   if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
   if (instagram) firstOptions.instagram = instagram
   if (pinterest) firstOptions.pinterest = pinterest
+  if (channel === 'facebook' && story) firstOptions.facebook = { placement: 'story' }
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true

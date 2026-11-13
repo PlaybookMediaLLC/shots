@@ -79,6 +79,7 @@ const DELIVERY: Record<ScheduledPostStatus, string> = {
   PUBLISHED: 'Published',
   SCHEDULED: 'Scheduled',
   UNKNOWN_DELIVERY: 'Delivery unknown; check the channel',
+  SENT_TO_APP: 'Sent to the app to finish there',
 }
 
 /** Scheduled posts still waiting to publish; only these can be cancelled. */

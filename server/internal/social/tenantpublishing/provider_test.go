@@ -285,6 +285,39 @@ func TestDirectPublisherMarksAmbiguousProviderFailureUnknown(t *testing.T) {
 	}
 }
 
+// inboxTikTok is TikTok taking the video as an app-inbox draft (UPLOAD): its
+// receipt is "missing" with the publish id in a messages link, not a video.
+type inboxTikTok struct{ *fakePoster }
+
+func (p inboxTikTok) Post(ctx context.Context, id, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
+	if _, err := p.fakePoster.Post(ctx, id, token, posts, account); err != nil {
+		return nil, err
+	}
+	return []integrations.PostResponse{{PostID: "missing", ReleaseURL: "https://www.tiktok.com/messages?lang=en#v_inbox_file~1", Status: "completed"}}, nil
+}
+
+func (inboxTikTok) CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error) {
+	return &postoptions.TikTokCreator{PrivacyLevels: []string{"SELF_ONLY"}, MaxDurationSeconds: 300}, nil
+}
+
+// A video sent to the TikTok app as a draft is not live: recording it as
+// published would mark the post PUBLISHED and emit draft.published.
+func TestTikTokInboxDraftIsNotAPublishedReceipt(t *testing.T) {
+	p, _, fake, input := directFixture()
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "tiktok", InternalID: "remote-user", Token: "private-token"}}
+	p.resolve = func(string) poster { return inboxTikTok{fake} }
+	duration := 10_000
+	input.Platform, input.AssetObjectKey = "tiktok", ""
+	input.Assets = []publishing.MediaAsset{{MediaType: "video/mp4", ObjectKey: "org/product-org/clip.mp4", DurationMs: &duration}}
+	input.Options = &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "SELF_ONLY", Consent: true}}
+	receipt, err := p.PublishThread(context.Background(), input)
+	var providerErr *socialapi.Error
+	if !errors.As(err, &providerErr) || !providerErr.UnknownDelivery || !strings.Contains(err.Error(), "final video receipt") ||
+		receipt.PostID != "" || fake.calls != 1 {
+		t.Fatalf("receipt=%+v err=%v providerCalls=%d", receipt, err, fake.calls)
+	}
+}
+
 func TestDirectPublisherFailsExpiredCredentialWithoutUnknownDelivery(t *testing.T) {
 	p, _, poster, input := directFixture()
 	poster.err = temporalx.RefreshToken("linkedin", "{}", "{}", "expired")
