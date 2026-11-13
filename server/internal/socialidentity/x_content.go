@@ -87,8 +87,10 @@ func CheckXMedia(caps XCapabilities, media []XMedia) error {
 			}
 			limit = *caps.VideoMaxBytes
 			if item.DurationMs > *caps.VideoMaxDurationSeconds*1000 {
+				// Round up, so a refused video never reads as exactly the limit (20:00.5 is 20:01).
+				seconds := (item.DurationMs + 999) / 1000
 				return fmt.Errorf("This X account takes videos up to %d minutes; this one is %d:%02d. Trim it before scheduling.",
-					*caps.VideoMaxDurationSeconds/60, item.DurationMs/60000, item.DurationMs/1000%60)
+					*caps.VideoMaxDurationSeconds/60, seconds/60, seconds%60)
 			}
 		default:
 			return errors.New("X supports JPEG, PNG, WebP, GIF, or MP4 attachments.")

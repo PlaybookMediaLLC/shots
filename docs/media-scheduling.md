@@ -306,13 +306,17 @@ Evidence levels: **Uploadable** (accepted and verified at upload),
 **Implemented** (the adapter sends it), **Test-verified** (automated test
 against the adapter's request shape or the worker), **Live-verified** (a real
 provider post on the current architecture), **Blocked**. Provider documents
-were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
+were read on 2026-10-28 (X on 2026-11-13); links are in `limits.json` (`docs`,
+`verifiedOn`). X's per-tier video limits are in `x.video.accounts`; stored X
+account snapshots must match them, so changing them sends every connected X
+account back through reconnect.
 
 | Destination | Content | Uploadable | Convertible | Implemented | Test-verified | Live-verified |
 | --- | --- | --- | --- | --- | --- | --- |
 | X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. |
 | X | GIF, alone, ≤ 15 MB | Yes | — | Yes | Adapter (`TestGIFFullAnimationLimits`) | No |
-| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
+| X | Photos and a video in one post | — | — | No | Refused before scheduling, with the reason (`write-media-rules.test.ts`, `TestDraftMediaFollowsEachDestination`) | Blocked: the X API takes 4 photos, 1 GIF or 1 video (read 2026-11-13) |
+| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length (20 min standard, 125 min Premium; 1080p sent unchanged) | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`, `TestTenMinute1080pSourcePreservedWithoutPremium`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
 | LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | Yes: image on `yoanyomba`, 2026-11-03; receipt and deletion recorded |
 | LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | Yes: 8-second video on `yoanyomba`, 2026-11-03; playback and deletion verified |
 | LinkedIn | PDF document, alone, ≤ 100 MB, ≤ 300 pages | Yes | — | Yes | Upload checks; publish via the document option | No |

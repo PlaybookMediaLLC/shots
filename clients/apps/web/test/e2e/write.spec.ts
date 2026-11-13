@@ -424,7 +424,14 @@ test(
     await snap(page, 'write-failed-destinations')
 
     // Retrying one destination makes one new post for it; the other stays as it is.
-    await failed.first().getByRole('button', { name: 'Retry this destination' }).click()
+    // The worker can reach a destination before the update above; one it found needing a
+    // reconnect rightly offers no retry, so retry one that does.
+    const retry = page.getByRole('button', { name: 'Retry this destination' })
+    await failed
+      .filter({ has: retry })
+      .first()
+      .getByRole('button', { name: 'Retry this destination' })
+      .click()
     await expect.poll(async () => (await draftPosts(draftId)).length, { timeout: 30_000 }).toBe(3)
   }
 )
