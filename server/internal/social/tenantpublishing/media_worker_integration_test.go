@@ -478,16 +478,24 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+id) })
 		asset, _ := upload("hooked.png", "image/png", photo(240))
 		posts := schedule("Hooked", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: linkedin, Caption: "Hooked", AssetIDs: []string{asset}})
-		events := func() int {
-			return db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(org), outboxevent.Type("webhook."+webhooks.DraftPublished),
-				outboxevent.AggregateID(*posts[0].ContentDraftID)).CountX(ctx)
-		}
 		if result := run(posts[0].ID); result.Outcome != temporalpublishing.OutcomePublished {
 			t.Fatalf("result %+v", result)
 		}
-		run(posts[0].ID)
-		if got := events(); got != 1 {
-			t.Fatalf("%d draft.published events, want 1", got)
+		// A retried CompleteV2 replays Complete with the worker's partial post.
+		stored := db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+		attempt := db.Client.PublicationAttempt.Query().Where(publicationattempt.ScheduledPostID(stored.ID)).OnlyX(ctx)
+		if err := repository.Complete(ctx, &productent.ScheduledPost{ID: stored.ID, OrganizationID: org}, publishing.Attempt{ID: attempt.ID},
+			*stored.RemotePostID, *stored.TriggerRunID); err != nil {
+			t.Fatal(err)
+		}
+		event, err := db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(org), outboxevent.Type("webhook."+webhooks.DraftPublished),
+			outboxevent.AggregateID(*posts[0].ContentDraftID)).Only(ctx)
+		if err != nil {
+			t.Fatalf("want one draft.published event: %v", err)
+		}
+		data, _ := event.Payload["data"].(map[string]any)
+		if post, _ := data["post"].(map[string]any); post["id"] != stored.ID || post["remotePostId"] != *stored.RemotePostID {
+			t.Fatalf("event data %+v", data)
 		}
 	})
 
