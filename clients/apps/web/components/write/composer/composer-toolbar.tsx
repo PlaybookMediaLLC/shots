@@ -30,6 +30,7 @@ import { insertSnippet } from '@/components/drafts/thread'
 import type { DraftChannel } from '@/lib/write/document'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { useWrite } from '../write-context'
+import { PastCaptions } from './past-captions'
 import { type Command, ComposerCommandsContext, type ComposerTool, commandsFor, rememberCommand } from './commands'
 import { DescribeImages } from './describe-images'
 import { insertAttachments } from '@/lib/write/media-operations'
@@ -302,6 +303,18 @@ export function ComposerToolbar({
           channel={channel}
           onClose={close}
           onInsert={(nodes) => insertAttachments(editor as PlateEditor, nodes)}
+        />
+      ) : null}
+      {tool === 'captions' ? (
+        <PastCaptions
+          channel={channel}
+          draftId={draftId}
+          onApply={(text) => {
+            if (!editor.selection) editor.tf.select(editor.api.end([]))
+            editor.tf.insertText(text)
+          }}
+          onClose={close}
+          setId={setId}
         />
       ) : null}
       {tool === 'snippets' && setId ? (
