@@ -510,33 +510,6 @@ test(
   }
 )
 
-test('⌘⇧↵ with the caret in the editor opens the publish review and adds no block', async ({
-  page,
-  startWorkspace,
-}) => {
-  await startWorkspace({ channels: ['x'] })
-  const draftId = await newDraft(page)
-  const editor = draftEditor(page)
-  await editor.click()
-  await settleSelection(page)
-  await page.keyboard.type('Reviewed from the keyboard')
-  await expectSaved(page)
-  const blocks = editor.locator('[data-slate-node="element"]')
-  const before = await blocks.count()
-
-  // The editor kit's exit break also binds this chord; in Write it belongs to the review.
-  await page.keyboard.press('ControlOrMeta+Shift+Enter')
-  await expect(page.getByTestId('publish-review')).toBeVisible()
-  // The modal review hides the editor from the accessibility tree; count once it closes.
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('publish-review')).toHaveCount(0)
-  // The shortcut only opens the review; it never publishes.
-  expect(await draftPosts(draftId)).toEqual([])
-  await expect(blocks).toHaveCount(before)
-  // The post header comes first; the exit break used to put an empty block between it and the text.
-  await expect(blocks.nth(1)).toContainText('Reviewed from the keyboard')
-})
-
 test('an old draft’s code block and heading keep the kit’s layout, and markdown typed in a post stays text', async ({
   page,
   startWorkspace,

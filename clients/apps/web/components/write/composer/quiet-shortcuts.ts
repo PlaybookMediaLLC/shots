@@ -1,11 +1,5 @@
-import type { EditorKitPlugin } from '@shots/platejs-editor/components'
 import type { AnyPlatePlugin } from '@shots/platejs-editor/platejs/react'
-import {
-  BasicBlocksKit,
-  BasicMarksKit,
-  CodeBlockKit,
-  ExitBreakKit,
-} from '@shots/platejs-editor/plugins'
+import { BasicBlocksKit, BasicMarksKit, CodeBlockKit } from '@shots/platejs-editor/plugins'
 
 /**
  * Plate's document shortcuts Write turns off. Headings, quotes and code blocks
@@ -23,12 +17,10 @@ const KIT: AnyPlatePlugin[] = [...BasicBlocksKit, ...BasicMarksKit, ...CodeBlock
  * "```", "==", "^"), which would turn post text into formatting a post cannot
  * carry. extend() keeps their elements, break rules and options.
  */
-export const QuietShortcutPlugins: EditorKitPlugin[] = [
-  ...KIT.filter((plugin) => QUIET.has(plugin.key)).map((plugin) =>
-    // shortcut: clears Plate 53's private __configuredInputRules (no public API does); switch
-    // when Plate adds one or the "markdown typed in a post stays text" e2e fails.
-    plugin.extend(() => ({ __configuredInputRules: [], shortcuts: { toggle: null } }))
-  ),
-  // ⌘⇧↵ opens the publish review. extend() keeps the kit's ⌘↵; configure() would drop it.
-  ...ExitBreakKit.map((plugin) => plugin.extend(() => ({ shortcuts: { insertBefore: null } }))),
-]
+export const QuietShortcutPlugins: AnyPlatePlugin[] = KIT.filter((plugin) =>
+  QUIET.has(plugin.key)
+).map((plugin) =>
+  // shortcut: clears Plate 53's private __configuredInputRules (no public API does); switch
+  // when Plate adds one or the "markdown typed in a post stays text" e2e fails.
+  plugin.extend(() => ({ __configuredInputRules: [], shortcuts: { toggle: null } }))
+)
