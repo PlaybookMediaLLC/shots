@@ -49,3 +49,10 @@ func (p *VideoProvider) CreatorInfo(context.Context, string) (*postoptions.TikTo
 func (p *VideoProvider) ConfirmVideo(context.Context, string, string, string) (string, error) {
 	return "private", nil
 }
+
+// SetThumbnail asks the fake to set a live video's thumbnail; the fake may
+// refuse it, as an unverified channel would.
+func (p *VideoProvider) SetThumbnail(ctx context.Context, _, videoID, thumbnail string) error {
+	_, err := p.action(ctx, "thumbnail", videoID, thumbnail)
+	return err
+}

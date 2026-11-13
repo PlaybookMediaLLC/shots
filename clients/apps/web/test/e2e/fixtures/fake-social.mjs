@@ -58,7 +58,7 @@ createServer(async (request, response) => {
         }
         return reply(response, 200, { ok: true })
       }
-      if (!['normal', 'throttle-once', 'server-error-once'].includes(mode)) {
+      if (!['normal', 'throttle-once', 'server-error-once', 'refuse-thumbnail'].includes(mode)) {
         return reply(response, 400, { error: 'invalid mode' })
       }
       Object.assign(state, { actions: [], mode, posts: [], requests: 0 })
@@ -70,6 +70,13 @@ createServer(async (request, response) => {
     if (request.method === 'POST' && path === '/actions') {
       const { kind, postId, text } = await readJSON(request)
       const id = `fake-action-${state.actions.length + 1}`
+      if (kind === 'thumbnail') {
+        // An unverified YouTube channel cannot set custom thumbnails.
+        if (state.mode === 'refuse-thumbnail')
+          return reply(response, 403, { error: 'youtube.thumbnail' })
+        state.actions.push({ id, kind, postId, media: await mediaReceipt({ path: text }) })
+        return reply(response, 201, { id })
+      }
       state.actions.push({ id, kind, postId, text })
       return reply(response, 201, { id })
     }
@@ -95,6 +102,12 @@ createServer(async (request, response) => {
       caption: body.post?.message,
       id: remoteId,
       media,
+      // Upload metadata only: settings can hold signed URLs, which stay out.
+      settings: {
+        containsSyntheticMedia: body.post?.settings?.containsSyntheticMedia,
+        tags: body.post?.settings?.tags?.map((tag) => tag.value),
+        title: body.post?.settings?.title,
+      },
       sourceId: body.id,
     })
     return reply(response, 201, {

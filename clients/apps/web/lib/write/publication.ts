@@ -1,7 +1,11 @@
 import { articleContent } from '@/lib/write/article'
-import type { Engagement } from 'screenshot-studio-backend-sdk'
+import type { Engagement, InstagramOptions } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
-import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
+import {
+  instagramOptionsSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+} from 'screenshot-studio-backend-sdk'
 import {
   type BlockImages,
   type SerializedCaption,
@@ -17,6 +21,8 @@ import {
   captionLimit,
   kindAvailability,
   pollProblems,
+  YOUTUBE_TAGS_LIMIT,
+  youtubeTagsLength,
 } from '@/lib/write/capabilities'
 import {
   type Article,
@@ -44,6 +50,7 @@ import { bodyFor, groupSettings, versionFor } from '@/lib/write/versions'
 export const publishOptionsSchema = z.object({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
+  instagram: instagramOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -150,6 +157,23 @@ function postOptions(
   return options
 }
 
+/** Instagram's settings that do something, or undefined when none is on. */
+function instagramChoices(
+  options: InstagramOptions | undefined
+): InstagramOptions | undefined {
+  if (!options) return undefined
+  const chosen: InstagramOptions = {}
+  if (options.collaborators?.length) chosen.collaborators = options.collaborators
+  if (options.userTags?.length) chosen.userTags = options.userTags
+  if (options.coverAssetId) chosen.coverAssetId = options.coverAssetId
+  if (options.shareToFeed === false) chosen.shareToFeed = false
+  if (options.trialReel) {
+    chosen.trialReel = true
+    if (options.trialGraduation) chosen.trialGraduation = options.trialGraduation
+  }
+  return Object.keys(chosen).length > 0 ? chosen : undefined
+}
+
 /** Follow-ups that do something, or undefined when none is on. */
 export function activeAutomation(automation: Automation | undefined): Automation | undefined {
   if (!automation) return undefined
@@ -238,6 +262,20 @@ export function buildPublication(
       options.youtube.madeForKids === undefined)
   )
     optionProblems.push('Choose a YouTube title, privacy and audience before scheduling.')
+  if (channel === 'youtube' && youtubeTagsLength(options.youtube?.tags ?? []) > YOUTUBE_TAGS_LIMIT)
+    optionProblems.push(`Keep YouTube tags under ${YOUTUBE_TAGS_LIMIT} characters together.`)
+  const instagram = channel === 'instagram' ? instagramChoices(options.instagram) : undefined
+  if (instagram) {
+    const media = first?.media ?? []
+    const reel = media.length === 1 && media[0]?.kind === 'video'
+    // A cover, the grid choice and a trial need a reel (Go: InstagramOptions.Reel).
+    if ((instagram.coverAssetId || instagram.shareToFeed === false || instagram.trialReel) && !reel)
+      optionProblems.push(
+        'A cover, grid setting or trial is for a reel. Post one video, or turn them off.'
+      )
+    if (instagram.userTags?.length && !reel && !media.some((item) => item.kind === 'image'))
+      optionProblems.push('Tag accounts on a photo or a reel.')
+  }
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
     if (!creator)
@@ -362,6 +400,7 @@ export function buildPublication(
   if (channel === 'x' && photoTags(first).length) firstOptions.taggedUserIds = photoTags(first)
   if (channel === 'youtube') firstOptions.youtube = options.youtube
   if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
+  if (instagram) firstOptions.instagram = instagram
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true

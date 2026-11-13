@@ -197,3 +197,56 @@ func TestRunAutomation(t *testing.T) {
 		t.Fatalf("unsupported: %+v", got)
 	}
 }
+
+// A YouTube thumbnail is a follow-up of the live video (PB-03): planned only
+// with a thumbnail to set, sent with that image, and a refusal is recorded on
+// its own receipt while the video stays published.
+func TestYouTubeThumbnailIsAFollowUp(t *testing.T) {
+	published := time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
+	no := false
+	cover := &publishing.MediaAsset{AssetID: "thumb-1", ObjectKey: "org/thumb.png", MediaType: "image/png"}
+	job := PreparedPublication{PostID: "post-1", Platform: "youtube", Cover: cover, Options: &postoptions.PublishOptions{
+		YouTube: &postoptions.YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no, ThumbnailAssetID: "thumb-1"}}}
+	steps := automationPlan(job, published)
+	if len(steps) != 1 || steps[0].Kind != AutomationThumbnail || steps[0].Key != "thumbnail" || !steps[0].At.Equal(published) {
+		t.Fatalf("steps = %+v", steps)
+	}
+	without := job
+	without.Options = &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Launch", Privacy: "public", MadeForKids: &no}}
+	if steps := automationPlan(without, published); len(steps) != 0 {
+		t.Fatalf("a video without a thumbnail planned %+v", steps)
+	}
+
+	store := &receiptStore{receipts: map[string]*receipt{"thumbnail": {status: ReceiptPending}}}
+	provider := &fakeAutomator{err: httpError(403)}
+	result, err := NewActivities(store, provider).RunAutomation(context.Background(), AutomationInput{Job: job, ProviderID: "vid1", Step: steps[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := store.receipts["thumbnail"]; !result.Settled || got.status != ReceiptFailed || got.code != "http_403" {
+		t.Fatalf("refused thumbnail: %+v %+v", result, got)
+	}
+	if call := provider.calls[0]; call.Kind != AutomationThumbnail || call.RemotePostID != "vid1" || call.Media != cover {
+		t.Fatalf("thumbnail request = %+v", call)
+	}
+
+	// The image was gone when the video went out: skipped and named, nothing sent.
+	gone := job
+	gone.Cover = nil
+	if steps := automationPlan(gone, published); len(steps) != 1 || steps[0].Kind != AutomationThumbnail {
+		t.Fatalf("a missing thumbnail was not reported: %+v", steps)
+	}
+	store.receipts["thumbnail"] = &receipt{status: ReceiptPending}
+	if _, err := NewActivities(store, provider).RunAutomation(context.Background(), AutomationInput{Job: gone, ProviderID: "vid1", Step: steps[0]}); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.receipts["thumbnail"]; got.status != ReceiptSkipped || got.code != "media_unavailable" || len(provider.calls) != 1 {
+		t.Fatalf("missing thumbnail: %+v, calls %d", got, len(provider.calls))
+	}
+	// An Instagram reel's cover goes with the reel: no thumbnail step.
+	reel := PreparedPublication{PostID: "post-2", Platform: "instagram-standalone", Cover: cover,
+		Options: &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "thumb-1"}}}
+	if steps := automationPlan(reel, published); len(steps) != 0 {
+		t.Fatalf("an Instagram cover planned %+v", steps)
+	}
+}

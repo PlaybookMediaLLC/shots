@@ -1919,6 +1919,7 @@ export function WriteComposer({
                 disabled={!canEdit}
                 onChange={(options) => setOptions(active, options)}
                 options={versionOfTab.options ?? {}}
+                uploadFile={services.uploadFile}
               />
             </section>
           ) : null}

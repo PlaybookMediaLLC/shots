@@ -345,3 +345,18 @@ export function pollRules(channel: DraftChannel, standing?: AccountStanding): Po
     durationRange: { min, max },
   }
 }
+
+/** YouTube's cap on a video's tags together. */
+export const YOUTUBE_TAGS_LIMIT = 500
+
+/**
+ * Tags counted as YouTube counts them, and as Go does (`YouTubeTagsLength`):
+ * UTF-16 units, two more for the quotes around a tag with a space, and a
+ * comma between tags.
+ */
+export function youtubeTagsLength(tags: readonly string[]): number {
+  return tags.reduce(
+    (total, tag) => total + tag.length + (/\s/.test(tag) ? 2 : 0),
+    Math.max(tags.length - 1, 0)
+  )
+}

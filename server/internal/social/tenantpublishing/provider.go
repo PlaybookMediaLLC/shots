@@ -299,6 +299,14 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	if settings, err = p.articleCover(ctx, input, settings); err != nil {
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusServiceUnavailable, false, "article cover could not be signed")
 	}
+	if strings.HasPrefix(input.Platform, "instagram") && input.Cover != nil && len(media) == 1 {
+		// Instagram takes a reel's cover in the same request as the reel.
+		cover, err := p.signedMedia(ctx, input.OrganizationID, []publishing.MediaAsset{*input.Cover})
+		if err != nil || len(cover) == 0 {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusServiceUnavailable, false, "reel cover could not be signed")
+		}
+		media[0].Thumbnail = cover[0].Path
+	}
 	// Signing media can take time. Reload the grant immediately before handoff,
 	// allowing credential refresh but never a different destination identity.
 	account, provider, err = p.publicationAccount(ctx, input, account)

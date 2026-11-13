@@ -6,31 +6,24 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 )
 
-// YouTube caps the combined length of all tags at 500 characters.
-// Tags containing whitespace are wrapped in quotes by YouTube, which adds
-// two extra characters per tag toward that limit.
-const YoutubeTagsMaxLength = 500
+// YoutubeTagsMaxLength is YouTube's cap on all of a video's tags together.
+const YoutubeTagsMaxLength = postoptions.YouTubeTagsLimit
 
-// GetYoutubeTagsLength counts like JavaScript's string length (UTF-16 units).
+// GetYoutubeTagsLength counts tags as YouTube does (postoptions.YouTubeTagsLength).
 func GetYoutubeTagsLength(tags []TagsSettings) int {
-	total := 0
-	for _, tag := range tags {
-		label := ""
+	labels := make([]string, len(tags))
+	for i, tag := range tags {
 		if tag.Label != nil {
-			label = *tag.Label
-		}
-		total += utf16Length(label)
-		if strings.IndexFunc(label, unicode.IsSpace) >= 0 {
-			total += 2
+			labels[i] = *tag.Label
 		}
 	}
-	return total
+	return postoptions.YouTubeTagsLength(labels)
 }
 
 type TagsSettings struct {
@@ -53,6 +46,7 @@ type SettingsDTO struct {
 	SelfDeclaredMadeForKids *string        `json:"selfDeclaredMadeForKids,omitempty"`
 	Thumbnail               *MediaDTO      `json:"thumbnail,omitempty"`
 	Tags                    []TagsSettings `json:"tags,omitempty"`
+	ContainsSyntheticMedia  bool           `json:"containsSyntheticMedia,omitempty"`
 }
 
 // Validate reproduces class-validator: properties in declaration order, each

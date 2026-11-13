@@ -72,6 +72,7 @@ type fakePoster struct {
 	replyPolls       []*integrations.PollDetails
 	message          string
 	path             string
+	thumbnail        string
 	err              error
 	status           string
 	expectedNativeID string
@@ -90,7 +91,7 @@ func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrati
 	}
 	f.message, f.media, f.poll = posts[0].Message, len(posts[0].Media), posts[0].Poll
 	if len(posts[0].Media) > 0 {
-		f.path = posts[0].Media[0].Path
+		f.path, f.thumbnail = posts[0].Media[0].Path, posts[0].Media[0].Thumbnail
 	}
 	if f.err != nil {
 		return nil, f.err
@@ -549,5 +550,21 @@ func TestPlatformLimitsReachTheirPublicationOutcome(t *testing.T) {
 				t.Fatalf("requests=%d result=%+v err=%v", requests.Load(), result, err)
 			}
 		})
+	}
+}
+
+// An Instagram reel's cover is signed and sent with the reel itself.
+func TestInstagramReelCarriesItsSignedCover(t *testing.T) {
+	p, signer, poster, input := directFixture()
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "instagram-standalone", InternalID: "remote-user", Token: "private-token"}}
+	input.Platform = "instagram-standalone"
+	input.AssetObjectKey, input.AssetMediaType = "org/product-org/reel.mp4", "video/mp4"
+	input.Cover = &publishing.MediaAsset{AssetID: "cover-1", MediaType: "image/jpeg", ObjectKey: "org/product-org/cover.jpg"}
+	input.Options = &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "cover-1"}}
+	if _, err := p.Publish(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	if signer.calls != 2 || poster.thumbnail != "https://r2.example/private/image.png?fresh-signature" {
+		t.Fatalf("signed=%d cover=%q", signer.calls, poster.thumbnail)
 	}
 }

@@ -101,6 +101,8 @@ type AutomationInput struct {
 	SecretReference string
 	Text            string
 	Threshold       int
+	// Media is the image a thumbnail step sets.
+	Media *publishing.MediaAsset
 }
 
 // AutomationResult is a follow-up's outcome: Done when it acted (RemoteID

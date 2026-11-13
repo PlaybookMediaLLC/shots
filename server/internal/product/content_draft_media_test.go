@@ -1,10 +1,13 @@
 package product
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 )
 
 func mediaRow(mime string, bytes, width, height, durationMs int) *ent.Asset {
@@ -90,5 +93,72 @@ func TestVideoDraftChannelsAcceptStandardPostsOnly(t *testing.T) {
 				t.Fatalf("%s must reject %s", channel, kind)
 			}
 		}
+	}
+}
+
+// Instagram's reel settings need one video, tags need a photo or a reel, and
+// each cover follows its destination's published formats and size.
+func TestOptionMediaFollowsEachDestination(t *testing.T) {
+	photo := mediaRow("image/jpeg", 300_000, 1080, 1350, 0)
+	reel := mediaRow("video/mp4", 20_000_000, 1080, 1920, 30_000)
+	off := false
+	ig := func(o postoptions.InstagramOptions) *postoptions.PublishOptions {
+		return &postoptions.PublishOptions{Instagram: &o}
+	}
+	for _, tc := range []struct {
+		name    string
+		options *postoptions.PublishOptions
+		rows    []*ent.Asset
+		valid   bool
+	}{
+		{"grid choice on a reel", ig(postoptions.InstagramOptions{ShareToFeed: &off}), []*ent.Asset{reel}, true},
+		{"grid choice on a photo", ig(postoptions.InstagramOptions{ShareToFeed: &off}), []*ent.Asset{photo}, false},
+		{"trial on a carousel", ig(postoptions.InstagramOptions{TrialReel: true}), []*ent.Asset{reel, reel}, false},
+		{"tags on a photo", ig(postoptions.InstagramOptions{UserTags: []string{"brand"}}), []*ent.Asset{photo}, true},
+		{"tags on a carousel of videos", ig(postoptions.InstagramOptions{UserTags: []string{"brand"}}), []*ent.Asset{reel, reel}, false},
+		{"collaborators on a carousel", ig(postoptions.InstagramOptions{Collaborators: []string{"partner"}}), []*ent.Asset{photo, reel}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkOptionMedia(context.Background(), nil, "org", "instagram", tc.options, tc.rows); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		channel string
+		cover   *ent.Asset
+		valid   bool
+	}{
+		{"instagram", mediaRow("image/jpeg", 8_000_000, 1080, 1920, 0), true},
+		{"instagram", mediaRow("image/png", 300_000, 1080, 1920, 0), false},
+		{"instagram", mediaRow("image/jpeg", 8_000_001, 1080, 1920, 0), false},
+		{"youtube", mediaRow("image/png", 2_097_152, 1280, 720, 0), true},
+		{"youtube", mediaRow("image/png", 2_097_153, 1280, 720, 0), false},
+		{"youtube", mediaRow("image/webp", 300_000, 1280, 720, 0), false},
+		{"x", mediaRow("image/jpeg", 300_000, 1280, 720, 0), false},
+	} {
+		if err := checkCover(tc.channel, tc.cover); (err == nil) != tc.valid {
+			t.Fatalf("%s %s %d bytes: valid=%v error=%v", tc.channel, tc.cover.MediaType, tc.cover.Bytes, tc.valid, err)
+		}
+	}
+}
+
+func TestInstagramOptionsBelongToInstagram(t *testing.T) {
+	options := &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Collaborators: []string{"partner"}}}
+	if err := checkPostOptions("instagram", options, true); err != nil {
+		t.Fatal(err)
+	}
+	if checkPostOptions("linkedin", options, true) == nil {
+		t.Fatal("Instagram settings were accepted for LinkedIn")
+	}
+	bad := &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "../x"}}
+	if checkPostOptions("instagram", bad, true) == nil {
+		t.Fatal("a cover that is not an asset id was accepted")
+	}
+	if _, err := versionOptions("x", &draftdoc.VersionOptions{Instagram: &postoptions.InstagramOptions{UserTags: []string{"a"}}}); err == nil {
+		t.Fatal("a draft's X version stored Instagram settings")
+	}
+	if _, err := versionOptions("instagram", &draftdoc.VersionOptions{Instagram: &postoptions.InstagramOptions{Collaborators: []string{"a", "b", "c", "d"}}}); err == nil {
+		t.Fatal("a draft stored four collaborators")
 	}
 }

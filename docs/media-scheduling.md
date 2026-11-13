@@ -324,6 +324,7 @@ account back through reconnect.
 | Instagram (Instagram Login) | Image, aspect 4:5–1.91:1, width ≥ 320 | Yes | PNG/WebP → JPEG, transparency to white | Yes | Adapter (`TestCarouselPendingFlow`), `TestJPEGOnlyProfileFlattensTransparency` | Yes: feed image on `@get.eigenn`, 2026-11-03; receipt and deletion recorded |
 | Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | Yes: 8-second Reel on `@get.eigenn`, 2026-11-03; playback and deletion verified |
 | Instagram | Carousel of up to 20, images and videos mixed | Yes | As above | Yes | Adapter, worker (order and mixed MOV) | No |
+| Instagram | Reel cover (JPEG ≤ 8 MB), grid choice, trial reel; collaborators (3) and tagged accounts (20) on photos, carousels and reels | Yes | — | Yes: with the reel's container; tags on the reel or the first photo | Adapter (`TestReelTagsGridAndCover`, `TestCarouselTagsTheFirstPhoto`), options, `TestOptionMediaFollowsEachDestination` | No |
 | Instagram | GIF | Yes | — | No | — | Blocked: no animated GIF in the API |
 | Instagram (Facebook Login) | Any | Yes | — | Adapter exists | — | Blocked: refused at scheduling until the account reconnects with Instagram Login |
 | Threads | Up to 20, images and videos mixed; video MP4/MOV ≤ 5 min, ≤ 1 GB | Yes (uploads stop at 512 MiB) | WebP → PNG | Yes | Adapter (`TestCarouselFlow`, `TestMixedCarouselSendsVideoByType`) | No |
@@ -334,6 +335,7 @@ account back through reconnect.
 | Any | Audio, or a file other than a PDF, as an attachment | Uploadable for design timelines | — | No | Refused before scheduling, with the reason | Blocked |
 | TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
 | YouTube | One MP4, ≤ 512 MiB; explicit title, privacy and audience | Yes | — | Resumable upload with processing confirmation | Adapter, options, worker and social gate | No: @getconduitt private video scheduled for 2026-11-04 00:20 UTC; receipt and playback pending |
+| YouTube | Tags (500 characters together), synthetic-content disclosure; custom thumbnail (JPEG or PNG ≤ 2 MB) set after the video is live, as a follow-up whose failure never fails the video | Yes | — | Yes | Adapter (`TestSetThumbnailReportsARefusal`), `TestYouTubeThumbnailIsAFollowUp`, social gate | No. A thumbnail needs a verified channel; Shorts ignore it. |
 | Pinterest, Facebook Pages | — | — | — | Not in the direct publishing path | — | Blocked for drafts |
 
 Nothing is silently dropped. Content a destination cannot take is refused

@@ -51,7 +51,17 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		options  *postoptions.PublishOptions
 		want     map[string]any
 	}{
-		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "unlisted", MadeForKids: &audience}}, map[string]any{"title": "Explicit title", "type": "unlisted", "selfDeclaredMadeForKids": "no"}},
+		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "unlisted", MadeForKids: &audience}}, map[string]any{"title": "Explicit title", "type": "unlisted", "selfDeclaredMadeForKids": "no", "containsSyntheticMedia": false}},
+		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "public", MadeForKids: &audience,
+			Tags: []string{"launch", "screen shots"}, ContainsSyntheticMedia: true, ThumbnailAssetID: "thumb"}},
+			map[string]any{"title": "Explicit title", "type": "public", "selfDeclaredMadeForKids": "no", "containsSyntheticMedia": true,
+				"tags": []any{map[string]any{"value": "launch", "label": "launch"}, map[string]any{"value": "screen shots", "label": "screen shots"}}}},
+		{"instagram-standalone", &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Collaborators: []string{"partner"},
+			UserTags: []string{"brand", "maker"}, ShareToFeed: &audience, TrialReel: true, CoverAssetID: "cover"}},
+			map[string]any{"collaborators": []any{map[string]any{"label": "partner"}}, "user_tags": []any{"brand", "maker"},
+				"share_to_feed": false, "is_trial_reel": true}},
+		{"instagram-standalone", &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{TrialReel: true, TrialGraduation: "SS_PERFORMANCE"}},
+			map[string]any{"is_trial_reel": true, "graduation_strategy": "SS_PERFORMANCE"}},
 		{"tiktok", &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "PUBLIC_TO_EVERYONE", AllowComments: true, AllowStitch: true, CommercialContent: true, BrandOrganic: true, MadeWithAI: true, Consent: true}}, map[string]any{"content_posting_method": "DIRECT_POST", "privacy_level": "PUBLIC_TO_EVERYONE", "comment": true, "duet": false, "stitch": true, "brand_organic_toggle": true, "brand_content_toggle": false, "video_made_with_ai": true, "autoAddMusic": "no"}},
 	} {
 		if got := decode(t, must(postSettings(tc.platform, nil, tc.options, ""))); !reflect.DeepEqual(got, tc.want) {
@@ -59,6 +69,14 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		}
 	}
 
+}
+
+func TestInstagramSettingsRefuseInvalidOptions(t *testing.T) {
+	// A stored snapshot is checked again before it reaches the adapter.
+	if _, err := postSettings("instagram-standalone", nil, &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{
+		Collaborators: []string{"a", "b", "c", "d"}}}, ""); err == nil {
+		t.Fatal("four collaborators reached the adapter")
+	}
 }
 
 func TestAFinisherQuotesTheFirstPostOnlyOnceItIsLive(t *testing.T) {

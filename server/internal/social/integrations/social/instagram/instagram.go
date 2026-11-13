@@ -614,8 +614,20 @@ func (p *Provider) PostPendingOn(ctx context.Context, id, token string, posts []
 	}
 	isTrialReel := integrations.AssetBoolean(settings.IsTrialReel)
 	single := len(firstPost.Media) == 1
+	tagged := -1 // the item that carries user tags: the reel, or the first photo
+	for i, m := range firstPost.Media {
+		if len(settings.UserTags) > 0 && !isStory && (single || m.Type != "video" && !helpers.HasExtension(m.Path, "mp4")) {
+			tagged = i
+			break
+		}
+	}
 
-	medias, err := facebook.All(firstPost.Media, func(m integrations.MediaContent) (string, error) {
+	order := make([]int, len(firstPost.Media))
+	for i := range order {
+		order[i] = i
+	}
+	medias, err := facebook.All(order, func(index int) (string, error) {
+		m := firstPost.Media[index]
 		caption := ""
 		if single {
 			caption = "&caption=" + facebook.EncodeURIComponent(firstPost.Message)
@@ -678,7 +690,15 @@ func (p *Provider) PostPendingOn(ctx context.Context, id, token string, posts []
 			audioConfiguration = "&audio_configuration=" + facebook.EncodeURIComponent(string(data))
 		}
 
-		return p.postID(ctx, graph(host)+"/"+id+"/media?"+mediaType+isCarousel+itemCollaborators+trialParams+audioConfiguration+"&access_token="+accessToken+caption)
+		extras := ""
+		if index == tagged {
+			extras += "&user_tags=" + facebook.EncodeURIComponent(userTags(settings.UserTags, !isVideo))
+		}
+		if settings.ShareToFeed != nil && isVideo && single && !isStory {
+			extras += "&share_to_feed=" + strconv.FormatBool(*settings.ShareToFeed)
+		}
+
+		return p.postID(ctx, graph(host)+"/"+id+"/media?"+mediaType+isCarousel+itemCollaborators+trialParams+audioConfiguration+extras+"&access_token="+accessToken+caption)
 	})
 	if err != nil {
 		return nil, err
@@ -704,6 +724,20 @@ func (p *Provider) PostPendingOn(ctx context.Context, id, token string, posts []
 	}
 	data, _ := json.Marshal(pending)
 	return []integrations.PostResponse{{ID: firstPost.ID, Status: "pending", PendingData: data}}, nil
+}
+
+// userTags is the user_tags parameter: usernames, with a position on a
+// photo, where Instagram requires one. Tags fill a 5×4 grid of the photo.
+func userTags(names []string, photo bool) string {
+	tags := make([]map[string]any, len(names))
+	for i, name := range names {
+		tags[i] = map[string]any{"username": stripHandle(name)}
+		if photo {
+			tags[i]["x"], tags[i]["y"] = (float64(i%5)+0.5)/5, (float64(i/5)+0.5)/4
+		}
+	}
+	data, _ := json.Marshal(tags)
+	return string(data)
 }
 
 // jsonNumber is JSON.stringify(+value) for a present volume (NaN -> null).

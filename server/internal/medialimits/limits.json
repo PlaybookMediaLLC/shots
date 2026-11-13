@@ -105,6 +105,10 @@
         "maxMs": 900000,
         "maxBytes": 300000000
       },
+      "cover": {
+        "formats": ["image/jpeg"],
+        "maxBytes": 8000000
+      },
       "docs": [
         "https://developers.facebook.com/docs/instagram-platform/content-publishing/",
         "https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media"
@@ -183,7 +187,13 @@
         "alone": true,
         "maxBytes": 536870912
       },
-      "docs": ["https://developers.google.com/youtube/v3/docs/videos/insert"],
+      "cover": {
+        "formats": ["image/jpeg", "image/png"],
+        "maxBytes": 2097152
+      },
+      "docs": ["https://developers.google.com/youtube/v3/docs/videos/insert",
+        "https://developers.google.com/youtube/v3/docs/thumbnails/set"
+      ],
       "verifiedOn": "2026-11-03"
     }
   }

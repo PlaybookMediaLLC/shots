@@ -36,6 +36,7 @@ import {
 import { threadLabels } from '@/lib/write/numbering'
 import { cn } from '@/lib/utils'
 import { PdfCarousel } from './pdf-carousel'
+import { InstagramOptions } from './instagram-options'
 import { AutoDmDraft } from './auto-dm-draft'
 
 /** A numbering style as the dialog shows it. */
@@ -162,6 +163,17 @@ export function VersionOptionsBar({
         onChange={(firstComment) => onChange({ ...options, firstComment })}
         readOnly={readOnly}
         value={options.firstComment ?? ''}
+      />
+    )
+  }
+  if (channel === 'instagram') {
+    tools.push(
+      <InstagramOptions
+        disabled={readOnly}
+        key="instagram"
+        onChange={(instagram) => onChange({ ...options, instagram })}
+        uploadFile={uploadFile}
+        value={options.instagram}
       />
     )
   }

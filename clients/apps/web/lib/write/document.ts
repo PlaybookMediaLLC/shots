@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
+import {
+  instagramOptionsSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+} from 'screenshot-studio-backend-sdk'
 
 /**
  * The Write document (RFC 025): the structured parts of a content draft
@@ -197,6 +201,8 @@ export type AutoDm = z.infer<typeof autoDmSchema>
 export const versionOptionsSchema = z.strictObject({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
+  /** Instagram: collaborators, tags, and a reel's cover, grid and trial. */
+  instagram: instagramOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),
