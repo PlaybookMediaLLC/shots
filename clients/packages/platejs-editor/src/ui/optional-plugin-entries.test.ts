@@ -71,9 +71,6 @@ const slashGroups = (editor: PlateEditor) =>
     .filter((group) => !group.when || group.when(editor))
     .map((group) => group.group);
 
-// The toolbar's Ask AI is named by its tooltip.
-const ASK_AI_BUTTON = "Edit, generate, and more";
-
 const has = (texts: string[], prefix: string) =>
   texts.some((text) => text.startsWith(prefix));
 
@@ -90,7 +87,7 @@ describe("entries that call an optional plugin's API", () => {
 
     const buttons = await toolbarButtons(writing);
     expect(has(buttons, "Bold")).toBe(true);
-    expect(has(buttons, ASK_AI_BUTTON)).toBe(false);
+    expect(has(buttons, "Ask AI")).toBe(false);
     expect(has(buttons, "Suggestion edits")).toBe(false);
 
     expect(slashGroups(writing)).toContain("Basic blocks");
@@ -102,7 +99,7 @@ describe("entries that call an optional plugin's API", () => {
     expect(has(options, "Comment")).toBe(true);
     expect(has(options, "Ask AI")).toBe(false);
     const buttons = await toolbarButtons(collaborative);
-    expect(has(buttons, ASK_AI_BUTTON)).toBe(false);
+    expect(has(buttons, "Ask AI")).toBe(false);
     expect(has(buttons, "Suggestion edits")).toBe(true);
     expect(slashGroups(collaborative)).not.toContain("AI");
   });
@@ -113,7 +110,7 @@ describe("entries that call an optional plugin's API", () => {
     expect(has(options, "Comment")).toBe(true);
     expect(has(await mediaMenuOptions("full"), "Comment")).toBe(true);
     const buttons = await toolbarButtons(full);
-    expect(has(buttons, ASK_AI_BUTTON)).toBe(true);
+    expect(has(buttons, "Ask AI")).toBe(true);
     expect(has(buttons, "Suggestion edits")).toBe(true);
     expect(slashGroups(full)).toContain("AI");
   });

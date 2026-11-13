@@ -141,6 +141,10 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   and one without SuggestionKit showed a Suggestion button that did nothing.
   `src/ui/optional-plugin-entries.test.ts` (new) renders them in jsdom, which
   `test/dom.ts` (new) sets up.
+- `src/ui/floating-toolbar-buttons.tsx`: the toolbar's Ask AI has
+  `aria-label="Ask AI"`. `withTooltip` named it after its tooltip ("Edit,
+  generate, and more"), which does not contain its visible text, and that
+  text is hidden on narrow screens.
 
 ## Pulling a later fix from oppulence-canvas
 
