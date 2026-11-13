@@ -45,7 +45,7 @@ func (c *Configuration) revokeProviderConnection(ctx context.Context, connection
 		return nil, err
 	}
 	defer tx.Rollback()
-	actor := Actor{OrganizationID: connection.OrganizationID, Kind: "service", Display: "provider callback"}
+	actor := Actor{OrganizationID: connection.OrganizationID, Kind: "service", Display: "provider callback", Source: "callback"}
 	cancelled, err := cancelPosts(ctx, tx, actor, []string{connection.ID}, "account_revoked")
 	if err != nil {
 		return nil, err

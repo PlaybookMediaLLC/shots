@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
@@ -47,7 +48,7 @@ type Store interface {
 	ListConnections(context.Context, string) ([]*ent.ChannelConnection, error)
 	SetConnectionProfile(ctx context.Context, id, name, handle, avatar string) (*ent.ChannelConnection, error)
 	CreateScheduledPost(context.Context, publishing.Actor, publishing.CreateScheduledPostInput) (publishing.CreateScheduledPostResult, error)
-	ListScheduledPosts(context.Context, string, bool, int) ([]*ent.ScheduledPost, error)
+	ListScheduledPosts(context.Context, string, string, int) ([]*ent.ScheduledPost, error)
 	CancelScheduledPost(context.Context, publishing.Actor, string) (*ent.ScheduledPost, error)
 }
 
@@ -513,7 +514,7 @@ func (s *Server) createConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.ExternalAccountID = strings.TrimSpace(input.ExternalAccountID)
-	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
+	input.Platform = socialplatform.Adapter(strings.ToLower(strings.TrimSpace(input.Platform)))
 	input.SecretReference = strings.TrimSpace(input.SecretReference)
 	if input.Platform == "" {
 		input.Platform = "x"
@@ -585,8 +586,14 @@ func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	connections = s.fillProfiles(r.Context(), organizationID, connections)
 	var states map[string]product.ChannelAccountState
+	if s.configuration != nil {
+		if connections, err = s.configuration.VisibleConnections(r.Context(), requestActor(r), connections); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+	}
+	connections = s.fillProfiles(r.Context(), organizationID, connections)
 	if s.configuration != nil {
 		if states, err = s.configuration.ChannelAccountStates(r.Context(), organizationID, connections); err != nil {
 			writeStoreError(w, err)
@@ -720,7 +727,11 @@ func (s *Server) listScheduledPosts(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = parsed
 	}
-	posts, err := s.store.ListScheduledPosts(r.Context(), r.Header.Get("X-Organization-ID"), !requestActor(r).IsSession(), limit)
+	viewer := ""
+	if actor := requestActor(r); actor.IsSession() {
+		viewer = actor.UserID
+	}
+	posts, err := s.store.ListScheduledPosts(r.Context(), r.Header.Get("X-Organization-ID"), viewer, limit)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -752,10 +763,16 @@ func (s *Server) cancelScheduledPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) (publishing.Actor, bool) {
-	userID, actorType := r.Header.Get("X-User-ID"), "USER"
-	if !requestActor(r).IsSession() {
+	userID, actorType, source := r.Header.Get("X-User-ID"), "USER", ""
+	if principal := requestActor(r); !principal.IsSession() {
 		// An API key has no user; the audit records it as a service by its name.
 		requireUser, actorType = false, "SERVICE"
+		switch principal.Kind {
+		case "api_key":
+			source = "api"
+		case "support":
+			actorType = "SUPPORT"
+		}
 	}
 	if requireUser && userID == "" {
 		writeError(w, http.StatusBadRequest, "X-User-ID is required")
@@ -769,7 +786,7 @@ func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) 
 	// rows (post.scheduled, post.cancelled) record it.
 	return publishing.Actor{
 		Display: r.Header.Get("X-Principal-Display"), Organization: r.Header.Get("X-Organization-ID"),
-		RequestID: requestID, Type: actorType, UserID: userID,
+		RequestID: requestID, Source: source, Type: actorType, UserID: userID,
 	}, true
 }
 
@@ -843,8 +860,12 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		})
 	case errors.Is(err, product.ErrWebhooksUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "webhooks_unavailable", "error": err.Error()})
-	case errors.Is(err, publishing.ErrSocialSetSlotTaken), errors.Is(err, publishing.ErrAccountInAnotherSet):
-		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, publishing.ErrSocialSetSlotTaken):
+		writeError(w, http.StatusConflict, publishing.ErrSocialSetSlotTaken.Error())
+	case errors.Is(err, publishing.ErrAccountInAnotherSet):
+		writeError(w, http.StatusConflict, publishing.ErrAccountInAnotherSet.Error())
+	case errors.Is(err, publishing.ErrAccountRemovedFromAnotherSet):
+		writeError(w, http.StatusConflict, publishing.ErrAccountRemovedFromAnotherSet.Error())
 	case errors.Is(err, publishing.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, err.Error())
 	case errors.Is(err, publishing.ErrForbidden):
