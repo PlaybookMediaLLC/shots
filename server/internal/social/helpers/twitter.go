@@ -40,14 +40,11 @@ const surrogateShift = 0xf0000
 
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 
-// regexp2 still backtracks badly through a URL path that is a long run of
-// parenthesised groups: "https://a.co/" + "(a)" x 8,000 took 7 s. So one call
-// of the URL regex gets linkScanBudget, and one text's scan linkScanBudget
-// plus linkScanPerUnit for each of its UTF-16 units up to linkScanMaxUnits,
-// the longest caption (an X Article); ordinary text uses a small fraction of
-// either.
-// shortcut: a link whose path is a long run of parenthesised groups cannot be
-// counted. Match the path by hand if such links must count.
+// The link scan is linear, but a long text makes many regexp2 calls: so one
+// call of the URL regex gets linkScanBudget, and one text's scan
+// linkScanBudget plus linkScanPerUnit for each of its UTF-16 units up to
+// linkScanMaxUnits, the longest caption (an X Article); ordinary text uses a
+// small fraction of either.
 const (
 	linkScanBudget   = 200 * time.Millisecond
 	linkScanMaxUnits = 100_000
@@ -120,6 +117,10 @@ var (
 	// \G makes an attempt match only at the index it is given.
 	extractURLAtRe = jsRegexp(`\G(?:`+extractURLSource+`)`, regexp2.IgnoreCase)
 	validTLDAtRe   = jsRegexp(`\G`+validTLDSource(), regexp2.IgnoreCase)
+	// validUrlPath's pieces, which urlPathEnd matches a path with.
+	urlPathRunRe    = jsRegexp(`\G`+urlPathChars+`*`, regexp2.IgnoreCase)
+	urlPathEndingRe = jsRegexp(`\G`+urlPathChars+`*`+sourceSpan(`[\+\-a-z\u0400-\u04FF0-9=_#`, `\u1EFF]`), regexp2.IgnoreCase)
+	urlPathParensRe = jsRegexp(`\G\((?:`+urlPathChars+`+|(?:`+urlPathChars+`*\(`+urlPathChars+`+\)`+urlPathChars+`*))\)`, regexp2.IgnoreCase)
 	// validAsciiDomain's label character, cut from its source.
 	asciiLabelCharRe         = jsRegexp(`^`+validASCIIDomainSource[len(`(?:(?:`):strings.Index(validASCIIDomainSource, `+)\.)+`)]+`$`, regexp2.IgnoreCase)
 	validTcoURLRe            = jsRegexp(validTcoURLSource, regexp2.IgnoreCase)
@@ -128,8 +129,11 @@ var (
 	twemojiRe                = jsRegexp(twemojiSource, 0)
 )
 
-// Only the URL regex's path backtracks badly, so only it can time out; the
-// others are linear and never return an error.
+// urlPathChars is validGeneralUrlPathChars, cut from extractURLSource.
+var urlPathChars = sourceSpan(`[a-z\u0400-\u04FF0-9!`, `\u1EFF]`)
+
+// Only the URL regex is long enough to need a timeout; the others are short
+// and never return an error.
 func init() {
 	extractURLAtRe.MatchTimeout = linkScanBudget
 }
@@ -448,6 +452,10 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 	}
 	var urls []*urlEntity
 	for _, m := range matches {
+		// A domain's ASCII-only scan below makes a TLD check per label.
+		if time.Now().After(deadline) {
+			return nil, ErrTextTooComplex
+		}
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
@@ -527,8 +535,13 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 // tries the regex only where urlEnds says one starts. Scanning from every
 // index is quadratic on long runs of letters, which is any CJK text, because
 // each start rescans the run.
+//
+// It writes to text while it matches a path, and puts it back.
 func urlMatches(text []rune, deadline time.Time) ([]*regexp2.Match, error) {
-	ends := urlEnds(text)
+	ends, err := urlEnds(text, deadline)
+	if err != nil {
+		return nil, err
+	}
 	var matches []*regexp2.Match
 	for s := 0; s < len(text); s++ {
 		end := ends[s]
@@ -544,7 +557,16 @@ func urlMatches(text []rune, deadline time.Time) ([]*regexp2.Match, error) {
 		if end == len(text) || strings.ContainsRune(":/?", text[end]) {
 			end = len(text)
 		}
+		// regexp2 retries a path's first kind of segment after each run of
+		// parentheses, rescanning the rest: quadratic. It reads the path as
+		// letters instead, which it matches in one pass to the same end.
+		path, pathEnd := urlPathAfterDomain(text, ends[s])
+		written := slices.Clone(text[path:pathEnd])
+		for i := path; i < pathEnd; i++ {
+			text[i] = 'a'
+		}
 		m, err := extractURLAtRe.FindRunesMatchStartingAt(text[:end], s)
+		copy(text[path:], written)
 		if err != nil {
 			return nil, ErrTextTooComplex
 		}
@@ -558,8 +580,11 @@ func urlMatches(text []rune, deadline time.Time) ([]*regexp2.Match, error) {
 
 // urlEnds is, at each index, where the domain of extractUrl's match from
 // there ends, or -1.
-func urlEnds(text []rune) []int {
-	domains := domainEnds(text)
+func urlEnds(text []rune, deadline time.Time) ([]int, error) {
+	domains, err := domainEnds(text, deadline)
+	if err != nil {
+		return nil, err
+	}
 	domainAt := func(i int) int {
 		if p := protocolLength(text, i); p > 0 && domains[i+p] >= 0 {
 			return domains[i+p]
@@ -577,14 +602,15 @@ func urlEnds(text []rune) []int {
 			ends[s] = domainAt(0)
 		}
 	}
-	return ends
+	return ends, nil
 }
 
 // domainEnds is, at each index, where validDomain's match from there ends,
 // or -1: labels of domain characters, - and _ that each end in a dot, then a
 // TLD. What follows a label's dot does not depend on where the label starts,
-// so one right-to-left pass settles each dot once.
-func domainEnds(text []rune) []int {
+// so one right-to-left pass settles each dot once. A TLD check is the slow
+// step, so one word of dots can take seconds: each checks the deadline.
+func domainEnds(text []rune, deadline time.Time) ([]int, error) {
 	ends := slices.Repeat([]int{-1}, len(text)+1)
 	for dot := len(text) - 1; dot > 0; dot-- {
 		if text[dot] != '.' || !domainChar(text[dot-1]) {
@@ -594,7 +620,10 @@ func domainEnds(text []rune) []int {
 		// follows, else as the domain name, which has no _, before a TLD.
 		subdomain, name := ends[dot+1], -1
 		if subdomain < 0 {
-			name = tldEnd(text, dot+1)
+			if time.Now().After(deadline) {
+				return nil, ErrTextTooComplex
+			}
+			name = regexEnd(validTLDAtRe, text, dot+1)
 		}
 		underscore := false
 		for x := dot - 1; x >= 0 && (text[x] == '-' || text[x] == '_' || domainChar(text[x])); x-- {
@@ -608,7 +637,7 @@ func domainEnds(text []rune) []int {
 			}
 		}
 	}
-	return ends
+	return ends, nil
 }
 
 // asciiDomainEnds is domainEnds for validAsciiDomain, whose labels are any
@@ -622,7 +651,7 @@ func asciiDomainEnds(text []rune) []int {
 		}
 		end := ends[dot+1]
 		if end < 0 {
-			end = tldEnd(text, dot+1)
+			end = regexEnd(validTLDAtRe, text, dot+1)
 		}
 		for x := dot - 1; x >= 0 && asciiLabelChar(text[x]); x-- {
 			ends[x] = end
@@ -631,12 +660,66 @@ func asciiDomainEnds(text []rune) []int {
 	return ends
 }
 
-// tldEnd is where validDomain's TLD from i ends, or -1.
-func tldEnd(text []rune, i int) int {
-	if m, _ := validTLDAtRe.FindRunesMatchStartingAt(text, i); m != nil {
+// urlPathAfterDomain is the path, after its slash, of the match whose domain
+// ends at domainEnd, past any port: empty when there is none.
+func urlPathAfterDomain(text []rune, domainEnd int) (start, end int) {
+	i := domainEnd
+	if i+1 < len(text) && text[i] == ':' && '0' <= text[i+1] && text[i+1] <= '9' {
+		for i += 2; i < len(text) && '0' <= text[i] && text[i] <= '9'; i++ {
+		}
+	}
+	if i < len(text) && text[i] == '/' {
+		return i + 1, urlPathEnd(text, i+1)
+	}
+	return i, i
+}
+
+// urlPathEnd is where validUrlPath's segments from i end. Each segment is
+// the first of these that matches: path characters and parenthesised groups
+// up to an ending character; one parenthesised group; or @, path characters
+// and a slash, which never matches where the first fails, since its slash
+// ends the first. The first reaches every ending character the segments
+// after it could, so it matches at most once, at i, and only groups follow.
+func urlPathEnd(text []rune, i int) int {
+	if end := urlPathSegmentEnd(text, i); end >= 0 {
+		i = end
+	}
+	for end := regexEnd(urlPathParensRe, text, i); end >= 0; end = regexEnd(urlPathParensRe, text, i) {
+		i = end
+	}
+	return i
+}
+
+// urlPathSegmentEnd is where path characters and parenthesised groups up to
+// an ending character, from i, end: after the last ending character among
+// the path characters they cover, which regexp2 backtracks to, or -1.
+func urlPathSegmentEnd(text []rune, i int) int {
+	end := -1
+	for i >= 0 {
+		if e := regexEnd(urlPathEndingRe, text, i); e >= 0 {
+			end = e
+		}
+		i = regexEnd(urlPathParensRe, text, regexEnd(urlPathRunRe, text, i))
+	}
+	return end
+}
+
+// regexEnd is where re's match at i ends, or -1.
+func regexEnd(re *regexp2.Regexp, text []rune, i int) int {
+	if m, _ := re.FindRunesMatchStartingAt(text, i); m != nil {
 		return m.Index + m.Length
 	}
 	return -1
+}
+
+// sourceSpan is extractURLSource from the first from through the next through.
+func sourceSpan(from, through string) string {
+	i := strings.Index(extractURLSource, from)
+	j := strings.Index(extractURLSource[max(i, 0):], through)
+	if i < 0 || j < 0 {
+		panic("twitter-text: no " + from + " … " + through + " in extractURLSource")
+	}
+	return extractURLSource[i : i+j+len(through)]
 }
 
 // notDomainChars is what validDomainChars excludes: ASCII punctuation but
@@ -674,12 +757,7 @@ next:
 // validTLDSource is validDomain's TLD alternatives, cut from extractURLSource
 // after the last label's dot.
 func validTLDSource() string {
-	const lastLabelEnd, tldEnd = `\.)(?:(?:(?:`, `|(?:xn--[\-0-9a-z]+))`
-	start, end := strings.Index(extractURLSource, lastLabelEnd), strings.Index(extractURLSource, tldEnd)
-	if start < 0 || end < start {
-		panic("twitter-text: no TLD alternatives in extractURLSource")
-	}
-	return extractURLSource[start+len(`\.)`) : end+len(tldEnd)]
+	return sourceSpan(`\.)(?:(?:(?:`, `|(?:xn--[\-0-9a-z]+))`)[len(`\.)`):]
 }
 
 func indexRunes(s, sub []rune, from int) int {
@@ -697,6 +775,10 @@ func indexRunes(s, sub []rune, from int) int {
 // domain carries the stand-ins the regexes need; written is the same span
 // of the original text, which punycode encodes.
 func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) bool {
+	// First the length, which keeps the domain short for the scans below.
+	if protocolLen+len(url) > tweetMaxURLLength {
+		return false
+	}
 	if len(domain) >= 4 && string(domain[:4]) == "xn--" {
 		// Punycode encoded url cannot contain non ASCII characters
 		if !slices.ContainsFunc(asciiDomainEnds(domain), func(end int) bool { return end >= 0 }) {
@@ -713,7 +795,7 @@ func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) bool {
 			return false
 		}
 	}
-	return protocolLen+len(url) <= tweetMaxURLLength
+	return true
 }
 
 func splitRunes(s []rune, sep func(rune) bool) [][]rune {
