@@ -104,7 +104,7 @@ type automator interface {
 func automationPlan(job PreparedPublication, publishedAt time.Time) []AutomationStep {
 	var steps []AutomationStep
 	if job.Options != nil && strings.TrimSpace(job.Options.FirstComment) != "" &&
-		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram")) {
+		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram") || job.Platform == "facebook") {
 		steps = append(steps, AutomationStep{At: publishedAt, Key: "first-comment", Kind: AutomationFirstComment})
 	}
 	if job.Platform == "youtube" && job.Options != nil && job.Options.YouTube != nil && job.Options.YouTube.ThumbnailAssetID != "" {

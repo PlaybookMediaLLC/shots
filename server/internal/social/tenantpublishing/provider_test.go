@@ -172,6 +172,27 @@ func TestThreadsKeepsTheProvidersLinkToTheLivePost(t *testing.T) {
 	}
 }
 
+func TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard(t *testing.T) {
+	for _, platform := range []string{"facebook", "pinterest"} {
+		p, _, poster, input := directFixture()
+		poster.releaseURL = "https://www.pinterest.com/pin/77/"
+		p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: platform, InternalID: "remote-user", Token: "private-token"}}
+		input.Platform = platform
+		if platform == "pinterest" {
+			_, err := p.PublishThread(context.Background(), input)
+			var coded *socialapi.Error
+			if !errors.As(err, &coded) || coded.Code != publishing.FailurePostOptions || poster.calls != 0 {
+				t.Fatalf("a pin without a board: err=%v calls=%d", err, poster.calls)
+			}
+			input.Options = &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001"}}
+		}
+		receipt, err := p.PublishThread(context.Background(), input)
+		if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
+			t.Fatalf("%s receipt=%+v err=%v", platform, receipt, err)
+		}
+	}
+}
+
 func TestDirectPublisherSendsEveryAssetInOnePost(t *testing.T) {
 	p, signer, poster, input := directFixture()
 	input.Assets = []publishing.MediaAsset{{MediaType: "image/png", ObjectKey: "org/product-org/1.png"},
@@ -413,19 +434,19 @@ func (p *analyticsPoster) PostAnalytics(context.Context, string, string, string,
 
 func TestAnalyticsCapabilitiesDoNotInheritPublishingRolloutRestrictions(t *testing.T) {
 	p, _, base, input := directFixture()
-	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "facebook"
+	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "tumblr"
 	p.resolve = func(string) poster { return &analyticsPoster{base} }
-	if !p.AnalyticsCapabilities("facebook").Posts {
+	if !p.AnalyticsCapabilities("tumblr").Posts {
 		t.Fatal("installed analytics capability hidden")
 	}
-	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", input.SecretReference, "remote-post")
+	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", input.SecretReference, "remote-post")
 	if err != nil || len(metrics) != 1 || metrics["impressions"] != 0 {
 		t.Fatalf("metrics=%v error=%v", metrics, err)
 	}
-	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", "another-tenant-secret", "remote-post"); err == nil {
+	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", "another-tenant-secret", "remote-post"); err == nil {
 		t.Fatal("analytics bypassed credential binding")
 	}
-	input.Platform = "facebook"
+	input.Platform = "tumblr"
 	if _, err := p.Publish(context.Background(), input); err == nil {
 		t.Fatal("analytics widened publication rollout")
 	}

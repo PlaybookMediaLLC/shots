@@ -36,10 +36,11 @@ type PostPart struct {
 
 // PostOptions are the settings a new post can carry on a platform.
 type PostOptions struct {
-	FirstComment string                      `json:"firstComment"`
-	TikTok       *postoptions.TikTokOptions  `json:"tiktok"`
-	Visibility   string                      `json:"visibility"`
-	YouTube      *postoptions.YouTubeOptions `json:"youtube"`
+	FirstComment string                        `json:"firstComment"`
+	Pinterest    *postoptions.PinterestOptions `json:"pinterest"`
+	TikTok       *postoptions.TikTokOptions    `json:"tiktok"`
+	Visibility   string                        `json:"visibility"`
+	YouTube      *postoptions.YouTubeOptions   `json:"youtube"`
 }
 
 // PostPlatform is what one platform posts instead of the shared text, and its
@@ -329,7 +330,7 @@ func (o *PostOptions) publish() *postoptions.PublishOptions {
 	if o == nil {
 		return nil
 	}
-	return &postoptions.PublishOptions{FirstComment: o.FirstComment, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &postoptions.PublishOptions{FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }
 
 // version is the options as a draft's platform version stores them.
@@ -337,5 +338,5 @@ func (o *PostOptions) version() *draftdoc.VersionOptions {
 	if o == nil {
 		return nil
 	}
-	return &draftdoc.VersionOptions{FirstComment: o.FirstComment, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &draftdoc.VersionOptions{FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }

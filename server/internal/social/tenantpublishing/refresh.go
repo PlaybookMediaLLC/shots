@@ -34,7 +34,7 @@ func newRefresh(client *socialent.Client, manager *integrations.Manager) *social
 func (p *Publisher) RefreshSocialTokens(ctx context.Context) (int, error) {
 	due, err := p.channels.Integration.Query().Where(
 		integration.Or(
-			integration.And(integration.ProviderIdentifierIn("threads", "instagram-standalone", "linkedin", "linkedin-page"), integration.TokenExpirationLTE(p.currentTime().Add(TokenRefreshWindow))),
+			integration.And(integration.ProviderIdentifierIn("threads", "instagram-standalone", "linkedin", "linkedin-page", "pinterest"), integration.TokenExpirationLTE(p.currentTime().Add(TokenRefreshWindow))),
 			integration.And(integration.ProviderIdentifierIn("youtube", "tiktok"), integration.TokenExpirationLTE(p.currentTime().Add(15*time.Minute))),
 		),
 		integration.Or(integration.ProviderIdentifierIn("threads", "instagram-standalone"), integration.RefreshTokenNotNil()),

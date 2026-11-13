@@ -102,9 +102,12 @@ createServer(async (request, response) => {
       caption: body.post?.message,
       id: remoteId,
       media,
+      platform: body.platform,
       // Upload metadata only: settings can hold signed URLs, which stay out.
       settings: {
+        board: body.post?.settings?.board,
         containsSyntheticMedia: body.post?.settings?.containsSyntheticMedia,
+        link: body.post?.settings?.link,
         tags: body.post?.settings?.tags?.map((tag) => tag.value),
         title: body.post?.settings?.title,
       },

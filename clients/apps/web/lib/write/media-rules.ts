@@ -70,6 +70,8 @@ export const LABELS: Record<DraftChannel, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   x: 'X',
+  facebook: 'Facebook',
+  pinterest: 'Pinterest',
 }
 
 /** Formats as people know them: JPEG, PNG, MP4, MOV. */
@@ -125,7 +127,9 @@ export function mediaProblems(
       ? [
           rules.images.length === 0
             ? `${label} needs one video. Add one to the post.`
-            : `${label} needs at least one image or video. Add one to the post.`,
+            : rules.video
+              ? `${label} needs at least one image or video. Add one to the post.`
+              : `${label} needs an image. Add one to the post.`,
         ]
       : []
   if (media.length > rules.maxMedia)

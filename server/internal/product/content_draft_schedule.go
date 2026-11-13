@@ -36,6 +36,7 @@ var draftPlatformChannels = map[string]string{
 	"x": "x", "linkedin": "linkedin", "instagram": "instagram", "instagram-standalone": "instagram",
 	"threads": "threads", "bluesky": "bluesky", "mastodon": "mastodon",
 	"tiktok": "tiktok", "youtube": "youtube", "twitter": "x", "linkedin-page": "linkedin", "mastodon-custom": "mastodon", "mastodoncustom": "mastodon",
+	"facebook": "facebook", "pinterest": "pinterest",
 }
 
 // EnableE2EDraftPlatform lets the local provider fixture's "e2e" connections
@@ -49,6 +50,7 @@ func EnableE2EDraftPlatform() {
 // same numbers (DRAFT_CHANNEL_LIMITS in lib/content-drafts/serialize.ts).
 var draftChannelLimits = map[string]int{
 	"tiktok": 2000, "youtube": 5000, "bluesky": 300, "instagram": 2200, "linkedin": 3000, "mastodon": 500, "threads": 500, "x": 280,
+	"facebook": 63206, "pinterest": 500,
 }
 
 // ContentDraftScheduleTarget is one channel and the caption serialized for it.

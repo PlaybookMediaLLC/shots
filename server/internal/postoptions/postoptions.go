@@ -136,6 +136,8 @@ type PublishOptions struct {
 	TikTok  *TikTokOptions  `json:"tiktok,omitempty"`
 	// Instagram: collaborators, tags, and a reel's cover, grid and trial.
 	Instagram *InstagramOptions `json:"instagram,omitempty"`
+	// Pinterest: the pin's board, title and link.
+	Pinterest *PinterestOptions `json:"pinterest,omitempty"`
 	// X: up to ten numeric user IDs tagged in attached photos.
 	PhotoTagIDs   []string     `json:"photoTagIds,omitempty"`
 	LinkPreview   *LinkPreview `json:"linkPreview,omitempty"`

@@ -48,6 +48,10 @@ func (m *Manager) ConnectionStatus(id string, showHidden bool) (string, bool) {
 		keys = []string{"FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"}
 	case "instagram-standalone":
 		keys = []string{"INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET"}
+	case "facebook":
+		keys = []string{"FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"}
+	case "pinterest":
+		keys = []string{"PINTEREST_CLIENT_ID", "PINTEREST_CLIENT_SECRET"}
 	case "mastodon":
 		keys = []string{"MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"}
 		// The product's legacy callback only accepts mastodon.social. Other

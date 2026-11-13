@@ -12748,7 +12748,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 10,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -12774,7 +12774,9 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -12926,6 +12928,23 @@
                                             "enum": [
                                               "story"
                                             ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
                                           }
                                         },
                                         "additionalProperties": false
@@ -14032,7 +14051,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 10,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -14058,7 +14077,9 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -14210,6 +14231,23 @@
                                             "enum": [
                                               "story"
                                             ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
                                           }
                                         },
                                         "additionalProperties": false
@@ -22674,7 +22712,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -22700,7 +22738,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -22852,6 +22892,23 @@
                                     "enum": [
                                       "story"
                                     ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
                                   }
                                 },
                                 "additionalProperties": false
@@ -24370,7 +24427,9 @@
               "youtube",
               "threads",
               "mastodon",
-              "mastodon-custom"
+              "mastodon-custom",
+              "facebook",
+              "pinterest"
             ]
           },
           "instanceServer": {
@@ -24406,8 +24465,8 @@
             "const": 1
           },
           "providers": {
-            "minItems": 12,
-            "maxItems": 12,
+            "minItems": 14,
+            "maxItems": 14,
             "type": "array",
             "items": {
               "type": "object",
@@ -24426,7 +24485,9 @@
                     "bluesky",
                     "instagram",
                     "instagram-standalone",
-                    "substack"
+                    "substack",
+                    "facebook",
+                    "pinterest"
                   ]
                 },
                 "status": {
@@ -27738,7 +27799,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -27764,7 +27825,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -27916,6 +27979,23 @@
                                     "enum": [
                                       "story"
                                     ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
                                   }
                                 },
                                 "additionalProperties": false
@@ -28710,7 +28790,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -28736,7 +28816,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -28888,6 +28970,23 @@
                                     "enum": [
                                       "story"
                                     ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
                                   }
                                 },
                                 "additionalProperties": false
@@ -29334,7 +29433,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -29360,7 +29459,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29512,6 +29613,23 @@
                               "enum": [
                                 "story"
                               ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
                             }
                           },
                           "additionalProperties": false
@@ -29878,7 +29996,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -29930,7 +30050,9 @@
               "bluesky",
               "mastodon",
               "tiktok",
-              "youtube"
+              "youtube",
+              "facebook",
+              "pinterest"
             ]
           },
           "releaseId": {
@@ -30332,7 +30454,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -30358,7 +30480,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -30510,6 +30634,23 @@
                               "enum": [
                                 "story"
                               ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
                             }
                           },
                           "additionalProperties": false
@@ -30947,7 +31088,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -30973,7 +31114,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -31125,6 +31268,23 @@
                               "enum": [
                                 "story"
                               ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
                             }
                           },
                           "additionalProperties": false
@@ -31491,7 +31651,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -31551,7 +31713,9 @@
                   "bluesky",
                   "mastodon",
                   "tiktok",
-                  "youtube"
+                  "youtube",
+                  "facebook",
+                  "pinterest"
                 ]
               },
               {
@@ -31919,7 +32083,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -31931,6 +32097,23 @@
                     "firstComment": {
                       "type": "string",
                       "maxLength": 1250
+                    },
+                    "pinterest": {
+                      "type": "object",
+                      "properties": {
+                        "boardId": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,30}$"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string",
+                          "maxLength": 2048
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "tiktok": {
                       "type": "object",
@@ -32487,7 +32670,7 @@
                     "const": 1
                   },
                   "versions": {
-                    "maxItems": 8,
+                    "maxItems": 10,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -32513,7 +32696,9 @@
                             "bluesky",
                             "mastodon",
                             "tiktok",
-                            "youtube"
+                            "youtube",
+                            "facebook",
+                            "pinterest"
                           ]
                         },
                         "forkedFromVersion": {
@@ -32665,6 +32850,23 @@
                                   "enum": [
                                     "story"
                                   ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "pinterest": {
+                              "type": "object",
+                              "properties": {
+                                "boardId": {
+                                  "type": "string",
+                                  "pattern": "^[0-9]{1,30}$"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "link": {
+                                  "type": "string",
+                                  "maxLength": 2048
                                 }
                               },
                               "additionalProperties": false
@@ -33901,7 +34103,9 @@
                       "bluesky",
                       "instagram",
                       "tiktok",
-                      "youtube"
+                      "youtube",
+                      "facebook",
+                      "pinterest"
                     ]
                   },
                   "postId": {

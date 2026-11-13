@@ -39,6 +39,26 @@ export const instagramOptionsSchema = z.strictObject({
 /** Instagram metadata stored with a scheduled snapshot. */
 export type InstagramOptions = z.infer<typeof instagramOptionsSchema>
 
+/**
+ * A pin's board, title and link. The board is one of the account's, by its
+ * numeric id; Go requires it when the pin is scheduled, so a draft always saves.
+ */
+export const pinterestOptionsSchema = z.strictObject({
+  boardId: z
+    .string()
+    .regex(/^[0-9]{1,30}$/)
+    .optional(),
+  /** Up to 100 characters, counted as Go counts them (code points). */
+  title: z
+    .string()
+    .refine((value) => [...value].length <= 100)
+    .optional(),
+  link: z.string().max(2048).optional(),
+})
+
+/** Pinterest metadata stored with a scheduled snapshot. */
+export type PinterestOptions = z.infer<typeof pinterestOptionsSchema>
+
 /** TikTok settings selected by the creator for direct publishing. */
 export const tiktokOptionsSchema = z.strictObject({
   privacy: z.enum([

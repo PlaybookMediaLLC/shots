@@ -50,6 +50,8 @@ export const writeApi = {
     call<{ items: { id: string; name: string }[] }>(
       `/api/v1/social-sets/${encodeURIComponent(setId)}/communities?${new URLSearchParams({ q: query })}`
     ),
+  /** The boards of the set's Pinterest account, read with its own authorization. */
+  pinterestBoards: (setId: string) => call<unknown>(`${set(setId)}/pinterest-boards`),
   /** A set's engagement defaults (RFC 024), based on the set's version. */
   updateSetEngagement: (
     id: string,

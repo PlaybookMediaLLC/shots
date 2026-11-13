@@ -61,6 +61,18 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			if err := instagramSettings(platform, settings, options.Instagram); err != nil {
 				return nil, err
 			}
+		case "pinterest":
+			o := options.Pinterest
+			if err := postoptions.ValidatePinterestOptions(platform, o, true); err != nil {
+				return nil, err
+			}
+			settings["board"] = o.BoardID
+			if o.Title != "" {
+				settings["title"] = o.Title
+			}
+			if o.Link != "" {
+				settings["link"] = o.Link
+			}
 		case "tiktok":
 			o := options.TikTok
 			settings["content_posting_method"] = "DIRECT_POST"

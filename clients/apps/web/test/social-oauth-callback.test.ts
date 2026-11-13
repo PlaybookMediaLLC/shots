@@ -82,6 +82,26 @@ test('LinkedIn uses the same session-bound callback exchange', async () => {
   assert.equal(result.status, 303)
 })
 
+test('a Facebook Page is chosen after Facebook Login, as a LinkedIn page is', async () => {
+  process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
+  const url = 'http://localhost/integrations/social/facebook?code=code1&state=state1'
+  const choices: string[] = []
+  const picker = await completeSocialOAuth(new Request(url), 'facebook', {
+    exchange: async () => ({ id: 'go-fb', pages: [{ id: 'p1', pageId: 'p1', name: 'Acme Page' }] }),
+    onPageChoice: async (_state, id) => {
+      choices.push(id)
+    },
+  })
+  assert.equal(picker.status, 200)
+  assert.match(await picker.text(), /Acme Page/)
+  assert.deepEqual(choices, ['go-fb'])
+  // A Page chosen in an earlier attempt completes without asking again.
+  const completed = await completeSocialOAuth(new Request(url), 'facebook', {
+    exchange: async () => ({ completed: true, id: 'go-fb' }),
+  })
+  assert.equal(completed.status, 303)
+})
+
 test('Facebook Login requires a linked Instagram account selection', async () => {
   process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
   const url = 'http://localhost/integrations/social/instagram?code=code1&state=state1'

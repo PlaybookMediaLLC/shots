@@ -75,6 +75,15 @@ func TestDraftMediaFollowsEachDestination(t *testing.T) {
 		{"mastodon five photos", "mastodon", many(photo, 5), "up to 4"},
 		{"mastodon large image", "mastodon", []*ent.Asset{mediaRow("image/png", 17_000_000, 100, 100, 0)}, "up to 16 MB"},
 		{"mastodon audio", "mastodon", []*ent.Asset{mediaRow("audio/mpeg", 1000, 0, 0, 0)}, "can't publish audio/mpeg"},
+		{"facebook text only", "facebook", nil, ""},
+		{"facebook ten photos", "facebook", many(photo, 10), ""},
+		{"facebook eleven photos", "facebook", many(photo, 11), "up to 10 attachments"},
+		{"facebook photo and video", "facebook", []*ent.Asset{photo, mp4}, "on its own"},
+		{"facebook quicktime", "facebook", []*ent.Asset{mov}, "takes MP4 video"},
+		{"pinterest empty", "pinterest", nil, "Pinterest needs an image"},
+		{"pinterest one photo", "pinterest", []*ent.Asset{photo}, ""},
+		{"pinterest two photos", "pinterest", many(photo, 2), "up to 1 attachment"},
+		{"pinterest video", "pinterest", []*ent.Asset{mp4}, "video"},
 	} {
 		err := checkDraftMedia(tc.channel, tc.rows)
 		if tc.refusal == "" && err != nil || tc.refusal != "" && (err == nil || !strings.Contains(err.Error(), tc.refusal)) {
@@ -140,6 +149,25 @@ func TestOptionMediaFollowsEachDestination(t *testing.T) {
 		if err := checkCover(tc.channel, tc.cover); (err == nil) != tc.valid {
 			t.Fatalf("%s %s %d bytes: valid=%v error=%v", tc.channel, tc.cover.MediaType, tc.cover.Bytes, tc.valid, err)
 		}
+	}
+}
+
+func TestAPinNeedsItsBoardOnlyWhenScheduled(t *testing.T) {
+	// A draft saves while its pin has no board, or a link still being typed.
+	if _, err := versionOptions("pinterest", &draftdoc.VersionOptions{Pinterest: &postoptions.PinterestOptions{Title: "Launch", Link: "shots.example"}}); err != nil {
+		t.Fatalf("a pin being written did not save: %v", err)
+	}
+	if _, err := versionOptions("x", &draftdoc.VersionOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1"}}); err == nil {
+		t.Fatal("a draft's X version stored Pinterest settings")
+	}
+	for _, options := range []*postoptions.PublishOptions{nil, {Pinterest: &postoptions.PinterestOptions{Title: "Launch"}},
+		{Pinterest: &postoptions.PinterestOptions{BoardID: "1", Link: "shots.example"}}} {
+		if checkPostOptions("pinterest", options, true) == nil {
+			t.Fatalf("an incomplete pin was scheduled: %+v", options)
+		}
+	}
+	if err := checkPostOptions("pinterest", &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1", Link: "https://shots.example"}}, true); err != nil {
+		t.Fatal(err)
 	}
 }
 

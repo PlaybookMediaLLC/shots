@@ -2072,7 +2072,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -2108,6 +2108,11 @@ export interface components {
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                 /** @enum {string} */
                                 placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -2424,7 +2429,7 @@ export interface components {
             returnPath?: string;
             socialSetId?: string;
             /** @enum {string} */
-            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom";
+            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "facebook" | "pinterest";
             instanceServer?: string;
         };
         SocialConnectionAttemptResponse: {
@@ -2436,7 +2441,7 @@ export interface components {
             version: 1;
             providers: {
                 /** @enum {string} */
-                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
+                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack" | "facebook" | "pinterest";
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
@@ -3199,7 +3204,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3235,6 +3240,11 @@ export interface components {
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                 /** @enum {string} */
                                 placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3423,7 +3433,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3459,6 +3469,11 @@ export interface components {
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                 /** @enum {string} */
                                 placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3553,7 +3568,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3589,6 +3604,11 @@ export interface components {
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             /** @enum {string} */
                             placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3682,7 +3702,7 @@ export interface components {
             /** @enum {string} */
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
-            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
             /** Format: uuid */
             releaseId?: string;
             scratchpad?: string;
@@ -3796,7 +3816,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3832,6 +3852,11 @@ export interface components {
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             /** @enum {string} */
                             placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3925,7 +3950,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3961,6 +3986,11 @@ export interface components {
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                             /** @enum {string} */
                             placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -4055,7 +4085,7 @@ export interface components {
             /** @enum {string} */
             status?: "draft" | "archived";
             naturalPostingTime?: boolean;
-            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube") | "";
+            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest") | "";
             plannedFor?: string | "";
         };
         ContentDraftPostList: {
@@ -4131,6 +4161,11 @@ export interface components {
                 [key: string]: {
                     options?: {
                         firstComment?: string;
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
                         tiktok?: {
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
@@ -4281,7 +4316,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -4317,6 +4352,11 @@ export interface components {
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                 /** @enum {string} */
                                 placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -4569,7 +4609,7 @@ export interface components {
             threadId?: string;
             anchor: {
                 /** @enum {string} */
-                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube";
+                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest";
                 postId: string;
                 quote?: string;
             };
@@ -10462,7 +10502,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10498,6 +10538,11 @@ export interface operations {
                                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                             /** @enum {string} */
                                             placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10757,7 +10802,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10793,6 +10838,11 @@ export interface operations {
                                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
                                             /** @enum {string} */
                                             placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
