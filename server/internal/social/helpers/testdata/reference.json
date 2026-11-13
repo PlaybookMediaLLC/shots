@@ -1777,6 +1777,22 @@
   {
    "text": "https://пример.ᲃайт/x",
    "want": 23
+  },
+  {
+   "text": "https://el.wikipedia.org/wiki/ιστορία",
+   "want": 29
+  },
+  {
+   "text": "https://παράδειγμα.ϵλ/a/long/path",
+   "want": 23
+  },
+  {
+   "text": "https://Ιaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x",
+   "want": 70
+  },
+  {
+   "text": "see Àa.comxжⱥa.com now",
+   "want": 39
   }
  ],
  "slicer": [

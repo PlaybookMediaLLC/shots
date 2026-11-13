@@ -487,7 +487,7 @@
       }
     },
     {
-      "label": "the Kelvin sign before a protocol is not the letter k",
+      "label": "the Kelvin sign before a protocol is not the letter k on Mastodon (X reads it as K)",
       "text": "a \u212ahttps://example.com/path b",
       "lengths": {
         "bluesky": 29,
