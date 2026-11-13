@@ -676,19 +676,16 @@ func replayDraftSchedule(ctx context.Context, tx *ent.Tx, draft *ent.ContentDraf
 		return nil, conflict("This draft was already scheduled to other channels at this version. Reload it and try again.")
 	}
 	intent := scheduleIntent(input)
-	byKey := make(map[string]*ent.ScheduledPost, len(existing))
 	for _, post := range existing {
 		if post.ScheduleIntent != nil && *post.ScheduleIntent != intent {
 			return nil, conflict("This version was already scheduled for another time. Reload to see the current schedule, then change it.")
 		}
-		byKey[post.IdempotencyKey] = post
 	}
-	// A replay answers in the order of its targets, as the first call did.
-	ordered := make([]*ent.ScheduledPost, 0, len(keys))
-	for _, key := range keys {
-		ordered = append(ordered, byKey[key])
-	}
-	return ordered, nil
+	// A replay answers in the targets' order, as the first answer did; the query has none.
+	slices.SortFunc(existing, func(a, b *ent.ScheduledPost) int {
+		return slices.Index(keys, a.IdempotencyKey) - slices.Index(keys, b.IdempotencyKey)
+	})
+	return existing, nil
 }
 
 // cancelLiveDraftPosts withdraws queued commitments for a reschedule or review.
