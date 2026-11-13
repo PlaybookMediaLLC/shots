@@ -364,7 +364,8 @@ const FAKE_GOOGLE_SIGN_IN = `window.google = window.google || {};
 window.google.accounts = { oauth2: { initTokenClient: (config) => ({
   requestAccessToken: () => config.callback({ access_token: 'fixture-drive-token' }),
 }) } };`
-const FAKE_GOOGLE_PICKER = `window.gapi = { load: (name, ready) => {
+// gapi.load takes the callback in an options object, with its error handlers.
+const FAKE_GOOGLE_PICKER = `window.gapi = { load: (name, options) => {
   const google = (window.google = window.google || {});
   class Builder {
     addView() { return this } enableFeature() { return this } setMaxItems() { return this }
@@ -377,7 +378,7 @@ const FAKE_GOOGLE_PICKER = `window.gapi = { load: (name, ready) => {
   google.picker = { Action: { PICKED: 'picked', CANCEL: 'cancel' }, DocsView: View,
     Feature: { MULTISELECT_ENABLED: 'multiselect' }, PickerBuilder: Builder,
     Response: { ACTION: 'action', DOCUMENTS: 'docs' } };
-  ready();
+  options.callback();
 } };`
 
 test(
