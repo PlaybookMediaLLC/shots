@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
@@ -51,6 +52,7 @@ const fakeStateSchema = z.object({
           board: z.string().optional(),
           containsSyntheticMedia: z.boolean().optional(),
           link: z.string().optional(),
+          postType: z.string().optional(),
           tags: z.array(z.string()).optional(),
           title: z.string().optional(),
         })
@@ -89,6 +91,7 @@ async function readBootstrap() {
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
       facebookDestinationId: z.string().min(1),
+      gmbDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
       pinterestDestinationId: z.string().min(1),
       tiktokDestinationId: z.string().min(1),
@@ -727,6 +730,91 @@ test('a pin goes to the board chosen in the composer, and a Facebook Page post t
         timeout: 120_000,
       })
       .toEqual([expect.objectContaining({ postId: pagePost?.id, text: 'Link in the comments' })])
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a Facebook story chosen in the composer and a Google Business post publish once through Go', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const gmb = await connect(page, bootstrap.gmbDestinationId, 'gmb')
+    // Google Business takes images at least 250 pixels wide; the shared fixture is 1×1.
+    const photo = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: '#2e6f40' },
+    })
+      .png()
+      .toBuffer()
+    const image = await createUploadedAsset(page, photo, 'image/png', 'story.png')
+    const caption = 'Open late on Fridays.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, gmb],
+        primaryPlatform: 'gmb',
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The story is chosen in the Facebook version's settings, and the composer says what it leaves out.
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-facebook').click()
+    await page.getByTestId('options-chip').click()
+    await page.getByTestId('facebook-options').getByLabel('Post as a story').check()
+    await expect(page.getByTestId('story-notice')).toContainText('This Facebook post is a story')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, gmb],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const received = (await fakeState()).posts
+    const story = received.find((post) => post.platform === 'facebook')
+    const local = received.find((post) => post.platform === 'gmb')
+    // The story carries the image alone; the text went to the location's post.
+    expect(story).toMatchObject({ caption: '', settings: { postType: 'story' } })
+    expect(story?.media).toHaveLength(1)
+    expect(local?.caption).toBe(caption)
+    // Nothing story-like reached Google Business.
+    expect(local?.settings).toEqual({})
+    expect(local?.media).toHaveLength(1)
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

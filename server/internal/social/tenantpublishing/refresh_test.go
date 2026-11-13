@@ -30,7 +30,7 @@ func (f *fakeThreads) RefreshToken(_ context.Context, refreshToken string) (*int
 }
 
 func TestRefreshSocialTokensRenewsDueChannelsAndFlagsRevokedOnes(t *testing.T) {
-	for _, provider := range []string{"threads", "linkedin-page", "youtube", "tiktok", "pinterest"} {
+	for _, provider := range []string{"threads", "linkedin-page", "youtube", "tiktok", "pinterest", "gmb"} {
 		t.Run(provider, func(t *testing.T) {
 			databaseURL := os.Getenv("PUBLISHING_TEST_DATABASE_URL")
 			if databaseURL == "" {

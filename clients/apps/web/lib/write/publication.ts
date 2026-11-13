@@ -2,6 +2,7 @@ import { articleContent } from '@/lib/write/article'
 import type { Engagement, InstagramOptions, PinterestOptions } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import {
+  facebookOptionsSchema,
   instagramOptionsSchema,
   pinterestOptionsSchema,
   youtubeOptionsSchema,
@@ -34,6 +35,7 @@ import {
   type PlateBody,
   type PlatformVersions,
   type PostSettings,
+  type VersionOptions,
   postSettingsSchema,
   replySettingsSchema,
   linkPreviewSchema,
@@ -53,6 +55,7 @@ export const publishOptionsSchema = z.object({
   tiktok: tiktokOptionsSchema.optional(),
   instagram: instagramOptionsSchema.optional(),
   pinterest: pinterestOptionsSchema.optional(),
+  facebook: facebookOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -182,6 +185,17 @@ function webAddress(value: string): boolean {
   }
 }
 
+/**
+ * Whether a version posts as a story: one image or video with no text, on
+ * Instagram or a Facebook Page (Go: PublishOptions.Story).
+ */
+export function isStory(channel: DraftChannel, options: VersionOptions | undefined): boolean {
+  return (
+    (channel === 'instagram' && options?.instagram?.placement === 'story') ||
+    (channel === 'facebook' && options?.facebook?.placement === 'story')
+  )
+}
+
 /** Instagram's settings that do something, or undefined when none is on. */
 function instagramChoices(
   options: InstagramOptions | undefined
@@ -270,7 +284,7 @@ export function buildPublication(
   const options = version.options ?? {}
   const article = draft.kind === 'article'
   // A story carries no text: the draft's text goes to its other platforms.
-  const story = channel === 'instagram' && options.instagram?.placement === 'story'
+  const story = isStory(channel, options)
   const serialized = serializeDraft(body, channel, blockImages, undefined, {
     story,
     limit: article || story ? 100_000 : captionLimit(channel, account.standing),
@@ -439,6 +453,7 @@ export function buildPublication(
   if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
   if (instagram) firstOptions.instagram = instagram
   if (pinterest) firstOptions.pinterest = pinterest
+  if (channel === 'facebook' && story) firstOptions.facebook = { placement: 'story' }
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true

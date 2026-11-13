@@ -72,6 +72,7 @@ export const LABELS: Record<DraftChannel, string> = {
   x: 'X',
   facebook: 'Facebook',
   pinterest: 'Pinterest',
+  gmb: 'Google Business',
 }
 
 /** Formats as people know them: JPEG, PNG, MP4, MOV. */

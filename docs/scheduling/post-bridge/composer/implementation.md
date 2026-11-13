@@ -23,7 +23,7 @@ Recorded with the owner on 13 November 2026.
 | 3a | Manual crop in the composer; a searchable past-captions picker | `components/write/composer/{media-crop,media-tools,past-captions}.tsx`, `lib/write/grid-layout.ts` (`coverCrop`) |
 | 3b | Import from Google Drive and Senja, once their secret references exist | `components/write/composer/media-import-dialog.tsx` |
 | 4a | Facebook Pages and Pinterest as draft channels, with their limits, behind each channel's availability check: a Page post with a first comment; a pin with its board, title and link | the channel lists in `lib/write/document.ts`, `lib/content-drafts/serialize.ts`, `components/drafts/channel-meta.tsx`, `server/internal/product/content_draft_schedule.go`, `server/internal/medialimits/limits.json`; `server/internal/postoptions/pinterest.go`, `server/internal/product/social_boards.go`, `components/write/composer/pinterest-options.tsx` |
-| 4b | Google Business as a draft channel; Facebook Stories | the same channel lists; `server/internal/postoptions` |
+| 4b | Google Business as a draft channel, posting text or one image to a chosen location; Facebook Page stories | the same channel lists; `server/internal/postoptions/facebook.go`, `components/write/composer/{facebook-options,story-toggle}.tsx` |
 | 5 | Send a video to the TikTok app as a draft (PB-05), kept apart from a Shots draft | `server/internal/postoptions/video.go`, `server/internal/social/integrations/social/tiktok` |
 
 ## Data and authority boundaries
@@ -45,6 +45,14 @@ Recorded with the owner on 13 November 2026.
 - A video pin needs a separate cover image, which Shots does not send yet, so Pinterest takes images only and the composer says "Pinterest needs an image". Pinterest tokens renew with the others before they expire; a throttled or failing Pinterest is retried on the next run rather than asking for a reconnect, and a Pinterest error answer is never read as an empty board list.
 - A link being typed saves with the draft; the whole address is checked when the pin is scheduled. The public `POST /api/v1/posts` takes a pin's board, title and link as `platforms.pinterest.options.pinterest`.
 - A Facebook account with no Page it can post as is refused at connection, before anything is saved. A Page token, minted from a long-lived user token, is stored without an expiry.
+- A Facebook Page story is the Facebook version's `placement: "story"`, as an Instagram story is Instagram's. Both go through one check (`PublishOptions.Story`): one image or MP4 of 3 to 60 seconds (`destinations.facebook.story` in `limits.json`), no text and no first comment. A Page story is left out of post analytics, as an Instagram story is.
+- A Google Business post is a standard "What's new" post of text, up to 1,500 characters, with at most one image (JPEG or PNG, at least 250 pixels wide), to the location chosen after Google sign-in. Events, offers and call-to-action buttons are not offered. Google Business needs its own keys (`GOOGLE_GMB_CLIENT_ID`/`SECRET`); the adapter would borrow YouTube's, but the Business Profile API needs its own approval, so availability waits for its keys. Its tokens renew with YouTube's and TikTok's, reading only the chosen location, and a throttled or failing Google retries on the next run. Local posts have no per-post metrics, so post analytics read as unsupported for it.
+
+### Known gaps (Slice 4b)
+
+- Shots checks a Google Business image's width (250 px) but not its height or its 10 KB floor, and checks the original, not the derivative a tall image becomes. Google refuses such an image at publish, so the post fails with nothing created.
+- A Facebook video story's shape (9:16, at least 540×960) is not checked before scheduling; Facebook refuses another shape after the upload, and Shots records the post as of unknown delivery, as for any failure after the upload starts.
+- Google Business treats a post Google is still processing as published; one Google rejects later stays published in Shots.
 - Facebook's deauthorize and data deletion callbacks name a Facebook user, not the Page Shots stores, so they are not wired for Facebook Pages, as they are not for Instagram's Facebook Login.
 - A story is left out of post analytics: Instagram keeps a story's insights for a day and offers none of a feed post's counts. Its link stops working after 24 hours, so a story of unknown delivery has to be checked on the account within that day.
 
@@ -73,7 +81,8 @@ A thumbnail deleted in the moments between the video going live and its follow-u
 | Facebook Pages and Pinterest connect behind their availability checks, schedule against the e2e social mock, and refuse a caption or media over their limits in the composer and in Go with the same numbers | 4a |
 | A pin publishes to the board chosen in the composer, with its title and link; a pin without a board is refused in the composer, in Go and in the publisher | 4a |
 | A Facebook Page post's first comment is its own follow-up | 4a |
-| Google Business connects behind its availability check and schedules against the e2e social mock; a Facebook story takes one image or video and no caption | 4b |
+| Google Business connects behind its availability check, a location is chosen after sign-in, and a post of text and one image schedules against the e2e social mock | 4b |
+| A Facebook story takes one image or MP4 and no caption or first comment, in the composer and in Go; it publishes with `post_type=story` | 4b |
 | A TikTok app draft is sent with `video.upload`, never counts as published, and says the person finishes it in TikTok | 5 |
 
 ## Outcome metric
@@ -85,6 +94,7 @@ Weekly scheduled posts that use an Instagram or YouTube option, and the share of
 - Slice 1 rolls forward only. Deploy the migration, then the API and worker together, then the web. The previous code ignores the new options rather than refusing them: an older worker would publish a scheduled trial reel, or a reel kept off the grid, as an ordinary reel, and a YouTube video without its tags, disclosure or thumbnail; the previous web cannot read a post with a `thumbnail` follow-up. Before any redeploy of older code, hold the queued posts that set them (`"publishOptions" ? 'instagram'`, or `"publishOptions"->'youtube' ?| array['tags','containsSyntheticMedia','thumbnailAssetId']`). The migration's constraint and function can stay; the old constraint cannot be restored while `thumbnail` rows exist.
 - Slice 2 has no migration. It rolls forward only, for the same reasons as Slice 1: an older worker ignores `placement` and would publish a queued photo story as a feed post with no caption and a video story as a public Reel, and the older web cannot read a draft or post that holds `placement`. Before redeploying older code, hold the queued posts with `"publishOptions"->'instagram'->>'placement' = 'story'`.
 - Slice 3a is web only and additive: redeploy the previous web to roll back. Crops already saved stay ordinary images on their attachments.
+- Slice 4b has no migration and rolls forward only, as Slice 4a does: the previous web cannot read a draft with a Google Business version or a Facebook `placement`, and an older worker would publish a queued Facebook story as a feed post. Before redeploying older code, hold queued posts to `gmb`, and those with `"publishOptions"->'facebook'->>'placement' = 'story'`.
 - Slice 4a has no migration. It rolls forward only: the previous web cannot read a draft with a Facebook or Pinterest version, and the previous API and worker refuse both platforms, so a queued post to them fails rather than publishing. Before redeploying older code, hold the queued posts whose connection's platform is `facebook` or `pinterest`. Listing a channel in `HIDDEN_PROVIDERS` stops new connections only: accounts already connected keep scheduling and publishing.
 - Later slices: redeploy the previous web and API; each records its own migration order here when it has one.
 
@@ -138,7 +148,7 @@ Every check from the [verification matrix](post-bridge-verification-matrix.csv),
 | PB-01 | Exists: an idempotency key per draft, channel and version; an ambiguous publish is `UNKNOWN_DELIVERY` and never retried automatically. |
 | PB-02 | Exists: one `scheduled_post` per destination; a failed one is retried alone. |
 | PB-03 | Slice 1: first comments already ran as follow-ups; the YouTube thumbnail moves out of the upload into its own follow-up. |
-| PB-04 | Slice 2 for Instagram, Slice 4b for Facebook. |
+| PB-04 | Slice 2 for Instagram, Slice 4b for Facebook: one image or video, no caption, no first comment. |
 | PB-05 | Slice 5. |
 | PB-06 | Exists: duplicating a draft copies its references, and retention keeps media a draft or post still names. |
 | UX-01 | Skip: accounts come from the draft's social set; there is no remembered selection to leak between workspaces. |

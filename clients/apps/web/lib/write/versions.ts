@@ -310,6 +310,7 @@ const PLATFORM_NAMES: Record<DraftChannel, { label: string; pattern: RegExp }> =
   youtube: { label: 'YouTube', pattern: /\byoutube\b/i },
   facebook: { label: 'Facebook', pattern: /\bfacebook\b/i },
   pinterest: { label: 'Pinterest', pattern: /\bpinterest\b/i },
+  gmb: { label: 'Google Business', pattern: /\bgoogle (?:my )?business\b/i },
 }
 
 /**

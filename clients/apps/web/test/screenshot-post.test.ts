@@ -187,8 +187,9 @@ test('every account a draft can post from is offered, under its channel', () => 
       account('old', 'twitter'),
       account('masto', 'mastodon'),
       account('fb', 'facebook'),
-      // Google Business is not a draft channel yet, so its account is not offered.
       account('local', 'gmb'),
+      // Reddit is not a draft channel, so its account is not offered.
+      account('forum', 'reddit'),
     ]).map((item) => [item.id, item.channel]),
     [
       ['page', 'linkedin'],
@@ -196,6 +197,7 @@ test('every account a draft can post from is offered, under its channel', () => 
       ['old', 'x'],
       ['masto', 'mastodon'],
       ['fb', 'facebook'],
+      ['local', 'gmb'],
     ]
   )
   const accounts = postAccounts([account('a', 'x'), account('b', 'linkedin')])

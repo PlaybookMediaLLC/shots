@@ -61,6 +61,13 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			if err := instagramSettings(platform, settings, options.Instagram); err != nil {
 				return nil, err
 			}
+		case "facebook":
+			if err := postoptions.ValidateFacebookOptions(platform, options.Facebook); err != nil {
+				return nil, err
+			}
+			if options.Facebook.Story() {
+				settings["post_type"] = "story"
+			}
 		case "pinterest":
 			o := options.Pinterest
 			if err := postoptions.ValidatePinterestOptions(platform, o, true); err != nil {

@@ -47,6 +47,8 @@ services:
       FACEBOOK_APP_SECRET: fixture
       PINTEREST_CLIENT_ID: fixture
       PINTEREST_CLIENT_SECRET: fixture
+      GOOGLE_GMB_CLIENT_ID: fixture
+      GOOGLE_GMB_CLIENT_SECRET: fixture
       R2_ENDPOINT: http://rustfs:9000
       R2_DELIVERY_ENDPOINT: http://rustfs:9000
       R2_BROWSER_ENDPOINT: http://localhost:9013
@@ -80,6 +82,8 @@ services:
       FACEBOOK_APP_SECRET: fixture
       PINTEREST_CLIENT_ID: fixture
       PINTEREST_CLIENT_SECRET: fixture
+      GOOGLE_GMB_CLIENT_ID: fixture
+      GOOGLE_GMB_CLIENT_SECRET: fixture
       R2_ENDPOINT: http://rustfs:9000
       R2_DELIVERY_ENDPOINT: http://rustfs:9000
       R2_BROWSER_ENDPOINT: http://localhost:9013

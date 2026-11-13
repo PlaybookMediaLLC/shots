@@ -101,7 +101,7 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
-import { buildPublication } from '@/lib/write/publication'
+import { buildPublication, isStory } from '@/lib/write/publication'
 import { splitThread } from '@/lib/write/split-thread'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
@@ -1923,14 +1923,14 @@ export function WriteComposer({
               />
             </section>
           ) : null}
-          {active === 'instagram' && versionOfTab.options?.instagram?.placement === 'story' ? (
+          {isStory(active, versionOfTab.options) ? (
             <p
               className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
               data-testid="story-notice"
               role="status"
             >
-              This Instagram post is a story: one image or video, shown for 24 hours, without this
-              text. The text goes to your other platforms.
+              This {CHANNEL_META[active].label} post is a story: one image or video, shown for 24
+              hours, without this text. The text goes to your other platforms.
             </p>
           ) : null}
           {namedElsewhere ? (

@@ -67,6 +67,8 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		{"pinterest", &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001", Title: "Launch", Link: "https://shots.example"}},
 			map[string]any{"board": "1001", "title": "Launch", "link": "https://shots.example"}},
 		{"pinterest", &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001"}}, map[string]any{"board": "1001"}},
+		{"facebook", &postoptions.PublishOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}, map[string]any{"post_type": "story"}},
+		{"facebook", &postoptions.PublishOptions{FirstComment: "Link"}, map[string]any{}},
 		{"tiktok", &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "PUBLIC_TO_EVERYONE", AllowComments: true, AllowStitch: true, CommercialContent: true, BrandOrganic: true, MadeWithAI: true, Consent: true}}, map[string]any{"content_posting_method": "DIRECT_POST", "privacy_level": "PUBLIC_TO_EVERYONE", "comment": true, "duet": false, "stitch": true, "brand_organic_toggle": true, "brand_content_toggle": false, "video_made_with_ai": true, "autoAddMusic": "no"}},
 	} {
 		if got := decode(t, must(postSettings(tc.platform, nil, tc.options, ""))); !reflect.DeepEqual(got, tc.want) {

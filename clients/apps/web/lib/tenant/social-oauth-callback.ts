@@ -174,13 +174,13 @@ export async function completeSocialOAuth(
   const connected = socialOAuthExchangeSchema.safeParse(await completion.exchange(state, code))
   if (!connected.success) return connectionFailed(providerName)
   if (
-    !['instagram', 'linkedin-page', 'youtube', 'facebook'].includes(providerName) ||
+    !['instagram', 'linkedin-page', 'youtube', 'facebook', 'gmb'].includes(providerName) ||
     connected.data.completed ||
     (providerName !== 'instagram' && !connected.data.pages)
   ) {
     if (
       !connected.data.completed &&
-      ['linkedin-page', 'youtube', 'facebook'].includes(providerName)
+      ['linkedin-page', 'youtube', 'facebook', 'gmb'].includes(providerName)
     )
       await completion.onPageChoice?.(state, connected.data.id)
     await completion.onConnected?.(state, connected.data.id)

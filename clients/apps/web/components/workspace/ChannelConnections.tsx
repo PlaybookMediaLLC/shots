@@ -70,6 +70,7 @@ const ORDER = [
   'mastodon',
   'facebook',
   'pinterest',
+  'gmb',
 ]
 
 /** One row per platform the connect routes support, from the same registry the brand pages use. */
@@ -102,6 +103,7 @@ const CONNECTED: Record<string, string> = {
   youtube: 'YouTube is connected. Approved YouTube posts can be scheduled to it.',
   facebook: 'Facebook Page is connected. Approved Facebook posts can be scheduled to it.',
   pinterest: 'Pinterest is connected. Approved pins can be scheduled to it.',
+  gmb: 'Google Business is connected. Approved posts can be scheduled to its location.',
 }
 
 /** The help tip ID that remembers the banner was dismissed. */

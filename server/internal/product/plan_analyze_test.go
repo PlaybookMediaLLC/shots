@@ -509,17 +509,26 @@ func TestPlanAnalyzeDatabase(t *testing.T) {
 	t.Run("a published story is never imported for post analytics", func(t *testing.T) {
 		d := draft("story fixture")
 		live := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
-		id := cuid.New()
-		if _, e := repo.client.ScheduledPost.Create().SetID(id).SetOrganizationID(w.org).SetContentDraftID(d.ID).SetChannelConnectionID(x.ID).SetStatus(scheduledpost.StatusPUBLISHED).
-			SetScheduledFor(live).SetCaption("").SetIdempotencyKey(id).SetRemotePostID(id).SetPublishedAt(live).
-			SetPublishOptions(postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}}).Save(ctx); e != nil {
-			t.Fatal(e)
+		publish := func(options postoptions.PublishOptions) string {
+			t.Helper()
+			id := cuid.New()
+			if _, e := repo.client.ScheduledPost.Create().SetID(id).SetOrganizationID(w.org).SetContentDraftID(d.ID).SetChannelConnectionID(x.ID).SetStatus(scheduledpost.StatusPUBLISHED).
+				SetScheduledFor(live).SetCaption("").SetIdempotencyKey(id).SetRemotePostID(id).SetPublishedAt(live).
+				SetPublishOptions(options).Save(ctx); e != nil {
+				t.Fatal(e)
+			}
+			return id
 		}
+		instagram := publish(postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}})
+		facebook := publish(postoptions.PublishOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}})
+		feed := publish(postoptions.PublishOptions{Facebook: &postoptions.FacebookOptions{}})
 		if e := repo.importCanonicalAnalyticsPosts(ctx, x); e != nil {
 			t.Fatal(e)
 		}
-		if count, e := repo.client.AnalyticsPost.Query().Where(analyticspost.ConnectionID(x.ID), analyticspost.RemoteID(id)).Count(ctx); e != nil || count != 0 {
-			t.Fatalf("a story was imported: %d %v", count, e)
+		for id, want := range map[string]int{instagram: 0, facebook: 0, feed: 1} {
+			if count, e := repo.client.AnalyticsPost.Query().Where(analyticspost.ConnectionID(x.ID), analyticspost.RemoteID(id)).Count(ctx); e != nil || count != want {
+				t.Fatalf("post %s imported %d times, want %d: %v", id, count, want, e)
+			}
 		}
 	})
 	t.Run("Analyze counts a post confirmed live without waiting for a provider read", func(t *testing.T) {

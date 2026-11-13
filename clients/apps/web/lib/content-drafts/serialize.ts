@@ -92,6 +92,7 @@ export const DRAFT_CHANNEL_LIMITS: Record<DraftChannel, number> = {
   x: 280,
   facebook: 63_206,
   pinterest: 500,
+  gmb: 1500,
 }
 
 /** The block that starts the next post of a thread. */
@@ -179,6 +180,7 @@ const CONNECTION_CHANNELS: Record<string, DraftChannel> = {
   twitter: 'x',
   facebook: 'facebook',
   pinterest: 'pinterest',
+  gmb: 'gmb',
 }
 
 /** The draft channel a connection platform publishes to, or null. */
@@ -830,6 +832,7 @@ const CHANNEL_NAMES: Record<DraftChannel, string> = {
   x: 'X',
   facebook: 'Facebook',
   pinterest: 'Pinterest',
+  gmb: 'Google Business',
 }
 
 /** Top-level blocks grouped into posts at each post break. */

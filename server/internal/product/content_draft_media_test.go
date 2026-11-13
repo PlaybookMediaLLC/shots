@@ -84,6 +84,11 @@ func TestDraftMediaFollowsEachDestination(t *testing.T) {
 		{"pinterest one photo", "pinterest", []*ent.Asset{photo}, ""},
 		{"pinterest two photos", "pinterest", many(photo, 2), "up to 1 attachment"},
 		{"pinterest video", "pinterest", []*ent.Asset{mp4}, "video"},
+		{"google business text only", "gmb", nil, ""},
+		{"google business one photo", "gmb", []*ent.Asset{photo}, ""},
+		{"google business two photos", "gmb", many(photo, 2), "up to 1 attachment"},
+		{"google business video", "gmb", []*ent.Asset{mp4}, "video"},
+		{"google business narrow photo", "gmb", []*ent.Asset{mediaRow("image/png", 1000, 200, 200, 0)}, "250 pixels wide"},
 	} {
 		err := checkDraftMedia(tc.channel, tc.rows)
 		if tc.refusal == "" && err != nil || tc.refusal != "" && (err == nil || !strings.Contains(err.Error(), tc.refusal)) {
@@ -200,41 +205,61 @@ func TestStoriesFollowTheirOwnRules(t *testing.T) {
 	if checkDraftMedia("instagram", []*ent.Asset{portrait}) == nil {
 		t.Fatal("the feed took a 9:16 photo")
 	}
-	for _, tc := range []struct {
-		name  string
-		rows  []*ent.Asset
-		valid bool
-	}{
-		{"a 9:16 photo", []*ent.Asset{portrait}, true},
-		{"a 30-second video", []*ent.Asset{short}, true},
-		{"a 61-second video", []*ent.Asset{long}, false},
-		{"two photos", []*ent.Asset{portrait, portrait}, false},
-		{"a photo and a video", []*ent.Asset{portrait, short}, false},
-		{"nothing", nil, false},
-	} {
-		if err := checkStoryMedia("instagram", tc.rows); (err == nil) != tc.valid {
-			t.Fatalf("%s: valid=%v error=%v", tc.name, tc.valid, err)
+	for _, channel := range []string{"instagram", "facebook"} {
+		for _, tc := range []struct {
+			name  string
+			rows  []*ent.Asset
+			valid bool
+		}{
+			{"a 9:16 photo", []*ent.Asset{portrait}, true},
+			{"a 30-second video", []*ent.Asset{short}, true},
+			{"a 61-second video", []*ent.Asset{long}, false},
+			{"two photos", []*ent.Asset{portrait, portrait}, false},
+			{"a photo and a video", []*ent.Asset{portrait, short}, false},
+			{"nothing", nil, false},
+		} {
+			if err := checkStoryMedia(channel, tc.rows); (err == nil) != tc.valid {
+				t.Fatalf("%s %s: valid=%v error=%v", channel, tc.name, tc.valid, err)
+			}
 		}
 	}
 	if err := checkStoryMedia("instagram", []*ent.Asset{portrait, portrait}); err == nil || !strings.HasPrefix(err.Error(), "An Instagram story takes") {
 		t.Fatalf("story wording: %v", err)
 	}
+	if err := checkStoryMedia("facebook", []*ent.Asset{mediaRow("video/quicktime", 1000, 1080, 1920, 30_000)}); err == nil || !strings.HasPrefix(err.Error(), "A Facebook story takes MP4") {
+		t.Fatalf("a Facebook story took a MOV: %v", err)
+	}
 	if checkStoryMedia("x", []*ent.Asset{portrait}) == nil {
 		t.Fatal("X took a story")
 	}
-	story := &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}}
-	for _, tc := range []struct {
-		name   string
-		target ContentDraftScheduleTarget
-		valid  bool
-	}{
-		{"no caption", ContentDraftScheduleTarget{Options: story}, true},
-		{"a caption", ContentDraftScheduleTarget{Caption: "Hello", Options: story}, false},
-		{"a first comment", ContentDraftScheduleTarget{Options: &postoptions.PublishOptions{FirstComment: "Link",
-			Instagram: &postoptions.InstagramOptions{Placement: "story"}}}, false},
+	for channel, story := range map[string]*postoptions.PublishOptions{
+		"instagram": {Instagram: &postoptions.InstagramOptions{Placement: "story"}},
+		"facebook":  {Facebook: &postoptions.FacebookOptions{Placement: "story"}},
 	} {
-		if err := checkStory("instagram", tc.target); (err == nil) != tc.valid {
-			t.Fatalf("%s: valid=%v error=%v", tc.name, tc.valid, err)
+		commented := *story
+		commented.FirstComment = "Link"
+		for _, tc := range []struct {
+			name   string
+			target ContentDraftScheduleTarget
+			valid  bool
+		}{
+			{"no caption", ContentDraftScheduleTarget{Options: story}, true},
+			{"a caption", ContentDraftScheduleTarget{Caption: "Hello", Options: story}, false},
+			{"a first comment", ContentDraftScheduleTarget{Options: &commented}, false},
+		} {
+			if err := checkStory(channel, tc.target); (err == nil) != tc.valid {
+				t.Fatalf("%s %s: valid=%v error=%v", channel, tc.name, tc.valid, err)
+			}
 		}
+	}
+	if _, err := versionOptions("x", &draftdoc.VersionOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}); err == nil {
+		t.Fatal("a draft's X version stored a Facebook story")
+	}
+	if checkPostOptions("instagram", &postoptions.PublishOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}, true) == nil {
+		t.Fatal("a Facebook story was scheduled to Instagram")
+	}
+	// The public post API carries a story through to the scheduled post.
+	if !(&PostOptions{Facebook: &postoptions.FacebookOptions{Placement: "story"}}).publish().Story() {
+		t.Fatal("the post API dropped a Facebook story")
 	}
 }

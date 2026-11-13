@@ -36,6 +36,7 @@ type PostPart struct {
 
 // PostOptions are the settings a new post can carry on a platform.
 type PostOptions struct {
+	Facebook     *postoptions.FacebookOptions  `json:"facebook"`
 	FirstComment string                        `json:"firstComment"`
 	Pinterest    *postoptions.PinterestOptions `json:"pinterest"`
 	TikTok       *postoptions.TikTokOptions    `json:"tiktok"`
@@ -330,7 +331,7 @@ func (o *PostOptions) publish() *postoptions.PublishOptions {
 	if o == nil {
 		return nil
 	}
-	return &postoptions.PublishOptions{FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &postoptions.PublishOptions{Facebook: o.Facebook, FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }
 
 // version is the options as a draft's platform version stores them.
@@ -338,5 +339,5 @@ func (o *PostOptions) version() *draftdoc.VersionOptions {
 	if o == nil {
 		return nil
 	}
-	return &draftdoc.VersionOptions{FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &draftdoc.VersionOptions{Facebook: o.Facebook, FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }

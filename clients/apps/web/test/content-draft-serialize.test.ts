@@ -252,6 +252,7 @@ test('connection platforms map to draft channels', () => {
   assert.equal(channelForPlatform('linkedin-page'), 'linkedin')
   assert.equal(channelForPlatform('facebook'), 'facebook')
   assert.equal(channelForPlatform('pinterest'), 'pinterest')
+  assert.equal(channelForPlatform('gmb'), 'gmb')
   // An occupied alias fills its canonical slot, so the picker disables that platform.
   assert.equal(channelForPlatform('twitter'), 'x')
   assert.equal(channelForPlatform('mastodon-custom'), 'mastodon')
