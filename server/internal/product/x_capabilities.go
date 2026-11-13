@@ -11,10 +11,11 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 )
 
-func checkXTarget(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection, target ContentDraftScheduleTarget, ids []string, article bool) (*socialidentity.XCapabilities, error) {
+func checkXTarget(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection, target ContentDraftScheduleTarget, ids []string, article bool, budget *helpers.ScanBudget) (*socialidentity.XCapabilities, error) {
 	var caps *socialidentity.XCapabilities
 	err := tx.Client().PlatformQuery(ctx, `SELECT i."internalId", i."verifiedAccountKey", i."verifiedAccountKind",
 		i."verifiedScopes", i."verifiedCapabilities", i."identityVerifiedAt"
@@ -59,7 +60,7 @@ func checkXTarget(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnec
 			return conflict("X quote posts require Enterprise API access, which this connection has not verified.")
 		}
 		if !isArticle {
-			if err := socialidentity.CheckXText(*caps, text); err != nil {
+			if err := socialidentity.CheckXText(*caps, text, budget); err != nil {
 				return conflict(err.Error())
 			}
 		}

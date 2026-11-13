@@ -3,6 +3,7 @@ package product
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 )
 
 // The composer's platformCaptionLength reads the same cases
@@ -39,7 +41,7 @@ func TestDraftPostLengthMatchesTheComposer(t *testing.T) {
 				t.Fatalf("case covers %d of %d channels", len(item.Lengths), len(draftChannelLimits))
 			}
 			for channel, want := range item.Lengths {
-				if got, err := draftPostLength(channel, item.Text); err != nil || got != want {
+				if got, err := draftPostLength(channel, item.Text, nil); err != nil || got != want {
 					t.Errorf("%s: draftPostLength(%q) = %d, %v, want %d", channel, item.Text, got, err, want)
 				}
 			}
@@ -62,9 +64,30 @@ func TestFitsXPost(t *testing.T) {
 		{strings.Repeat("a.", 5000), 0, false}, // too complex to count
 	}
 	for _, c := range cases {
-		if got := fitsXPost(c.text, c.extra); got != c.want {
+		if got := fitsXPost(c.text, c.extra, nil); got != c.want {
 			t.Errorf("fitsXPost(%.12q…, %d) = %v, want %v", c.text, c.extra, got, c.want)
 		}
+	}
+}
+
+// A request of 10 X targets with 25 crafted posts each counts every text as
+// draftTargetConnections does (CheckXText, then draftPostLength) within one
+// budget, not a budget for each text.
+func TestOneRequestCountsWithinItsBudget(t *testing.T) {
+	caps := socialidentity.XVerifiedAccountLimits("read-write", nil)
+	budget := helpers.NewScanBudget(draftCountBudget)
+	start := time.Now()
+	for i := range 250 {
+		text := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 150))
+		if err := socialidentity.CheckXText(caps, text, budget); !errors.Is(err, helpers.ErrTextTooComplex) {
+			t.Fatalf("CheckXText %d: %v", i, err)
+		}
+		if _, err := draftPostLength("x", text, budget); !errors.Is(err, helpers.ErrTextTooComplex) {
+			t.Fatalf("draftPostLength %d: %v", i, err)
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("counting took %v, want about the %v budget", elapsed, draftCountBudget)
 	}
 }
 
@@ -74,7 +97,7 @@ func TestDraftPostLengthRefusesTextTooComplexToCount(t *testing.T) {
 	for _, text := range []string{strings.Repeat("a.", 5000), "https://" + strings.Repeat("a.", 5000)} {
 		for _, channel := range []string{"x", "mastodon"} {
 			start := time.Now()
-			length, err := draftPostLength(channel, text)
+			length, err := draftPostLength(channel, text, nil)
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("%s: took %v", channel, elapsed)
 			}

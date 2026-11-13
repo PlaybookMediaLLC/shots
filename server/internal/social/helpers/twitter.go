@@ -106,12 +106,56 @@ func init() {
 	validASCIIDomainRe.MatchTimeout = linkScanBudget
 }
 
+// A ScanBudget is the time one request may spend finding the links of all its
+// texts, however many it counts: each scan also stops when the budget runs
+// out, and a text counted again is not scanned again. It is not safe for
+// concurrent use. A nil *ScanBudget bounds each text on its own.
+type ScanBudget struct {
+	left    time.Duration
+	scanned map[scanKey][]*urlEntity
+}
+
+type scanKey struct {
+	text            string
+	withoutProtocol bool
+}
+
+func NewScanBudget(d time.Duration) *ScanBudget {
+	return &ScanBudget{left: d, scanned: map[scanKey][]*urlEntity{}}
+}
+
+// urls is extractURLsWithIndices within the budget.
+func (b *ScanBudget) urls(text []rune, withoutProtocol bool) ([]*urlEntity, error) {
+	if b == nil {
+		return extractURLsWithIndices(text, withoutProtocol, time.Time{})
+	}
+	key := scanKey{string(text), withoutProtocol}
+	if urls, ok := b.scanned[key]; ok {
+		return urls, nil
+	}
+	start := time.Now()
+	urls, err := extractURLsWithIndices(text, withoutProtocol, start.Add(b.left))
+	b.left -= time.Since(start)
+	if err == nil {
+		b.scanned[key] = urls
+	}
+	return urls, err
+}
+
+// ParseTweet is twitter-text parseTweet within the budget: text's weighted
+// length, and whether it is valid within limit (no invalid characters, and
+// 1 to limit weighted).
+func (b *ScanBudget) ParseTweet(text string, limit int) (weighted int, valid bool, err error) {
+	weighted, valid, _, err = b.parseTweet(text, limit)
+	return weighted, valid, err
+}
+
 // TextSlicer returns the slice bounds of text within the length limit (twitter-text for x).
 func TextSlicer(integrationType string, end int, text string) (int, int, error) {
 	if integrationType != "x" {
 		return 0, end, nil
 	}
-	_, valid, validRangeEnd, err := parseTweet(text, end)
+	_, valid, validRangeEnd, err := (*ScanBudget)(nil).parseTweet(text, end)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -123,14 +167,14 @@ func TextSlicer(integrationType string, end int, text string) (int, int, error) 
 
 // WeightedLength is twitter-text parseTweet(text).weightedLength.
 func WeightedLength(text string) (int, error) {
-	weighted, _, _, err := parseTweet(text, 280)
+	weighted, _, err := (*ScanBudget)(nil).ParseTweet(text, 280)
 	return weighted, err
 }
 
 // ValidTweetText applies twitter-text's invalid-character and weighted-length
 // rules together. Empty text is handled separately by media-only publishers.
 func ValidTweetText(text string, limit int) (bool, error) {
-	_, valid, _, err := parseTweet(text, limit)
+	_, valid, err := (*ScanBudget)(nil).ParseTweet(text, limit)
 	return valid, err
 }
 
@@ -145,12 +189,12 @@ func CountLength(integrationType, text string) (int, error) {
 	return jsLength(text), nil
 }
 
-func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int, err error) {
+func (b *ScanBudget) parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int, err error) {
 	normalized := utf16Units(norm.NFC.String(text))
 	shifted := shiftSurrogates(normalized)
 
 	// Hash all entities by their startIndex for fast lookup
-	urls, err := extractURLsWithIndices(shifted, true)
+	urls, err := b.urls(shifted, true)
 	if err != nil {
 		return 0, false, 0, err
 	}
@@ -221,7 +265,10 @@ type urlEntity struct {
 // LinkSpans are the byte ranges of the links in text that start with a
 // protocol: twitter-text's extractUrlsWithIndices with
 // extractUrlsWithoutProtocol: false, as Mastodon finds the links it counts.
-func LinkSpans(text string) ([][2]int, error) {
+func LinkSpans(text string) ([][2]int, error) { return (*ScanBudget)(nil).LinkSpans(text) }
+
+// LinkSpans is the package's LinkSpans within the budget.
+func (b *ScanBudget) LinkSpans(text string) ([][2]int, error) {
 	// Only a link with a protocol counts, and the scan is slow on long runs.
 	if !strings.Contains(text, "://") {
 		return nil, nil
@@ -234,7 +281,7 @@ func LinkSpans(text string) ([][2]int, error) {
 		}
 	}
 	offsets = append(offsets, len(text))
-	urls, err := extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false)
+	urls, err := b.urls(shiftSurrogates(utf16Units(text)), false)
 	if err != nil {
 		return nil, err
 	}
@@ -251,10 +298,13 @@ func LinkSpans(text string) ([][2]int, error) {
 // scan runs word by word, each with the space before it, and skips the words
 // with no dot, or, when only links with a protocol count, with no "://": one
 // regexp2 call never sees more than one word. It fails with
-// ErrTextTooComplex once the text's budget runs out; each call is bounded,
-// but a text of many slow words makes many calls.
-func extractURLsWithIndices(text []rune, withoutProtocol bool) ([]*urlEntity, error) {
+// ErrTextTooComplex once the text's budget, or limit when it is sooner, runs
+// out; each call is bounded, but a text of many slow words makes many calls.
+func extractURLsWithIndices(text []rune, withoutProtocol bool, limit time.Time) ([]*urlEntity, error) {
 	deadline := time.Now().Add(linkScanBudget + time.Duration(min(len(text), linkScanMaxUnits))*linkScanPerUnit)
+	if !limit.IsZero() && limit.Before(deadline) {
+		deadline = limit
+	}
 	var urls []*urlEntity
 	for start, end := 0, 0; start < len(text); start = end {
 		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {

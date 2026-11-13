@@ -3,6 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -119,6 +120,28 @@ func TestLinkSpansSkipsWordsWithoutAProtocol(t *testing.T) {
 	spans, err := LinkSpans(text)
 	if err != nil || len(spans) != 1 || text[spans[0][0]:spans[0][1]] != "https://example.com" {
 		t.Fatalf("LinkSpans = %v, %v", spans, err)
+	}
+}
+
+// One request's texts share its budget: once crafted texts spend it, the next
+// scans stop at once, while a text counted before is not scanned again.
+func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
+	budget := NewScanBudget(500 * time.Millisecond)
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("before = %v, %v", spans, err)
+	}
+	start := time.Now()
+	for i := range 20 {
+		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 150))
+		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Fatalf("crafted %d: %v", i, err)
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+		t.Errorf("20 crafted texts took %v of a 500 ms budget", elapsed)
+	}
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("after = %v, %v", spans, err)
 	}
 }
 
