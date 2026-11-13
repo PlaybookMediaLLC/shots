@@ -95,7 +95,17 @@ expiration cleanup remains outstanding; this record does not claim it ran.
   profiles. A draft belongs to one profile; moving a connection disables it and
   requires a reconnect. This run does not authorize that account change. Separate
   successful publications do not prove the requested single-draft cross-post.
-- **Check 26 / TF-066 — Pending:** no ten-minute publication or 9:50 playback
-  proof exists. The standard-account 20-minute limit is already represented in
-  the code and docs; Premium is not the blocker. The next post still requires
-  explicit approval of its exact content and a usable signed-in composer.
+- **Check 26 / TF-066 — Approved, blocked locally:** the owner explicitly
+  approved the default caption and `shots-x-10min.mp4`: 600 seconds, 1280×720,
+  30 fps, moving test pattern with a 440 Hz tone, 160,252,211 bytes. Metadata
+  inspection and decoding the final ten seconds passed. [Preflight record](video-preflight.json)
+  includes the file hash. The file remains local under `.context/typefully-l2`.
+  Browser control returned `noWindowsAvailable`, ScreenCaptureKit `-3811`, and
+  **The browser access host is unavailable**, including after the user brought
+  Shots forward and the control session was reset. Scratch draft
+  `cmwf8znww000201rrnv1phdoh` has duplicated text from stale input and must be
+  corrected before final review. A read-only recheck found zero scheduled posts
+  for that draft and no uploaded asset with the video's byte count. Nothing was
+  published; there is no provider error or UNKNOWN_DELIVERY to reconcile.
+  The exact-content approval remains valid. Native ID, displayed 10:00 duration
+  and playback near 9:50 remain unverified; Premium is not the blocker.
