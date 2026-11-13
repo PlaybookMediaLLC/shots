@@ -11,6 +11,8 @@ import (
 
 	"github.com/lucsky/cuid"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
@@ -18,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/thread"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/webhooks"
 )
 
 // standings supplies display metadata; it cannot authorize scheduling.
@@ -456,10 +459,26 @@ func TestWritePublishing(t *testing.T) {
 		if _, err := repo.ReconcileContentDraftPost(ctx, owner, unknown, ReconcileInput{Live: true, URL: "https://example.com/nope"}); !errors.Is(err, ErrInvalidInput) {
 			t.Fatalf("a URL from elsewhere: %v", err)
 		}
+		w.db.Client.WebhookSubscription.Create().SetID("hook_" + w.org).SetOrganizationID(w.org).SetName("Hook").
+			SetURL("https://hooks.example.test/shots").SetEvents([]string{webhooks.DraftPublished}).SetEncryptedSecret("unused").SaveX(ctx)
+		t.Cleanup(func() { w.exec(t, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+w.org) })
+		published := func(draftID string) []*ent.OutboxEvent {
+			return w.db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(w.org),
+				outboxevent.Type("webhook."+webhooks.DraftPublished), outboxevent.AggregateID(draftID)).AllX(ctx)
+		}
 		live, err := repo.ReconcileContentDraftPost(ctx, owner, unknown, ReconcileInput{Live: true,
 			URL: "https://www.linkedin.com/feed/update/urn:li:share:7100000000000000000/"})
 		if err != nil || live.Status != "PUBLISHED" || live.URL == nil || live.FailureCode != nil {
 			t.Fatalf("live=%+v err=%v", live, err)
+		}
+		// A post a person confirmed live notifies subscribers as the worker would.
+		events := published(d.ID)
+		if len(events) != 1 {
+			t.Fatalf("%d draft.published events for the reconciled post, want 1", len(events))
+		}
+		data, _ := events[0].Payload["data"].(map[string]any)
+		if post, _ := data["post"].(map[string]any); post["id"] != unknown || post["remotePostId"] != "urn:li:share:7100000000000000000" {
+			t.Fatalf("event data %+v", data)
 		}
 		other := draft(ContentDraftInput{})
 		again, err := repo.ScheduleContentDraft(ctx, owner, other.ID, ScheduleContentDraftInput{PublishNow: true, Targets: target("Unknown", x), Version: 1})
@@ -470,6 +489,9 @@ func TestWritePublishing(t *testing.T) {
 		notLive, err := repo.ReconcileContentDraftPost(ctx, owner, again.Posts[0].ID, ReconcileInput{Live: false})
 		if err != nil || notLive.Status != "FAILED" || notLive.FailureCode == nil || *notLive.FailureCode != publishing.FailureNotLive {
 			t.Fatalf("not live=%+v err=%v", notLive, err)
+		}
+		if events := published(other.ID); len(events) != 0 {
+			t.Fatalf("a post reconciled as not live emitted %d draft.published events", len(events))
 		}
 		if _, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID); err != nil {
 			t.Fatalf("a post reconciled as not live cannot be retried: %v", err)

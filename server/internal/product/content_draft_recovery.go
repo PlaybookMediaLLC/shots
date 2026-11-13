@@ -248,6 +248,11 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 	if err != nil {
 		return nil, err
 	}
+	if input.Live {
+		if err := publishing.EmitDraftPublished(ctx, tx, updated, optionalText(updated.RemotePostID)); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
