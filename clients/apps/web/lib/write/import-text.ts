@@ -34,9 +34,9 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   const measure = (value: string) => platformCaptionLength(channel, value)
   const posts: string[] = []
   let current = ''
-  // What `current` counts. No link, mention, emoji or normalization crosses a
-  // space, so a post counts its words and spaces added up. (A grapheme that joins
-  // a space, such as an accent right after one, is counted twice: a cut comes early.)
+  // What `current` counts. A word is measured with the spaces before it, after a
+  // letter: X's count trims a lone space, and a link right after U+FEFF is not
+  // one. No count looks back further, so a post counts its words added up.
   let counted = 0
   const push = () => {
     if (current.trim()) posts.push(current.trim())
@@ -47,13 +47,18 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
         `This text needs more than ${THREAD_POST_LIMIT} posts. Shorten it or increase the limit.`
       )
   }
+  let gap = ''
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    let word = token.trimEnd()
+    const word = token.trimEnd()
     const space = token.slice(word.length)
-    let count = measure(word)
-    if (counted + count > limit) push()
+    let count = current ? measure(`a${gap}${word}`) - 1 : measure(word)
+    if (counted + count > limit) {
+      push()
+      count = measure(word)
+    }
     // A word longer than a post is cut between graphemes, each time at the
-    // longest piece that fits. A cut can split a link, so pieces are measured whole.
+    // longest piece that halving finds (a link can stop it short). A cut can
+    // split a link, so pieces are measured whole.
     const ends =
       count > limit
         ? Array.from(
@@ -75,10 +80,9 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
       ;[start, first] = [ends[low], low + 1]
       count = measure(word.slice(start))
     }
-    word = word.slice(start)
-    current += word + space
-    // Spaces count the same between any two words.
-    counted += count + (space ? measure(`a${space}a`) - 2 : 0)
+    current += word.slice(start) + space
+    counted += count
+    gap = space
   }
   push()
   return posts
