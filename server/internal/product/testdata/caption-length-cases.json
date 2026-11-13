@@ -1,0 +1,528 @@
+{
+  "limits": {
+    "bluesky": 300,
+    "facebook": 63206,
+    "instagram": 2200,
+    "linkedin": 3000,
+    "mastodon": 500,
+    "pinterest": 500,
+    "threads": 500,
+    "tiktok": 2000,
+    "x": 280,
+    "youtube": 5000
+  },
+  "cases": [
+    {
+      "label": "plain text",
+      "text": "hello",
+      "lengths": {
+        "bluesky": 5,
+        "facebook": 5,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 5,
+        "pinterest": 5,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 5,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "a long link counts 23 on X and Mastodon",
+      "text": "see https://example.com/a/very/long/path?with=query.",
+      "lengths": {
+        "bluesky": 52,
+        "facebook": 52,
+        "instagram": 52,
+        "linkedin": 52,
+        "mastodon": 28,
+        "pinterest": 52,
+        "threads": 52,
+        "tiktok": 52,
+        "x": 28,
+        "youtube": 52
+      }
+    },
+    {
+      "label": "a bare domain is a link on X, not on Mastodon",
+      "text": "www.example.com",
+      "lengths": {
+        "bluesky": 15,
+        "facebook": 15,
+        "instagram": 15,
+        "linkedin": 15,
+        "mastodon": 15,
+        "pinterest": 15,
+        "threads": 15,
+        "tiktok": 15,
+        "x": 23,
+        "youtube": 15
+      }
+    },
+    {
+      "label": "a domain without www is a link on X",
+      "text": "example.com",
+      "lengths": {
+        "bluesky": 11,
+        "facebook": 11,
+        "instagram": 11,
+        "linkedin": 11,
+        "mastodon": 11,
+        "pinterest": 11,
+        "threads": 11,
+        "tiktok": 11,
+        "x": 23,
+        "youtube": 11
+      }
+    },
+    {
+      "label": "CJK weighs two on X",
+      "text": "日本語",
+      "lengths": {
+        "bluesky": 3,
+        "facebook": 3,
+        "instagram": 3,
+        "linkedin": 3,
+        "mastodon": 3,
+        "pinterest": 3,
+        "threads": 3,
+        "tiktok": 3,
+        "x": 6,
+        "youtube": 3
+      }
+    },
+    {
+      "label": "emoji",
+      "text": "🚀",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 2,
+        "instagram": 2,
+        "linkedin": 2,
+        "mastodon": 1,
+        "pinterest": 2,
+        "threads": 2,
+        "tiktok": 2,
+        "x": 2,
+        "youtube": 2
+      }
+    },
+    {
+      "label": "emoji with a skin tone",
+      "text": "👍🏽",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 4,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 1,
+        "pinterest": 4,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 2,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "ZWJ family emoji",
+      "text": "👨‍👩‍👧",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 8,
+        "instagram": 8,
+        "linkedin": 8,
+        "mastodon": 1,
+        "pinterest": 8,
+        "threads": 8,
+        "tiktok": 8,
+        "x": 2,
+        "youtube": 8
+      }
+    },
+    {
+      "label": "a flag",
+      "text": "🇫🇷",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 4,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 1,
+        "pinterest": 4,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 2,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "two flags",
+      "text": "🇫🇷🇺🇸",
+      "lengths": {
+        "bluesky": 2,
+        "facebook": 8,
+        "instagram": 8,
+        "linkedin": 8,
+        "mastodon": 2,
+        "pinterest": 8,
+        "threads": 8,
+        "tiktok": 8,
+        "x": 4,
+        "youtube": 8
+      }
+    },
+    {
+      "label": "keycap emoji",
+      "text": "#️⃣",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 3,
+        "instagram": 3,
+        "linkedin": 3,
+        "mastodon": 1,
+        "pinterest": 3,
+        "threads": 3,
+        "tiktok": 3,
+        "x": 2,
+        "youtube": 3
+      }
+    },
+    {
+      "label": "punctuation X weighs one",
+      "text": "café — “quoted”",
+      "lengths": {
+        "bluesky": 15,
+        "facebook": 15,
+        "instagram": 15,
+        "linkedin": 15,
+        "mastodon": 15,
+        "pinterest": 15,
+        "threads": 15,
+        "tiktok": 15,
+        "x": 15,
+        "youtube": 15
+      }
+    },
+    {
+      "label": "combining acute, normalized on X",
+      "text": "café",
+      "lengths": {
+        "bluesky": 4,
+        "facebook": 5,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 4,
+        "pinterest": 5,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 4,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "stacked combining marks",
+      "text": "Z͑ͫ̓ͪ",
+      "lengths": {
+        "bluesky": 1,
+        "facebook": 5,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 1,
+        "pinterest": 5,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 5,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "Devanagari conjunct (Unicode 15.1)",
+      "text": "नमस्ते",
+      "lengths": {
+        "bluesky": 3,
+        "facebook": 6,
+        "instagram": 6,
+        "linkedin": 6,
+        "mastodon": 3,
+        "pinterest": 6,
+        "threads": 6,
+        "tiktok": 6,
+        "x": 6,
+        "youtube": 6
+      }
+    },
+    {
+      "label": "multiline",
+      "text": "line one\nline two\n\nline three",
+      "lengths": {
+        "bluesky": 29,
+        "facebook": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 29,
+        "pinterest": 29,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    },
+    {
+      "label": "CRLF is one grapheme",
+      "text": "a\r\nb",
+      "lengths": {
+        "bluesky": 3,
+        "facebook": 4,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 3,
+        "pinterest": 4,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 4,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "X trims surrounding whitespace",
+      "text": "  hello\n\n",
+      "lengths": {
+        "bluesky": 9,
+        "facebook": 9,
+        "instagram": 9,
+        "linkedin": 9,
+        "mastodon": 9,
+        "pinterest": 9,
+        "threads": 9,
+        "tiktok": 9,
+        "x": 5,
+        "youtube": 9
+      }
+    },
+    {
+      "label": "multiline post with a link and an emoji",
+      "text": "Launch day 🚀\n\nhttps://shots.example.com/launch?utm_source=x&utm_medium=social\nThanks!",
+      "lengths": {
+        "bluesky": 85,
+        "facebook": 86,
+        "instagram": 86,
+        "linkedin": 86,
+        "mastodon": 45,
+        "pinterest": 86,
+        "threads": 86,
+        "tiktok": 86,
+        "x": 46,
+        "youtube": 86
+      }
+    },
+    {
+      "label": "mention and hashtag",
+      "text": "@shots_app #launch",
+      "lengths": {
+        "bluesky": 18,
+        "facebook": 18,
+        "instagram": 18,
+        "linkedin": 18,
+        "mastodon": 18,
+        "pinterest": 18,
+        "threads": 18,
+        "tiktok": 18,
+        "x": 18,
+        "youtube": 18
+      }
+    },
+    {
+      "label": "a short link counts 23 on X and Mastodon",
+      "text": "https://x.com",
+      "lengths": {
+        "bluesky": 13,
+        "facebook": 13,
+        "instagram": 13,
+        "linkedin": 13,
+        "mastodon": 23,
+        "pinterest": 13,
+        "threads": 13,
+        "tiktok": 13,
+        "x": 23,
+        "youtube": 13
+      }
+    },
+    {
+      "label": "a link counts 23 on Mastodon only once its host is complete",
+      "text": "https://a-very-long-subdomain-name-for-testing.example.com",
+      "lengths": {
+        "bluesky": 58,
+        "facebook": 58,
+        "instagram": 58,
+        "linkedin": 58,
+        "mastodon": 23,
+        "pinterest": 58,
+        "threads": 58,
+        "tiktok": 58,
+        "x": 23,
+        "youtube": 58
+      }
+    },
+    {
+      "label": "a remote mention counts without its domain on Mastodon",
+      "text": "@alice@mastodon.social hi",
+      "lengths": {
+        "bluesky": 25,
+        "facebook": 25,
+        "instagram": 25,
+        "linkedin": 25,
+        "mastodon": 9,
+        "pinterest": 25,
+        "threads": 25,
+        "tiktok": 25,
+        "x": 25,
+        "youtube": 25
+      }
+    },
+    {
+      "label": "a profile path without a protocol is text on Mastodon",
+      "text": "mastodon.social/@alice@example.org",
+      "lengths": {
+        "bluesky": 34,
+        "facebook": 34,
+        "instagram": 34,
+        "linkedin": 34,
+        "mastodon": 34,
+        "pinterest": 34,
+        "threads": 34,
+        "tiktok": 34,
+        "x": 23,
+        "youtube": 34
+      }
+    },
+    {
+      "label": "a mention inside a link is part of the link",
+      "text": "https://example.com/?a=1&@alice@example.org",
+      "lengths": {
+        "bluesky": 43,
+        "facebook": 43,
+        "instagram": 43,
+        "linkedin": 43,
+        "mastodon": 23,
+        "pinterest": 43,
+        "threads": 43,
+        "tiktok": 43,
+        "x": 23,
+        "youtube": 43
+      }
+    },
+    {
+      "label": "a mention followed by another at sign is not a mention",
+      "text": "@alice@example.org@x",
+      "lengths": {
+        "bluesky": 20,
+        "facebook": 20,
+        "instagram": 20,
+        "linkedin": 20,
+        "mastodon": 20,
+        "pinterest": 20,
+        "threads": 20,
+        "tiktok": 20,
+        "x": 20,
+        "youtube": 20
+      }
+    },
+    {
+      "label": "accents around a link and a remote mention",
+      "text": "Ünïcode https://x.com/é then @bob@ex.org.",
+      "lengths": {
+        "bluesky": 41,
+        "facebook": 41,
+        "instagram": 41,
+        "linkedin": 41,
+        "mastodon": 42,
+        "pinterest": 41,
+        "threads": 41,
+        "tiktok": 41,
+        "x": 49,
+        "youtube": 41
+      }
+    },
+    {
+      "label": "a capitalized remote mention with a Unicode domain before a link",
+      "text": "@Abcd@bü.example https://x.com",
+      "lengths": {
+        "bluesky": 30,
+        "facebook": 30,
+        "instagram": 30,
+        "linkedin": 30,
+        "mastodon": 29,
+        "pinterest": 30,
+        "threads": 30,
+        "tiktok": 30,
+        "x": 40,
+        "youtube": 30
+      }
+    },
+    {
+      "label": "no mention after a letter or =, or before :// or ＠",
+      "text": "é@a@b.org =@a@b.org @a@b.org://x @a@b.org＠x",
+      "lengths": {
+        "bluesky": 43,
+        "facebook": 43,
+        "instagram": 43,
+        "linkedin": 43,
+        "mastodon": 43,
+        "pinterest": 43,
+        "threads": 43,
+        "tiktok": 43,
+        "x": 44,
+        "youtube": 43
+      }
+    },
+    {
+      "label": "no mention after a letter number or a circled letter",
+      "text": "Ⅻ@a@b.org ⓐ@a@b.org",
+      "lengths": {
+        "bluesky": 19,
+        "facebook": 19,
+        "instagram": 19,
+        "linkedin": 19,
+        "mastodon": 19,
+        "pinterest": 19,
+        "threads": 19,
+        "tiktok": 19,
+        "x": 21,
+        "youtube": 19
+      }
+    },
+    {
+      "label": "a mention domain counts up to 253 characters",
+      "text": "@a@ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd @a@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "lengths": {
+        "bluesky": 514,
+        "facebook": 514,
+        "instagram": 514,
+        "linkedin": 514,
+        "mastodon": 260,
+        "pinterest": 514,
+        "threads": 514,
+        "tiktok": 514,
+        "x": 514,
+        "youtube": 514
+      }
+    },
+    {
+      "label": "a post can end with a remote mention",
+      "text": "Thanks @alice@mastodon.social",
+      "lengths": {
+        "bluesky": 29,
+        "facebook": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 13,
+        "pinterest": 29,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    }
+  ]
+}

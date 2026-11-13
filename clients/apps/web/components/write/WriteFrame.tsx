@@ -22,6 +22,7 @@ import {
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import { cn } from '@/lib/utils'
+import { useLauncherFocus } from './launcher-focus'
 import { WriteRail } from './library'
 import { PendingDraftInput, useBlankDraft } from './pending-draft'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
@@ -200,22 +201,7 @@ function FrameLayout({
       setCreating(false)
     }
   }
-  const launcher = React.useRef<HTMLElement | null>(null)
-  const launcherRange = React.useRef<Range | null>(null)
-  const launcherScroll = React.useRef<{ element: HTMLElement; top: number; left: number } | null>(
-    null
-  )
-  const rememberLauncher = React.useCallback(() => {
-    launcher.current = document.activeElement as HTMLElement | null
-    const selection = window.getSelection()
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null
-    launcherRange.current =
-      range && launcher.current?.contains(range.commonAncestorContainer) ? range.cloneRange() : null
-    const element = launcher.current?.closest('main')
-    launcherScroll.current = element
-      ? { element, top: element.scrollTop, left: element.scrollLeft }
-      : null
-  }, [])
+  const { remember: rememberLauncher, restore: restoreFocus } = useLauncherFocus()
   const open = (setter: (value: boolean) => void) => {
     rememberLauncher()
     setter(true)
@@ -315,22 +301,6 @@ function FrameLayout({
       inEditor: true,
     },
   ])
-  const restoreFocus = () => {
-    // Focusing a contenteditable alone moves its native caret to the start.
-    // Restore its range as well, while leaving the surrounding scroll in place.
-    setTimeout(() => {
-      if (!launcher.current?.isConnected) return
-      launcher.current.focus({ preventScroll: true })
-      const range = launcherRange.current
-      if (range?.startContainer.isConnected && range.endContainer.isConnected) {
-        const selection = window.getSelection()
-        selection?.removeAllRanges()
-        selection?.addRange(range)
-      }
-      const scroll = launcherScroll.current
-      if (scroll?.element.isConnected) scroll.element.scrollTo(scroll.left, scroll.top)
-    }, 0)
-  }
   React.useEffect(() => {
     const timer = setTimeout(() => {
       void import('@/components/drafts/DraftEditor')
