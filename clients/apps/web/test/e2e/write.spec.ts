@@ -494,10 +494,12 @@ test('an old draft’s code block and heading keep the kit’s layout, and markd
   })
   expect(boxed).toBe(true)
   // Its block menu leaves out Ask AI: Write's editor has no AI plugin, so the item threw.
+  // Comment stays: Write loads the comment plugin.
   await editor.getByText('const answer = 42', { exact: true }).hover()
   await editor.getByRole('button', { name: 'Block actions' }).click()
   const actions = page.getByRole('listbox')
   await expect(actions.getByRole('option', { name: /^Delete/ })).toBeVisible()
+  await expect(actions.getByRole('option', { name: /^Comment/ })).toBeVisible()
   await expect(actions.getByRole('option', { name: /Ask AI/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(actions).toHaveCount(0)
