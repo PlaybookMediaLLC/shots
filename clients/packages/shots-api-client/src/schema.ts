@@ -2127,6 +2127,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3239,6 +3240,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3448,6 +3450,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3563,6 +3566,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3791,6 +3795,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3905,6 +3910,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -4243,6 +4249,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -10402,6 +10409,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10682,6 +10690,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];

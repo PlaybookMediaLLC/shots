@@ -12959,6 +12959,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -14179,6 +14180,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -22748,6 +22750,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -27748,6 +27751,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -28657,6 +28661,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -29218,6 +29223,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -29230,7 +29236,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -30154,6 +30159,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30706,6 +30712,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30718,7 +30725,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -32169,6 +32175,7 @@
                                             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                           },
                                           "days": {
+                                            "default": 0,
                                             "type": "integer",
                                             "minimum": 0,
                                             "maximum": 30

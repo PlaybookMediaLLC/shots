@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { followUpLines, retweetAt, ruleLabel } from '../lib/write/automation'
+import { retweetRuleSchema } from '../lib/write/document'
 import { fenced } from '../lib/write/refine-actions'
+
+test('a same-day repost rule stored without days reads as day 0', () => {
+  assert.deepEqual(retweetRuleSchema.parse({ at: '02:16', timeZone: 'UTC' }), {
+    at: '02:16',
+    days: 0,
+    timeZone: 'UTC',
+  })
+  assert.deepEqual(retweetRuleSchema.parse({ afterMinutes: 60 }), { afterMinutes: 60 })
+})
 
 test('repost times match the Go plan, across a daylight-saving change', () => {
   // 2026-03-07 20:00 in New York; the clocks go forward the next night.
