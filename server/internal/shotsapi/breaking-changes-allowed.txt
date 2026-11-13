@@ -144,3 +144,19 @@ POST /api/v1/posts the `draft/platformVersions/versions` response property's max
 POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `10` to `11` for the response status `201`
 GET /api/v1/social-connection-availability added the new `gmb` enum value to the `providers/items/provider` response property for the response status `200`
 GET /api/v1/social-connection-availability the `providers` response property's maxItems was increased from `14` to `15` for the response status `200`
+# The same, compared with a develop that does not have Slice 4a yet: a draft
+# goes from eight versions to eleven, and the catalog from twelve providers.
+POST /api/v1/calendar/mutations the `drafts/items/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+GET /api/v1/content-drafts the `items/items/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+GET /api/v1/content-drafts the `pinned/items/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+POST /api/v1/content-drafts the `platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
+GET /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+PATCH /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+POST /api/v1/content-drafts/{id}/copy the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
+POST /api/v1/content-drafts/{id}/plan the `platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties the `platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
+POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
+POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
+GET /api/v1/social-connection-availability the `providers` response property's maxItems was increased from `12` to `15` for the response status `200`
