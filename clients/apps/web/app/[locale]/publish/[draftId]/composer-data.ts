@@ -2,6 +2,7 @@ import 'server-only'
 
 import { giphyEnabled } from '@/lib/content-drafts/giphy'
 import { googleDriveConfig } from '@/lib/content-drafts/google-drive'
+import { senjaConfigured } from '@/lib/content-drafts/senja'
 import { contentDraftPostSchema, contentDraftSchema } from '@/lib/api/contracts/content-drafts'
 import { accessAllows } from '@/lib/auth/permissions'
 import {
@@ -66,6 +67,7 @@ export async function loadDraftComposer(
       draft: contentDraftSchema.parse(draft),
       drive: googleDriveConfig(),
       giphy: giphyEnabled(),
+      senja: await senjaConfigured(access.tenant),
       posts: (posts ?? []).map((post) => contentDraftPostSchema.parse(post)),
       requireApproval: settings.requireApproval,
       set: data.activeSet,

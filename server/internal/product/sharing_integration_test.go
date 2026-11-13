@@ -188,6 +188,21 @@ func TestShareLinksAndIntegrations(t *testing.T) {
 	if items, err := repo.ListIntegrations(ctx, actor); err != nil || len(items) != 0 {
 		t.Fatalf("items=%+v err=%v", items, err)
 	}
+	// A workspace's Senja key (composer slice 3c) is one sealed connection;
+	// saving it again replaces it, and a stranger cannot read it.
+	senja, err := repo.SaveIntegration(ctx, actor, IntegrationInput{Provider: "SENJA", ExternalID: "senja", DisplayName: "Senja",
+		EncryptedCredentials: "v1.iv.tag.senja"})
+	if err != nil || senja.Provider != "SENJA" {
+		t.Fatalf("senja=%+v err=%v", senja, err)
+	}
+	replaced, err := repo.SaveIntegration(ctx, actor, IntegrationInput{Provider: "SENJA", ExternalID: "senja", DisplayName: "Senja",
+		EncryptedCredentials: "v1.iv.tag.senja2"})
+	if err != nil || replaced.ID != senja.ID {
+		t.Fatalf("a second Senja key made a second connection: %+v err=%v", replaced, err)
+	}
+	if _, err := repo.IntegrationCredentials(ctx, stranger, senja.ID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("stranger reads the Senja key: %v", err)
+	}
 }
 
 func ptr[T any](value T) *T { return &value }

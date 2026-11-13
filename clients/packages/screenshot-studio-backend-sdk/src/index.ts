@@ -1695,7 +1695,8 @@ export type BackendPublicShareLink = {
 }
 
 /** A provider an integration connects. */
-export type IntegrationProvider = 'SLACK' | 'NOTION' | 'FIGMA'
+/** SENJA holds a workspace's own Senja API key, for importing testimonials. */
+export type IntegrationProvider = 'SLACK' | 'NOTION' | 'FIGMA' | 'SENJA'
 
 /** A workspace's connection to a provider account, without credentials. */
 export type BackendIntegration = {

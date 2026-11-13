@@ -424,3 +424,33 @@ test(
     expect(Buffer.from(await stored.body()).equals(png)).toBe(true)
   }
 )
+
+test(
+  'UI-17: Senja says how to set it up until the workspace saves its key',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    await openNewDraft(page)
+    await draftEditor(page).click()
+    await settleSelection(page)
+    await editorMore(page, 'From Senja')
+    const dialog = page.getByRole('dialog', { name: 'Senja is not set up' })
+    await expect(dialog).toContainText('in Settings, under Integrations')
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    // Without a key nothing is listed or imported, and Senja is never asked.
+    const listed = await apiRequest(page, '/api/v1/content-drafts/senja')
+    expect(listed.status).toBe(409)
+    const imported = await apiRequest(page, '/api/v1/content-drafts/senja', {
+      body: { id: 'any' },
+      method: 'POST',
+    })
+    expect(imported.status).toBe(409)
+    // Settings shows where the key goes, and never a key.
+    await page.goto('/settings/integrations')
+    await expect(page.getByText('No API key yet', { exact: true })).toBeVisible()
+    const status = await apiRequest(page, '/api/v1/integrations/senja')
+    expect(status.status).toBe(200)
+    expect(status.body).toMatchObject({ configured: false })
+  }
+)

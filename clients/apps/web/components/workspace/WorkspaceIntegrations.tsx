@@ -15,6 +15,7 @@ import {
 } from '@/lib/integrations/schema'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { getErrorMessage } from './settings-client'
+import { SenjaKey } from './SenjaKey'
 
 type Setup = Record<IntegrationProvider, { missing: string[]; ready: boolean }>
 
@@ -185,6 +186,7 @@ export function WorkspaceIntegrations({ canManage }: { canManage: boolean }) {
           </Section>
         )
       })}
+      <SenjaKey canManage={canManage} />
     </div>
   )
 }

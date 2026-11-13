@@ -266,6 +266,7 @@ export function WriteComposer({
   draft: initial,
   drive = null,
   giphy = false,
+  senja = false,
   layout = 'page',
   posts: initialPosts,
   requireApproval,
@@ -282,6 +283,8 @@ export function WriteComposer({
   drive?: GoogleDriveConfig | null
   /** Whether GIF search is approved and configured. */
   giphy?: boolean
+  /** Whether the workspace saved its Senja API key. */
+  senja?: boolean
   /**
    * `page`: the Publish page, where Preview takes the draft's place.
    * `workspace`: the publishing workspace over the screenshot editor, where
@@ -2636,6 +2639,7 @@ export function WriteComposer({
           channels,
           drive,
           giphy,
+          senja,
           openTool: setTool,
           postSetting: (number, setting) => setPostSetting({ at: Date.now(), number, setting }),
           snippets,

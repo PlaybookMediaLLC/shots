@@ -58,7 +58,8 @@ func (IntegrationConnection) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("id").StorageKey("id").Immutable(),
 		field.String("organization_id").StorageKey("organizationId").Immutable(),
-		field.Enum("provider").StorageKey("provider").Values("SLACK", "NOTION", "FIGMA").Immutable(),
+		// SENJA holds a workspace's own Senja API key, for importing testimonials.
+		field.Enum("provider").StorageKey("provider").Values("SLACK", "NOTION", "FIGMA", "SENJA").Immutable(),
 		field.String("external_id").StorageKey("externalId").Immutable(),
 		field.String("display_name").StorageKey("displayName"),
 		field.String("encrypted_credentials").StorageKey("encryptedCredentials").Sensitive(),
