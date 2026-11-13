@@ -53,7 +53,10 @@ export async function providerSetup(
 /** The workspace's connections, without credentials. */
 export async function listIntegrations(context: BackendContext): Promise<Integration[]> {
   const { integrations } = await backendSDK(context).listIntegrations()
-  return integrations.map((integration) => integrationSchema.parse(integration))
+  // Senja's key imports testimonials (lib/content-drafts/senja.ts); it delivers nothing.
+  return integrations
+    .filter((integration) => integration.provider !== 'SENJA')
+    .map((integration) => integrationSchema.parse(integration))
 }
 
 /** Store a new grant (a first connection, or a reconnection of the same account). */

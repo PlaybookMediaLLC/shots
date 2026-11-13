@@ -28,6 +28,13 @@ import {
   draftGiphyAttachContract,
 } from '@/lib/api/contracts/draft-media'
 import {
+  importSenjaVideoContract,
+  listSenjaVideosContract,
+  removeSenjaKeyContract,
+  saveSenjaKeyContract,
+  senjaStatusContract,
+} from '@/lib/api/contracts/senja'
+import {
   mutateCalendarContract,
   getAnalyticsContract,
   refreshAnalyticsContract,
@@ -159,6 +166,11 @@ export const documentedContracts = [
   draftLinkImageContract,
   draftGiphySearchContract,
   draftGiphyAttachContract,
+  senjaStatusContract,
+  saveSenjaKeyContract,
+  removeSenjaKeyContract,
+  listSenjaVideosContract,
+  importSenjaVideoContract,
   mutateCalendarContract,
   listCalendarNotesContract,
   createCalendarNoteContract,

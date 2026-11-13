@@ -5435,6 +5435,481 @@
         ]
       }
     },
+    "/api/v1/integrations/senja": {
+      "get": {
+        "description": "Whether the workspace saved a Senja API key. The key itself is never returned.",
+        "operationId": "getSenjaStatus",
+        "responses": {
+          "200": {
+            "description": "Senja import status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "sealable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "sealable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Read whether Senja import is set up",
+        "tags": [
+          "Workspace"
+        ]
+      },
+      "put": {
+        "description": "Check a Senja project API key with Senja, then seal and save it as the workspace’s one Senja key.",
+        "operationId": "saveSenjaKey",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The key is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "sealable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "sealable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Senja refused the key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Senja is unreachable, or keys cannot be sealed here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Save the workspace’s Senja API key",
+        "tags": [
+          "Workspace"
+        ]
+      },
+      "delete": {
+        "description": "Forget the workspace’s Senja API key. Imported videos stay in the workspace.",
+        "operationId": "removeSenjaKey",
+        "responses": {
+          "200": {
+            "description": "The key is gone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "sealable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "sealable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Remove the workspace’s Senja API key",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/api/v1/content-drafts/senja": {
+      "get": {
+        "description": "The newest approved video testimonials of the workspace’s Senja project, up to 100.",
+        "operationId": "listSenjaVideos",
+        "responses": {
+          "200": {
+            "description": "Video testimonials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "customerName": {
+                            "type": "string"
+                          },
+                          "durationSeconds": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "thumbnailUrl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "customerName",
+                          "durationSeconds",
+                          "id",
+                          "thumbnailUrl"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The workspace has no Senja key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Senja refused the saved key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Senja is unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "List Senja video testimonials to import",
+        "tags": [
+          "Assets"
+        ]
+      },
+      "post": {
+        "description": "Re-read a testimonial from Senja and store its video through the workspace upload pipeline.",
+        "operationId": "importSenjaVideo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,100}$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The video is a workspace asset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assetId": {
+                      "type": "string"
+                    },
+                    "mediaType": {
+                      "type": "string",
+                      "const": "video/mp4"
+                    }
+                  },
+                  "required": [
+                    "assetId",
+                    "mediaType"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The testimonial is no longer in Senja.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The workspace has no Senja key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The testimonial has no usable video, or Senja refused the saved key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Senja is unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Import a Senja video testimonial",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/api/v1/calendar/mutations": {
       "post": {
         "x-shots-entitlement": {

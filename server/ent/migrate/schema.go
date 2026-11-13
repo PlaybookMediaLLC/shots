@@ -1826,7 +1826,7 @@ var (
 	IntegrationConnectionColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
 		{Name: "organizationId", Type: field.TypeString},
-		{Name: "provider", Type: field.TypeEnum, Enums: []string{"SLACK", "NOTION", "FIGMA"}},
+		{Name: "provider", Type: field.TypeEnum, Enums: []string{"SLACK", "NOTION", "FIGMA", "SENJA"}},
 		{Name: "externalId", Type: field.TypeString},
 		{Name: "displayName", Type: field.TypeString},
 		{Name: "encryptedCredentials", Type: field.TypeString},

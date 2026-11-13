@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { createHash } from 'node:crypto'
 import { BackendSDKError } from 'screenshot-studio-backend-sdk'
 import { backendSDK, orNull } from '@/lib/backend/sdk'
 import type { TenantContext } from '@/lib/auth/access'
@@ -41,6 +42,64 @@ export async function completeAssetUpload(
 ) {
   const result = await orNull(backendSDK(context).completeAssetUpload(assetId, sha256, partSha256))
   return result?.asset ?? null
+}
+
+const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+/** Above this, a file goes in parts, as `saveExportToWorkspace` sends one. */
+const PART_BYTES = 16 * 1024 * 1024
+
+/**
+ * Store bytes the server fetched (an import) as an input asset, through the
+ * same reservation, signed upload and Go completion checks as a browser
+ * upload: a large file in parts, each with its digest. Null when storage
+ * did not take it; an unsent reservation is cleaned up like any other.
+ */
+export async function storeFetchedAsset(
+  context: TenantContext,
+  file: { bytes: Uint8Array; contentType: string; fileName: string }
+) {
+  const put = async (url: string, body: Uint8Array, headers: Record<string, string>) =>
+    (
+      await fetch(url, {
+        body: new Uint8Array(body),
+        headers,
+        method: 'PUT',
+        signal: AbortSignal.timeout(120_000),
+      }).catch(() => null)
+    )?.ok === true
+  const reservation = {
+    bytes: file.bytes.length,
+    classification: 'input' as const,
+    contentType: file.contentType,
+    fileName: file.fileName,
+  }
+  if (file.bytes.length <= PART_BYTES) {
+    const digest = sha256(file.bytes)
+    const signed = await signAssetUpload(context, { ...reservation, sha256: digest })
+    // The signed URL is write-once; the header is part of its signature.
+    const sent = await put(signed.uploadUrl, file.bytes, {
+      'content-type': file.contentType,
+      'if-none-match': '*',
+    })
+    return sent ? completeAssetUpload(context, signed.asset.id, digest) : null
+  }
+  const signed = await signAssetUploadInParts(context, reservation)
+  if (!signed.multipart) return null
+  const { partBytes, parts } = signed.multipart
+  const digests: string[] = []
+  for (let number = 1; number <= parts; number++) {
+    const part = file.bytes.subarray((number - 1) * partBytes, number * partBytes)
+    digests.push(sha256(part))
+    // A part that fails is sent again with a fresh URL, twice at most, as the browser does.
+    let sent = false
+    for (let attempt = 0; attempt < 3 && !sent; attempt++) {
+      const { urls } = await signAssetUploadParts(context, signed.asset.id, [number])
+      sent = await put(urls[0]!.url, part, {})
+    }
+    if (!sent) return null
+  }
+  return completeAssetUpload(context, signed.asset.id, undefined, digests)
 }
 
 export async function signAssetDownload(

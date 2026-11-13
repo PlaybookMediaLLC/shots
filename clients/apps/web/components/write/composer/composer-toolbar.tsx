@@ -32,6 +32,8 @@ import { useKeys, useShortcuts } from '../shortcuts'
 import { useWrite } from '../write-context'
 import { PastCaptions } from './past-captions'
 import { GoogleDriveImport } from './google-drive'
+import { SenjaImport } from './senja-import'
+import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { uploadFiles } from './media-strip'
 import { type Command, ComposerCommandsContext, type ComposerTool, commandsFor, rememberCommand } from './commands'
 import { DescribeImages } from './describe-images'
@@ -282,6 +284,13 @@ export function ComposerToolbar({
           config={composer?.drive ?? null}
           onClose={close}
           onFiles={(picked) => void uploadFiles(editor as PlateEditor, picked)}
+        />
+      ) : null}
+      {tool === 'senja' ? (
+        <SenjaImport
+          configured={composer?.senja ?? false}
+          onClose={close}
+          onImported={(asset) => insertAttachments(editor, [draftAssetNode(asset)])}
         />
       ) : null}
       <MediaTools

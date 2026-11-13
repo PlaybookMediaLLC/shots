@@ -30,6 +30,7 @@ function context(overrides: Partial<CommandContext> = {}): CommandContext {
     }),
     drive: null,
     giphy: false,
+    senja: false,
     openTool: () => undefined,
     postSetting: () => undefined,
     snippets: [],
@@ -65,6 +66,13 @@ test('Google Drive is always offered, and says when it is not set up', () => {
   const ready = drive({ drive: { apiKey: 'key', appId: '123456789', clientId: 'client' } })
   assert.ok(ready)
   assert.equal(ready.badge, undefined)
+})
+
+test('Senja is always offered, and says when the workspace has no key', () => {
+  const senja = (overrides: Partial<CommandContext>) =>
+    commandsFor(context(overrides)).find((command) => command.id === 'insert-senja')
+  assert.equal(senja({})?.badge, 'Not set up')
+  assert.equal(senja({ senja: true })?.badge, undefined)
 })
 
 test('AI commands follow the platforms and disappear when AI is off', () => {

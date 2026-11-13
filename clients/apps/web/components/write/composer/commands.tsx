@@ -11,6 +11,7 @@ import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/ssr/ClockC
 import { CopyIcon } from '@phosphor-icons/react/dist/ssr/Copy'
 import { GifIcon } from '@phosphor-icons/react/dist/ssr/Gif'
 import { GoogleDriveLogoIcon } from '@phosphor-icons/react/dist/ssr/GoogleDriveLogo'
+import { VideoCameraIcon } from '@phosphor-icons/react/dist/ssr/VideoCamera'
 import { HashIcon } from '@phosphor-icons/react/dist/ssr/Hash'
 import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
 import { ImagesIcon } from '@phosphor-icons/react/dist/ssr/Images'
@@ -68,6 +69,7 @@ export type ComposerTool =
   | 'link-image'
   | 'media'
   | 'mention'
+  | 'senja'
   | 'snippets'
   | 'captions'
 
@@ -87,6 +89,8 @@ export type CommandContext = {
   giphy: boolean
   /** Google Picker's keys, or null while Drive import is not set up. */
   drive: GoogleDriveConfig | null
+  /** Whether the workspace saved its Senja API key. */
+  senja: boolean
   snippets: readonly Snippet[]
   addMedia: () => void
   openTool: (tool: ComposerTool) => void
@@ -248,6 +252,15 @@ export function commandsFor(context: CommandContext): Command[] {
       id: 'insert-drive',
       label: 'From Google Drive',
       run: () => context.openTool('drive'),
+    },
+    {
+      aliases: ['senja', 'testimonial'],
+      badge: context.senja ? undefined : 'Not set up',
+      group: 'Insert',
+      icon: VideoCameraIcon,
+      id: 'insert-senja',
+      label: 'From Senja',
+      run: () => context.openTool('senja'),
     },
     context.giphy && {
       aliases: ['gif', 'giphy'],
