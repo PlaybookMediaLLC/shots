@@ -56,9 +56,9 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
       push()
       count = measure(word)
     }
-    // A word longer than a post is cut between graphemes, each time at the
-    // longest piece that halving finds (a link can stop it short). A cut can
-    // split a link, so pieces are measured whole.
+    // A word longer than a post is cut between graphemes. Each piece grows by
+    // doubling until it stops fitting, then halves back, so no measure runs far
+    // past a post. A cut can split a link, so pieces are measured whole.
     const ends =
       count > limit
         ? Array.from(
@@ -68,17 +68,22 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
         : []
     let [start, first] = [0, 0]
     while (count > limit) {
-      let [low, high] = [first - 1, ends.length - 2]
+      const fits = (index: number) => measure(word.slice(start, ends[index])) <= limit
+      let [low, high, step] = [first - 1, ends.length - 1, 1]
+      while (low + step <= high && fits(low + step)) [low, step] = [low + step, step * 2]
+      high = Math.min(high, low + step - 1)
       while (low < high) {
         const middle = Math.ceil((low + high) / 2)
-        if (measure(word.slice(start, ends[middle])) <= limit) low = middle
+        if (fits(middle)) low = middle
         else high = middle - 1
       }
       if (low < first) throw new Error('A character sequence exceeds the selected limit.')
-      current = word.slice(start, ends[low])
-      push()
-      ;[start, first] = [ends[low], low + 1]
-      count = measure(word.slice(start))
+      if (low === ends.length - 1) count = measure(word.slice(start))
+      else {
+        current = word.slice(start, ends[low])
+        push()
+        ;[start, first] = [ends[low], low + 1]
+      }
     }
     current += word.slice(start) + space
     counted += count
