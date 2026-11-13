@@ -1,6 +1,6 @@
 {
   "name": "screenshot-studio-backend-sdk",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "description": "Typed server SDK for the Screenshot Studio Go backend",
   "type": "module",
   "license": "Apache-2.0",
