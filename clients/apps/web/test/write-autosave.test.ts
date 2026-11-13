@@ -493,3 +493,51 @@ test('typing during a delayed conflict reload is preserved in the conflict copy'
   await act(async () => editor.state.discardConflict())
   await editor.unmount()
 })
+
+test('offline edits show as unsaved and every one saves when the network returns', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let online = false
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => online })
+  t.after(() => Reflect.deleteProperty(navigator, 'onLine'))
+  const save = t.mock.method(draftsApi, 'save', async (_id: string, input: DraftSave) => {
+    if (!online) throw new TypeError('Failed to fetch')
+    return { ...draft, ...input, version: 2 }
+  })
+  // Let the autosave timer fire and its request settle.
+  const autosave = () =>
+    act(async () => {
+      t.mock.timers.tick(800)
+      await new Promise((resolve) => setImmediate(resolve))
+    })
+  const leaving = () => {
+    const event = new dom.window.Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    return event.defaultPrevented
+  }
+  const editor = await mount()
+  await act(async () => editor.state.update({ title: 'Written offline' }))
+  await autosave()
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(editor.state.saveState, 'offline')
+  await act(async () => editor.state.update({ value: paragraph('A second offline edit') }))
+  assert.equal(editor.state.saveState, 'unsaved')
+  await autosave()
+  assert.equal(editor.state.saveState, 'offline')
+  assert.equal(leaving(), true, 'leaving with unsaved edits asks first')
+  // Nothing retries until the network returns.
+  await act(async () => t.mock.timers.tick(60_000))
+  assert.equal(save.mock.callCount(), 2)
+  online = true
+  await act(async () => {
+    window.dispatchEvent(new dom.window.Event('online'))
+    await new Promise((resolve) => setImmediate(resolve))
+  })
+  assert.equal(save.mock.callCount(), 3)
+  const saved = save.mock.calls[2].arguments[1]
+  assert.equal(saved.title, 'Written offline')
+  assert.deepEqual(saved.body, paragraph('A second offline edit'))
+  assert.equal(saved.plainText, 'A second offline edit')
+  assert.equal(editor.state.saveState, 'saved')
+  assert.equal(leaving(), false)
+  await editor.unmount()
+})

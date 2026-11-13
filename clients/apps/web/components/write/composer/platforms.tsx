@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import { platformCaptionLength, serializeDraft } from '@/lib/content-drafts/serialize'
+import { overflowAt, serializeDraft } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import type {
   DraftChannel,
@@ -626,16 +626,6 @@ export function SyncedVersion({
       })}
     </div>
   )
-}
-
-/** Where a caption passes a platform's limit, counted as the platform counts it. */
-function overflowAt(channel: DraftChannel, caption: string, limit: number): number {
-  let at = caption.length
-  while (at > 0 && platformCaptionLength(channel, caption.slice(0, at)) > limit) {
-    const code = caption.charCodeAt(at - 1)
-    at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
-  }
-  return at
 }
 
 /** A manual version's notice: edited on its own, and whether the primary changed since. */

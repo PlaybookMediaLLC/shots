@@ -469,7 +469,11 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 			// This is the application's article-size bound, not an X entitlement.
 			limit = 100_000
 		}
-		if length := draftPostLength(channel, target.Caption); length > limit {
+		length, err := draftPostLength(channel, target.Caption)
+		if err != nil {
+			return nil, nil, conflict(fmt.Sprintf("The %s caption is too long or too complex to count. Shorten it.", channel))
+		}
+		if length > limit {
 			return nil, nil, conflict(fmt.Sprintf("The %s caption is %d characters; the limit is %d.", channel, length, limit))
 		}
 		if err := checkDraftReplies(ctx, tx, organizationID, channel, limit, target.Replies); err != nil {
@@ -534,10 +538,10 @@ func checkDraftExtras(channel string, target ContentDraftScheduleTarget) error {
 			actions.RepostAtLikes > 1_000_000 || actions.PlugAtLikes > 1_000_000 || actions.QuoteAfterHours > 24*30 {
 			return invalid("Set like counts and hours as small positive numbers.")
 		}
-		if actions.PlugAtLikes > 0 && (strings.TrimSpace(actions.PlugText) == "" || xLength(actions.PlugText) > 280) {
+		if actions.PlugAtLikes > 0 && !fitsXPost(actions.PlugText, 0) {
 			return invalid("The auto reply needs text that fits in one X post.")
 		}
-		if actions.QuoteAfterHours > 0 && (strings.TrimSpace(actions.QuoteText) == "" || xLength(actions.QuoteText)+1+xLinkLength > 280) {
+		if actions.QuoteAfterHours > 0 && !fitsXPost(actions.QuoteText, 1+xLinkLength) {
 			return invalid("The quote needs text that fits in one X post with the link.")
 		}
 		if actions.PlugMetric != "" && actions.PlugMetric != "likes" && actions.PlugMetric != "reposts" {
@@ -649,7 +653,11 @@ func checkDraftReplies(ctx context.Context, tx *ent.Tx, organizationID, channel 
 	for index := range replies {
 		reply := &replies[index]
 		reply.Caption = strings.TrimSpace(reply.Caption)
-		if length := draftPostLength(channel, reply.Caption); length > limit {
+		length, err := draftPostLength(channel, reply.Caption)
+		if err != nil {
+			return conflict(fmt.Sprintf("Post %d is too long or too complex to count. Shorten it.", index+2))
+		}
+		if length > limit {
 			return conflict(fmt.Sprintf("Post %d is %d characters; the %s limit is %d.", index+2, length, channel, limit))
 		}
 		if err := checkLinkPreviewMedia(reply.Options, len(reply.AssetIDs)); err != nil {
