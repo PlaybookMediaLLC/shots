@@ -11,6 +11,7 @@ import type { SaveResult } from '@/components/settings/PreferencesProvider'
 const { JSDOM } = createRequire(import.meta.url)('jsdom')
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' })
 const originals = Object.getOwnPropertyDescriptors(globalThis)
+const realSetTimeout = setTimeout // some tests mock timers until after afterEach
 const browser = {
   window: dom.window,
   location: dom.window.location,
@@ -69,6 +70,9 @@ afterEach(async () => {
   await act(async () => root?.unmount())
   root = null
   document.body.replaceChildren()
+  // Radix's FocusScope dispatches its unmount event from a timer; let it run
+  // while jsdom's globals are installed, not after `after` restores Node's.
+  await new Promise((resolve) => realSetTimeout(resolve, 0))
 })
 after(() => {
   dom.window.close()
