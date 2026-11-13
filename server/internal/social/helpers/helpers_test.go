@@ -85,28 +85,27 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
 		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
 	}
-	cases := map[string]struct {
-		text    string
-		refused bool
-	}{
-		"a.":         {strings.Repeat("a.", 5000), false},
-		"https://a.": {"https://" + strings.Repeat("a.", 5000), false},
-		"many words": {strings.Repeat(" https://"+strings.Repeat("a.", 25), 200), false},
-		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), false},
+	cases := map[string]string{
+		"a.":         strings.Repeat("a.", 5000),
+		"https://a.": "https://" + strings.Repeat("a.", 5000),
+		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+		"(a)":        "https://a.co/" + strings.Repeat("(a)", 8000),
+		// Ending characters between the groups, and a port, or a colon
+		// without one, before the path: each path is still read in one pass.
+		"a(a)":     "https://a.co/" + strings.Repeat("a(a)", 8000),
+		"port (a)": "https://a.co:80/" + strings.Repeat("(a)", 8000),
+		"no port":  strings.Repeat("a.co:/(a)", 3000),
+		// A long xn-- domain: its ASCII-only scan waits for the length check.
+		"xn--": "https://xn--a." + strings.Repeat("a.日", 40000) + ".com",
 	}
-	for name, c := range cases {
+	for name, text := range cases {
 		for scan, run := range scans {
 			start := time.Now()
-			err := run(c.text)
+			if err := run(text); err != nil {
+				t.Errorf("%s(%s) error = %v", scan, name, err)
+			}
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("%s(%s) took %v", scan, name, elapsed)
-			}
-			var want error
-			if c.refused {
-				want = ErrTextTooComplex
-			}
-			if !errors.Is(err, want) {
-				t.Errorf("%s(%s) error = %v, want %v", scan, name, err, want)
 			}
 		}
 	}
@@ -125,8 +124,13 @@ func liftTextBudget(t *testing.T) {
 // A text longer than any caption gets no more time than the longest one: 1 MiB
 // of slow words took 21 s while the budget grew with length.
 func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
-	// Many words, and one word: its TLD checks within the word stop too.
-	for _, text := range []string{strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59), strings.Repeat("a.", 1<<19)} {
+	// Many words; one word, whose TLD checks stop too; and many bare domains,
+	// each with an ASCII-only scan of a TLD check per label.
+	for _, text := range []string{
+		strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59),
+		strings.Repeat("a.", 1<<19),
+		strings.Repeat("!"+strings.Repeat("`a.", 1333)+"com", 1<<20/4003),
+	} {
 		start := time.Now()
 		if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("WeightedLength(%.12q…) error = %v", text, err)
@@ -236,7 +240,7 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 	// The path's segments: validUrlPath, cut from extractURLSource.
 	pathAt := jsRegexp(`\G`+strings.TrimSuffix(sourceSpan(`\/(?:(?:`, `*)?(\?`), `)?(\?`), regexp2.IgnoreCase)
 	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
-		"(a)", "((a)b)", ")", "!", "Ж", "é", ":80",
+		"(a)", "((a)b)", ")", "!", "Ж", "é", ":80", "a.co:80/",
 		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
 	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
@@ -277,8 +281,11 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 			}
 		}
 		for s, c := range text {
-			if want := matchEnd(pathAt, text, s, 0); c == '/' && urlPathEnd(text, s+1) != want {
-				t.Errorf("urlPathEnd(%q, %d) = %d, want %d", raw, s+1, urlPathEnd(text, s+1), want)
+			if c != '/' {
+				continue
+			}
+			if got, want := urlPathEnd(text, s+1), matchEnd(pathAt, text, s, 0); got != want {
+				t.Errorf("urlPathEnd(%q, %d) = %d, want %d", raw, s+1, got, want)
 			}
 		}
 		for s, end := range asciiDomainEnds(text) {
@@ -317,6 +324,9 @@ func TestWeightedLengthOfLongText(t *testing.T) {
 		// A path of parenthesised groups, which regexp2 rescanned after each
 		// one: one link, and past 4,096 characters no link at all.
 		{"https://a.co/" + strings.Repeat("(a)", 1300), 23},
+		// The longest link, and one character more.
+		{"https://a.co/" + strings.Repeat("a", 4075), 23},
+		{"https://a.co/" + strings.Repeat("a", 4076), 13 + 4076},
 		{"https://a.co/" + strings.Repeat("(a)", 8000), 13 + 3*8000},
 		{"https://a.co/" + strings.Repeat("((a))", 19000), 13 + 5*19000},
 	} {

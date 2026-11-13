@@ -452,6 +452,10 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 	}
 	var urls []*urlEntity
 	for _, m := range matches {
+		// A domain's ASCII-only scan below makes a TLD check per label.
+		if time.Now().After(deadline) {
+			return nil, ErrTextTooComplex
+		}
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
@@ -674,24 +678,16 @@ func urlPathAfterDomain(text []rune, domainEnd int) (start, end int) {
 // the first of these that matches: path characters and parenthesised groups
 // up to an ending character; one parenthesised group; or @, path characters
 // and a slash, which never matches where the first fails, since its slash
-// ends the first. Once the first fails it fails on every later segment, which
-// only skips its groups, so it is tried at most twice.
+// ends the first. The first reaches every ending character the segments
+// after it could, so it matches at most once, at i, and only groups follow.
 func urlPathEnd(text []rune, i int) int {
-	first := true
-	for {
-		if first {
-			if end := urlPathSegmentEnd(text, i); end >= 0 {
-				i = end
-				continue
-			}
-			first = false
-		}
-		if end := regexEnd(urlPathParensRe, text, i); end >= 0 {
-			i = end
-			continue
-		}
-		return i
+	if end := urlPathSegmentEnd(text, i); end >= 0 {
+		i = end
 	}
+	for end := regexEnd(urlPathParensRe, text, i); end >= 0; end = regexEnd(urlPathParensRe, text, i) {
+		i = end
+	}
+	return i
 }
 
 // urlPathSegmentEnd is where path characters and parenthesised groups up to
@@ -721,7 +717,7 @@ func sourceSpan(from, through string) string {
 	i := strings.Index(extractURLSource, from)
 	j := strings.Index(extractURLSource[max(i, 0):], through)
 	if i < 0 || j < 0 {
-		panic("twitter-text: no " + from + " in extractURLSource")
+		panic("twitter-text: no " + from + " … " + through + " in extractURLSource")
 	}
 	return extractURLSource[i : i+j+len(through)]
 }
@@ -761,12 +757,7 @@ next:
 // validTLDSource is validDomain's TLD alternatives, cut from extractURLSource
 // after the last label's dot.
 func validTLDSource() string {
-	const lastLabelEnd, tldEnd = `\.)(?:(?:(?:`, `|(?:xn--[\-0-9a-z]+))`
-	start, end := strings.Index(extractURLSource, lastLabelEnd), strings.Index(extractURLSource, tldEnd)
-	if start < 0 || end < start {
-		panic("twitter-text: no TLD alternatives in extractURLSource")
-	}
-	return extractURLSource[start+len(`\.)`) : end+len(tldEnd)]
+	return sourceSpan(`\.)(?:(?:(?:`, `|(?:xn--[\-0-9a-z]+))`)[len(`\.)`):]
 }
 
 func indexRunes(s, sub []rune, from int) int {
