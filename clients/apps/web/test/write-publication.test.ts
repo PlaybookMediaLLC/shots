@@ -8,6 +8,7 @@ import {
   type PublicationDraft,
 } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
+import type { AccountStanding } from '@/lib/write/capabilities'
 import { optionsSummary } from '@/components/write/composer/video-options'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
@@ -367,24 +368,19 @@ test("X video needs the account's verified video length, as Go requires", () => 
     body: [p('Clip'), { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }],
   })
   const reconnect = "Reconnect X to verify this account's video limits."
-  assert.ok(buildPublication(value, { ...x, standing: {} }).accountProblems.includes(reconnect))
-  assert.ok(
-    buildPublication(value, { ...x, standing: { xVideoMaxSeconds: null } }).problems.includes(
-      reconnect
-    )
-  )
-  assert.ok(
-    !buildPublication(value, { ...x, standing: { xVideoMaxSeconds: 1200 } }).problems.includes(
-      reconnect
-    )
-  )
-  // The account-free preview and images alone are not judged.
-  assert.ok(!buildPublication(value, x).problems.includes(reconnect))
-  assert.ok(
-    !buildPublication(draft({ body: [p('Text')] }), { ...x, standing: {} }).problems.includes(
-      reconnect
-    )
-  )
+  const read = { maxWeightedCharacters: 280 as const }
+  const problems = (standing?: AccountStanding, body = value) =>
+    buildPublication(body, { ...x, standing }).accountProblems
+  // A read standing that reports no verified length refuses X video, as Go does.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 0 }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 1200 }), [])
+  // Unknown is left to Go: an unread standing, an older API without the field, the preview.
+  assert.deepEqual(problems({ maxWeightedCharacters: null, xVideoMaxSeconds: null }), [])
+  assert.deepEqual(problems(read), [])
+  assert.deepEqual(problems(undefined), [])
+  // Images alone are not judged.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }, draft({ body: [p('Text')] })), [])
 })
 
 test('Mastodon quotes require a verified server and quote lookup scopes', () => {

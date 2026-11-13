@@ -278,10 +278,14 @@ export function buildPublication(
       optionProblems.push('Branded TikTok content cannot be private.')
   }
   // Go refuses X video until the account's video length is verified (socialidentity.CheckXMedia).
+  // Only a standing that was read (it has a caption limit) and reports no length says so; an
+  // unread standing, or an API without the field, is unknown and left to Go, like the caption limit.
+  const standing = account.standing
   if (
     channel === 'x' &&
-    account.standing &&
-    !account.standing.xVideoMaxSeconds &&
+    standing?.maxWeightedCharacters &&
+    standing.xVideoMaxSeconds !== undefined &&
+    !standing.xVideoMaxSeconds &&
     serialized.posts.some((post) => post.videos > 0)
   )
     accountProblems.push("Reconnect X to verify this account's video limits.")

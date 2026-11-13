@@ -121,8 +121,14 @@ test("an X video longer than the account's verified length is refused in Go's wo
   const reconnect = "Reconnect X to verify this account's video limits."
   const card = (account: BatchAccount) =>
     previewPublications(video(600_000), [account], {}).cards[0]!.publication.problems
-  assert.ok(card({ ...accounts[2], xVideoMaxSeconds: null }).includes(reconnect))
-  assert.ok(!card(standard[0]!).includes(reconnect))
+  assert.ok(
+    card({ ...accounts[2], xCaptionLimit: 280, xVideoMaxSeconds: null }).includes(reconnect)
+  )
+  assert.ok(!card({ ...standard[0]!, xCaptionLimit: 280 }).includes(reconnect))
+  // An account whose standing could not be read is left to Go.
+  assert.ok(
+    !card({ ...accounts[2], xCaptionLimit: null, xVideoMaxSeconds: null }).includes(reconnect)
+  )
 })
 
 test('a local time is read in its own zone, refusing skipped and unchosen repeated times', () => {
