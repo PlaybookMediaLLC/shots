@@ -72,6 +72,23 @@ done, 429 and 5xx retry, and another status is a refusal.
 | Instagram | Not supported | Meta [announced media deletion](https://developers.facebook.com/blog/post/2025/12/03/instragram-api-updates/) for accounts linked through a Facebook Page. Shots uses Instagram Login; support there is not confirmed. |
 | TikTok | Not supported | The Content Posting API has no delete call. |
 
+## Retry timing and known limits
+
+- A rate limit (HTTP 429) that names its reset retries one second after it:
+  X's `x-rate-limit-reset`, or a `Retry-After` header. Other busy answers use
+  Temporal's backoff: 10 seconds, doubling, at most 15 minutes. After 8
+  attempts the part is `failed`, and a new request retries it.
+- A reset more than 15 minutes away, such as a daily cap (Threads allows 100
+  deletes a day), fails the part at once, so no run waits for hours. A new
+  request after the reset retries the part.
+- Meta can report throttling as HTTP 400 or 403. Shots then records a
+  refusal, not a retry. This is not confirmed for the Threads delete call;
+  map it in the Threads adapter once a real answer shows it.
+- `post_deletion.requestedBy` keeps who first asked for each part. The audit
+  log has every request. The owner chose to keep the column (2026-11-13).
+- Delete parts share the social activity worker with publishing. Give them
+  their own task queue if bulk deletes measurably delay scheduled posts.
+
 ## Slices
 
 | Slice | Scope | Owner |

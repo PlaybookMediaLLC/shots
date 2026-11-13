@@ -215,32 +215,29 @@ func (f *deletingPoster) DeletePost(_ context.Context, _ *socialent.Integration,
 	return f.answer
 }
 
-// A delete part undoes a repost or deletes a record through the account, and
-// passes the provider's answer back with its status; a platform without a
-// delete call is unsupported.
-func TestDeleteRemoteDispatchesEachPart(t *testing.T) {
+// Deleting a record of a live post goes to the account's provider and passes
+// the provider's answer back with its status; a platform without a delete
+// call is unsupported.
+func TestAutomateDeletesARecord(t *testing.T) {
 	p, _, _, _ := directFixture()
 	provider := &deletingPoster{answer: &integrations.HTTPError{Status: 404}}
 	p.resolve = func(string) poster { return provider }
 	ctx := context.Background()
-	input := socialapi.DeleteInput{DestinationID: "destination", OrganizationID: "product-org", Platform: "linkedin",
-		RemoteID: "remote-post-1", SecretReference: "SOCIAL_API_KEY"}
-	repost, post := input, input
-	repost.Kind, post.Kind = "repost", "post"
-	if err := p.DeleteRemote(ctx, repost); err != nil {
-		t.Fatal(err)
-	}
+	input := socialapi.AutomationInput{DestinationID: "destination", Kind: "delete", OrganizationID: "product-org",
+		Platform: "linkedin", RemotePostID: "remote-post-1", SecretReference: "SOCIAL_API_KEY"}
 	var status interface{ HTTPStatus() int }
-	if err := p.DeleteRemote(ctx, post); !errors.As(err, &status) || status.HTTPStatus() != 404 {
+	if _, err := p.Automate(ctx, input); !errors.As(err, &status) || status.HTTPStatus() != 404 {
 		t.Fatalf("delete error = %v", err)
 	}
-	if fmt.Sprint(provider.actions) != "[unretweet:remote-post-1 delete:remote-post-1]" {
+	provider.answer = nil
+	if result, err := p.Automate(ctx, input); err != nil || !result.Done {
+		t.Fatalf("delete = %+v, %v", result, err)
+	}
+	if fmt.Sprint(provider.actions) != "[delete:remote-post-1 delete:remote-post-1]" {
 		t.Fatalf("actions = %v", provider.actions)
 	}
 	p.resolve = func(string) poster { return &fakePoster{} }
-	for _, part := range []socialapi.DeleteInput{repost, post} {
-		if err := p.DeleteRemote(ctx, part); !errors.Is(err, socialapi.ErrUnsupported) {
-			t.Fatalf("%s on a platform without the call: %v", part.Kind, err)
-		}
+	if _, err := p.Automate(ctx, input); !errors.Is(err, socialapi.ErrUnsupported) {
+		t.Fatalf("delete on a platform without the call: %v", err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -26,6 +27,11 @@ const (
 	// deleteMaxAttempts bounds the retries of a transient answer; the last
 	// one records the part failed, so no receipt stays pending.
 	deleteMaxAttempts = 8
+	// deleteMaxRetryDelay is the longest wait for a platform's reset: X's
+	// 15-minute window. It is also the retry policy's MaximumInterval, which
+	// the server applies to a requested delay. A later reset, such as a daily
+	// cap, fails the part at once; a new request retries it.
+	deleteMaxRetryDelay = 15 * time.Minute
 )
 
 // DeleteWorkflowID gives each post one delete run; a repeated request joins it.
@@ -52,10 +58,6 @@ type deletionStore interface {
 	SettleDeletion(ctx context.Context, postID string) (bool, error)
 }
 
-type remoteDeleter interface {
-	DeleteRemote(ctx context.Context, input socialapi.DeleteInput) error
-}
-
 // PostDeleteWorkflow removes each pending part in order. A part that cannot
 // be removed is recorded and the others continue. It plans twice: a reply or
 // repost that a follow-up made while the first pass ran is in the second.
@@ -67,7 +69,7 @@ func PostDeleteWorkflow(ctx workflow.Context, input DeleteWorkflowInput) error {
 	social := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		TaskQueue: queueOr(input.ActivityTaskQueue, DefaultActivityQueue), StartToCloseTimeout: 2 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			InitialInterval: 10 * time.Second, BackoffCoefficient: 2, MaximumInterval: 5 * time.Minute,
+			InitialInterval: 10 * time.Second, BackoffCoefficient: 2, MaximumInterval: deleteMaxRetryDelay,
 			MaximumAttempts: deleteMaxAttempts,
 		},
 	})
@@ -118,18 +120,29 @@ func (a *Activities) DeletePart(ctx context.Context, input DeletePartInput) erro
 		return nil
 	}
 	plan, part := input.Plan, input.Part
-	status, code, retry := ReceiptUnsupported, "unsupported", false
-	if actor, ok := a.provider.(remoteDeleter); ok {
-		status, code, retry = deletionOutcome(actor.DeleteRemote(ctx, socialapi.DeleteInput{
-			DestinationID: plan.DestinationID, Kind: part.Kind, OrganizationID: plan.OrganizationID,
-			Platform: plan.Platform, RemoteID: part.RemoteID, SecretReference: plan.SecretReference,
-		}))
+	// A repost is undone; a post, thread part or reply is deleted.
+	kind := "delete"
+	if part.Kind == "repost" {
+		kind = AutomationUnretweet
+	}
+	err := socialapi.ErrUnsupported
+	if actor, ok := a.provider.(automator); ok {
+		_, err = actor.Automate(ctx, socialapi.AutomationInput{
+			DestinationID: plan.DestinationID, Kind: kind, OrganizationID: plan.OrganizationID,
+			Platform: plan.Platform, RemotePostID: part.RemoteID, SecretReference: plan.SecretReference,
+		})
+	}
+	status, code, retry := deletionOutcome(err)
+	wait := retryDelay(err, time.Now())
+	if retry && wait > deleteMaxRetryDelay {
+		retry, status = false, ReceiptFailed
 	}
 	if retry && activity.GetInfo(ctx).Attempt < deleteMaxAttempts {
 		if err := store.RecordDeletion(ctx, plan.PostID, part.Key, ReceiptPending, code); err != nil {
 			return err
 		}
-		return temporal.NewApplicationError("the platform did not answer the delete; it will be retried", "delete_transient")
+		return temporal.NewApplicationErrorWithOptions("the platform did not answer the delete; it will be retried",
+			"delete_transient", temporal.ApplicationErrorOptions{NextRetryDelay: wait})
 	}
 	if retry {
 		status = ReceiptFailed
@@ -144,6 +157,23 @@ func (a *Activities) SettleDeletion(ctx context.Context, postID string) error {
 		return err
 	}
 	return nil
+}
+
+// retryDelay is the wait until a rate limit's reset (X's x-rate-limit-reset,
+// a Retry-After header), with a second for clock skew. Only a 429 names a
+// reset worth waiting for; zero keeps Temporal's backoff.
+func retryDelay(err error, now time.Time) time.Duration {
+	var limited interface {
+		HTTPStatus() int
+		RetryAt() time.Time
+	}
+	if !errors.As(err, &limited) || limited.HTTPStatus() != http.StatusTooManyRequests {
+		return 0
+	}
+	if wait := limited.RetryAt().Sub(now); !limited.RetryAt().IsZero() && wait > 0 {
+		return wait + time.Second
+	}
+	return 0
 }
 
 // deletionOutcome classifies a delete: gone (404, 410) counts as done; a

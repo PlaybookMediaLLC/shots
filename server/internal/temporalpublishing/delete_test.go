@@ -3,11 +3,14 @@ package temporalpublishing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -96,19 +99,20 @@ type scriptedDeleter struct {
 	directProvider
 	mu      sync.Mutex
 	answers map[string][]error
-	calls   []socialapi.DeleteInput
+	calls   []socialapi.AutomationInput
 }
 
-func (d *scriptedDeleter) DeleteRemote(_ context.Context, in socialapi.DeleteInput) error {
+func (d *scriptedDeleter) Automate(_ context.Context, in socialapi.AutomationInput) (socialapi.AutomationResult, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.calls = append(d.calls, in)
-	answers := d.answers[in.Kind+":"+in.RemoteID]
+	key := in.Kind + ":" + in.RemotePostID
+	answers := d.answers[key]
 	if len(answers) == 0 {
-		return nil
+		return socialapi.AutomationResult{Done: true}, nil
 	}
-	d.answers[in.Kind+":"+in.RemoteID] = answers[1:]
-	return answers[0]
+	d.answers[key] = answers[1:]
+	return socialapi.AutomationResult{}, answers[0]
 }
 
 // The workflow removes each pending part in order, retries a busy platform,
@@ -126,9 +130,9 @@ func TestPostDeleteWorkflow(t *testing.T) {
 		}},
 		late: []publishing.DeletionPart{{Key: "first-comment", Kind: "post", RemoteID: "comment", Status: ReceiptPending}}}
 	deleter := &scriptedDeleter{answers: map[string][]error{
-		"post:busy":   {httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503)},
-		"post:reply":  {httpError(503), nil},
-		"repost:root": {httpError(403)},
+		"delete:busy":    {httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503), httpError(503)},
+		"delete:reply":   {httpError(503), nil},
+		"unretweet:root": {httpError(403)},
 	}}
 	activities := NewActivities(store, deleter)
 	var suite testsuite.WorkflowTestSuite
@@ -153,7 +157,80 @@ func TestPostDeleteWorkflow(t *testing.T) {
 	}
 	// 8 busy tries, 2 for the reply, the repost, the root, then the late reply.
 	last := deleter.calls[len(deleter.calls)-1]
-	if len(deleter.calls) != deleteMaxAttempts+5 || last.RemoteID != "comment" || deleter.calls[deleteMaxAttempts+3].RemoteID != "root" || deleter.calls[0].DestinationID != "conn-1" {
+	// A repost part is undone, every other part deleted.
+	repost := deleter.calls[deleteMaxAttempts+2]
+	if len(deleter.calls) != deleteMaxAttempts+5 || last.RemotePostID != "comment" || last.Kind != "delete" ||
+		repost.Kind != "unretweet" || repost.RemotePostID != "root" ||
+		deleter.calls[deleteMaxAttempts+3].RemotePostID != "root" || deleter.calls[0].DestinationID != "conn-1" {
 		t.Fatalf("calls %+v", deleter.calls)
+	}
+}
+
+type resetError struct {
+	at     time.Time
+	status int
+}
+
+func (e resetError) Error() string      { return "rate limited" }
+func (e resetError) HTTPStatus() int    { return e.status }
+func (e resetError) RetryAt() time.Time { return e.at }
+
+// A rate limit that names its reset is retried a second after it; any other
+// answer keeps Temporal's backoff.
+func TestDeleteRetryWaitsForThePlatformReset(t *testing.T) {
+	now := time.Date(2026, 11, 13, 16, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		err  error
+		want time.Duration
+	}{
+		{resetError{now.Add(90 * time.Second), 429}, 91 * time.Second},
+		{fmt.Errorf("wrapped: %w", resetError{now.Add(3 * time.Hour), 429}), 3*time.Hour + time.Second},
+		{resetError{now.Add(-time.Minute), 429}, 0},
+		{resetError{time.Time{}, 429}, 0},
+		{resetError{now.Add(10 * time.Minute), 503}, 0},
+		{httpError(503), 0},
+	} {
+		if got := retryDelay(tc.err, now); got != tc.want {
+			t.Errorf("%v: got %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
+// DeletePart asks Temporal to wait for the reset, fails a part at once when
+// the reset is further away than X's window, and fails a removed account.
+func TestDeletePartWaitsForTheResetOrFails(t *testing.T) {
+	store := &deletionReceipts{status: map[string]string{}, code: map[string]string{}, tries: map[string]int{}}
+	reset := time.Now().Add(2 * time.Minute)
+	deleter := &scriptedDeleter{answers: map[string][]error{
+		"delete:soon":  {resetError{reset, 429}},
+		"delete:later": {resetError{time.Now().Add(6 * time.Hour), 429}},
+		"delete:gone":  {socialapi.NewCodedError(404, publishing.FailureAccountReconnect, "removed")},
+	}}
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestActivityEnvironment()
+	activities := NewActivities(store, deleter)
+	env.RegisterActivityWithOptions(activities.DeletePart, activity.RegisterOptions{Name: DeletePartActivityName})
+	part := func(id string) DeletePartInput {
+		return DeletePartInput{Plan: publishing.DeletionPlan{PostID: "post-1", Platform: "x"},
+			Part: publishing.DeletionPart{Key: id, Kind: "post", RemoteID: id, Status: ReceiptPending}}
+	}
+	_, err := env.ExecuteActivity(DeletePartActivityName, part("soon"))
+	var retry *temporal.ApplicationError
+	if !errors.As(err, &retry) || retry.NextRetryDelay() < time.Minute || retry.NextRetryDelay() > deleteMaxRetryDelay {
+		t.Fatalf("soon: %v", err)
+	}
+	if store.status["soon"] != ReceiptPending || store.code["soon"] != "http_429" {
+		t.Fatalf("soon receipt %s %s", store.status["soon"], store.code["soon"])
+	}
+	if _, err := env.ExecuteActivity(DeletePartActivityName, part("later")); err != nil {
+		t.Fatalf("later: %v", err)
+	}
+	if store.status["later"] != ReceiptFailed || store.code["later"] != "http_429" || store.tries["later"] != 1 {
+		t.Fatalf("later receipt %s %s after %d tries", store.status["later"], store.code["later"], store.tries["later"])
+	}
+	// A removed account is Shots' own refusal: failed, never counted as deleted.
+	if _, err := env.ExecuteActivity(DeletePartActivityName, part("gone")); err != nil || store.status["gone"] != ReceiptFailed ||
+		store.code["gone"] != publishing.FailureAccountReconnect {
+		t.Fatalf("gone: %v %s %s", err, store.status["gone"], store.code["gone"])
 	}
 }

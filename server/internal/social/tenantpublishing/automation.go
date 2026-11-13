@@ -32,8 +32,8 @@ type (
 )
 
 // Automate runs one follow-up of a live post: a first comment, a thumbnail, a repost or
-// its removal, a plug or like-gated repost once its threshold is met, or a
-// quote. Thresholds count likes unless Metric is reposts. A platform that
+// its removal, a plug or like-gated repost once its threshold is met, a
+// quote, or the delete of one of its records. Thresholds count likes unless Metric is reposts. A platform that
 // cannot do the step reports socialapi.ErrUnsupported.
 func (p *Publisher) Automate(ctx context.Context, input socialapi.AutomationInput) (socialapi.AutomationResult, error) {
 	account, provider, settings, err := p.account(ctx, input.OrganizationID, input.DestinationID, input.Platform,
@@ -123,6 +123,15 @@ func (p *Publisher) Automate(ctx context.Context, input socialapi.AutomationInpu
 			return socialapi.AutomationResult{}, temporalx.UnknownDelivery(input.Platform, "The provider returned no quote receipt. Reconcile before resending.")
 		}
 		return socialapi.AutomationResult{Done: true, RemoteID: firstPostID(posted)}, nil
+	case "delete":
+		// A part of a post Shots deletes (#557); the provider's error keeps its
+		// HTTP status, so the delete workflow can classify it.
+		deleter, ok := provider.(integrations.PostDeleter)
+		if !ok {
+			return socialapi.AutomationResult{}, socialapi.ErrUnsupported
+		}
+		err := deleter.DeletePost(ctx, account, post)
+		return socialapi.AutomationResult{Done: err == nil}, err
 	}
 	return socialapi.AutomationResult{}, socialapi.ErrUnsupported
 }

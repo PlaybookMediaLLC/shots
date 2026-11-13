@@ -89,7 +89,8 @@ type AutoActionResult struct {
 }
 
 // AutomationInput is one follow-up of a live post (RFC 025). Kind is a
-// temporalpublishing step kind; Threshold and Metric gate a plug or a
+// temporalpublishing step kind, or "delete" for a record of a post Shots
+// deletes (#557); Threshold and Metric gate a plug or a
 // like-gated repost; Text is a first comment, plug or quote.
 type AutomationInput struct {
 	DestinationID   string
@@ -114,17 +115,6 @@ type AutomationResult struct {
 
 // ErrUnsupported is a follow-up the account's platform cannot do.
 var ErrUnsupported = errors.New("the platform does not support this follow-up")
-
-// DeleteInput is one part of deleting a published post: Kind post deletes
-// RemoteID, Kind repost undoes the account's repost of RemoteID.
-type DeleteInput struct {
-	DestinationID   string
-	Kind            string
-	OrganizationID  string
-	Platform        string
-	RemoteID        string
-	SecretReference string
-}
 
 // Media is every file to publish, in order.
 func (input PublishInput) Media() []publishing.MediaAsset {
