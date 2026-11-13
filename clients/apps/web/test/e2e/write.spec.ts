@@ -480,6 +480,14 @@ test('an old draft’s code block and heading keep the kit’s layout, and markd
     return false
   })
   expect(boxed).toBe(true)
+  // Its block menu leaves out Ask AI: Write's editor has no AI plugin, so the item threw.
+  await editor.getByText('const answer = 42', { exact: true }).hover()
+  await editor.getByRole('button', { name: 'Block actions' }).click()
+  const actions = page.getByRole('listbox')
+  await expect(actions.getByRole('option', { name: /^Delete/ })).toBeVisible()
+  await expect(actions.getByRole('option', { name: /Ask AI/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(actions).toHaveCount(0)
   // The heading's text flows as one paragraph; the kit's flex row would set the bold run beside it.
   const leadBox = await editor.getByText(lead).boundingBox()
   const endBox = await editor.getByText('a bold end', { exact: true }).boundingBox()
