@@ -72,7 +72,7 @@ func TestPostDeletionLifecycle(t *testing.T) {
 		}
 		keys = append(keys, part.Key+"="+part.RemoteID)
 	}
-	if strings.Join(keys, ",") != "plug=reply-1,repost:retweet:0=root-1,root=root-1" || plan.DestinationID != "connection_"+id || plan.Platform != "x" {
+	if strings.Join(keys, ",") != "plug=reply-1,repost:retweet:0=root-1,root=root-1" || plan.DestinationID != "destination" || plan.Platform != "x" {
 		t.Fatalf("plan %+v keys %v", plan, keys)
 	}
 	var pending string

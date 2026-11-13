@@ -86,7 +86,8 @@ func (r *Repository) PlanDeletion(ctx context.Context, organizationID, postID, r
 		parts[i].Status = status[parts[i].Key]
 	}
 	return &DeletionPlan{
-		OrganizationID: organizationID, PostID: postID, DestinationID: connection.ID,
+		// The social account, as the publish job names it, not the connection row.
+		OrganizationID: organizationID, PostID: postID, DestinationID: connection.ExternalAccountID,
 		Platform: connection.Platform, SecretReference: connection.SecretReference, Parts: parts,
 	}, nil
 }
