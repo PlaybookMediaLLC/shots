@@ -204,15 +204,21 @@ test(
       })
     }
     // The feed takes 4:5 to 1.91:1, so the backend refuses the 9:16 photo there.
-    expect((await schedule()).status).toBe(409)
+    const refused = await schedule()
+    expect(refused.status).toBe(409)
+    expect(JSON.stringify(refused.body)).toContain('4:5 portrait')
 
     await page.getByTestId('platform-tab-instagram').click()
     await page.getByTestId('options-chip').click()
     const options = page.getByTestId('instagram-options')
+    await options.getByLabel('Collaborators').fill('@partner')
+    await expectSaved(page)
+    // A story takes no collaborators: turning it on clears them, so the draft still saves.
     await options.getByLabel('Post as a story').check()
     await expect(page.getByTestId('story-notice')).toBeVisible()
     await expect(options.getByLabel('Collaborators')).toHaveCount(0)
     await expectSaved(page)
+    expect((await savedOptions(page, id, 'instagram'))?.instagram).toEqual({ placement: 'story' })
 
     const response = await schedule()
     expect(response.status, JSON.stringify(response.body)).toBe(201)

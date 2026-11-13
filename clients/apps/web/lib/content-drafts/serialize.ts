@@ -695,6 +695,8 @@ export function serializeDraft(
     for (const problem of mediaProblems(channel, facts, options.story ? 'story' : undefined))
       errors.push(posts.length > 1 ? `Post ${index + 1}: ${problem}` : problem)
   })
+  // An empty story still says what it needs, as Go does.
+  if (options.story && posts.length === 0) errors.push(...mediaProblems(channel, [], 'story'))
   if (context.unpublishable > 0) {
     errors.push(
       `${CHANNEL_NAMES[channel]} can't post an uploaded file or audio as an attachment. Remove it from the post; a PDF goes to LinkedIn through the document option.`

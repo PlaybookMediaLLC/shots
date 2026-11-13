@@ -96,6 +96,14 @@ func storyLabel(channel string) string {
 	return "A " + label + " story"
 }
 
+// plural is a noun for a count: "1 attachment", "4 attachments".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return noun
+	}
+	return noun + "s"
+}
+
 // checkMedia checks attachments, in order, against one set of rules.
 func checkMedia(label string, rules medialimits.Destination, rows []*ent.Asset) error {
 	if len(rows) == 0 {
@@ -108,7 +116,7 @@ func checkMedia(label string, rules medialimits.Destination, rows []*ent.Asset) 
 		return nil
 	}
 	if len(rows) > rules.MaxMedia {
-		return invalid(fmt.Sprintf("%s takes up to %d attachments in one post; this one has %d. Remove some, or schedule them as separate posts.", label, rules.MaxMedia, len(rows)))
+		return invalid(fmt.Sprintf("%s takes up to %d %s in one post; this one has %d. Remove some, or schedule them as separate posts.", label, rules.MaxMedia, plural(rules.MaxMedia, "attachment"), len(rows)))
 	}
 	images, gifs, videos := 0, 0, 0
 	for i, row := range rows {

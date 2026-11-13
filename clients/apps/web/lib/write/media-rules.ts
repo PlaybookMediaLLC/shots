@@ -103,7 +103,7 @@ export function clock(ms: number) {
 }
 
 /** A channel's story as Go names it (`storyLabel`): "An Instagram story". */
-export function storyLabel(channel: DraftChannel): string {
+function storyLabel(channel: DraftChannel): string {
   return `${/^[AEIOU]/.test(LABELS[channel]) ? 'An' : 'A'} ${LABELS[channel]} story`
 }
 
@@ -116,7 +116,9 @@ export function mediaProblems(
   media: MediaFacts[],
   placement?: 'story'
 ): string[] {
-  const rules = (placement === 'story' && DESTINATION_MEDIA[channel].story) || DESTINATION_MEDIA[channel]
+  const story = DESTINATION_MEDIA[channel].story
+  if (placement === 'story' && !story) return [`${LABELS[channel]} takes no stories.`]
+  const rules = (placement === 'story' && story) || DESTINATION_MEDIA[channel]
   const label = placement === 'story' ? storyLabel(channel) : LABELS[channel]
   if (media.length === 0)
     return rules.requiresMedia
@@ -128,7 +130,7 @@ export function mediaProblems(
       : []
   if (media.length > rules.maxMedia)
     return [
-      `${label} takes up to ${rules.maxMedia} attachments in one post; this one has ${media.length}. Remove some, or schedule them as separate posts.`,
+      `${label} takes up to ${rules.maxMedia} attachment${rules.maxMedia === 1 ? '' : 's'} in one post; this one has ${media.length}. Remove some, or schedule them as separate posts.`,
     ]
   let images = 0,
     gifs = 0,

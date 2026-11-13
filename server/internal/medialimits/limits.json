@@ -27,6 +27,11 @@
       "maxEdge": 1440,
       "formats": ["image/jpeg"]
     },
+    "instagram-standalone-story": {
+      "maxBytes": 8000000,
+      "maxEdge": 1920,
+      "formats": ["image/jpeg"]
+    },
     "threads": {
       "maxBytes": 8000000,
       "maxEdge": 1440,
@@ -102,10 +107,6 @@
         "requiresMedia": true,
         "mixed": false,
         "images": ["image/jpeg", "image/png", "image/webp"],
-        "converts": {
-          "image/png": "image/jpeg",
-          "image/webp": "image/jpeg"
-        },
         "video": {
           "formats": ["video/mp4", "video/quicktime"],
           "alone": true,

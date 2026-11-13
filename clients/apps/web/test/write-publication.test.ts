@@ -729,9 +729,24 @@ test('an Instagram story sends one image or video without text or feed settings'
   // One file only, in the story's own limits.
   assert.match(
     build([image, video], { instagram: { placement: 'story' } }).problems.join(),
-    /An Instagram story takes up to 1 attachments/
+    /An Instagram story takes up to 1 attachment in one post/
   )
   assert.deepEqual(build([video], { instagram: { placement: 'story' } }).problems, [])
+  // A story needs no text, and says it needs media.
+  const imageOnly = buildPublication(
+    draft({
+      body: [image],
+      platformVersions: withOptions(readVersions(undefined), 'instagram', {
+        instagram: { placement: 'story' },
+      }),
+    }),
+    instagram
+  )
+  assert.deepEqual(imageOnly.problems, [])
+  assert.match(
+    build([], { instagram: { placement: 'story' } }).problems.join(),
+    /An Instagram story needs at least one image or video/
+  )
   const commented = build([image], { instagram: { placement: 'story' }, firstComment: 'Link' })
   assert.match(commented.optionProblems.join(), /A story takes no first comment/)
   assert.equal(commented.target.options?.firstComment, undefined)

@@ -661,7 +661,7 @@ func (p *Provider) PostPendingOn(ctx context.Context, id, token string, posts []
 		}
 
 		trialParams := ""
-		if isTrialReel {
+		if isTrialReel && !isStory {
 			strategy := "MANUAL"
 			if settings.GraduationStrategy != nil && *settings.GraduationStrategy != "" {
 				strategy = *settings.GraduationStrategy

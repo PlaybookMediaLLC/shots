@@ -347,7 +347,8 @@ func validateDraftTargets(input ScheduleContentDraftInput) error {
 			return invalid("Each channel must be a distinct, valid connection.")
 		}
 		seen[target.ChannelConnectionID] = true
-		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "") {
+		// A story has no caption: its media check says what it needs.
+		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "" && !target.Options.Instagram.Story()) {
 			return invalid("Every channel needs a caption.")
 		}
 	}
