@@ -221,8 +221,8 @@ test('the post opens with a caption written for a chosen platform', () => {
 })
 
 test('each platform is measured against the text it will post', () => {
-  const link = `Read it: https://${'a'.repeat(300)}.example.com`
-  // X counts any link as 23 characters, so this one fits despite its length.
+  const link = `Read it: https://example.com/${'a'.repeat(300)}`
+  // X counts any link it recognizes as 23 characters, so this one fits despite its length.
   assert.deepEqual(captionsOverLimit({ body: link, channels: ['x'], copy: null, primary: 'x' }), [])
   assert.deepEqual(
     captionsOverLimit({ body: 'x'.repeat(281), channels: ['x'], copy: null, primary: 'x' }),
