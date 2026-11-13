@@ -59,6 +59,7 @@ func TestWeightedLength(t *testing.T) {
 		"see sample.com":                   27, // bare domains too
 		"mail a@sample.com":                17, // not emails
 		"é.com x":                          25, // a domain from the start of text
+		"https://a.co/" + strings.Repeat("(a)", 1000): 23, // a path of parenthesised groups
 	}
 	for in, want := range cases {
 		if got, err := WeightedLength(in); err != nil || got != want {
@@ -76,36 +77,30 @@ func TestWeightedLength(t *testing.T) {
 	}
 }
 
-// regexp2 backtracked quadratically through domain-like words, which now
-// count, and still does through a URL path of parenthesised groups, which the
-// budget refuses: without the budget it took seconds.
+// regexp2 backtracked quadratically through domain-like words and through a
+// URL path of parenthesised groups: "(a)" took 7 s and "((a))" 42 s. Both
+// count now.
 func TestLinkScanStopsOnCraftedText(t *testing.T) {
 	scans := map[string]func(string) error{
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
 		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
 	}
-	cases := map[string]struct {
-		text    string
-		refused bool
-	}{
-		"a.":         {strings.Repeat("a.", 5000), false},
-		"https://a.": {"https://" + strings.Repeat("a.", 5000), false},
-		"many words": {strings.Repeat(" https://"+strings.Repeat("a.", 25), 200), false},
-		"(a)":        {"https://a.co/" + strings.Repeat("(a)", 8000), true},
+	texts := map[string]string{
+		"a.":         strings.Repeat("a.", 5000),
+		"https://a.": "https://" + strings.Repeat("a.", 5000),
+		"many words": strings.Repeat(" https://"+strings.Repeat("a.", 25), 200),
+		"(a)":        "https://a.co/" + strings.Repeat("(a)", 8000),
+		"((a))":      "https://a.co/" + strings.Repeat("((a))", 19000),
 	}
-	for name, c := range cases {
+	for name, text := range texts {
 		for scan, run := range scans {
 			start := time.Now()
-			err := run(c.text)
+			err := run(text)
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("%s(%s) took %v", scan, name, elapsed)
 			}
-			var want error
-			if c.refused {
-				want = ErrTextTooComplex
-			}
-			if !errors.Is(err, want) {
-				t.Errorf("%s(%s) error = %v, want %v", scan, name, err, want)
+			if err != nil {
+				t.Errorf("%s(%s) error = %v", scan, name, err)
 			}
 		}
 	}
@@ -141,9 +136,10 @@ func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
 	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
 		t.Fatalf("before = %v, %v", spans, err)
 	}
+	words := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59) // seconds unbounded
 	start := time.Now()
 	for i := range 20 {
-		crafted := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 8000)) // seconds unbounded
+		crafted := fmt.Sprintf("%d%s", i, words)
 		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
 			t.Fatalf("crafted %d: %v", i, err)
 		}
@@ -187,6 +183,11 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 	domain := class(`[^/\!'#%&'\(\)*\+,\\\-\.\/:;<=>\?@\[\]\^_{|}~\$//\x09-\x0D\x20\x85\xA0\u1680\u180E\u2000-\u200A\u2028\u2029\u202F\u205F\u3000//\uFFFE\uFEFF\uFFFF//\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069/]`)
 	preceding := class(`[^A-Za-z0-9@\uff20$#\uff03\uFFFE\uFEFF\uFFFF]`)
 	directional := class(`[\u202A-\u202E\u061C\u200E\u200F\u2066\u2067\u2068\u2069]`)
+	const latinAccent = `\xC0-\xD6\xD8-\xF6\xF8-\xFF\u0100-\u024F\u0253\u0254\u0256\u0257\u0259\u025B\u0263\u0268\u026F\u0272\u0289\u028B\u02BB\u0300-\u036F\u1E00-\u1EFF`
+	pathChar := class(`[a-z\u0400-\u04FF0-9!\*';:=\+,\.\$\/%#\[\]\-\u2013_~@\|&` + latinAccent + `]`)
+	pathEndingChar := class(`[\+\-a-z\u0400-\u04FF0-9=_#\/` + latinAccent + `]`)
+	queryChar := class(`[a-z0-9!?\*'@\(\);:&=\+\$\/%#\[\]\-_\.,~|]`)
+	queryEndingChar := class(`[a-z0-9\-_&=#\/]`)
 	for unit := rune(0); unit <= 0xffff; unit++ {
 		c := unit
 		if 0xd800 <= c && c <= 0xdfff {
@@ -197,6 +198,12 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		if urlPrecedingChar(c) != (preceding(c) || directional(c)) {
 			t.Errorf("urlPrecedingChar(%U) = %v", c, urlPrecedingChar(c))
+		}
+		if urlPathChar(c) != pathChar(c) || urlPathEndingChar(c) != pathEndingChar(c) {
+			t.Errorf("urlPathChar(%U) = %v, urlPathEndingChar = %v", c, urlPathChar(c), urlPathEndingChar(c))
+		}
+		if urlQueryChar(c) != queryChar(c) || urlQueryEndingChar(c) != queryEndingChar(c) {
+			t.Errorf("urlQueryChar(%U) = %v, urlQueryEndingChar = %v", c, urlQueryChar(c), urlQueryEndingChar(c))
 		}
 	}
 
@@ -213,38 +220,48 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		return m.GroupByNumber(group).Index + m.GroupByNumber(group).Length
 	}
-	describe := func(m *regexp2.Match) string {
+	// validUrlPath, from its slash to the query.
+	pathAt := jsRegexp(`\G`+extractURLSource[strings.Index(extractURLSource, `(\/(?:(?:`):strings.Index(extractURLSource, `(\?[`)], regexp2.IgnoreCase)
+	// describe is a match from its start to its end, with its groups before
+	// the path and its path; the query is what is left.
+	describe := func(m *regexp2.Match, end int, path []rune) string {
 		var b strings.Builder
-		for _, g := range m.Groups() {
-			fmt.Fprintf(&b, "%d+%d ", g.Index, g.Length)
+		fmt.Fprintf(&b, "%d-%d ", m.Index, end)
+		for _, g := range []int{2, 4, 5, 6} {
+			fmt.Fprintf(&b, "%d+%d ", m.GroupByNumber(g).Index, m.GroupByNumber(g).Length)
 		}
-		return b.String()
+		return fmt.Sprintf("%s%q", b.String(), string(path))
 	}
-	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", "/", ":", ":80", "@", "＠", "#", "(", "(a)", "((a))", ")", "?x=1", "?", ".co/",
+		"!", "~", "'", "=", "+", "&", "ж", "Ж", "é", "É", "\u0193", "\u2013",
 		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
-	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
+	// Shapes the random texts miss.
+	texts := []string{"é.com x", "x a-.b.com", "a.co/(a)b(c)(d)", "a.co/((a))x((b)", "a.co:8/@a/b(c)?d=(e", "a.co/b(c)d?e!"}
 	rng := rand.New(rand.NewPCG(1, 2))
-	for range 5000 {
+	for range 8000 {
 		var b strings.Builder
 		for range 1 + rng.IntN(16) {
 			b.WriteString(tokens[rng.IntN(len(tokens))])
 		}
 		texts = append(texts, b.String())
 	}
-	found := 0
+	found, parens := 0, 0 // matches, and paths with balanced parentheses
 	for _, raw := range texts {
 		text := shiftSurrogates(utf16Units(raw))
 		var want, got []string
 		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
-			want = append(want, describe(m))
+			want = append(want, describe(m, m.Index+m.Length, m.GroupByNumber(7).Runes()))
+			if slices.Contains(m.GroupByNumber(7).Runes(), ')') {
+				parens++
+			}
 		}
 		matches, err := urlMatches(text, time.Now().Add(time.Hour))
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, m := range matches {
-			got = append(got, describe(m))
+			got = append(got, describe(m.Match, m.end, text[m.Index+m.Length:m.pathEnd]))
 		}
 		if !slices.Equal(got, want) {
 			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
@@ -255,6 +272,11 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 				t.Errorf("urlEnds(%q)[%d] = %d, want %d", raw, s, end, want)
 			}
 		}
+		for s, end := range urlPathEnds(text) {
+			if want := matchEnd(pathAt, text, s, 0); end != want {
+				t.Errorf("urlPathEnds(%q)[%d] = %d, want %d", raw, s, end, want)
+			}
+		}
 		for s, end := range asciiDomainEnds(text) {
 			if want := matchEnd(asciiDomainAt, text, s, 0); end != want {
 				t.Errorf("asciiDomainEnds(%q)[%d] = %d, want %d", raw, s, end, want)
@@ -262,8 +284,8 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		found += len(want)
 	}
-	if found < 1000 {
-		t.Fatalf("only %d matches: the cases miss the regex", found)
+	if found < 1000 || parens < 100 {
+		t.Fatalf("only %d matches, %d with parentheses in their path: the cases miss the regex", found, parens)
 	}
 }
 

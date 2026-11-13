@@ -61,12 +61,14 @@ func TestFitsXPost(t *testing.T) {
 		{strings.Repeat("a", 281), 0, false},
 		{strings.Repeat("a", 256), 1 + xLinkLength, true},
 		{strings.Repeat("a", 257), 1 + xLinkLength, false},
-		{"https://a.co/" + strings.Repeat("(a)", 8000), 0, false}, // too complex to count
 	}
 	for _, c := range cases {
 		if got := fitsXPost(c.text, c.extra, nil); got != c.want {
 			t.Errorf("fitsXPost(%.12q…, %d) = %v, want %v", c.text, c.extra, got, c.want)
 		}
+	}
+	if fitsXPost("a", 0, helpers.NewScanBudget(0)) {
+		t.Error("text too complex to count fits")
 	}
 }
 
@@ -80,7 +82,7 @@ func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	start := time.Now()
 	var err error
 	for i := 0; i < 250 && err == nil; i++ {
-		text := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("(a)", 1000))
+		text := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("a.", 2000)) // one TLD scan per dot
 		if err = socialidentity.CheckXText(caps, text, budget); err == nil {
 			_, err = draftPostLength("x", text, budget)
 		}
@@ -93,13 +95,13 @@ func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	}
 }
 
-// A URL path of parenthesised groups costs seconds of backtracking; the link
-// scan gives up within its budget and the caller refuses the text.
+// Dotted words without a TLD cost seconds of TLD scans; the link scan gives
+// up within its budget and the caller refuses the text.
 func TestDraftPostLengthRefusesTextTooComplexToCount(t *testing.T) {
-	text := "https://a.co/" + strings.Repeat("(a)", 8000)
+	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
 	for _, channel := range []string{"x", "mastodon"} {
 		start := time.Now()
-		_, err := draftPostLength(channel, text, nil)
+		_, err := draftPostLength(channel, text, helpers.NewScanBudget(100*time.Millisecond))
 		if elapsed := time.Since(start); elapsed > time.Second {
 			t.Errorf("%s: took %v", channel, elapsed)
 		}

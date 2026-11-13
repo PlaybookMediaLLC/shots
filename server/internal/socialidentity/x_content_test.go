@@ -25,9 +25,9 @@ func TestXContentUsesVerifiedLimitsWithoutChangingContent(t *testing.T) {
 	if CheckXText(premium, strings.Repeat("a", 25000), nil) != nil || CheckXText(premium, strings.Repeat("a", 25001), nil) == nil || premium.Articles == nil || *premium.Articles {
 		t.Fatal("long posts and Articles must be independent")
 	}
-	// 24,013 characters fit the premium limit; only the link scan refuses them,
+	// Text that fits the premium limit but not the count's budget is refused
 	// with a sentence that still matches the error the publisher retries.
-	if err := CheckXText(premium, "https://a.co/"+strings.Repeat("(a)", 8000), nil); !errors.Is(err, helpers.ErrTextTooComplex) ||
+	if err := CheckXText(premium, strings.Repeat("a", 25000), helpers.NewScanBudget(0)); !errors.Is(err, helpers.ErrTextTooComplex) ||
 		err.Error() != "The X post is too long or too complex to count. Shorten it." {
 		t.Fatalf("text too complex to count: %v", err)
 	}

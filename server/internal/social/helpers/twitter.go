@@ -40,14 +40,12 @@ const surrogateShift = 0xf0000
 
 var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 
-// regexp2 still backtracks badly through a URL path that is a long run of
-// parenthesised groups: "https://a.co/" + "(a)" x 8,000 took 7 s. So one call
-// of the URL regex gets linkScanBudget, and one text's scan linkScanBudget
-// plus linkScanPerUnit for each of its UTF-16 units up to linkScanMaxUnits,
-// the longest caption (an X Article); ordinary text uses a small fraction of
-// either.
-// shortcut: a link whose path is a long run of parenthesised groups cannot be
-// counted. Match the path by hand if such links must count.
+// One call of the URL regex gets linkScanBudget, and one text's scan
+// linkScanBudget plus linkScanPerUnit for each of its UTF-16 units up to
+// linkScanMaxUnits, the longest caption (an X Article); ordinary text uses a
+// small fraction of either. Dotted words without a TLD still cost about half
+// of linkScanPerUnit, a TLD regex call for each dot, so a text of them runs
+// out only past linkScanMaxUnits.
 const (
 	linkScanBudget   = 200 * time.Millisecond
 	linkScanPerUnit  = 20 * time.Microsecond
@@ -124,8 +122,9 @@ var (
 	twemojiRe                = jsRegexp(twemojiSource, 0)
 )
 
-// Only the URL regex's path backtracks badly, so only it can time out; the
-// others are linear and never return an error.
+// Only the URL regex gets a timeout, a backstop now that urlMatches keeps the
+// paths it backtracked through from it; the others are linear and never
+// return an error.
 func init() {
 	extractURLAtRe.MatchTimeout = linkScanBudget
 }
@@ -445,14 +444,14 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 	var urls []*urlEntity
 	for _, m := range matches {
 		before := m.GroupByNumber(2).Runes()
-		url := m.GroupByNumber(3).Runes()
+		url := folded[m.GroupByNumber(3).Index:m.end]
 		protocol := m.GroupByNumber(4).Runes()
 		domainGroup := m.GroupByNumber(5)
 		domain := domainGroup.Runes()
 		// JavaScript punycodes and searches the domain as written.
 		written := word[domainGroup.Index : domainGroup.Index+domainGroup.Length]
-		path := m.GroupByNumber(7).Runes()
-		endPosition := offset + m.Index + m.Length
+		hasPath := m.pathEnd > m.Index+m.Length
+		endPosition := offset + m.end
 		startPosition := endPosition - len(url)
 
 		protocolLen := len(protocol)
@@ -497,7 +496,7 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 			}
 
 			// lastUrl only contains domain. Need to add path and query if they exist.
-			if len(path) > 0 {
+			if hasPath {
 				if i := indexRunes(url, domain, 0); i >= 0 {
 					lastURL.url = slices.Concat(url[:i], lastURL.url, url[i+len(domain):])
 				}
@@ -519,13 +518,20 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 	return urls, nil
 }
 
+// A urlMatch is an extractUrl match: regexp2's through the port, then the
+// path, text[Index+Length:pathEnd], and the query, through end.
+type urlMatch struct {
+	*regexp2.Match
+	pathEnd, end int
+}
+
 // urlMatches is extractUrl's matches as its scan from index 0 finds them, but
 // tries the regex only where urlEnds says one starts. Scanning from every
 // index is quadratic on long runs of letters, which is any CJK text, because
 // each start rescans the run.
-func urlMatches(text []rune, deadline time.Time) ([]*regexp2.Match, error) {
-	ends := urlEnds(text)
-	var matches []*regexp2.Match
+func urlMatches(text []rune, deadline time.Time) ([]urlMatch, error) {
+	ends, pathEnds := urlEnds(text), urlPathEnds(text)
+	var matches []urlMatch
 	for s := 0; s < len(text); s++ {
 		end := ends[s]
 		if end < 0 {
@@ -534,22 +540,132 @@ func urlMatches(text []rune, deadline time.Time) ([]*regexp2.Match, error) {
 		if time.Now().After(deadline) {
 			return nil, ErrTextTooComplex
 		}
-		// Only a port, path or query runs past the domain. Without one the
-		// regex need not see the labels after it, which its greedy subdomain
-		// loop would otherwise reread for every match in a long chain.
-		if end == len(text) || strings.ContainsRune(":/?", text[end]) {
-			end = len(text)
+		// The regex sees no further than the port, [0-9]+ after a colon. Past
+		// it, its greedy subdomain loop would reread a long chain of labels for
+		// every match in it, and its path backtrack through parentheses;
+		// urlPathEnds and urlQueryEnd read the path and query instead.
+		if p := end + 1; p < len(text) && text[end] == ':' {
+			for p < len(text) && '0' <= text[p] && text[p] <= '9' {
+				p++
+			}
+			if p > end+1 {
+				end = p
+			}
 		}
 		m, err := extractURLAtRe.FindRunesMatchStartingAt(text[:end], s)
 		if err != nil {
 			return nil, ErrTextTooComplex
 		}
 		if m != nil {
-			matches = append(matches, m)
-			s = m.Index + m.Length - 1
+			pathEnd := pathEnds[end]
+			matches = append(matches, urlMatch{m, pathEnd, urlQueryEnd(text, pathEnd)})
+			s = matches[len(matches)-1].end - 1
 		}
 	}
 	return matches, nil
+}
+
+// urlPathEnds is, at each index, where extractUrl's path (validUrlPath) from
+// there ends: the index itself where none starts. Each step of the path's
+// loop tries X*(?:P X*)*E first, X a path character, P balanced parentheses
+// and E a path-ending character, and on a run of P that reads to the run's
+// end before it fails; then P alone. So the regex rereads the run from each
+// P in it, where this one right-to-left pass reads it once.
+func urlPathEnds(text []rune) []int {
+	n := len(text)
+	// runEnd is where the run of path characters from i ends. last is the last
+	// E that X*(?:P X*)*E from i can end on, or -1: the greedy regex tries the
+	// longest chain of P first, then the latest E in each run of X.
+	runEnd, last, loop, ends := make([]int, n+1), make([]int, n+1), make([]int, n+1), make([]int, n+1)
+	runEnd[n], last[n], loop[n], ends[n] = n, -1, n, n
+	// paren is where validUrlBalancedParens from i ends, or -1: (X+) or
+	// (X*(X+)X*), each run of X whole, since X has no parenthesis.
+	paren := func(i int) int {
+		if text[i] != '(' {
+			return -1
+		}
+		j := runEnd[i+1]
+		if j > i+1 && j < n && text[j] == ')' {
+			return j + 1
+		}
+		if j < n && text[j] == '(' {
+			if k := runEnd[j+1]; k > j+1 && k < n && text[k] == ')' {
+				if l := runEnd[k+1]; l < n && text[l] == ')' {
+					return l + 1
+				}
+			}
+		}
+		return -1
+	}
+	for i := n - 1; i >= 0; i-- {
+		next := -1
+		if urlPathChar(text[i]) {
+			runEnd[i], last[i] = runEnd[i+1], last[i+1]
+			if last[i] < 0 && urlPathEndingChar(text[i]) {
+				last[i] = i
+			}
+		} else {
+			runEnd[i], last[i] = i, -1
+			if next = paren(i); next >= 0 {
+				last[i] = last[next]
+			}
+		}
+		// One step of the loop. Its third alternative, @X+\/, never matches
+		// where the first fails: / is an E.
+		if last[i] >= 0 {
+			next = last[i] + 1
+		}
+		loop[i] = i
+		if next >= 0 {
+			loop[i] = loop[next]
+		}
+		ends[i] = i
+		if text[i] == '/' {
+			ends[i] = loop[i+1]
+		}
+	}
+	return ends
+}
+
+// urlQueryEnd is where extractUrl's query from i ends: after the last
+// query-ending character of the query characters after a ?, else i.
+func urlQueryEnd(text []rune, i int) int {
+	end := i
+	if i < len(text) && text[i] == '?' {
+		for j := i + 1; j < len(text) && urlQueryChar(text[j]); j++ {
+			if urlQueryEndingChar(text[j]) {
+				end = j + 1
+			}
+		}
+	}
+	return end
+}
+
+// urlPathChar is validGeneralUrlPathChars, urlPathEndingChar
+// validUrlPathEndingChars, and urlQueryChar and urlQueryEndingChar the
+// query's classes, as regexp2's IgnoreCase reads them: on the lowercased
+// character.
+func urlPathChar(c rune) bool {
+	return urlPathEndingChar(c) || strings.ContainsRune("!*';:,.$%[]\u2013~@|&", unicode.ToLower(c))
+}
+
+func urlPathEndingChar(c rune) bool {
+	c = unicode.ToLower(c)
+	return 'a' <= c && c <= 'z' || '0' <= c && c <= '9' || 0x400 <= c && c <= 0x4ff || strings.ContainsRune("+-=_#/", c) ||
+		0xc0 <= c && c <= 0x24f && c != 0xd7 && c != 0xf7 || 0x300 <= c && c <= 0x36f || 0x1e00 <= c && c <= 0x1eff ||
+		strings.ContainsRune("\u0253\u0254\u0256\u0257\u0259\u025b\u0263\u0268\u026f\u0272\u0289\u028b\u02bb", c) ||
+		// IgnoreCase adds to the class the lowercase forms of its uppercase
+		// letters, and those of Ɠ, Ɩ, Ɵ, Ʃ, Ʈ, Ʊ and Ʒ fall outside it.
+		strings.ContainsRune("\u0260\u0269\u0275\u0283\u0288\u028a\u0292", c)
+}
+
+func urlQueryChar(c rune) bool {
+	return urlQueryEndingChar(c) || strings.ContainsRune("!?*'@();:+$%[].,~|", unicode.ToLower(c))
+}
+
+func urlQueryEndingChar(c rune) bool {
+	c = unicode.ToLower(c)
+	return 'a' <= c && c <= 'z' || '0' <= c && c <= '9' || strings.ContainsRune("-_&=#/", c)
 }
 
 // urlEnds is, at each index, where the domain of extractUrl's match from
