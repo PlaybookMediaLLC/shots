@@ -359,6 +359,8 @@ function BlockMenuItems() {
   const [searchValue] = useComboboxValueState();
   const selectedBlocks = useBlockSelectionNodes();
   const editor = useEditorRef();
+  const hasAI = Boolean(editor.plugins[AIChatPlugin.key]);
+  const hasComment = Boolean(editor.plugins[KEYS.comment]);
 
   const menuGroups = useMemo(() => {
     const isMedia =
@@ -367,10 +369,20 @@ function BlockMenuItems() {
         MEDIA_BLOCK_TYPES.has(String(item[0].type))
       );
 
-    const items = isMedia ? mediaMenuItems : orderedMenuItems;
+    // Ask AI and Comment call their plugin's API, which an editor without it lacks.
+    const items = (isMedia ? mediaMenuItems : orderedMenuItems).map(
+      (group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) =>
+            (hasAI || item !== blockMenuItems.askAI) &&
+            (hasComment || item !== blockMenuItems.comment)
+        ),
+      })
+    );
 
     return filterMenuGroups(items, searchValue) || items;
-  }, [selectedBlocks, searchValue]);
+  }, [hasAI, hasComment, selectedBlocks, searchValue]);
 
   return (
     <>

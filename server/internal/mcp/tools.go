@@ -352,6 +352,7 @@ func (s *Server) execute(ctx context.Context, call principal, tool *shotsTool, r
 		}
 	}
 	actor := call.key.Actor(call.requestID)
+	actor.Source = "mcp"
 	if err := s.authorize(ctx, call, actor, tool.operation); err != nil {
 		return refuse(err)
 	}

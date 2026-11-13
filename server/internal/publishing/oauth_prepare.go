@@ -6,6 +6,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialoauthstart"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
 )
 
@@ -58,7 +59,7 @@ func validateOAuthIntent(ctx context.Context, client *ent.Client, actor Actor, p
 	if err != nil {
 		return "", err
 	}
-	if connection.Provider != "social" || connection.Platform != provider || connection.SocialSetID == nil || options.SocialSetID == nil || *connection.SocialSetID != *options.SocialSetID {
+	if connection.Provider != "social" || socialplatform.Adapter(connection.Platform) != provider || connection.SocialSetID == nil || options.SocialSetID == nil || *connection.SocialSetID != *options.SocialSetID {
 		return "", ErrConflict
 	}
 	return connection.ExternalAccountID, nil

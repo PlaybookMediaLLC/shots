@@ -38,7 +38,10 @@ test(
     })
     await expect(page.getByLabel('Product name', { exact: true })).toHaveText('Acme')
     // The background read reaches the pricing page and fills in the plan.
-    await expect(page.getByRole('status')).toContainText('Done', { timeout: 90_000 })
+    // Scoped: the review shows other status lines, such as "Loading findings…", as the read ends.
+    await expect(
+      page.getByRole('region', { name: 'Background read' }).getByRole('status')
+    ).toContainText('Done', { timeout: 90_000 })
     await expect(page.getByLabel('Pricing', { exact: true })).toHaveText(/\$9 a month/)
     await expect(page.getByText(/From your site/).first()).toBeVisible()
     await page.getByRole('button', { name: 'Edit who it is for' }).click()

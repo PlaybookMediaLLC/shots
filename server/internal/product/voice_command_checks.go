@@ -163,7 +163,7 @@ func checkVoiceProposal(reply voiceParse, in voiceCheckInput) voiceProposal {
 	if result.Platform != nil {
 		// Text too complex to count is flagged too; scheduling refuses it.
 		if limit, ok := draftChannelLimits[*result.Platform]; ok {
-			if length, err := draftPostLength(*result.Platform, text); err != nil || length > limit {
+			if length, err := draftPostLength(*result.Platform, text, nil); err != nil || length > limit {
 				result.Flags = append(result.Flags, voiceFlagTextTooLong)
 			}
 		}

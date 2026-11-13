@@ -203,7 +203,7 @@ is described below.
 
 ## Temporal maintenance
 
-The tenant orchestrator inside `screenshot-studio-backend` owns six durable schedules in
+The tenant orchestrator inside `screenshot-studio-backend` owns these durable schedules, among others, in
 `screenshot-studio-publishing.kpisa`, on task queue `platform-maintenance`:
 
 | Schedule ID | Cadence (UTC) | Go handler |
@@ -214,6 +214,7 @@ The tenant orchestrator inside `screenshot-studio-backend` owns six durable sche
 | `platform-maintenance-workspace-cleanup` | Every minute | Due workspace deletion after its grace period |
 | `platform-maintenance-scheduled-posts` | Every minute | Start the existing stable-ID publishing workflows for due posts |
 | `platform-maintenance-audit-retention` | Daily at 03:05 | Expired audit deletion, honoring legal holds |
+| `platform-maintenance-notification-retention` | Daily at 04:05 | Notifications and delivery records older than 90 days, honoring legal holds |
 
 `RUN_MAINTENANCE=true` enables registration and the Go worker. Each schedule
 skips overlapping runs and has bounded activity retries. Minute schedules catch
