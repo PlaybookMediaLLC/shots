@@ -1,0 +1,373 @@
+[
+    {
+        "id": "cmwebbjax000801qkbgok1y9l",
+        "poll": {
+            "options": [
+                "Option A",
+                "Option B"
+            ],
+            "durationMinutes": 5
+        },
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmweb9uv7000001qkmoh3wigq",
+        "options": null,
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwebdzti00g501rzce0f0rwe",
+                "url": "https://x.com/i/status/2121056706041925765",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "2121056706041925765",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "2121056706041925765",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T01:45:00.862565+00:00",
+        "scheduledFor": "2026-11-13T01:45:00"
+    },
+    {
+        "id": "cmwebk4em000j01qk5pnfzz9e",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwebhpv4000c01qk7an2sm8h",
+        "options": {
+            "replySettings": "following"
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwebk4fp00h101rzg5y4st0g",
+                "url": "https://x.com/i/status/2121057905294090370",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "2121057905294090370",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "2121057905294090370",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T01:49:46.744967+00:00",
+        "scheduledFor": "2026-11-13T01:49:45.934"
+    },
+    {
+        "id": "cmwebnqki000v01qkibny3bcf",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwebm6v4000n01qk64jcw0t8",
+        "options": {
+            "madeWithAi": true,
+            "paidPartnership": true
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwebnqll00h901rz7hc23ij1",
+                "url": "https://x.com/i/status/2121058611589722292",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "2121058611589722292",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "2121058611589722292",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T01:52:35.155033+00:00",
+        "scheduledFor": "2026-11-13T01:52:34.625"
+    },
+    {
+        "id": "cmwebu8yk001o01qk7xecgrul",
+        "poll": null,
+        "status": "CANCELLED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwebrcgr001601qkis8zxvz7",
+        "options": null,
+        "assetIds": [
+            "241f91c6-a967-49f6-b224-b67816340568",
+            "3e5d3cd0-d78e-4c62-b444-25e851916637"
+        ],
+        "attempts": null,
+        "nativeId": null,
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": null,
+        "scheduledFor": "2026-11-13T09:00:00"
+    },
+    {
+        "id": "cmwebuylx001v01qkudcazh1d",
+        "poll": null,
+        "status": "FAILED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwebrcgr001601qkis8zxvz7",
+        "options": null,
+        "assetIds": [
+            "241f91c6-a967-49f6-b224-b67816340568",
+            "3e5d3cd0-d78e-4c62-b444-25e851916637"
+        ],
+        "attempts": [
+            {
+                "id": "cmwebuyms00hr01rzz092n3sj",
+                "url": null,
+                "number": 1,
+                "message": "The X media source is unavailable",
+                "outcome": "FAILED",
+                "nativeId": null,
+                "failureCode": "UNKNOWN_DELIVERY"
+            }
+        ],
+        "nativeId": null,
+        "followUps": null,
+        "automation": null,
+        "failureCode": "NOT_LIVE",
+        "publishedAt": null,
+        "scheduledFor": "2026-11-13T01:58:11.637"
+    },
+    {
+        "id": "cmwedojy7000e01o8afzdoe4t",
+        "poll": null,
+        "status": "CANCELLED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwedmbv5000301o8hywtuzbo",
+        "options": null,
+        "assetIds": [
+            "241f91c6-a967-49f6-b224-b67816340568",
+            "3e5d3cd0-d78e-4c62-b444-25e851916637"
+        ],
+        "attempts": null,
+        "nativeId": null,
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": null,
+        "scheduledFor": "2026-11-13T16:15:00"
+    },
+    {
+        "id": "cmwedpp29000o01o8oankmcp7",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwedmbv5000301o8hywtuzbo",
+        "options": null,
+        "assetIds": [
+            "241f91c6-a967-49f6-b224-b67816340568",
+            "3e5d3cd0-d78e-4c62-b444-25e851916637"
+        ],
+        "attempts": [
+            {
+                "id": "cmwedpp40000701qs1f6v8j1l",
+                "url": "https://x.com/i/status/2121073120832311594",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "2121073120832311594",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "2121073120832311594",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T02:50:14.671948+00:00",
+        "scheduledFor": "2026-11-13T02:50:05.217"
+    },
+    {
+        "id": "cmwedu5gy001001o8o9g6jtan",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmweds3wj000s01o82mkcsc25",
+        "options": null,
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwedu5ic000g01qs0lkkn55w",
+                "url": "https://x.com/i/status/2121073956824183158",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "2121073956824183158",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "2121073956824183158",
+        "followUps": [
+            {
+                "id": "cmwedu5yy000j01qsm5x9gr4l",
+                "key": "plug",
+                "kind": "plug",
+                "status": "done",
+                "attempts": 2,
+                "nativeId": "2121081510233010373",
+                "updatedAt": "2026-11-13T03:23:34.496",
+                "failureCode": null
+            },
+            {
+                "id": "cmwedu5z1000k01qsg07k40sf",
+                "key": "retweet:0",
+                "kind": "retweet",
+                "status": "done",
+                "attempts": 1,
+                "nativeId": null,
+                "updatedAt": "2026-11-13T03:53:34.103",
+                "failureCode": null
+            }
+        ],
+        "automation": {
+            "plugText": "Shots live test reply, please ignore",
+            "retweets": [
+                {
+                    "afterMinutes": 60
+                }
+            ],
+            "plugMetric": "likes",
+            "plugAtLikes": 1
+        },
+        "failureCode": null,
+        "publishedAt": "2026-11-13T02:53:33.726518+00:00",
+        "scheduledFor": "2026-11-13T02:53:33.105"
+    },
+    {
+        "id": "cmwedxiw0001h01o83rao349e",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwedwcmw001b01o8d8c5lk74",
+        "options": {
+            "firstComment": "Shots live test first comment, please ignore"
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwedxj7q000q01qsevst1rdb",
+                "url": "https://www.linkedin.com/feed/update/urn:li:share:7526840307548594176",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "urn:li:share:7526840307548594176",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "urn:li:share:7526840307548594176",
+        "followUps": [
+            {
+                "id": "cmwedxjxv000t01qsg06lyfqz",
+                "key": "first-comment",
+                "kind": "first_comment",
+                "status": "failed",
+                "attempts": 1,
+                "nativeId": null,
+                "updatedAt": "2026-11-13T02:56:12.269",
+                "failureCode": "provider_error"
+            }
+        ],
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T02:56:11.760299+00:00",
+        "scheduledFor": "2026-11-13T02:56:10.454"
+    },
+    {
+        "id": "cmwee1llf001x01o840qntg3m",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test repost, please ignore",
+        "draftId": "cmwee0mtr001r01o8xnm29mu7",
+        "options": {
+            "quoteRemoteId": "urn:li:share:7526840307548594176"
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwee1lmg000z01qsbdcbrz4u",
+                "url": "https://www.linkedin.com/feed/update/urn:li:share:7526841103610929152",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "urn:li:share:7526841103610929152",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "urn:li:share:7526841103610929152",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T02:59:21.384141+00:00",
+        "scheduledFor": "2026-11-13T02:59:20.594"
+    },
+    {
+        "id": "cmwee99aj002i01o8zzatye9g",
+        "poll": {
+            "options": [
+                "Option A",
+                "Option B"
+            ],
+            "durationMinutes": 1440
+        },
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmwee7dhs002a01o8goa8rsjg",
+        "options": {
+            "pollQuestion": "Shots live test poll, please ignore"
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmwee99c3001j01qs512ru39y",
+                "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7526842603464720385",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "urn:li:ugcPost:7526842603464720385",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "urn:li:ugcPost:7526842603464720385",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T03:05:19.006429+00:00",
+        "scheduledFor": "2026-11-13T03:05:17.899"
+    },
+    {
+        "id": "cmweecuzh002x01o883j23lne",
+        "poll": null,
+        "status": "PUBLISHED",
+        "caption": "Shots live test, please ignore",
+        "draftId": "cmweeb02y002m01o85lj4w8kx",
+        "options": {
+            "documentTitle": "Shots live test PDF",
+            "documentAssetId": "8384323c-dec3-448c-a3f2-153de9df8aab"
+        },
+        "assetIds": null,
+        "attempts": [
+            {
+                "id": "cmweecvd9001s01qs2cqwkjer",
+                "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7526843401661661184",
+                "number": 1,
+                "message": null,
+                "outcome": "SUCCEEDED",
+                "nativeId": "urn:li:ugcPost:7526843401661661184",
+                "failureCode": null
+            }
+        ],
+        "nativeId": "urn:li:ugcPost:7526843401661661184",
+        "followUps": null,
+        "automation": null,
+        "failureCode": null,
+        "publishedAt": "2026-11-13T03:08:29.270696+00:00",
+        "scheduledFor": "2026-11-13T03:08:05.966"
+    }
+]

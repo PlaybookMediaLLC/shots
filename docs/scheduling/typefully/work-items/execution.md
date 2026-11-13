@@ -1,6 +1,6 @@
 # Typefully implementation and verification record
 
-Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 43 Exists, 60 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
+Branch `codex/typefully-backlog-completion`, targeting `develop`; L2 evidence follow-up on `docs/typefully-live-verification-l2`, also targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 42 Exists, 61 Partial, one Later and five Skip. TF-107 remains Partial because only its following-account reply mode has a live outcome. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
 
 ## Develop integration
 
@@ -122,7 +122,9 @@ Coverage key **L1**. Each post was scheduled through Write from a local stack (n
 
 The same run also published to Instagram `@get.eigenn`, TikTok `@the_dark_lightskin` and YouTube `@getconduitt`; no Typefully row depends on those networks alone.
 
-Coverage key **L2**. Each check ran through Write from a local stack (not production) on 2026-11-13. The X posts used X API credit. Each post was confirmed by its receipt, one successful attempt and the public post, and its native ID matched the receipt. Each post was then deleted with the network's own Delete control in the signed-in browser. The worker read signed media through a public quick tunnel (`R2_DELIVERY_ENDPOINT`), as in L1.
+Coverage key **L2**. Each check ran through Write from a local stack (not production) on 2026-11-13. The X posts used X API credit. Each delivered root post was confirmed by its receipt, one successful attempt and the public post, and its native ID matched the receipt. Each delivered post was then deleted with the network's own Delete control in the signed-in browser. The worker read signed media through a public quick tunnel (`R2_DELIVERY_ENDPOINT`), as in L1.
+
+The [L2 evidence bundle](../evidence/l2/README.md) preserves the original screenshots and exact content, plus a read-only 2026-11-13 recheck of the nine original delivered root posts and their attempts. The default body was **Shots live test, please ignore**. X poll options were **Option A / Option B**; the plug was **Shots live test reply, please ignore**. LinkedIn's requested first comment was **Shots live test first comment, please ignore**, repost commentary was **Shots live test repost, please ignore**, and poll question was **Shots live test poll, please ignore**, with **Option A / Option B**. These are existing outcomes from PR #545, not newly sent posts.
 
 | Date (UTC) | Account | Content | Receipt | Deletion |
 |---|---|---|---|---|
@@ -138,17 +140,20 @@ Coverage key **L2**. Each check ran through Write from a local stack (not produc
 | 2026-11-13 03:08 | LinkedIn member `yoanyomba` | 2-page PDF titled "Shots live test PDF"; both pages showed (TF-083) | `urn:li:ugcPost:7526843401661661184` | Removal verified by 03:09:38 |
 | 2026-11-13 04:11 | X `@yoanyombax` | Retest of the #544 fix on a stack built from its branch: Publish now with Auto-RT "Days later at", 0 days, 04:18 UTC (TF-064). The draft stored `days: 0`, reopened, and the Publish review loaded | `2121093675342008401` | Repost undone, post deleted; removal verified by 04:20 |
 
-For the 02:53 post, the plug reply (`2121081510233010373`) went out at 03:23:34 after the owner liked the post. The repost went out at 03:53:48. Both receipts are `done`. The repost was undone in X before the reply and the post were deleted.
+For the 02:53 post, the plug reply (`2121081510233010373`) went out at 03:23:34 after the owner liked the post. The repost receipt was updated at 03:53:34.103 and the browser check confirmed it at 03:53:48. Both receipts are `done`. The repost has `attempts=1`; the plug has `attempts=2`, which includes pending engagement checks and does not mean two successful reply creations. The repost was undone in X before the reply and the post were deleted.
 
 For the 04:11 post, the repost receipt was `done` at 04:18:00, and X showed one repost.
 
 Checks without a post:
 
 - The X composer suggested "Lysol (@getsol)" for `@getsol` (TF-001). The lookup matches an exact handle.
-- The LinkedIn lookup of the Page `getsolomonai` (106498803) returned HTTP 500 (TF-077), so no mention post was sent.
-- The cross-post (TF-035) did not run. X and LinkedIn are in different profiles, and moving a connection disables it.
+- **Blocked — TF-077:** the LinkedIn lookup of Solomon AI / `getsolomonai` (106498803) returned web HTTP 503 and backend HTTP 500 `{"error":"internal server error"}`, so no mention post was sent. The provider status/body was discarded; a Community Management permission problem is a hypothesis, not a recorded provider error.
+- **Blocked — TF-035:** the cross-post did not run. X and LinkedIn are in different profiles, and moving a connection disables it and requires a reconnect. This run does not authorize that change.
+- **Pending — TF-066, check 26:** the ten-minute video still needs a matching native receipt, a public 10:00 duration and playback after seeking to about 9:50. No post has been approved or sent for that check. Standard-account duration is supported; Premium is not required. Browser recovery and exact-content approval precede the next provider mutation.
 
-Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots had no control to delete a published post; draft PR #557 adds one.
+**Blocked — TF-071:** the first-comment receipt retained `provider_error`, one failed attempt and no native comment ID. The adapter exposed **LinkedIn rejected this request. Check permissions, content and account limits before retrying.** It discarded the provider HTTP status/body, so an exact provider refusal cannot be quoted or classified as 403 from this evidence. No retry was sent; retaining that response is required before a separately approved retest.
+
+Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF; their stored statuses were rechecked and are listed in the evidence bundle. One browser upload that failed before the storage CORS fix still has status `PENDING`; its normal 24-hour expiry cleanup has not been observed. Shots had no control to delete a published post during the original checks; PR #557 added one.
 
 #### Delete through Shots (#557)
 
