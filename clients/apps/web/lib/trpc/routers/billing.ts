@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server'
 
 import { monthlyUsagePeriod } from '@/lib/billing/display'
 import { backendSDK } from '@/lib/backend/sdk'
-import { getWorkspaceQuota, type WorkspaceQuota, workspacePlanSchema } from '@/lib/billing/plans'
+import { includedAllowance, type WorkspaceQuota, workspacePlanSchema } from '@/lib/billing/plans'
 import { workspaceSubscriptionCycle } from '@/lib/billing/stripe'
 import { consumeWorkspaceQuota, WorkspaceQuotaError } from '@/lib/tenant/entitlements'
 import { router } from '../init'
@@ -27,9 +27,10 @@ export const billingRouter = router({
     const sdk = backendSDK(ctx.access)
     const entitlements = await sdk.getEntitlements()
     const plan = workspacePlanSchema.catch(workspacePlanSchema.enum.free).parse(entitlements.plan)
-    // An amount of 0 reads what is left; an exhausted allowance reads as 0.
+    // The backend decides what the plan includes; an amount of 0 reads what is
+    // left, and an exhausted allowance reads as 0.
     const allowance = async (quota: WorkspaceQuota) => ({
-      included: getWorkspaceQuota(plan, quota),
+      included: includedAllowance(entitlements.allowances, plan, quota),
       left: await consumeWorkspaceQuota(ctx.access, quota, 0).catch((error: unknown) => {
         if (error instanceof WorkspaceQuotaError) return 0
         throw error
