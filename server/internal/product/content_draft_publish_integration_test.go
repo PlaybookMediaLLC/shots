@@ -576,6 +576,48 @@ func TestWritePublishing(t *testing.T) {
 		}
 	})
 
+	// A confirmed post's link reaches webhook subscribers, so it must be a post
+	// on its own platform, never an arbitrary page or a link with credentials.
+	t.Run("a live post's link must point at its own platform", func(t *testing.T) {
+		for _, item := range []struct {
+			platform, link, remoteID string
+			invalid                  []string
+		}{
+			{"threads", "https://www.threads.net/@canary/post/C8abc", "https://www.threads.net/@canary/post/C8abc",
+				[]string{"https://example.com/@canary/post/C8abc", "https://www.threads.net.evil.test/@canary/post/C8abc", "https://evilthreads.net/@canary/post/C8abc",
+					"https://user:pw@www.threads.net/@canary/post/C8abc", "http://www.threads.net/@canary/post/C8abc", "https://www.threads.net:8443/@canary/post/C8abc"}},
+			{"instagram-standalone", "https://www.instagram.com/p/C8abc/", "https://www.instagram.com/p/C8abc/",
+				[]string{"https://instagram.com.evil.test/p/C8abc/", "https://user@www.instagram.com/p/C8abc/"}},
+			{"facebook", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "https://www.facebook.com/permalink.php?story_fbid=1&id=2",
+				[]string{"https://facebook.evil.test/permalink.php?story_fbid=1&id=2"}},
+			{"pinterest", "https://www.pinterest.com/pin/123/", "https://www.pinterest.com/pin/123/", []string{"https://example.com/pin/123/"}},
+			{"gmb", "https://business.google.com/locations/123", "https://business.google.com/locations/123",
+				[]string{"https://www.google.com/url?q=https://evil.test"}},
+			{"bluesky", "https://bsky.app/profile/canary.bsky.social/post/3kabc", "at://canary.bsky.social/app.bsky.feed.post/3kabc",
+				[]string{"https://example.com/profile/canary.bsky.social/post/3kabc", "https://bsky.app/profile/canary.bsky.social"}},
+			{"mastodon", "https://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233",
+				[]string{"https://mastodon.social/about", "https://user@mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233?ref=x"}},
+		} {
+			t.Run(item.platform, func(t *testing.T) {
+				post := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).
+					SetContentDraftID(draft(ContentDraftInput{}).ID).SetChannelConnectionID(connect(item.platform, "link-"+item.platform+"-"+w.id, nil)).
+					SetScheduledFor(time.Now().UTC()).SetStatus(scheduledpost.StatusUNKNOWN_DELIVERY).SetCaption("Link canary").
+					SetIdempotencyKey(cuid.New()).SetFailureCode(publishing.FailureUnknownDelivery).SaveX(ctx)
+				for _, bad := range item.invalid {
+					if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: bad}); !errors.Is(err, ErrInvalidInput) {
+						t.Fatalf("accepted %q: %v", bad, err)
+					}
+				}
+				if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.link}); err != nil {
+					t.Fatal(err)
+				}
+				if stored := w.db.Client.ScheduledPost.GetX(ctx, post.ID); stored.RemotePostID == nil || *stored.RemotePostID != item.remoteID {
+					t.Fatalf("stored remote id %v, want %q", stored.RemotePostID, item.remoteID)
+				}
+			})
+		}
+	})
+
 	t.Run("P39 cross-provider partial success retains the confirmed receipt when retrying the failed target", func(t *testing.T) {
 		d := draft(ContentDraftInput{PlainText: "partial publication"})
 		result, e := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Version: d.Version, Targets: append(target("X succeeded", x), target("LinkedIn failed", linkedin)...)})

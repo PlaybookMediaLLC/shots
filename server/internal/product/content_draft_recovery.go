@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/lucsky/cuid"
 )
 
@@ -25,6 +27,14 @@ var (
 	linkedInURN     = regexp.MustCompile(`urn:li:(?:share|ugcPost|activity):[0-9]{1,30}`)
 	tikTokVideoPath = regexp.MustCompile(`^/@([A-Za-z0-9_.]{1,24})/video/([1-9][0-9]{0,29})/?$`)
 	youTubeVideoID  = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+	// postSites are where a live post's link may point, with any subdomain, on
+	// platforms whose post id is the link itself; each is where the provider
+	// links a post it published.
+	postSites = map[string][]string{
+		"threads": {"threads.net", "threads.com"}, "instagram": {"instagram.com"}, "instagram-standalone": {"instagram.com"},
+		"facebook": {"facebook.com"}, "pinterest": {"pinterest.com", "pin.it"},
+		"gmb": {"business.google.com", "local.google.com"},
+	}
 )
 
 // draftPostForRecovery loads a draft post the actor may see, for a publisher.
@@ -227,8 +237,25 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 				progress.Publication = &receipt
 				update.SetThreadProgress(progress)
 			}
-		case strings.HasPrefix(input.URL, "https://"):
-			remote = input.URL
+		case platform == "bluesky":
+			// Kept as the worker keeps it: the post's at:// URI.
+			if uri, err := socialidentity.BlueskyPostURI(input.URL); err == nil {
+				remote = uri
+			}
+		case platform == "mastodon" || platform == "mastodon-custom":
+			// shortcut: any instance's status link passes, as the connection does not record its instance; check it once it does.
+			if socialidentity.MastodonStatusURL(input.URL) {
+				remote = input.URL
+			}
+		default:
+			parsed, err := url.Parse(input.URL)
+			if err == nil && parsed.Scheme == "https" && parsed.User == nil && parsed.Port() == "" &&
+				slices.ContainsFunc(postSites[platform], func(site string) bool {
+					host := strings.ToLower(parsed.Hostname())
+					return host == site || strings.HasSuffix(host, "."+site)
+				}) {
+				remote = input.URL
+			}
 		}
 		if input.URL != "" && remote == "" {
 			return nil, invalid("That URL is not a post on this channel.")
