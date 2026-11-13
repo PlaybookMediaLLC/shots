@@ -83,8 +83,9 @@ async function connect(code, provider = 'e2e') {
       provider,
       state,
       integrationId: id,
-      accountId: 'fixture-channel',
-      pageId: 'fixture-channel',
+      // The fixture's page id is per platform, as a real network's is.
+      accountId: `fixture-${provider}`,
+      pageId: `fixture-${provider}`,
     })
   }
   return id
