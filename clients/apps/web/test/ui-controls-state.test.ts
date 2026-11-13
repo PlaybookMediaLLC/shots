@@ -1012,7 +1012,7 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
   // No count starts while the profile loads; once its accounts are chosen, the
   // loading worker takes the latest request when it is ready.
   assert.equal(workers.length, 1)
-  assert.deepEqual(workers[0].requests, [])
+  assert.equal(workers[0].requests.length, 0)
   await workers[0].ready()
   assert.deepEqual(workers[0].requests, [
     {
