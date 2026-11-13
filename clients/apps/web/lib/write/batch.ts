@@ -103,6 +103,36 @@ export function stagedChecks(item: BatchItem, accounts: readonly BatchAccount[])
 }
 
 /**
+ * A preview row's files against its accounts' platforms before anything
+ * uploads, on the facts the browser has: type and size. A row no account can
+ * take needs fixing; one that only some refuse is added, with a note saying
+ * what they refuse. Length and shape are known once uploaded, so Check judges
+ * those, and a row with a library asset or an untyped file is left to it.
+ */
+export function intakeChecks(
+  channels: readonly DraftChannel[],
+  files: readonly ({ size: number; type: string } | undefined)[]
+): { notes: string[]; problems: string[] } {
+  const facts: MediaFacts[] = []
+  for (const file of files) {
+    if (!file?.type) return { notes: [], problems: [] }
+    facts.push({ bytes: file.size, mimeType: file.type })
+  }
+  const pdf = facts.some((fact) => fact.mimeType === 'application/pdf')
+  const platforms = [...new Set(channels)]
+  const refusals = facts.length
+    ? platforms.flatMap((channel) =>
+        (pdf ? documentProblems(channel, facts) : mediaProblems(channel, facts)).slice(0, 1)
+      )
+    : []
+  // A PDF's refusal reads the same for every platform but LinkedIn: say it once.
+  const said = [...new Set(refusals)]
+  return refusals.length && refusals.length === platforms.length
+    ? { notes: [], problems: said }
+    : { notes: said, problems: [] }
+}
+
+/**
  * Whether a caption source's longest expansion fits every account given, or
  * what to shorten. Literal captions, variations and CSV rows all come here.
  */

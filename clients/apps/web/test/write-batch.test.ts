@@ -8,6 +8,7 @@ import {
   captionProblem,
   feedPublications,
   hourlyWindow,
+  intakeChecks,
   plainTextDraft,
   plannedText,
   itemAccounts,
@@ -129,6 +130,36 @@ test("an X video longer than the account's verified length is refused in Go's wo
   assert.ok(
     !card({ ...accounts[2], xCaptionLimit: null, xVideoMaxSeconds: null }).includes(reconnect)
   )
+})
+
+test('before upload, a file no account takes needs fixing; one some refuse carries a note', () => {
+  const video = { size: 400_000_000, type: 'video/mp4' }
+  // LinkedIn takes 500 MB videos, Bluesky 300 MB: the row goes, saying Bluesky will not.
+  const some = intakeChecks(['linkedin', 'bluesky'], [video])
+  assert.deepEqual(some.problems, [])
+  assert.match(some.notes.join(), /Bluesky takes videos up to 300 MB/)
+  const none = intakeChecks(['bluesky', 'instagram', 'instagram'], [video])
+  assert.equal(none.problems.length, 2)
+  assert.deepEqual(none.notes, [])
+  assert.match(
+    intakeChecks(['instagram'], [{ size: 1000, type: 'image/gif' }]).problems.join(),
+    /GIF/
+  )
+  assert.deepEqual(intakeChecks(['x', 'linkedin'], [{ size: 1000, type: 'image/png' }]), {
+    notes: [],
+    problems: [],
+  })
+  const pdf = { size: 1000, type: 'application/pdf' }
+  assert.deepEqual(intakeChecks(['linkedin'], [pdf]).problems, [])
+  assert.match(intakeChecks(['x'], [pdf]).problems.join(), /Only LinkedIn posts a PDF/)
+  assert.equal(intakeChecks(['x', 'threads'], [pdf]).problems.length, 1)
+  assert.equal(intakeChecks(['linkedin', 'x', 'threads'], [pdf]).notes.length, 1)
+  // A library asset or a file the browser could not type is left to Check, as is a text row.
+  const unknown = { notes: [], problems: [] }
+  assert.deepEqual(intakeChecks(['bluesky'], [video, undefined]), unknown)
+  assert.deepEqual(intakeChecks(['bluesky'], [{ size: 400_000_000, type: '' }]), unknown)
+  assert.deepEqual(intakeChecks(['tiktok'], []), unknown)
+  assert.deepEqual(intakeChecks([], [video]), unknown)
 })
 
 test('a local time is read in its own zone, refusing skipped and unchosen repeated times', () => {

@@ -16,13 +16,16 @@ test(
     await openNewBatch(page, app)
     const items = await addBatchRows(
       page,
-      'caption,asset,channels\nRefused first,,x\nNot a channel,,myspace\nMissing file,gone.png,x'
+      'caption,asset,channels\nRefused first,,x\nNot a channel,,myspace\nMissing file,gone.png,x\nPDF to X,deck.pdf,x',
+      [{ name: 'deck.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF\n') }]
     )
     await expect(items).toHaveCount(1)
     // Rows with problems are not added and stay listed with what to fix.
     const preview = page.getByTestId('import-preview')
     await expect(preview).toContainText('Unknown channel myspace')
     await expect(preview).toContainText('no selected file is named gone.png')
+    // The row's own accounts judge its files before they upload: only LinkedIn posts a PDF.
+    await expect(preview).toContainText('Only LinkedIn posts a PDF')
     await expect(preview.getByRole('button', { name: /^Add 0 ready rows/ })).toBeDisabled()
     // Cancel drops the refused rows from view and leaves the added post alone.
     await preview.getByRole('button', { name: 'Cancel', exact: true }).click()

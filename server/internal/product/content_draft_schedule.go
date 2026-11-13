@@ -677,16 +677,16 @@ func replayDraftSchedule(ctx context.Context, tx *ent.Tx, draft *ent.ContentDraf
 	if len(existing) != len(keys) {
 		return nil, conflict("This draft was already scheduled to other channels at this version. Reload it and try again.")
 	}
-	// A replay answers in the targets' order, as the first schedule did; the query has no order.
-	slices.SortFunc(existing, func(a, b *ent.ScheduledPost) int {
-		return slices.Index(keys, a.IdempotencyKey) - slices.Index(keys, b.IdempotencyKey)
-	})
 	intent := scheduleIntent(input)
 	for _, post := range existing {
 		if post.ScheduleIntent != nil && *post.ScheduleIntent != intent {
 			return nil, conflict("This version was already scheduled for another time. Reload to see the current schedule, then change it.")
 		}
 	}
+	// A replay answers in the targets' order, as the first answer did; the query has none.
+	slices.SortFunc(existing, func(a, b *ent.ScheduledPost) int {
+		return slices.Index(keys, a.IdempotencyKey) - slices.Index(keys, b.IdempotencyKey)
+	})
 	return existing, nil
 }
 

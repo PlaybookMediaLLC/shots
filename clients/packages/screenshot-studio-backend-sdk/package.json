@@ -1,6 +1,6 @@
 {
   "name": "screenshot-studio-backend-sdk",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "description": "Typed server SDK for the Screenshot Studio Go backend",
   "type": "module",
   "license": "Apache-2.0",
@@ -26,6 +26,6 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "zod": "^4.1.12"
+    "zod": "^4.5.0"
   }
 }
