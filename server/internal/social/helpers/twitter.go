@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/dlclark/regexp2"
 	"golang.org/x/text/unicode/norm"
@@ -184,6 +185,10 @@ type urlEntity struct {
 // protocol: twitter-text's extractUrlsWithIndices with
 // extractUrlsWithoutProtocol: false, as Mastodon finds the links it counts.
 func LinkSpans(text string) [][2]int {
+	// Only a link with a protocol counts, and the scan is slow on long runs.
+	if !strings.Contains(text, "://") {
+		return nil
+	}
 	offsets := make([]int, 0, len(text)+1) // the byte offset of each UTF-16 unit
 	for i, r := range text {
 		offsets = append(offsets, i)

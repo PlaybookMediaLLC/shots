@@ -387,6 +387,76 @@
         "x": 49,
         "youtube": 41
       }
+    },
+    {
+      "label": "a capitalized remote mention with a Unicode domain before a link",
+      "text": "@Abcd@bü.example https://x.com",
+      "lengths": {
+        "bluesky": 30,
+        "instagram": 30,
+        "linkedin": 30,
+        "mastodon": 29,
+        "threads": 30,
+        "tiktok": 30,
+        "x": 40,
+        "youtube": 30
+      }
+    },
+    {
+      "label": "no mention after a letter or =, or before :// or ＠",
+      "text": "é@a@b.org =@a@b.org @a@b.org://x @a@b.org＠x",
+      "lengths": {
+        "bluesky": 43,
+        "instagram": 43,
+        "linkedin": 43,
+        "mastodon": 43,
+        "threads": 43,
+        "tiktok": 43,
+        "x": 44,
+        "youtube": 43
+      }
+    },
+    {
+      "label": "no mention after a letter number or a circled letter",
+      "text": "Ⅻ@a@b.org ⓐ@a@b.org",
+      "lengths": {
+        "bluesky": 19,
+        "instagram": 19,
+        "linkedin": 19,
+        "mastodon": 19,
+        "threads": 19,
+        "tiktok": 19,
+        "x": 21,
+        "youtube": 19
+      }
+    },
+    {
+      "label": "a mention domain counts up to 253 characters",
+      "text": "@a@ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd @a@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "lengths": {
+        "bluesky": 514,
+        "instagram": 514,
+        "linkedin": 514,
+        "mastodon": 260,
+        "threads": 514,
+        "tiktok": 514,
+        "x": 514,
+        "youtube": 514
+      }
+    },
+    {
+      "label": "a post can end with a remote mention",
+      "text": "Thanks @alice@mastodon.social",
+      "lengths": {
+        "bluesky": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 13,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
     }
   ]
 }

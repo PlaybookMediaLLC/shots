@@ -547,13 +547,12 @@ export function captionLength(caption: string): number {
 
 const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
-/** Mastodon's Account::MENTION_RE (v4.7): `@user`, then an optional `@domain`. */
+/**
+ * Mastodon's Account::MENTION_RE (v4.7): `@user`, then an optional `@domain`.
+ * Ruby's [[:word:]] is an alphabetic character, a mark, a digit or a connector.
+ */
 const mastodonMention =
-  /(?<![=/\p{L}\p{M}\p{Nd}\p{Pc}])@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@([\p{L}\p{M}\p{Nd}\p{Pc}]+(?:[.-]+[\p{L}\p{M}\p{Nd}\p{Pc}]+)*))?/giu
-
-/** twitter-text's end_mention_match: an at sign or a Latin accent right after (or `://`) means no mention. */
-const mastodonMentionEnd =
-  /[\u0300-\u036f@＠\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u0253\u0254\u0256\u0257\u0259\u025b\u0263\u0268\u026f\u0272\u0289\u028b\u02bb\u1e00-\u1eff]/
+  /(?<![=/\p{Alphabetic}\p{M}\p{Nd}\p{Pc}])@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@([\p{Alphabetic}\p{M}\p{Nd}\p{Pc}]+(?:[.-]+[\p{Alphabetic}\p{M}\p{Nd}\p{Pc}]+)*))?/giu
 
 /**
  * The text Mastodon's StatusLengthValidator counts: each link with a protocol
@@ -561,9 +560,12 @@ const mastodonMentionEnd =
  */
 function mastodonCountable(caption: string): string {
   // shortcut: stock twitter-text 3.1.0 finds the links; Mastodon's own regex also takes dat://, gemini:// and other protocols, any non-space path character and Unicode queries, and stops a path before a trailing '='. Port config/initializers/twitter_regex.rb on both sides if those links matter.
-  const links = twitterText
-    .extractUrlsWithIndices(caption, { extractUrlsWithoutProtocol: false })
-    .map(({ indices: [start, end] }) => ({ start, end, text: 'x'.repeat(23) }))
+  // Only a link with a protocol counts, and twitter-text's scan is slow on long CJK runs.
+  const links = caption.includes('://')
+    ? twitterText
+        .extractUrlsWithIndices(caption, { extractUrlsWithoutProtocol: false })
+        .map(({ indices: [start, end] }) => ({ start, end, text: 'x'.repeat(23) }))
+    : []
   const mentions = [...caption.matchAll(mastodonMention)]
     .map((match) => ({
       start: match.index,
@@ -573,8 +575,8 @@ function mastodonCountable(caption: string): string {
     }))
     .filter(
       ({ end, domain }) =>
-        !mastodonMentionEnd.test(caption[end] ?? '') &&
-        !caption.startsWith('://', end) &&
+        // An at sign, a Latin accent or :// right after means it is not a mention.
+        !twitterText.regexen.endMentionMatch.test(caption.slice(end, end + 3)) &&
         [...domain].length <= 253
     )
   let [countable, at] = ['', 0]
@@ -611,18 +613,19 @@ export function overflowAt(channel: DraftChannel, caption: string, limit: number
   if (channel !== 'x') {
     // Units and graphemes only grow as a prefix grows by whole code points, so
     // halve the range. X's link weighting can make a longer prefix count less.
-    // So can Mastodon's links and mentions, but only from a word's first '@'
-    // or five characters ('https') before its first '://' to the word's end:
-    // halve the cuts outside those spans, then step back through the one span
-    // where the count passes the limit.
-    // shortcut: a long unspaced span (CJK text with a link before more text) steps back one code point at a time, like X; find tighter safe cuts if it gets slow.
-    const risky = new Uint8Array(caption.length + 1)
-    if (channel === 'mastodon')
-      for (const word of caption.matchAll(/\S+/g)) {
-        const entity = word[0].search(/:\/\/|@/)
-        if (entity >= 0)
-          risky.fill(1, word.index + Math.max(1, entity - 4), word.index + word[0].length)
-      }
+    // So can Mastodon's links and mentions, but only in two kinds of span: from
+    // the 'https' before a '://' to the end of its word, and from a mention's
+    // '@' to the character after it, which can turn it back into text. Halve
+    // the cuts outside those spans, then step back through the one span where
+    // the count passes the limit.
+    // shortcut: a long unspaced span (CJK text right after a link) steps back one code point at a time, like X; find tighter safe cuts if it gets slow.
+    const risky = new Uint8Array(caption.length) // the whole caption is always a cut
+    if (channel === 'mastodon') {
+      for (const link of caption.matchAll(/\S{0,5}:\/\/\S*/g))
+        risky.fill(1, link.index + 1, link.index + link[0].length)
+      for (const mention of caption.matchAll(mastodonMention))
+        risky.fill(1, mention.index + 1, mention.index + mention[0].length + 1)
+    }
     const ends = [0]
     for (const character of caption) ends.push(ends[ends.length - 1] + character.length)
     const cuts = ends.filter((end) => !risky[end])

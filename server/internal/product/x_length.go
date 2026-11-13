@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -20,10 +19,17 @@ func xLength(text string) int {
 	return helpers.WeightedLength(text)
 }
 
+// rubyWord is Ruby's [[:word:]]: Alphabetic, marks, decimal digits and
+// connector punctuation. Alphabetic beyond letters and marks is the letter
+// numbers and the circled and squared Latin letters.
+const rubyWord = `[\pL\pM\p{Nl}\p{Nd}\p{Pc}\x{24B6}-\x{24E9}\x{1F130}-\x{1F149}\x{1F150}-\x{1F169}\x{1F170}-\x{1F189}]`
+
+var rubyWordRe = regexp.MustCompile(`^` + rubyWord + `$`)
+
 // mastodonMentionRe is Mastodon's Account::MENTION_RE (v4.7) without its
 // lookbehind (?<![=/[:word:]]), which RE2 lacks: mastodonLength checks the
 // rune before instead.
-var mastodonMentionRe = regexp.MustCompile(`(?i)@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@([\pL\pM\p{Nd}\p{Pc}]+(?:[.-]+[\pL\pM\p{Nd}\p{Pc}]+)*))?`)
+var mastodonMentionRe = regexp.MustCompile(`(?i)@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@(` + rubyWord + `+(?:[.-]+` + rubyWord + `+)*))?`)
 
 // mastodonMentionEndRe is twitter-text's end_mention_match: an at sign, a
 // Latin accent or :// right after a match means it is not a mention.
@@ -42,7 +48,7 @@ func mastodonLength(text string) int {
 	}
 	for _, m := range mastodonMentionRe.FindAllStringSubmatchIndex(text, -1) {
 		before, _ := utf8.DecodeLastRuneInString(text[:m[0]])
-		if before == '=' || before == '/' || unicode.In(before, unicode.L, unicode.M, unicode.Nd, unicode.Pc) ||
+		if before == '=' || before == '/' || rubyWordRe.MatchString(string(before)) ||
 			mastodonMentionEndRe.MatchString(text[m[1]:]) ||
 			m[4] >= 0 && utf8.RuneCountInString(text[m[4]:m[5]]) > 253 {
 			continue
