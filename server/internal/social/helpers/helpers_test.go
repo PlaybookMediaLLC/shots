@@ -127,8 +127,9 @@ func liftTextBudget(t *testing.T) {
 func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
 	// Many words; one word, whose TLD checks stop too; and many bare domains,
 	// each with an ASCII-only scan of a TLD check per label.
+	words := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
 	for _, text := range []string{
-		strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59),
+		words,
 		strings.Repeat("a.", 1<<19),
 		strings.Repeat("!"+strings.Repeat("`a.", 1333)+"com", 1<<20/4003),
 	} {
@@ -139,6 +140,14 @@ func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
 		if elapsed := time.Since(start); elapsed > 4*time.Second {
 			t.Errorf("%.12q… took %v, want about the 2.2 s budget of a 100,000-unit text", text, elapsed)
 		}
+	}
+	// Mastodon's scan has the same cap.
+	start := time.Now()
+	if _, err := LinkSpans(words); !errors.Is(err, ErrTextTooComplex) {
+		t.Fatalf("LinkSpans error = %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 4*time.Second {
+		t.Errorf("LinkSpans took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
 	}
 }
 
@@ -425,35 +434,59 @@ func TestMinifyPostsList(t *testing.T) {
 // emojiMatches must find what one scan of the twemoji regex finds, whatever
 // the window.
 func TestEmojiMatchesAreTheFullScan(t *testing.T) {
-	if n := longestMatch(t, twemojiSource); n > twemojiMaxLength {
-		t.Fatalf("a twemoji match spans up to %d units, over twemojiMaxLength", n)
+	if n := longestMatch(t, twemojiSource); n != twemojiMaxLength {
+		t.Fatalf("a twemoji match spans up to %d units, not twemojiMaxLength", n)
 	}
 	tokens := []string{"\U0001F600", "\U0001F44D\U0001F3FD", "\U0001F1EB\U0001F1F7", "#\ufe0f\u20e3",
 		"\U0001F468\u200d\U0001F469\u200d\U0001F467\u200d\U0001F466",             // a family, 11 units
 		"\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F", // England's flag, 14
 		"\U0001F468\u200d\u2764\ufe0f\u200d\U0001F468", "\u2764", "\u2642", "\u00a9", "7", "#",
-		"\u20e3", "\ufe0f", "\ufe0e", "\u200d", "a", " "}
+		"\u20e3", "\ufe0f", "\ufe0e", "\u200d", "a", " ",
+		// A profession, a sport and a gendered sequence, with and without a
+		// skin tone; a pointing finger, before a variation selector or not;
+		// and a lone skin tone.
+		"\U0001F469\U0001F3FD\u200d\U0001F680", "\u26f9\U0001F3FD\u200d\u2642\ufe0f", "\U0001F3C3\u200d\u2640\ufe0f",
+		"\u261d", "\U0001F3FD"}
+	full := func(text []rune) map[int]int {
+		want := map[int]int{}
+		for m, _ := twemojiRe.FindRunesMatch(text); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
+			want[m.Index] = m.Length
+		}
+		return want
+	}
+	// A stuck loop fails in seconds: emojiMatches checks the deadline every pass.
+	deadline := time.Now().Add(10 * time.Second)
 	rng := rand.New(rand.NewPCG(3, 4))
-	found := 0
+	var all strings.Builder
+	found, longest := 0, 0
 	for range 2000 {
 		var b strings.Builder
 		for range 1 + rng.IntN(40) {
 			b.WriteString(tokens[rng.IntN(len(tokens))])
 		}
+		all.WriteString(b.String())
 		text := shiftSurrogates(utf16Units(b.String()))
-		want := map[int]int{}
-		for m, _ := twemojiRe.FindRunesMatch(text); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
-			want[m.Index] = m.Length
-		}
-		for _, window := range []int{twemojiMaxLength + 2, 23, 40, emojiScanWindow} {
-			if got, err := emojiMatches(text, window, time.Now().Add(time.Hour)); err != nil || !maps.Equal(got, want) {
+		want := full(text)
+		for _, window := range []int{twemojiMaxLength + 2, 23, 40} {
+			if got, err := emojiMatches(text, window, deadline); err != nil || !maps.Equal(got, want) {
 				t.Fatalf("emojiMatches(%q, %d) = %v, %v, want %v", b.String(), window, got, err, want)
 			}
 		}
 		found += len(want)
+		for _, n := range want {
+			if n == twemojiMaxLength {
+				longest++
+			}
+		}
 	}
-	if found < 10000 {
-		t.Fatalf("only %d matches: the tokens miss the regex", found)
+	// Only matches as long as twemojiMaxLength test the windows' margin.
+	if found < 10000 || longest < 1000 {
+		t.Fatalf("only %d matches, %d of them %d units: the tokens miss the regex", found, longest, twemojiMaxLength)
+	}
+	// And the windows production reads, over all the texts as one.
+	text := shiftSurrogates(utf16Units(all.String()))
+	if got, err := emojiMatches(text, emojiScanWindow, deadline); err != nil || !maps.Equal(got, full(text)) {
+		t.Fatalf("emojiMatches of %d units = %v, not the full scan", len(text), err)
 	}
 }
 
@@ -477,7 +510,9 @@ func longestMatch(t *testing.T, source string) int {
 				i++ // optional: no longer
 			case strings.HasPrefix(source[i:], "(?!"):
 				i += 3
-				alternation() // spans nothing
+				if alternation() > 1 { // spans nothing, but emojiMatches leaves it one unit
+					t.Fatalf("a twemoji lookahead reads more than one unit")
+				}
 			case strings.HasPrefix(source[i:], "(?:"):
 				i += 3
 				n += alternation()
@@ -502,6 +537,39 @@ func longestMatch(t *testing.T, source string) int {
 		return max(longest, n)
 	}
 	return alternation()
+}
+
+// Each emoji window starts where the last stopped. Read from the text's start
+// instead, the scan counted the same but took 1.8 s, not 0.14 s, on 100,000
+// digits: 8 times the text must take about 8 times as long, not 64.
+func TestEmojiScanIsLinear(t *testing.T) {
+	scan := func(n int) time.Duration {
+		text := shiftSurrogates(utf16Units(strings.Repeat("7", n)))
+		best := time.Hour
+		for range 3 {
+			start := time.Now()
+			if _, err := emojiMatches(text, emojiScanWindow, time.Now().Add(time.Minute)); err != nil {
+				t.Fatal(err)
+			}
+			best = min(best, time.Since(start))
+		}
+		return best
+	}
+	if short, long := scan(1<<15), scan(1<<18); long > 20*short {
+		t.Errorf("8 times the digits took %v against %v", long, short)
+	}
+}
+
+// A twemoji regex call that fails, as a timeout would, is ErrTextTooComplex,
+// not a count without its matches.
+func TestEmojiScanErrorIsTextTooComplex(t *testing.T) {
+	saved := twemojiRe
+	t.Cleanup(func() { twemojiRe = saved })
+	twemojiRe = regexp2.MustCompile(`(a+)+b`, 0) // exponential: the group keeps regexp2 from merging the loops
+	twemojiRe.MatchTimeout = time.Millisecond
+	if _, err := emojiMatches([]rune(strings.Repeat("a", 30)), emojiScanWindow, time.Now().Add(time.Hour)); err != ErrTextTooComplex {
+		t.Fatalf("error = %v", err)
+	}
 }
 
 // The emoji scan checks the budget between its regex calls: one call over

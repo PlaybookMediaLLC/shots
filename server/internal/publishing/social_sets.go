@@ -121,10 +121,11 @@ func enableDefaultPlatform(ctx context.Context, tx *ent.Tx, setID *string, platf
 	return err
 }
 
-// emitDraftPublished writes a draft.published webhook event (RFC 024) in the
+// EmitDraftPublished writes a draft.published webhook event (RFC 024) in the
 // transaction that marks a draft's post live: the draft's identity and the
-// live post, never its text.
-func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost, providerPostID string) error {
+// live post, never its text. post must be the stored row; providerPostID may
+// be empty, and is then sent as null.
+func EmitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost, providerPostID string) error {
 	if post.ContentDraftID == nil {
 		return nil
 	}
@@ -163,7 +164,7 @@ func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 		"draft": map[string]any{"id": draft.ID, "socialSetId": draft.SocialSetID, "status": string(draft.Status),
 			"tags": tags, "title": draft.Title},
 		"post": map[string]any{"id": post.ID, "platform": connection.Platform, "publishedAt": time.Now().UTC(),
-			"remotePostId": providerPostID, "url": postoptions.LivePostURL(connection.Platform, &providerPostID)},
+			"remotePostId": nonEmpty(providerPostID), "url": postoptions.LivePostURL(connection.Platform, &providerPostID)},
 	}
 	return webhooks.Emit(ctx, tx, webhooks.NewEnvelope(post.OrganizationID, webhooks.DraftPublished, draft.SocialSetID,
 		webhooks.Resource{ID: draft.ID, Type: "draft"}, data))

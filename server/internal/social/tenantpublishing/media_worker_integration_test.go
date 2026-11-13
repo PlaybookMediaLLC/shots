@@ -387,6 +387,15 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		return provider.posts[len(provider.posts)-1]
 	}
 
+	// subscribe enables a draft.published webhook for the rest of the subtest:
+	// without one nothing is emitted, so an emission check would prove nothing.
+	subscribe := func(t *testing.T) {
+		hook := cuid.New()
+		db.Client.WebhookSubscription.Create().SetID(hook).SetOrganizationID(org).SetName("Hook").
+			SetURL("https://hooks.example.test/shots").SetEvents([]string{webhooks.DraftPublished}).SetEncryptedSecret("unused").SaveX(ctx)
+		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM webhook_subscription WHERE id=$1`, hook) })
+	}
+
 	t.Run("one photo with its caption", func(t *testing.T) {
 		asset, digest := upload("launch.png", "image/png", photo(40))
 		if _, err := store.SetAssetAltText(ctx, owner, asset, "The new dashboard"); err != nil {
@@ -490,9 +499,7 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 	}
 
 	t.Run("a draft published by the worker notifies its webhook subscribers once", func(t *testing.T) {
-		db.Client.WebhookSubscription.Create().SetID("hook_" + id).SetOrganizationID(org).SetName("Hook").
-			SetURL("https://hooks.example.test/shots").SetEvents([]string{webhooks.DraftPublished}).SetEncryptedSecret("unused").SaveX(ctx)
-		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+id) })
+		subscribe(t)
 		asset, _ := upload("hooked.png", "image/png", photo(240))
 		posts := schedule("Hooked", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: linkedin, Caption: "Hooked", AssetIDs: []string{asset}})
 		draft := db.Client.ContentDraft.GetX(ctx, *posts[0].ContentDraftID)
@@ -525,6 +532,7 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 	})
 
 	t.Run("a TikTok app draft is sent to the app and never published", func(t *testing.T) {
+		subscribe(t)
 		connection := connect("tiktok")
 		asset, digest := upload("draft.mp4", "video/mp4", read("portrait.mp4"))
 		posts := schedule("App draft", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: connection, Caption: "Finish me in TikTok",
@@ -547,6 +555,10 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		if err := db.SQL.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE type='activity.post.sent_to_app'), count(*) FILTER (WHERE type='activity.post.published')
 			FROM outbox_event WHERE "organizationId"=$1 AND "aggregateId"=$2`, org, posts[0].ID).Scan(&sent, &published); err != nil || sent != 1 || published != 0 {
 			t.Fatalf("activity sent=%d published=%d err=%v", sent, published, err)
+		}
+		if n := db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(org), outboxevent.Type("webhook."+webhooks.DraftPublished),
+			outboxevent.AggregateID(*posts[0].ContentDraftID)).CountX(ctx); n != 0 {
+			t.Fatalf("an app draft emitted %d draft.published events", n)
 		}
 		before := provider.calls
 		run(posts[0].ID)
