@@ -28,6 +28,7 @@ function context(overrides: Partial<CommandContext> = {}): CommandContext {
       plugins: [PostBreakPlugin],
       value: [postBreak(), p('Hi')] as Value,
     }),
+    drive: null,
     giphy: false,
     openTool: () => undefined,
     postSetting: () => undefined,
@@ -55,6 +56,15 @@ test('poll is offered on X and hidden on TikTok; GIF only when search is approve
   assert.ok(!ids(commandsFor(context({ channel: 'tiktok' }))).includes('insert-poll'))
   assert.ok(!ids(commandsFor(context())).includes('insert-gif'))
   assert.ok(ids(commandsFor(context({ giphy: true }))).includes('insert-gif'))
+})
+
+test('Google Drive is always offered, and says when it is not set up', () => {
+  const drive = (overrides: Partial<CommandContext>) =>
+    commandsFor(context(overrides)).find((command) => command.id === 'insert-drive')
+  assert.equal(drive({})?.badge, 'Not set up')
+  const ready = drive({ drive: { apiKey: 'key', appId: '123456789', clientId: 'client' } })
+  assert.ok(ready)
+  assert.equal(ready.badge, undefined)
 })
 
 test('AI commands follow the platforms and disappear when AI is off', () => {

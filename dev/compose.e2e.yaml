@@ -21,6 +21,11 @@ services:
       # itself, so GIPHY is never contacted. test/write-giphy.server.ts covers the gate.
       PLATFORM_GIPHY_APPROVED_API_AND_STORAGE: 'true'
       GIPHY_API_KEY: e2e-fixture
+      # Offers Google Drive import; the spec answers Google's scripts and Drive
+      # itself, so Google is never contacted. test/write-google-drive.server.ts covers the gate.
+      GOOGLE_PICKER_API_KEY: e2e-fixture
+      GOOGLE_PICKER_CLIENT_ID: e2e-fixture.apps.googleusercontent.com
+      GOOGLE_PICKER_APP_ID: '123456789012'
       # Test users have no inbox. Production verifies email by default.
       AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
       HOSTNAME: 0.0.0.0

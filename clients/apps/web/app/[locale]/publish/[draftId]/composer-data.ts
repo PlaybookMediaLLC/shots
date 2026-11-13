@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { giphyEnabled } from '@/lib/content-drafts/giphy'
+import { googleDriveConfig } from '@/lib/content-drafts/google-drive'
 import { contentDraftPostSchema, contentDraftSchema } from '@/lib/api/contracts/content-drafts'
 import { accessAllows } from '@/lib/auth/permissions'
 import {
@@ -63,6 +64,7 @@ export async function loadDraftComposer(
       collabToken,
       collabUrl,
       draft: contentDraftSchema.parse(draft),
+      drive: googleDriveConfig(),
       giphy: giphyEnabled(),
       posts: (posts ?? []).map((post) => contentDraftPostSchema.parse(post)),
       requireApproval: settings.requireApproval,

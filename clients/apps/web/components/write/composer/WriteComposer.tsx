@@ -166,6 +166,7 @@ import { mediaSwitches } from '@/lib/write/platform-rules'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
+import type { GoogleDriveConfig } from '@/lib/write/google-drive'
 import { RefineMenu, RefineProvider } from './refine'
 import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
 import { ComposerToolbar } from './composer-toolbar'
@@ -263,6 +264,7 @@ export function WriteComposer({
   collabToken = null,
   collabUrl,
   draft: initial,
+  drive = null,
   giphy = false,
   layout = 'page',
   posts: initialPosts,
@@ -276,6 +278,8 @@ export function WriteComposer({
   collabToken?: DraftCollaboration['issued'] | null
   collabUrl: string | null
   draft: DraftWire
+  /** Google Picker's keys, or null while Drive import is not set up. */
+  drive?: GoogleDriveConfig | null
   /** Whether GIF search is approved and configured. */
   giphy?: boolean
   /**
@@ -2630,6 +2634,7 @@ export function WriteComposer({
           addMedia,
           channel: active,
           channels,
+          drive,
           giphy,
           openTool: setTool,
           postSetting: (number, setting) => setPostSetting({ at: Date.now(), number, setting }),

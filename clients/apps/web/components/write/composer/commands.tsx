@@ -10,6 +10,7 @@ import { ChartBarHorizontalIcon } from '@phosphor-icons/react/dist/ssr/ChartBarH
 import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/ssr/ClockCounterClockwise'
 import { CopyIcon } from '@phosphor-icons/react/dist/ssr/Copy'
 import { GifIcon } from '@phosphor-icons/react/dist/ssr/Gif'
+import { GoogleDriveLogoIcon } from '@phosphor-icons/react/dist/ssr/GoogleDriveLogo'
 import { HashIcon } from '@phosphor-icons/react/dist/ssr/Hash'
 import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
 import { ImagesIcon } from '@phosphor-icons/react/dist/ssr/Images'
@@ -41,6 +42,7 @@ import {
 } from '@/components/drafts/thread'
 import { CAPABILITIES, pollRules } from '@/lib/write/capabilities'
 import type { DraftChannel } from '@/lib/write/document'
+import type { GoogleDriveConfig } from '@/lib/write/google-drive'
 import { DESTINATION_MEDIA } from '@/lib/write/media-rules'
 import { COMMAND_SHORTCUTS, type Shortcut } from '../shortcuts'
 import type { RefineApi } from './refine'
@@ -59,6 +61,7 @@ export type CommandGroup = 'AI' | 'Post' | 'Insert' | 'Snippets'
 /** The Write tools a command can open. */
 export type ComposerTool =
   | 'alt'
+  | 'drive'
   | 'emoji'
   | 'gif'
   | 'library'
@@ -82,6 +85,8 @@ export type CommandContext = {
   ai: RefineApi | null
   /** Whether GIF search is available here. */
   giphy: boolean
+  /** Google Picker's keys, or null while Drive import is not set up. */
+  drive: GoogleDriveConfig | null
   snippets: readonly Snippet[]
   addMedia: () => void
   openTool: (tool: ComposerTool) => void
@@ -234,6 +239,15 @@ export function commandsFor(context: CommandContext): Command[] {
       id: 'insert-library',
       label: 'From Library',
       run: () => context.openTool('library'),
+    },
+    {
+      aliases: ['drive', 'google'],
+      badge: context.drive ? undefined : 'Not set up',
+      group: 'Insert',
+      icon: GoogleDriveLogoIcon,
+      id: 'insert-drive',
+      label: 'From Google Drive',
+      run: () => context.openTool('drive'),
     },
     context.giphy && {
       aliases: ['gif', 'giphy'],

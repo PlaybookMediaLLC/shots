@@ -19,6 +19,15 @@ import { DESTINATION_MEDIA, mediaProblems } from '@/lib/write/media-rules'
 import { MediaThumb } from './media-thumb'
 
 const RECENT_SHOWN = 6
+
+/** Uploads files into the draft, as a drop or a picker does: the media plugin takes a FileList. */
+export async function uploadFiles(editor: PlateEditor, files: File[]) {
+  const { PlaceholderPlugin } = await import('@shots/platejs-editor/@platejs/media/react')
+  if (!editor.selection) editor.tf.select(editor.api.end([]))
+  const list = new DataTransfer()
+  files.forEach((file) => list.items.add(file))
+  editor.getTransforms(PlaceholderPlugin).insert.media(list.files)
+}
 const ACCEPT = {
   'image/gif': ['.gif'],
   'image/jpeg': ['.jpg', '.jpeg'],
@@ -162,14 +171,7 @@ function AddMedia({
     )
     .slice(0, RECENT_SHOWN)
 
-  async function upload(files: File[]) {
-    // The media plugin takes a FileList, as from a drop or a picker. It loads with the editor.
-    const { PlaceholderPlugin } = await import('@shots/platejs-editor/@platejs/media/react')
-    if (!editor.selection) editor.tf.select(editor.api.end([]))
-    const list = new DataTransfer()
-    files.forEach((file) => list.items.add(file))
-    editor.getTransforms(PlaceholderPlugin).insert.media(list.files)
-  }
+  const upload = (files: File[]) => uploadFiles(editor, files)
 
   async function attach(asset: { id: string; mediaType: string }) {
     setAttaching(asset.id)
