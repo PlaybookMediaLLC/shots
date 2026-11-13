@@ -346,6 +346,7 @@ test('closing a dialog opened from a dialog returns focus to each launcher in tu
   await holdsFocus(sheet)
   await page.keyboard.press('Escape')
   await expect(sheet).toHaveCount(0)
+  await expect(editor).toBeFocused()
   await page.keyboard.type('right ')
   await expect(editor).toContainText('Focus goes back where it came right from')
 })
