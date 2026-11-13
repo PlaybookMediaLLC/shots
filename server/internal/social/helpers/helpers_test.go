@@ -3,6 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -96,6 +97,59 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 				t.Errorf("%s(%s) error = %v", scan, name, err)
 			}
 		}
+	}
+}
+
+// A text longer than any caption gets no more time than the longest one: 1 MiB
+// of slow words took 21 s while the budget grew with length.
+func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
+	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
+	start := time.Now()
+	if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
+		t.Fatalf("WeightedLength error = %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 4*time.Second {
+		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	}
+}
+
+// Mastodon counts only links with a protocol, so a dotted word without one is
+// not scanned and cannot exhaust the budget.
+func TestLinkSpansSkipsWordsWithoutAProtocol(t *testing.T) {
+	text := "Docs at https://example.com and " + strings.Repeat("a.", 1000)
+	spans, err := LinkSpans(text)
+	if err != nil || len(spans) != 1 || text[spans[0][0]:spans[0][1]] != "https://example.com" {
+		t.Fatalf("LinkSpans = %v, %v", spans, err)
+	}
+}
+
+// One request's texts share its budget: once crafted texts spend it, the next
+// scans stop at once, while a text counted before is not scanned again.
+func TestScanBudgetIsSharedAcrossTexts(t *testing.T) {
+	budget := NewScanBudget(500 * time.Millisecond)
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("before = %v, %v", spans, err)
+	}
+	start := time.Now()
+	for i := range 20 {
+		crafted := fmt.Sprintf("https://%d.%s", i, strings.Repeat("a.", 1000)) // seconds unbounded
+		if _, _, err := budget.ParseTweet(crafted, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Fatalf("crafted %d: %v", i, err)
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+		t.Errorf("20 crafted texts took %v of a 500 ms budget", elapsed)
+	}
+	if spans, err := budget.LinkSpans("see https://example.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("after = %v, %v", spans, err)
+	}
+	// X counts bare domains, Mastodon does not: their scans are remembered apart.
+	both := NewScanBudget(time.Second)
+	if spans, err := both.LinkSpans("https://a.com b.com"); err != nil || len(spans) != 1 {
+		t.Fatalf("spans = %v, %v", spans, err)
+	}
+	if weighted, _, err := both.ParseTweet("https://a.com b.com", 280); err != nil || weighted != 47 {
+		t.Fatalf("weighted = %d, %v", weighted, err)
 	}
 }
 

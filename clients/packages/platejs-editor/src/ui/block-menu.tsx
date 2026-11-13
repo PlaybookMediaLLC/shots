@@ -360,7 +360,7 @@ function BlockMenuItems() {
   const selectedBlocks = useBlockSelectionNodes();
   const editor = useEditorRef();
   const hasAI = Boolean(editor.plugins[AIChatPlugin.key]);
-  const hasComments = Boolean(editor.plugins[KEYS.comment]);
+  const hasComment = Boolean(editor.plugins[KEYS.comment]);
 
   const menuGroups = useMemo(() => {
     const isMedia =
@@ -369,21 +369,20 @@ function BlockMenuItems() {
         MEDIA_BLOCK_TYPES.has(String(item[0].type))
       );
 
-    // Items whose plugin this editor lacks would call an API that is not there.
-    const missing = new Set<Action>([
-      ...(hasAI ? [] : [blockMenuItems.askAI]),
-      ...(hasComments ? [] : [blockMenuItems.comment]),
-    ]);
-    const groups: Action[] = isMedia ? mediaMenuItems : orderedMenuItems;
-    const items = groups
-      .map((group) => ({
+    // Ask AI and Comment call their plugin's API, which an editor without it lacks.
+    const items = (isMedia ? mediaMenuItems : orderedMenuItems).map(
+      (group) => ({
         ...group,
-        items: group.items?.filter((item) => !missing.has(item)),
-      }))
-      .filter((group) => group.items?.length);
+        items: group.items.filter(
+          (item) =>
+            (hasAI || item !== blockMenuItems.askAI) &&
+            (hasComment || item !== blockMenuItems.comment)
+        ),
+      })
+    );
 
     return filterMenuGroups(items, searchValue) || items;
-  }, [hasAI, hasComments, selectedBlocks, searchValue]);
+  }, [hasAI, hasComment, selectedBlocks, searchValue]);
 
   return (
     <>
