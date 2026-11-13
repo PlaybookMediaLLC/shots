@@ -61,7 +61,7 @@ func TestAutomationPlan(t *testing.T) {
 	if len(linkedIn) != 1 || linkedIn[0].Kind != AutomationFirstComment || !linkedIn[0].At.Equal(published) {
 		t.Fatalf("linkedin = %+v", linkedIn)
 	}
-	for _, platform := range []string{"instagram", "instagram-standalone"} {
+	for _, platform := range []string{"instagram", "instagram-standalone", "facebook"} {
 		instagram := automationPlan(PreparedPublication{
 			Platform: platform, Options: &postoptions.PublishOptions{FirstComment: "#launch"},
 		}, published)

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   instagramOptionsSchema,
+  pinterestOptionsSchema,
   youtubeOptionsSchema,
   tiktokOptionsSchema,
 } from 'screenshot-studio-backend-sdk'
@@ -21,6 +22,8 @@ export const draftChannelSchema = z.enum([
   'mastodon',
   'tiktok',
   'youtube',
+  'facebook',
+  'pinterest',
 ])
 
 /** One of {@link draftChannelSchema}. */
@@ -186,6 +189,8 @@ export const versionOptionsSchema = z.strictObject({
   tiktok: tiktokOptionsSchema.optional(),
   /** Instagram: collaborators, tags, and a reel's cover, grid and trial. */
   instagram: instagramOptionsSchema.optional(),
+  /** Pinterest: the pin's board, title and link. */
+  pinterest: pinterestOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),

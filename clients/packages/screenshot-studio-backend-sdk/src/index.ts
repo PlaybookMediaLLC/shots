@@ -2,6 +2,7 @@ import type {
   YouTubeOptions,
   TikTokOptions,
   InstagramOptions,
+  PinterestOptions,
   PublicationReceipt,
 } from './video-publishing.ts'
 export {
@@ -10,9 +11,15 @@ export {
   tiktokOptionsSchema,
   tiktokCreatorSchema,
   instagramOptionsSchema,
+  pinterestOptionsSchema,
   instagramUsernameSchema,
 } from './video-publishing.ts'
-export type { YouTubeOptions, TikTokOptions, InstagramOptions } from './video-publishing.ts'
+export type {
+  YouTubeOptions,
+  TikTokOptions,
+  InstagramOptions,
+  PinterestOptions,
+} from './video-publishing.ts'
 import { z } from 'zod'
 import {
   founderHubProfileSchema,
@@ -1348,6 +1355,7 @@ export type BackendPublishOptions = {
   youtube?: YouTubeOptions
   tiktok?: TikTokOptions
   instagram?: InstagramOptions
+  pinterest?: PinterestOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string
@@ -3338,6 +3346,13 @@ export class ScreenshotStudioBackendSDK {
   async searchSocialSetCommunities(id: string, query: string) {
     return this.request<{ items: { id: string; name: string }[] }>(
       `v1/social-sets/${encodeURIComponent(id)}/communities?${new URLSearchParams({ q: query })}`
+    )
+  }
+
+  /** The boards of the social set's Pinterest account, for choosing where a pin is saved. */
+  async listSocialSetPinterestBoards(id: string) {
+    return this.request<{ items: { id: string; name: string }[] }>(
+      `v1/social-sets/${encodeURIComponent(id)}/pinterest-boards`
     )
   }
 

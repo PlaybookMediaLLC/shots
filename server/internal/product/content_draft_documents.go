@@ -36,7 +36,7 @@ var (
 	linkedInSharePath = regexp.MustCompile(`^/posts/[A-Za-z0-9_-]+-activity-([0-9]{1,30})(?:-[A-Za-z0-9_-]+)?/?$`)
 	// The kinds of draft and the channels each can be written for.
 	draftKindChannels = map[string][]string{
-		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "tiktok", "youtube"},
+		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "tiktok", "youtube", "facebook", "pinterest"},
 		"reply":    {"x"},
 		"quote":    {"x", "linkedin", "bluesky", "mastodon"},
 		// A repurposed draft is a new post made from a published one.
@@ -231,6 +231,9 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	if err := postoptions.ValidateInstagramOptions(channel, clean.Instagram); err != nil {
 		return nil, invalid(err.Error())
 	}
+	if err := postoptions.ValidatePinterestOptions(channel, clean.Pinterest, false); err != nil {
+		return nil, invalid(err.Error())
+	}
 	if len(clean.LinkPreviews) > 25 {
 		return nil, invalid("A draft can store at most 25 link previews.")
 	}
@@ -277,8 +280,8 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	}
 	clean.FirstComment = strings.TrimSpace(clean.FirstComment)
 	if clean.FirstComment != "" {
-		if channel != "linkedin" && channel != "instagram" {
-			return nil, invalid("First comments are for LinkedIn and Instagram posts.")
+		if !firstCommentChannels[channel] {
+			return nil, invalid("First comments are for LinkedIn, Instagram and Facebook posts.")
 		}
 		if utf8.RuneCountInString(clean.FirstComment) > firstCommentLimit {
 			return nil, invalid(fmt.Sprintf("Keep the first comment under %d characters.", firstCommentLimit))

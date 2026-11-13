@@ -89,6 +89,8 @@ export const DRAFT_CHANNEL_LIMITS: Record<DraftChannel, number> = {
   mastodon: 500,
   threads: 500,
   x: 280,
+  facebook: 63_206,
+  pinterest: 500,
 }
 
 /** The block that starts the next post of a thread. */
@@ -174,6 +176,8 @@ const CONNECTION_CHANNELS: Record<string, DraftChannel> = {
   threads: 'threads',
   x: 'x',
   twitter: 'x',
+  facebook: 'facebook',
+  pinterest: 'pinterest',
 }
 
 /** The draft channel a connection platform publishes to, or null. */
@@ -729,6 +733,8 @@ const CHANNEL_NAMES: Record<DraftChannel, string> = {
   mastodon: 'Mastodon',
   threads: 'Threads',
   x: 'X',
+  facebook: 'Facebook',
+  pinterest: 'Pinterest',
 }
 
 /** Top-level blocks grouped into posts at each post break. */

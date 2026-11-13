@@ -131,6 +131,23 @@ test('video destinations require exactly one MP4 and refuse photos', () => {
   }
 })
 
+test('a pin is one image; a Facebook Page post is text, photos or one video', () => {
+  assert.deepEqual(mediaProblems('pinterest', []), [
+    'Pinterest needs an image. Add one to the post.',
+  ])
+  assert.deepEqual(mediaProblems('pinterest', [photo]), [])
+  assert.match(mediaProblems('pinterest', [photo, png]).join(), /up to 1 attachment/)
+  assert.ok(
+    mediaProblems('pinterest', [mp4]).length > 0,
+    'a video pin needs a cover Shots does not send yet'
+  )
+  assert.deepEqual(mediaProblems('facebook', []), [])
+  assert.deepEqual(mediaProblems('facebook', [photo, png]), [])
+  assert.deepEqual(mediaProblems('facebook', [mp4]), [])
+  assert.ok(mediaProblems('facebook', [photo, mp4]).length > 0)
+  assert.ok(mediaProblems('facebook', [mov]).length > 0, 'the adapter recognizes MP4 only')
+})
+
 test('a picture is named by the platform shape it is within 3% of, else by its size', () => {
   assert.equal(shapeName(1080, 1920), '9:16')
   assert.equal(shapeName(1080, 1350), '4:5')

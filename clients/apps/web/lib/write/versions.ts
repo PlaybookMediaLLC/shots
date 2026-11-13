@@ -308,6 +308,8 @@ const PLATFORM_NAMES: Record<DraftChannel, { label: string; pattern: RegExp }> =
   tiktok: { label: 'TikTok', pattern: /\btiktok\b/i },
   x: { label: 'X', pattern: /\b[Tt]witter\b|\b(?:[Nn]ow|[Pp]ost(?:ed|ing|s)?|[Pp]ublish(?:ed|ing)?|[Ss]har(?:e|ed|ing)|[Ff]ollow(?: me| us)?|[Ff]ind (?:me|us)|[Jj]oin (?:me|us)) (?:on|to) X\b/ },
   youtube: { label: 'YouTube', pattern: /\byoutube\b/i },
+  facebook: { label: 'Facebook', pattern: /\bfacebook\b/i },
+  pinterest: { label: 'Pinterest', pattern: /\bpinterest\b/i },
 }
 
 /**

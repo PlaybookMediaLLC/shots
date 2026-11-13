@@ -45,7 +45,9 @@ type VersionOptions struct {
 	YouTube *postoptions.YouTubeOptions `json:"youtube,omitempty"`
 	TikTok  *postoptions.TikTokOptions  `json:"tiktok,omitempty"`
 	// Instagram: collaborators, tags, and a reel's cover, grid and trial.
-	Instagram    *postoptions.InstagramOptions `json:"instagram,omitempty"`
+	Instagram *postoptions.InstagramOptions `json:"instagram,omitempty"`
+	// Pinterest: the pin's board, title and link.
+	Pinterest    *postoptions.PinterestOptions `json:"pinterest,omitempty"`
 	LinkPreviews []postoptions.LinkPreview     `json:"linkPreviews,omitempty"`
 	AutoDM       *autodm.Config                `json:"autoDm,omitempty"`
 	// Preferred length when making a thread; publication still checks account limits.

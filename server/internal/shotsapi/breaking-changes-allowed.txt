@@ -65,3 +65,50 @@ GET /api/v1/content-draft-posts added the new `thumbnail` enum value to the `ite
 GET /api/v1/content-drafts/{id}/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `200`
 POST /api/v1/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `200`
 POST /api/v1/posts added the new `thumbnail` enum value to the `posts/items/automations/items/kind` response property for the response status `201`
+
+# Facebook Pages and Pinterest as draft channels and connection providers
+# (docs/scheduling/post-bridge/composer/implementation.md, slice 4). Additive:
+# the channel and provider enums gain `facebook` and `pinterest`, a draft can
+# hold ten versions, and the availability catalog lists fourteen providers.
+POST /api/v1/calendar/mutations added the new `facebook` enum value to the `drafts/items/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/calendar/mutations added the new `pinterest` enum value to the `drafts/items/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/calendar/mutations the `drafts/items/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+GET /api/v1/content-drafts added the new `facebook` enum value to the `items/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `facebook` enum value to the `pinned/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `pinterest` enum value to the `items/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `pinterest` enum value to the `pinned/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts the `items/items/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+GET /api/v1/content-drafts the `pinned/items/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+POST /api/v1/content-drafts added the new `facebook` enum value to the `platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts added the new `pinterest` enum value to the `platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts the `platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `201`
+GET /api/v1/content-drafts/{id} added the new `facebook` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts/{id} added the new `pinterest` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+PATCH /api/v1/content-drafts/{id} added the new `facebook` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id} added the new `pinterest` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+POST /api/v1/content-drafts/{id}/copy added the new `facebook` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/copy added the new `pinterest` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/copy the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate added the new `facebook` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate added the new `pinterest` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `201`
+POST /api/v1/content-drafts/{id}/plan added the new `facebook` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/content-drafts/{id}/plan added the new `pinterest` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/content-drafts/{id}/plan the `platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties added the new `facebook` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties added the new `pinterest` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties the `platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `facebook` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `pinterest` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `201`
+POST /api/v1/posts added the new `facebook` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/posts added the new `facebook` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/posts added the new `pinterest` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/posts added the new `pinterest` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `200`
+POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `10` for the response status `201`
+GET /api/v1/social-connection-availability added the new `facebook` enum value to the `providers/items/provider` response property for the response status `200`
+GET /api/v1/social-connection-availability added the new `pinterest` enum value to the `providers/items/provider` response property for the response status `200`
+GET /api/v1/social-connection-availability the `providers` response property's maxItems was increased from `12` to `14` for the response status `200`

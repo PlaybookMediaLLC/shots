@@ -39,6 +39,8 @@ const providers = [
   { id: 'bluesky', label: 'Bluesky' },
   { id: 'substack', label: 'Substack Notes' },
   { id: 'instagram-standalone', label: 'Instagram' },
+  { id: 'facebook', label: 'Facebook Page' },
+  { id: 'pinterest', label: 'Pinterest' },
 ] as const
 
 /** A local provider step owns its request lifetime, so leaving it cannot navigate later. */

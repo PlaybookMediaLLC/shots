@@ -36,6 +36,16 @@
       "maxBytes": 8000000,
       "maxEdge": 1440,
       "formats": ["image/jpeg", "image/png"]
+    },
+    "facebook": {
+      "maxBytes": 4000000,
+      "maxEdge": 2048,
+      "formats": ["image/jpeg", "image/png"]
+    },
+    "pinterest": {
+      "maxBytes": 20000000,
+      "maxEdge": 4096,
+      "formats": ["image/jpeg", "image/png"]
     }
   },
   "destinations": {
@@ -209,6 +219,36 @@
         "https://developers.google.com/youtube/v3/docs/thumbnails/set"
       ],
       "verifiedOn": "2026-11-03"
+    },
+    "facebook": {
+      "maxMedia": 10,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "video": {
+        "formats": ["video/mp4"],
+        "alone": true,
+        "maxMs": 1200000,
+        "maxBytes": 1000000000
+      },
+      "docs": [
+        "https://developers.facebook.com/docs/graph-api/reference/page/photos/",
+        "https://developers.facebook.com/docs/video-api/guides/publishing"
+      ],
+      "verifiedOn": "2026-11-13"
+    },
+    "pinterest": {
+      "maxMedia": 1,
+      "requiresMedia": true,
+      "mixed": false,
+      "images": ["image/jpeg", "image/png", "image/webp"],
+      "converts": {
+        "image/webp": "image/png"
+      },
+      "docs": ["https://developers.pinterest.com/docs/api/v5/pins-create/"],
+      "verifiedOn": "2026-11-13"
     }
   }
 }

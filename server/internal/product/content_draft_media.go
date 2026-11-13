@@ -20,6 +20,7 @@ import (
 
 var draftChannelLabels = map[string]string{
 	"tiktok": "TikTok", "youtube": "YouTube", "x": "X", "linkedin": "LinkedIn", "instagram": "Instagram", "threads": "Threads", "bluesky": "Bluesky", "mastodon": "Mastodon",
+	"facebook": "Facebook", "pinterest": "Pinterest",
 }
 
 // draftMediaLimit is how many attachments one post on a channel takes.
@@ -108,8 +109,11 @@ func plural(n int, noun string) string {
 func checkMedia(label string, rules medialimits.Destination, rows []*ent.Asset) error {
 	if len(rows) == 0 {
 		if rules.RequiresMedia {
-			if len(rules.Images) == 0 {
+			switch {
+			case len(rules.Images) == 0:
 				return conflict(label + " needs one video. Add one to the post.")
+			case rules.Video == nil:
+				return conflict(label + " needs an image. Add one to the post.")
 			}
 			return conflict(label + " needs at least one image or video. Add one to the post.")
 		}

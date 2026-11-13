@@ -238,10 +238,15 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	// LinkedIn document goes out as the post's one media (RFC 025).
 	var youtubeOptions *postoptions.YouTubeOptions
 	var tiktokOptions *postoptions.TikTokOptions
+	var pinterestOptions *postoptions.PinterestOptions
 	if input.Options != nil {
-		youtubeOptions, tiktokOptions = input.Options.YouTube, input.Options.TikTok
+		youtubeOptions, tiktokOptions, pinterestOptions = input.Options.YouTube, input.Options.TikTok, input.Options.Pinterest
 	}
 	if err := postoptions.ValidateVideoOptions(input.Platform, youtubeOptions, tiktokOptions, true); err != nil {
+		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailurePostOptions, err.Error())
+	}
+	// A pin without its board would be refused by Pinterest; nothing is sent.
+	if err := postoptions.ValidatePinterestOptions(input.Platform, pinterestOptions, true); err != nil {
 		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailurePostOptions, err.Error())
 	}
 	assets := input.Media()
@@ -372,9 +377,10 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 	}
 	var publication *postoptions.PublicationReceipt
-	// Threads and Instagram ids do not make a link, so the provider's own address is kept.
+	// Threads, Instagram, Facebook and Pinterest ids do not make a link, so the
+	// provider's own address is kept.
 	if input.Platform == "tiktok" || input.Platform == "youtube" || input.Platform == "threads" ||
-		input.Platform == "instagram" || input.Platform == "instagram-standalone" {
+		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" {
 		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
 	}
 	if input.Platform == "youtube" {

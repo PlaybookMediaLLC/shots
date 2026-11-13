@@ -29,6 +29,7 @@ const fakeStateSchema = z.object({
       kind: z.string(),
       postId: z.string(),
       media: z.object({ sha256: z.string() }).optional(),
+      text: z.string().optional(),
     })
   ),
   posts: z.array(
@@ -46,7 +47,9 @@ const fakeStateSchema = z.object({
       ),
       settings: z
         .object({
+          board: z.string().optional(),
           containsSyntheticMedia: z.boolean().optional(),
+          link: z.string().optional(),
           tags: z.array(z.string()).optional(),
           title: z.string().optional(),
         })
@@ -84,7 +87,9 @@ async function readBootstrap() {
     .object({
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
+      facebookDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
+      pinterestDestinationId: z.string().min(1),
       tiktokDestinationId: z.string().min(1),
       youtubeDestinationId: z.string().min(1),
     })
@@ -609,6 +614,104 @@ test('PB-03: a refused YouTube thumbnail leaves the video published and shows th
     await page.goto(`/publish/${draft.id}`)
     const followUp = page.getByTestId('follow-up').filter({ hasText: 'Custom thumbnail' })
     await expect(followUp).toContainText('failed')
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a pin goes to the board chosen in the composer, and a Facebook Page post takes its first comment', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const pinterest = await connect(page, bootstrap.pinterestDestinationId, 'pinterest')
+    const image = await createUploadedAsset(page, png, 'image/png', 'pin.png')
+    const caption = 'Launch day, on the page and the board.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, pinterest],
+        primaryPlatform: 'facebook',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [
+            {
+              channel: 'facebook',
+              mode: 'synced',
+              options: { firstComment: 'Link in the comments' },
+            },
+          ],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The board comes from the Pinterest account's own list, read through Go.
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-pinterest').click()
+    await page.getByTestId('options-chip').click()
+    const options = page.getByTestId('pinterest-options')
+    await expect(page.getByTestId('blockers')).toContainText('Choose the Pinterest board')
+    await chooseOption(options.getByRole('combobox', { name: 'Pinterest board' }), 'Launch ideas')
+    await options.getByLabel('Pin title').fill('Launch day')
+    await options.getByLabel('Link').fill('https://shots.example/launch')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, pinterest],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const state = await fakeState()
+    const received = state.posts.filter((post) => post.caption === caption)
+    expect(received).toHaveLength(2)
+    expect(received.map((post) => post.media.length)).toEqual([1, 1])
+    expect(received.map((post) => post.settings)).toContainEqual({
+      board: '1001',
+      link: 'https://shots.example/launch',
+      title: 'Launch day',
+    })
+    // The first comment is the page post's follow-up, on the live post only.
+    await expect
+      .poll(async () => (await fakeState()).actions.filter((action) => action.kind === 'comment'), {
+        intervals: [1_000],
+        timeout: 120_000,
+      })
+      .toEqual([expect.objectContaining({ text: 'Link in the comments' })])
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

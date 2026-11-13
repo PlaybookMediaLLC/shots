@@ -1,8 +1,9 @@
 import { articleContent } from '@/lib/write/article'
-import type { Engagement, InstagramOptions } from 'screenshot-studio-backend-sdk'
+import type { Engagement, InstagramOptions, PinterestOptions } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import {
   instagramOptionsSchema,
+  pinterestOptionsSchema,
   youtubeOptionsSchema,
   tiktokOptionsSchema,
 } from 'screenshot-studio-backend-sdk'
@@ -51,6 +52,7 @@ export const publishOptionsSchema = z.object({
   youtube: youtubeOptionsSchema.optional(),
   tiktok: tiktokOptionsSchema.optional(),
   instagram: instagramOptionsSchema.optional(),
+  pinterest: pinterestOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -155,6 +157,27 @@ function postOptions(
   if (['x', 'bluesky', 'mastodon'].includes(channel) && settings.quoteFirstPost && !first)
     options.quoteFirstPost = true
   return options
+}
+
+/** A pin's settings as they publish: trimmed, without empty fields. */
+function pinChoices(options: PinterestOptions | undefined): PinterestOptions {
+  const title = options?.title?.trim()
+  const link = options?.link?.trim()
+  return {
+    ...(options?.boardId ? { boardId: options.boardId } : {}),
+    ...(title ? { title } : {}),
+    ...(link ? { link } : {}),
+  }
+}
+
+/** Whether a link is a web address Pinterest takes (Go: postoptions.pinterestLink). */
+function webAddress(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password
+  } catch {
+    return false
+  }
 }
 
 /** Instagram's settings that do something, or undefined when none is on. */
@@ -283,6 +306,11 @@ export function buildPublication(
     if (instagram.userTags?.length && !reel && !media.some((item) => item.kind === 'image'))
       optionProblems.push('Tag accounts on a photo or a reel.')
   }
+  const pinterest = channel === 'pinterest' ? pinChoices(options.pinterest) : undefined
+  if (channel === 'pinterest' && !pinterest?.boardId)
+    optionProblems.push('Choose the Pinterest board to save the pin to.')
+  if (pinterest?.link && !webAddress(pinterest.link))
+    optionProblems.push("A pin's link is a web address starting with https:// or http://.")
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
     if (!creator)
@@ -396,6 +424,7 @@ export function buildPublication(
   if (channel === 'youtube') firstOptions.youtube = options.youtube
   if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
   if (instagram) firstOptions.instagram = instagram
+  if (pinterest) firstOptions.pinterest = pinterest
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true

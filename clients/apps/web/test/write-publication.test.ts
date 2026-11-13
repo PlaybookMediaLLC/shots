@@ -67,7 +67,7 @@ test('numbering is counted and applied for the X version only', () => {
 })
 
 test('a first comment reaches Instagram and stays off platforms without one', () => {
-  const commented = (channel: 'instagram' | 'threads') => {
+  const commented = (channel: 'instagram' | 'facebook' | 'threads') => {
     const versions = withOptions(readVersions(undefined), channel, { firstComment: ' #launch ' })
     return buildPublication(draft({ platformVersions: versions }), {
       channel,
@@ -75,6 +75,7 @@ test('a first comment reaches Instagram and stays off platforms without one', ()
     }).target.options?.firstComment
   }
   assert.equal(commented('instagram'), '#launch')
+  assert.equal(commented('facebook'), '#launch')
   assert.equal(commented('threads'), undefined)
 })
 
@@ -833,5 +834,43 @@ test('rendered media stays bound to the flushed version for scheduling and publi
       renderBlocks: async () => ['image-v2'],
     }),
     /changed while preparing/
+  )
+})
+
+test('a pin needs its board, sends a trimmed title and link, and checks the link', () => {
+  const pinterest = { channel: 'pinterest' as const, connectionId: 'cp0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const build = (options: VersionOptions['pinterest']) =>
+    buildPublication(
+      draft({
+        body: [p('A pin description'), image],
+        platformVersions: withOptions(readVersions(undefined), 'pinterest', { pinterest: options }),
+      }),
+      pinterest
+    )
+  assert.match(build(undefined).optionProblems.join(), /Choose the Pinterest board/)
+  const pin = build({ boardId: '1001', title: ' Launch ', link: ' https://shots.example/launch ' })
+  assert.deepEqual(pin.optionProblems, [])
+  assert.deepEqual(pin.target.options?.pinterest, {
+    boardId: '1001',
+    title: 'Launch',
+    link: 'https://shots.example/launch',
+  })
+  assert.deepEqual(build({ boardId: '1001', title: '  ' }).target.options?.pinterest, {
+    boardId: '1001',
+  })
+  for (const link of ['shots.example', 'javascript:alert(1)', 'https://user:pass@shots.example'])
+    assert.match(build({ boardId: '1001', link }).optionProblems.join(), /web address/, link)
+  // Pinterest settings stay with Pinterest.
+  assert.equal(
+    buildPublication(
+      draft({
+        platformVersions: withOptions(readVersions(undefined), 'x', {
+          pinterest: { boardId: '1001' },
+        }),
+      }),
+      x
+    ).target.options?.pinterest,
+    undefined
   )
 })

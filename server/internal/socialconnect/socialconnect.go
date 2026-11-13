@@ -419,7 +419,7 @@ func (c *Connector) ExchangeOAuth(ctx context.Context, name, code, state string)
 				data, err := json.Marshal(loaded)
 				if err == nil {
 					err = json.Unmarshal(data, &result.Pages)
-					if err == nil && (name == "linkedin-page" || name == "youtube") {
+					if err == nil && (name == "linkedin-page" || name == "youtube" || name == "facebook") {
 						for i := range result.Pages {
 							result.Pages[i].PageID = result.Pages[i].ID
 						}

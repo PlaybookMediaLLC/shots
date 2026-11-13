@@ -250,6 +250,8 @@ test('connection platforms map to draft channels', () => {
   assert.equal(channelForPlatform('tiktok'), 'tiktok')
   assert.equal(channelForPlatform('youtube'), 'youtube')
   assert.equal(channelForPlatform('linkedin-page'), 'linkedin')
+  assert.equal(channelForPlatform('facebook'), 'facebook')
+  assert.equal(channelForPlatform('pinterest'), 'pinterest')
   assert.equal(draftPlainText([p(text('Hello'), text(' world', { bold: true }))]), 'Hello world')
 })
 

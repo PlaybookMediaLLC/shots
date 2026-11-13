@@ -12,7 +12,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 )
 
-// VideoProvider substitutes only the remote peer in the isolated social gate.
+// VideoProvider substitutes only the remote peer in the isolated social gate,
+// standing in for a platform the gate connects by name: TikTok, YouTube, a
+// Facebook Page or Pinterest.
 type VideoProvider struct {
 	*Provider
 	platform string
@@ -22,13 +24,26 @@ func NewVideo(endpoint, platform string) *VideoProvider {
 	return &VideoProvider{Provider: New(endpoint), platform: platform}
 }
 
+// fixturePages are the destinations a platform with page selection offers.
+var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page"}
+
 func (p *VideoProvider) Info() integrations.Info {
-	return integrations.Info{Identifier: p.platform, Name: "Fixture " + p.platform, Editor: "normal", IsBetweenSteps: p.platform == "youtube"}
+	_, pages := fixturePages[p.platform]
+	return integrations.Info{Identifier: p.platform, Name: "Fixture " + p.platform, Editor: "normal", IsBetweenSteps: pages}
 }
 
 func (p *VideoProvider) Functions() map[string]integrations.Function {
+	if p.platform == "pinterest" {
+		return map[string]integrations.Function{"boards": func(context.Context, string, json.RawMessage, string, *ent.Integration) (any, error) {
+			return []map[string]string{{"id": "1001", "name": "Launch ideas"}, {"id": "1002", "name": "Office"}}, nil
+		}}
+	}
+	name, ok := fixturePages[p.platform]
+	if !ok {
+		return nil
+	}
 	return map[string]integrations.Function{"pages": func(context.Context, string, json.RawMessage, string, *ent.Integration) (any, error) {
-		return []map[string]string{{"id": "fixture-channel", "name": "Fixture YouTube channel"}}, nil
+		return []map[string]string{{"id": "fixture-channel", "name": name}}, nil
 	}}
 }
 
@@ -36,10 +51,11 @@ func (p *VideoProvider) FetchPageInformation(_ context.Context, token string, da
 	var selection struct {
 		ID string `json:"id"`
 	}
-	if json.Unmarshal(data, &selection) != nil || selection.ID != "fixture-channel" {
+	name, ok := fixturePages[p.platform]
+	if !ok || json.Unmarshal(data, &selection) != nil || selection.ID != "fixture-channel" {
 		return nil, errors.New("unknown fixture channel")
 	}
-	return &integrations.FetchPageInformationResult{ID: selection.ID, Name: "Fixture YouTube channel", Username: "fixture", AccessToken: token}, nil
+	return &integrations.FetchPageInformationResult{ID: selection.ID, Name: name, Username: "fixture", AccessToken: token}, nil
 }
 
 func (p *VideoProvider) CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error) {

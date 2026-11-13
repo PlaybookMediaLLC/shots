@@ -193,6 +193,13 @@ export const CAPABILITIES: Record<DraftChannel, PlatformCapabilities> = {
   tiktok: { ...simple('TikTok', 2000, false), kinds: ['standard'], mentions: 'none' },
   youtube: { ...simple('YouTube', 5000, false), kinds: ['standard'], mentions: 'none' },
   x: X,
+  facebook: {
+    ...simple('Facebook', 63_206, false),
+    kinds: ['standard'],
+    mentions: 'none',
+    settings: { ...simple('Facebook', 63_206, false).settings, firstComment: true },
+  },
+  pinterest: { ...simple('Pinterest', 500, false), kinds: ['standard'], mentions: 'none' },
 }
 
 /** Publishing capabilities verified for the connected account. */
