@@ -172,11 +172,11 @@ export const autoDmSchema = z
     reposts: z.boolean(),
     replies: z.boolean(),
     requireFollow: z.boolean(),
-    replyText: z.string().max(100).optional(),
+    replyText: z.string().max(100, 'Keep the reply text to 100 characters.').optional(),
     message: z
       .string()
       .min(1)
-      .max(10_000)
+      .max(10_000, 'Keep the message to 10,000 characters.')
       // Not blank by Go's strings.TrimSpace: U+0085 is space there, U+FEFF is not.
       .refine((message) => /[^\s\u0085]|\uFEFF/.test(message), 'Write the message.')
       .refine(
