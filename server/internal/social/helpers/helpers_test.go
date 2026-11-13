@@ -99,6 +99,29 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 	}
 }
 
+// A text longer than any caption gets no more time than the longest one: 1 MiB
+// of slow words took 21 s while the budget grew with length.
+func TestLinkScanBudgetStopsGrowingPastTheLongestCaption(t *testing.T) {
+	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
+	start := time.Now()
+	if _, err := WeightedLength(text); !errors.Is(err, ErrTextTooComplex) {
+		t.Fatalf("WeightedLength error = %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 4*time.Second {
+		t.Errorf("took %v, want about the 2.2 s budget of a 100,000-unit text", elapsed)
+	}
+}
+
+// Mastodon counts only links with a protocol, so a dotted word without one is
+// not scanned and cannot exhaust the budget.
+func TestLinkSpansSkipsWordsWithoutAProtocol(t *testing.T) {
+	text := "Docs at https://example.com and " + strings.Repeat("a.", 1000)
+	spans, err := LinkSpans(text)
+	if err != nil || len(spans) != 1 || text[spans[0][0]:spans[0][1]] != "https://example.com" {
+		t.Fatalf("LinkSpans = %v, %v", spans, err)
+	}
+}
+
 // An X Article may weigh 100,000; dotted words and links throughout must not
 // exhaust the budget.
 func TestLinkScanCountsALongArticle(t *testing.T) {

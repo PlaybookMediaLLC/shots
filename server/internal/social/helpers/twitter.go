@@ -42,14 +42,16 @@ var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 // than JavaScript: 4,000 characters of "a." took 50 s, a CJK paragraph with a
 // dot 0.8 s per 2,000 characters. So one call of the URL regexes gets
 // linkScanBudget, and one text's scan linkScanBudget plus linkScanPerUnit for
-// each of its UTF-16 units; ordinary text uses a small fraction of either.
+// each of its UTF-16 units up to linkScanMaxUnits, the longest caption (an X
+// Article); ordinary text uses a small fraction of either.
 // shortcut: CJK has no spaces, so a paragraph is one word and scans
 // quadratically: a dotted paragraph over about 1,000 characters, or an article
 // of many dotted paragraphs, cannot be counted. Make the scan linear if long
 // CJK articles must count.
 const (
-	linkScanBudget  = 200 * time.Millisecond
-	linkScanPerUnit = 20 * time.Microsecond
+	linkScanBudget   = 200 * time.Millisecond
+	linkScanPerUnit  = 20 * time.Microsecond
+	linkScanMaxUnits = 100_000
 )
 
 // ErrTextTooComplex is a text whose links the URL scan could not find within
@@ -247,22 +249,24 @@ func LinkSpans(text string) ([][2]int, error) {
 // surrogate-shifted units. A match never contains ASCII whitespace, which can
 // only be its first, preceding character, and always contains a dot. So the
 // scan runs word by word, each with the space before it, and skips the words
-// with no dot: one regexp2 call never sees more than one word. It fails with
+// with no dot, or, when only links with a protocol count, with no "://": one
+// regexp2 call never sees more than one word. It fails with
 // ErrTextTooComplex once the text's budget runs out; each call is bounded,
 // but a text of many slow words makes many calls.
 func extractURLsWithIndices(text []rune, withoutProtocol bool) ([]*urlEntity, error) {
-	deadline := time.Now().Add(linkScanBudget + time.Duration(len(text))*linkScanPerUnit)
+	deadline := time.Now().Add(linkScanBudget + time.Duration(min(len(text), linkScanMaxUnits))*linkScanPerUnit)
 	var urls []*urlEntity
 	for start, end := 0, 0; start < len(text); start = end {
 		for end = start + 1; end < len(text) && !isASCIISpace(text[end]); end++ {
 		}
-		if !slices.Contains(text[start:end], '.') {
+		word := text[start:end]
+		if !slices.Contains(word, '.') || !withoutProtocol && indexRunes(word, []rune("://"), 0) < 0 {
 			continue
 		}
 		if time.Now().After(deadline) {
 			return nil, ErrTextTooComplex
 		}
-		found, err := extractWordURLs(text[start:end], start, withoutProtocol, deadline)
+		found, err := extractWordURLs(word, start, withoutProtocol, deadline)
 		if err != nil {
 			return nil, err
 		}
