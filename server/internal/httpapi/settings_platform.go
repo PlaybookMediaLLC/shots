@@ -28,6 +28,8 @@ type SettingsPlatformStore interface {
 	UpdateSocialSet(context.Context, product.Actor, string, product.SocialSetUpdate) (*product.SocialSetRecord, error)
 	UpdateSocialSetQueue(context.Context, product.Actor, string, product.SocialSetQueueUpdate) (*product.SocialSetRecord, error)
 	ShareSocialSet(context.Context, product.Actor, string) (*product.SocialSetRecord, error)
+	PreviewSocialSetTransfer(context.Context, product.Actor, string) (*product.SocialSetTransferPreview, error)
+	TransferSocialSet(context.Context, product.Actor, string, product.SocialSetTransferInput) (*product.SocialSetTransferResult, error)
 	DeleteSocialSet(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	AssignSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
 	RemoveSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
@@ -65,6 +67,8 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	mux.Handle("PATCH /v1/social-sets/{id}/queue", product(s.updateSocialSetQueue))
 	mux.Handle("DELETE /v1/social-sets/{id}", product(s.deleteSocialSet))
 	mux.Handle("POST /v1/social-sets/{id}/share", product(s.shareSocialSet))
+	mux.Handle("GET /v1/social-sets/{id}/transfer", product(s.previewSocialSetTransfer))
+	mux.Handle("POST /v1/social-sets/{id}/transfer", product(s.transferSocialSet))
 	mux.Handle("POST /v1/social-sets/{id}/accounts/{connectionId}", product(s.assignSocialSetAccount))
 	mux.Handle("DELETE /v1/social-sets/{id}/accounts/{connectionId}", product(s.removeSocialSetAccount))
 	mux.Handle("DELETE /v1/channel-connections/{id}", product(s.removeChannelConnection))
@@ -213,6 +217,29 @@ func (s *Server) shareSocialSet(w http.ResponseWriter, r *http.Request) {
 	}
 	set, err := s.configuration.ShareSocialSet(r.Context(), workspaceActor(r), id)
 	respond(w, http.StatusOK, set, err)
+}
+
+func (s *Server) previewSocialSetTransfer(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	preview, err := s.configuration.PreviewSocialSetTransfer(r.Context(), workspaceActor(r), id)
+	respond(w, http.StatusOK, preview, err)
+}
+
+func (s *Server) transferSocialSet(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var input product.SocialSetTransferInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid move")
+		return
+	}
+	result, err := s.configuration.TransferSocialSet(r.Context(), workspaceActor(r), id, input)
+	respond(w, http.StatusOK, result, err)
 }
 
 func (s *Server) deleteSocialSet(w http.ResponseWriter, r *http.Request) {

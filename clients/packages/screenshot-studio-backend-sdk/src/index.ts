@@ -4017,6 +4017,32 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /** Where a set can move and what the move changes; changes nothing. */
+  async previewSocialSetTransfer(id: string) {
+    return this.request<{
+      accounts: string[]
+      blocked: string
+      destinations: { name: string; organizationId: string }[]
+      drafts: number
+      mediaBytes: number
+      mediaFiles: number
+      noDestination: string
+      publishedPosts: number
+      queuedPosts: number
+      version: number
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`)
+  }
+
+  /** Moves a set, at the previewed version, to a workspace the person manages. */
+  async transferSocialSet(id: string, input: { destinationOrganizationId: string; version: number }) {
+    return this.request<{
+      cancelledPostIds: string[]
+      movedDrafts: number
+      organizationId: string
+      socialSetId: string
+    }>(`v1/social-sets/${encodeURIComponent(id)}/transfer`, { body: input, method: 'POST' })
+  }
+
   /** Shares a private set with the workspace; only its owner can. */
   async shareSocialSet(id: string) {
     return this.request<SocialSet>(`v1/social-sets/${encodeURIComponent(id)}/share`, {

@@ -93,6 +93,7 @@ func (memoryObjects) SignDownload(_ context.Context, key string) (string, error)
 func (memoryObjects) Exists(context.Context, string) (bool, error)         { return true, nil }
 func (memoryObjects) Put(context.Context, string, string, io.Reader) error { return nil }
 func (memoryObjects) Delete(context.Context, string) error                 { return nil }
+func (memoryObjects) Copy(context.Context, string, string) error           { return nil }
 
 func (memoryObjects) Read(context.Context, string) ([]byte, error) {
 	var body bytes.Buffer

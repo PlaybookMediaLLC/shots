@@ -51,6 +51,12 @@ func (o *voiceObjects) Exists(_ context.Context, key string) (bool, error) {
 	_, ok := o.stored[key]
 	return ok, nil
 }
+func (o *voiceObjects) Copy(_ context.Context, from, to string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.stored[to] = o.stored[from]
+	return nil
+}
 func (o *voiceObjects) Put(_ context.Context, key, _ string, body io.Reader) error {
 	data, err := io.ReadAll(body)
 	o.mu.Lock()
