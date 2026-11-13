@@ -1134,6 +1134,8 @@ export type BackendDraftActivity = {
   entityId: string
   id: string
   metadata: Record<string, unknown>
+  /** Who or what made the change. */
+  source: 'person' | 'api' | 'mcp' | 'workflow' | 'callback' | 'support' | 'automation'
 }
 
 /** A workspace's drafts settings: its queue's weekly slots and approvals. */
@@ -3604,9 +3606,11 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
-  async listContentDraftActivity(id: string) {
-    return this.request<{ items: BackendDraftActivity[] }>(
-      `v1/content-drafts/${encodeURIComponent(id)}/activity`
+  async listContentDraftActivity(id: string, cursor?: string) {
+    const parameters = new URLSearchParams()
+    if (cursor) parameters.set('cursor', cursor)
+    return this.request<{ items: BackendDraftActivity[]; nextCursor: string | null }>(
+      `v1/content-drafts/${encodeURIComponent(id)}/activity?${parameters}`
     )
   }
 

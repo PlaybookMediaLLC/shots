@@ -21,8 +21,11 @@ type Actor struct {
 	Display      string
 	Organization string
 	RequestID    string
-	Type         string
-	UserID       string
+	// Source says how an automated change arrived: api, mcp, workflow or
+	// callback. It is a safe label for histories, never a credential.
+	Source string
+	Type   string
+	UserID string
 }
 
 type CreateConnectionInput struct {

@@ -163,6 +163,24 @@ export const recoverContentDraftRevisionContract = defineContract({
   summary: 'Recover a backup as a new draft',
 })
 
+/**
+ * Who or what made a change: a person, a workspace API key, a key used through
+ * the MCP server, a publishing workflow, a provider or source callback, Shots
+ * support, or any other Shots service.
+ */
+export const draftActivitySourceSchema = z.enum([
+  'person',
+  'api',
+  'mcp',
+  'workflow',
+  'callback',
+  'support',
+  'automation',
+])
+
+/** One of {@link draftActivitySourceSchema}. */
+export type DraftActivitySource = z.infer<typeof draftActivitySourceSchema>
+
 /** One event in a draft's history. */
 export const draftActivitySchema = z.object({
   action: z.string(),
@@ -174,6 +192,7 @@ export const draftActivitySchema = z.object({
   id: z.string(),
   /** References only: ids, versions, field names. Never the draft's text. */
   metadata: z.record(z.string(), z.unknown()),
+  source: draftActivitySourceSchema,
 })
 
 /** One of {@link draftActivitySchema}. */
@@ -184,7 +203,7 @@ export const contentDraftActivityContract = defineContract({
   access: { apiKeyScope: 'artifact:read', feature: 'content:drafts', permission: 'artifact:read' },
   docs: workspaceDocs({
     description:
-      "Lists a draft's history, newest first: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who and when. Viewing a draft is never recorded.",
+      "Lists a draft's history, newest first (by time, then id), 50 events a page: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who, through what, and when. Viewing a draft is never recorded. Pass `nextCursor` as `cursor` for the next page.",
     extensions: entitlement,
     operationId: 'listContentDraftActivity',
     outputName: 'ContentDraftActivityList',
@@ -193,8 +212,9 @@ export const contentDraftActivityContract = defineContract({
   }),
   method: 'GET',
   name: 'content-drafts.activity',
-  output: z.object({ items: z.array(draftActivitySchema) }),
+  output: z.object({ items: z.array(draftActivitySchema), nextCursor: z.string().nullable() }),
   params: contentDraftParamsSchema,
+  query: z.object({ cursor: z.string().max(500).optional() }),
   path: '/api/v1/content-drafts/{id}/activity',
   summary: "List a draft's activity",
 })

@@ -1054,7 +1054,7 @@ func serviceActor(post *ent.ScheduledPost) Actor {
 	if post.TriggerRunID != nil && *post.TriggerRunID != "" {
 		requestID = *post.TriggerRunID
 	}
-	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Type: "SERVICE"}
+	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Source: "workflow", Type: "SERVICE"}
 }
 
 func ProviderFailureCode(status int, unknown bool) string {
