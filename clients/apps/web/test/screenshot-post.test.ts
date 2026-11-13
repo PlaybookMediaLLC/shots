@@ -275,6 +275,26 @@ test('each platform is measured against the text it will post', () => {
   )
 })
 
+test('the sheet counts its captions in a worker that answers the same way', async (t) => {
+  let listener: ((event: { data: unknown }) => void) | undefined
+  const replies: unknown[] = []
+  const worker = {
+    addEventListener: (_: 'message', handler: typeof listener) => (listener = handler),
+    postMessage: (message: unknown) => replies.push(message),
+  }
+  for (const [name, value] of Object.entries(worker)) {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, name)
+    Object.defineProperty(globalThis, name, { configurable: true, value })
+    t.after(() => {
+      if (previous) Object.defineProperty(globalThis, name, previous)
+      else Reflect.deleteProperty(globalThis, name)
+    })
+  }
+  await import('@/lib/write/caption-count.worker')
+  listener!({ data: { body: 'x'.repeat(281), channels: ['x'], copy: null, primary: 'x' } })
+  assert.deepEqual(replies, [[{ channel: 'x', length: 281, limit: 280, reused: false }]])
+})
+
 test('a shape a chosen platform refuses is reported before anything renders', () => {
   const story = { height: 1920, mimeType: 'image/jpeg', width: 1080 }
   const wide = { height: 1080, mimeType: 'image/jpeg', width: 1920 }
