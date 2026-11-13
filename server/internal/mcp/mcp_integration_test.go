@@ -563,7 +563,8 @@ func TestMutationsAreAuditedWithTheRequestID(t *testing.T) {
 	id := body["campaign"].(map[string]any)["id"].(string)
 	row, err := f.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(f.orgs["a"]), auditlog.EntityID(id),
 		auditlog.Action("product.campaign_created")).Only(f.ctx)
-	if err != nil || row.RequestID != requestID || row.ActorDisplay == nil || *row.ActorDisplay != f.keyNames["a"] {
+	if err != nil || row.RequestID != requestID || row.ActorDisplay == nil || *row.ActorDisplay != f.keyNames["a"] ||
+		row.Metadata["actorSource"] != "mcp" {
 		t.Fatalf("audit: %+v %v", row, err)
 	}
 }

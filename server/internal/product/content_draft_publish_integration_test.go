@@ -611,7 +611,8 @@ func TestWritePublishing(t *testing.T) {
 			return count(`SELECT count(*) FROM outbox_event WHERE "organizationId"=$1 AND type='activity.post.publish_failed' AND "aggregateId"=$2`)
 		}
 		audits := func() int {
-			return count(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action='post.publish_failed' AND "entityId"=$2`)
+			// Each is labelled as the publishing workflow's in the draft's history.
+			return count(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action='post.publish_failed' AND "entityId"=$2 AND metadata->>'actorSource'='workflow'`)
 		}
 		fail := func(run string, number int, retryAt *time.Time) func() error {
 			claimed, e := queue.Claim(ctx, post.ID, run, time.Now().Add(time.Hour))

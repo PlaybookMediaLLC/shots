@@ -75,7 +75,6 @@ import {
   writeApi,
   type SocialSetWire,
   type DraftTagWire,
-  type DraftActivityWire,
 } from '@/lib/write/client'
 import { wallTime, isTimeZone, localDateTimeSchema, resolveLocalTime } from '@/lib/write/zoned-time'
 import { addDays, zonedDayKey, zonedInstant } from '@/lib/settings/zoned-time'
@@ -99,6 +98,7 @@ import {
   type PlanItem,
   type PlanPreferences,
 } from '@/lib/plan/calendar'
+import { DraftHistory } from '@/components/drafts/DraftHistory'
 import { DraftSettingsDrawer, openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { NoteChip, NoteDialog } from './CalendarNotes'
 import { WorkspaceNav } from './WorkspaceNav'
@@ -1872,7 +1872,6 @@ function PlanDetail({
   placement: (item: PlanItem, at: string | null) => CalendarPlacement
 }) {
   const [draft, setDraft] = React.useState<DraftWire | null>(null)
-  const [activity, setActivity] = React.useState<DraftActivityWire[]>([])
   const [revisionCount, setRevisionCount] = React.useState<number | null>(null)
   const [timeValid, setTimeValid] = React.useState(true)
   const [local, setLocal] = React.useState(wallTime(new Date(item.at), item.zone))
@@ -1915,16 +1914,11 @@ function PlanDetail({
       })
       .catch(() => {})
     setError('')
-    Promise.allSettled([
-      draftsApi.get(item.draftId),
-      writeApi.activity(item.draftId),
-      draftsApi.revisions(item.draftId),
-    ]).then(([d, a, r]) => {
+    Promise.allSettled([draftsApi.get(item.draftId), draftsApi.revisions(item.draftId)]).then(([d, r]) => {
       if (!active) return
       if (d.status === 'fulfilled') setDraft(d.value)
-      if (a.status === 'fulfilled') setActivity(a.value.items)
       if (r.status === 'fulfilled') setRevisionCount(r.value.items.length)
-      const failure = [d, a, r].find((result) => result.status === 'rejected')
+      const failure = [d, r].find((result) => result.status === 'rejected')
       if (failure?.status === 'rejected') setError(failure.reason.message)
     })
     return () => {
@@ -2233,13 +2227,9 @@ function PlanDetail({
             <AccordionItem value="activity">
               <AccordionTrigger>Activity and revisions ({revisionCount ?? '…'})</AccordionTrigger>
               <AccordionContent>
-                {activity.map((a) => (
-                  <p key={a.id} className="my-2 text-xs">
-                    {a.actorName ?? 'System'} ·{' '}
-                    {a.action.replace(/^product\./, '').replaceAll('_', ' ')} ·{' '}
-                    {when(a.at, item.zone)}
-                  </p>
-                ))}
+                {draft?.id === item.draftId ? (
+                  <DraftHistory draftId={draft.id} key={draft.id} version={draft.version} />
+                ) : null}
                 <Button asChild className="h-auto p-0" size={null} variant="link">
                   <Link href={`/publish/${item.draftId}?panel=backups`}>
                     Browse revisions in editor
