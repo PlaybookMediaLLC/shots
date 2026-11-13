@@ -232,7 +232,7 @@ func (p *Publisher) AccountStanding(ctx context.Context, organizationID, destina
 	}
 	caps := account.VerifiedCapabilities.X
 	limit := caps.PostTextLimit()
-	return product.AccountStanding{Premium: caps.LongPostMaxWeightedCharacters != nil, XCaptionLimit: &limit, XArticles: caps.Articles, XQuotes: socialidentity.XEnterpriseQuotesEnabled()}, nil
+	return product.AccountStanding{Premium: caps.LongPostMaxWeightedCharacters != nil, XCaptionLimit: &limit, XArticles: caps.Articles, XQuotes: socialidentity.XEnterpriseQuotesEnabled(), XVideoMaxSeconds: caps.VideoMaxDurationSeconds}, nil
 }
 
 // Mentions looks a mention up with the account (RFC 025): an X user by

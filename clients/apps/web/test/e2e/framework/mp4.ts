@@ -138,8 +138,12 @@ export type DecodedMp4 = {
   decodedFrames: number
   /** RMS of the first channel from 0.7 s to 1.6 s. */
   during: number
+  /** Mean brightness (0-1) of the early frame. */
+  firstLuma: number
   /** Mean per-channel difference (0-255) between an early and a middle frame. */
   firstToMiddle: number
+  /** Mean brightness (0-1) of the middle frame. */
+  middleLuma: number
   /** Mean per-channel difference between a middle and a late frame. */
   middleToLast: number
 }
@@ -201,6 +205,12 @@ export async function decodeMp4(page: Page, file: Buffer, video: Mp4Track): Prom
         return total / (a.length / 4) / 3
       }
       const [first, middle, last] = picks.map((pick) => grabbed.get(pick)!)
+      const luma = (pixels: Uint8ClampedArray) => {
+        let total = 0
+        for (let index = 0; index < pixels.length; index += 4)
+          total += pixels[index]! + pixels[index + 1]! + pixels[index + 2]!
+        return total / (pixels.length / 4) / 3 / 255
+      }
       const audio = await new OfflineAudioContext(1, 1, 48_000).decodeAudioData(
         bytes.buffer.slice(0)
       )
@@ -218,7 +228,9 @@ export async function decodeMp4(page: Page, file: Buffer, video: Mp4Track): Prom
         before: rms(0.05, 0.4),
         decodedFrames,
         during: rms(0.7, 1.6),
+        firstLuma: luma(first!),
         firstToMiddle: difference(first!, middle!),
+        middleLuma: luma(middle!),
         middleToLast: difference(middle!, last!),
       }
     },
