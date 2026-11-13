@@ -450,6 +450,41 @@ test('⌘⇧↵ with the caret in the editor opens the publish review and adds n
   await expect(blocks.nth(1)).toContainText('Reviewed from the keyboard')
 })
 
+test('an old draft’s heading keeps its style, and markdown typed in a post stays text', async ({
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ channels: ['x'] })
+  await page.goto('/publish')
+  const created = await apiRequest(page, '/api/v1/content-drafts', {
+    method: 'POST',
+    body: {
+      body: [
+        { type: 'h1', children: [{ text: 'Old heading' }] },
+        { type: 'p', children: [{ text: 'Old text' }] },
+      ],
+    },
+  })
+  expect(created.status, JSON.stringify(created.body)).toBe(201)
+  await page.goto(`/publish/${(created.body as { id: string }).id}`)
+  const editor = draftEditor(page)
+  await expect(editor).toBeVisible({ timeout: 60_000 })
+
+  // Write turns off the heading's shortcut, not the kit's element, whose link control shows it.
+  await expect(editor.getByRole('heading', { level: 1 })).toContainText('Old heading')
+  await expect(editor.getByRole('button', { name: 'Copy link to heading' })).toHaveCount(1)
+
+  // A post cannot carry headings or quotes, so their markdown stays literal text.
+  await caretAtEndOf(page, editor.getByText('Old text', { exact: true }))
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('# Not a heading')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('> Not a quote')
+  await expectSaved(page)
+  await expect(editor).toContainText('# Not a heading')
+  await expect(editor).toContainText('> Not a quote')
+})
+
 test(
   'on a phone the library is the page, panels are sheets, and the review keeps the account identity',
   { tag: '@journey' },
