@@ -215,8 +215,7 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 	}
 
 	var urls []*urlEntity
-	next := urlMatches(text)
-	for m := next(0); m != nil; m = next(m.Index + m.Length) {
+	for _, m := range urlMatches(text) {
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
@@ -284,23 +283,23 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 	return urls
 }
 
-// urlMatches returns extractUrl's matches in the order its scan from index 0
-// finds them, but tries the regex only where urlStarts says one starts.
-// Scanning from every index is quadratic on long runs of letters, which is
-// any CJK text, because each start rescans the run.
-func urlMatches(text []rune) func(from int) *regexp2.Match {
+// urlMatches is extractUrl's matches as its scan from index 0 finds them, but
+// tries the regex only where urlStarts says one starts. Scanning from every
+// index is quadratic on long runs of letters, which is any CJK text, because
+// each start rescans the run.
+func urlMatches(text []rune) []*regexp2.Match {
 	starts := urlStarts(text)
-	return func(from int) *regexp2.Match {
-		for s := from; s < len(text); s++ {
-			if !starts[s] {
-				continue
-			}
-			if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); m != nil {
-				return m
-			}
+	var matches []*regexp2.Match
+	for s := 0; s < len(text); s++ {
+		if !starts[s] {
+			continue
 		}
-		return nil
+		if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); m != nil {
+			matches = append(matches, m)
+			s = m.Index + m.Length - 1
+		}
 	}
+	return matches
 }
 
 // urlStarts reports at each index whether extractUrl matches from there.
@@ -328,7 +327,7 @@ func domainStarts(text []rune) []bool {
 		// The label is a subdomain when a domain follows, or the domain name,
 		// which has no _, when a TLD follows.
 		subdomain, name := starts[dot+1], false
-		if !subdomain && dot+1 < len(text) {
+		if !subdomain {
 			m, _ := validTLDAtRe.FindRunesMatchStartingAt(text, dot+1)
 			name = m != nil
 		}

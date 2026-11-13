@@ -57,6 +57,7 @@ func TestWeightedLength(t *testing.T) {
 		"go to https://sample.com/a/b now": 33, // URLs count as 23
 		"see sample.com":                   27, // bare domains too
 		"mail a@sample.com":                17, // not emails
+		"é.com x":                          25, // a domain from the start of text
 	}
 	for in, want := range cases {
 		if got := WeightedLength(in); got != want {
@@ -108,32 +109,35 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 		}
 		return b.String()
 	}
-	tokens := []string{"a", "Z", "7", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
-		"http://", "HTTPS://", "https:/", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
+	tokens := []string{"a", "Z", "7", "日", "日本", "_", "-", ".", ".", " ", "/", ":", "@", "＠", "#", "(", "?x=1",
+		"http://", "HTTPS://", "https:/", "ttps://", "com", "co", "jp", "コム", "xn--p1ai", "t.co/a1",
 		"\u0130", "\u212a", "\u202a", "\u00a0", "\ufeff", "😀", "3.5"}
+	texts := []string{"é.com x", "x a-.b.com"} // shapes the random texts miss
 	rng := rand.New(rand.NewPCG(1, 2))
-	found := 0
 	for range 5000 {
 		var b strings.Builder
 		for range 1 + rng.IntN(16) {
 			b.WriteString(tokens[rng.IntN(len(tokens))])
 		}
-		text := shiftSurrogates(utf16Units(b.String()))
+		texts = append(texts, b.String())
+	}
+	found := 0
+	for _, raw := range texts {
+		text := shiftSurrogates(utf16Units(raw))
 		var want, got []string
 		for m, _ := full.FindRunesMatch(text); m != nil; m, _ = full.FindNextMatch(m) {
 			want = append(want, describe(m))
 		}
-		next := urlMatches(text)
-		for m := next(0); m != nil; m = next(m.Index + m.Length) {
+		for _, m := range urlMatches(text) {
 			got = append(got, describe(m))
 		}
 		if !slices.Equal(got, want) {
-			t.Errorf("urlMatches(%q)\n got %v\nwant %v", b.String(), got, want)
+			t.Errorf("urlMatches(%q)\n got %v\nwant %v", raw, got, want)
 		}
 		// A start the regex rejects would be skipped, so check every index.
 		for s, start := range urlStarts(text) {
 			if m, _ := extractURLAtRe.FindRunesMatchStartingAt(text, s); start != (m != nil) {
-				t.Errorf("urlStarts(%q)[%d] = %v", b.String(), s, start)
+				t.Errorf("urlStarts(%q)[%d] = %v", raw, s, start)
 			}
 		}
 		found += len(want)
@@ -158,7 +162,8 @@ func TestWeightedLengthOfLongText(t *testing.T) {
 		if got := WeightedLength(c.text); got != c.want {
 			t.Errorf("WeightedLength(%.20q…) = %d, want %d", c.text, got, c.want)
 		}
-		if took := time.Since(start); took > time.Second {
+		// The full scan took minutes here; the bound leaves room for -race.
+		if took := time.Since(start); took > 10*time.Second {
 			t.Errorf("WeightedLength(%.20q…) took %v", c.text, took)
 		}
 	}
