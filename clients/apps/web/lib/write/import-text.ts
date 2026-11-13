@@ -1,4 +1,4 @@
-import { xLength } from '@/lib/content-drafts/x-length'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from './document'
 import { postBreak } from './versions'
 
@@ -31,7 +31,10 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  const length = channel === 'x' ? xLength : (value: string) => [...value].length
+  // Only X's and Mastodon's counts (a short link is 23) exceed UTF-16 units: elsewhere, a text within the limit in units fits.
+  const fits = (value: string) =>
+    (channel !== 'x' && channel !== 'mastodon' && value.length <= limit) ||
+    platformCaptionLength(channel, value) <= limit
   const posts: string[] = []
   let current = ''
   const push = () => {
@@ -43,21 +46,21 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
       )
   }
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    if (length((current + token).trim()) <= limit) {
+    if (fits((current + token).trim())) {
       current += token
       continue
     }
     push()
-    if (length(token.trim()) <= limit) {
+    if (fits(token.trim())) {
       current = token
       continue
     }
     for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
       token
     )) {
-      if (length(segment) > limit)
+      if (!fits(segment))
         throw new Error('A character sequence exceeds the selected limit.')
-      if (length((current + segment).trim()) > limit) push()
+      if (!fits((current + segment).trim())) push()
       current += segment
     }
   }

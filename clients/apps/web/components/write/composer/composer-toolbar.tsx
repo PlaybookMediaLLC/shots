@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { MobileDrawer } from '@/components/ui/responsive-popover'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import type { DocumentActions } from '@/components/drafts/DraftEditor'
+import { insertSnippet } from '@/components/drafts/thread'
 import type { DraftChannel } from '@/lib/write/document'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { useWrite } from '../write-context'
@@ -319,10 +320,7 @@ export function ComposerToolbar({
       {tool === 'snippets' && setId ? (
         <FinisherDialog
           channel={channel}
-          onApply={(text) => {
-            if (!editor.selection) editor.tf.select(editor.api.end([]))
-            editor.tf.insertText(text)
-          }}
+          onApply={(text) => insertSnippet(editor as PlateEditor, text)}
           onClose={() => {
             onSnippetsChange()
             close()

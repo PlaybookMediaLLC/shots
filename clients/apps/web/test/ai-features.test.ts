@@ -71,7 +71,7 @@ test('captions are checked against each platform, coverage, and prohibited terms
     captionLength(`Read more https://example.com/${'x'.repeat(80)}`, 'x'),
     'Read more '.length + 23
   )
-  assert.equal(captionLength('héllo 👋', 'linkedin'), 7)
+  assert.equal(captionLength('héllo 👋', 'linkedin'), 8, 'UTF-16, as the composer and Go count')
   const problems = copyProblems(
     { altText: 'A dashboard.', captions: [{ channel: 'x', text: 'y'.repeat(281) }] },
     ['x', 'linkedin'],
