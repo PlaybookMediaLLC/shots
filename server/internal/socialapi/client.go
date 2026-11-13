@@ -101,6 +101,8 @@ type AutomationInput struct {
 	SecretReference string
 	Text            string
 	Threshold       int
+	// Media is the image a thumbnail step sets.
+	Media *publishing.MediaAsset
 }
 
 // AutomationResult is a follow-up's outcome: Done when it acted (RemoteID
@@ -112,6 +114,17 @@ type AutomationResult struct {
 
 // ErrUnsupported is a follow-up the account's platform cannot do.
 var ErrUnsupported = errors.New("the platform does not support this follow-up")
+
+// DeleteInput is one part of deleting a published post: Kind post deletes
+// RemoteID, Kind repost undoes the account's repost of RemoteID.
+type DeleteInput struct {
+	DestinationID   string
+	Kind            string
+	OrganizationID  string
+	Platform        string
+	RemoteID        string
+	SecretReference string
+}
 
 // Media is every file to publish, in order.
 func (input PublishInput) Media() []publishing.MediaAsset {
@@ -204,7 +217,8 @@ func New(baseURL string, httpClient *http.Client, assetReader AssetReader) *Clie
 
 func (c *Client) BeginOAuth(ctx context.Context, input BeginOAuthInput) (string, error) {
 	switch input.Provider {
-	case "x", "instagram", "instagram-standalone", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom":
+	case "x", "instagram", "instagram-standalone", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom",
+		"facebook", "pinterest", "gmb":
 	default:
 		return "", &Error{Status: http.StatusBadRequest, message: "unsupported social provider"}
 	}

@@ -313,6 +313,11 @@ export const MCP_TOOLS: { name: string; scope: string; summary: string }[] = [
     summary: 'Inspect draft delivery outcomes',
   },
   {
+    name: 'deleteContentDraftPost',
+    scope: 'post:delete',
+    summary: 'Delete a published post from its platform (asks to confirm)',
+  },
+  {
     name: 'planContentDraft',
     scope: 'draft:write',
     summary: 'Set a planning date; does not schedule or publish',

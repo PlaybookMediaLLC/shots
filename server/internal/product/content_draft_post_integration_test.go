@@ -1,11 +1,13 @@
 package product
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -102,7 +104,8 @@ func TestPublishScopeDoesNotOpenDraftScheduling(t *testing.T) {
 
 func TestCreatePostSchedulesAndARetryPostsOnce(t *testing.T) {
 	f := newPostFixture(t)
-	input := f.input("Shipped the new editor", f.x, f.li)
+	// LinkedIn first: neither the idempotency keys' order nor the table's may decide the answer.
+	input := f.input("Shipped the new editor", f.li, f.x)
 	first, err := f.repo.CreatePost(f.ctx, f.key, input)
 	if err != nil {
 		t.Fatal(err)
@@ -119,11 +122,13 @@ func TestCreatePostSchedulesAndARetryPostsOnce(t *testing.T) {
 		t.Fatalf("draft: %+v", first.Draft)
 	}
 	charged := f.meter.used
+	// A post written since, as its workflow starting does, moves in the table but not in the answer.
+	f.exec(t, `UPDATE scheduled_post SET "updatedAt"=now() WHERE id=$1`, first.Posts[0].ID)
 	retry, err := f.repo.CreatePost(f.ctx, f.key, input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if retry.Created || retry.Draft.ID != first.Draft.ID || len(retry.Posts) != 2 || retry.Posts[0].ID != first.Posts[0].ID {
+	if retry.Created || retry.Draft.ID != first.Draft.ID || len(retry.Posts) != 2 || retry.Posts[0].ID != first.Posts[0].ID || retry.Posts[1].ID != first.Posts[1].ID {
 		t.Fatalf("retry: %+v", retry)
 	}
 	total := 0
@@ -343,5 +348,125 @@ func TestCancellingTheLastPostReopensItsDraft(t *testing.T) {
 	}
 	if retry.Created || len(retry.Scheduled) != 0 {
 		t.Fatalf("retry revived cancelled posts: %+v", retry)
+	}
+}
+
+type recordingDeletions struct {
+	started []string
+	fail    bool
+}
+
+func (r *recordingDeletions) StartDelete(_ context.Context, organizationID, postID, _ string) error {
+	if r.fail {
+		return errors.New("temporal is down")
+	}
+	r.started = append(r.started, organizationID+"/"+postID)
+	return nil
+}
+
+// Only a live post is deleted, by the people who may publish it or a key with
+// post:delete. Each allowed request is audited and starts the workflow.
+func TestDeleteContentDraftPost(t *testing.T) {
+	f := newPostFixture(t)
+	created, err := f.repo.CreatePost(f.ctx, f.key, f.input("Going away", f.x))
+	if err != nil {
+		t.Fatal(err)
+	}
+	postID := created.Posts[0].ID
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, postID); !errors.Is(err, ErrPostDeletionNotStarted) {
+		t.Fatalf("without a starter: %v", err)
+	}
+	starter := &recordingDeletions{fail: true}
+	f.repo.WithPostDeletions(starter)
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, postID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("scheduled post: %v", err)
+	}
+	f.exec(t, `UPDATE scheduled_post SET status='PUBLISHED', "remotePostId"='tweet-1' WHERE id=$1`, postID)
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, postID); !errors.Is(err, ErrPostDeletionNotStarted) {
+		t.Fatalf("start failed: %v", err)
+	}
+	starter = &recordingDeletions{}
+	f.repo.WithPostDeletions(starter)
+	f.addMember(t, "viewer", "viewer")
+	for name, actor := range map[string]Actor{"viewer": f.actor("viewer"), "publish key": f.key} {
+		if _, err := f.repo.DeleteContentDraftPost(f.ctx, actor, postID); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, "missing"); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("missing post: %v", err)
+	}
+	key := postKey(t, f.testWorkspace, "delete", `{"post":["delete"]}`)
+	// A key does not reach an account in a person's private set.
+	var shared *string
+	if err := f.db.SQL.QueryRowContext(f.ctx, `SELECT "socialSetId" FROM channel_connection WHERE id=$1`, f.x).Scan(&shared); err != nil {
+		t.Fatal(err)
+	}
+	private := cuid.New()
+	f.exec(t, `INSERT INTO social_set (id,"organizationId",name,visibility,"publicSlug","ownerUserId","createdAt","updatedAt") VALUES ($1,$2,'Mine','PRIVATE',$1,$3,now(),now())`, private, f.org, f.owner.UserID)
+	f.exec(t, `UPDATE channel_connection SET "socialSetId"=$1 WHERE id=$2`, private, f.x)
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, key, postID); !errors.Is(err, publishing.ErrNotFound) || len(starter.started) != 0 {
+		t.Fatalf("private set: %v", err)
+	}
+	f.exec(t, `UPDATE channel_connection SET "socialSetId"=$1 WHERE id=$2`, shared, f.x)
+	request, err := f.repo.DeleteContentDraftPost(f.ctx, key, postID)
+	if err != nil || request.PostID != postID || request.Platform != "x" || len(starter.started) != 1 || starter.started[0] != f.org+"/"+postID {
+		t.Fatalf("request=%+v err=%v started=%v", request, err, starter.started)
+	}
+	audits, err := f.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(f.org), auditlog.Action("post.delete_requested")).Count(f.ctx)
+	if err != nil || audits != 2 {
+		t.Fatalf("audits=%d err=%v", audits, err)
+	}
+	// The post lists each part's receipt.
+	f.exec(t, `INSERT INTO post_deletion (id,"organizationId","scheduledPostId",key,kind,"remoteId","requestedBy",status,"failureCode",attempts)
+		VALUES ($1,$2,$3,'root','post','tweet-1','agent','failed','http_403',1)`, "deletion_"+f.id, f.org, postID)
+	listed, err := f.repo.ListContentDraftPosts(f.ctx, f.owner, created.Draft.ID)
+	if err != nil || len(listed) != 1 || len(listed[0].Deletions) != 1 || listed[0].Deletions[0].Status != "failed" ||
+		listed[0].Deletions[0].FailureCode == nil || *listed[0].Deletions[0].FailureCode != "http_403" {
+		t.Fatalf("listed=%+v err=%v", listed, err)
+	}
+	// A deleted post with a part left takes a retry; once every part is settled it does not.
+	f.exec(t, `UPDATE scheduled_post SET "deletedAt"=now() WHERE id=$1`, postID)
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, postID); err != nil || len(starter.started) != 2 {
+		t.Fatalf("retry of a failed part: %v, started=%v", err, starter.started)
+	}
+	var status string
+	var code *string
+	if err := f.db.SQL.QueryRowContext(f.ctx, `SELECT status, "failureCode" FROM post_deletion WHERE "scheduledPostId"=$1`, postID).Scan(&status, &code); err != nil || status != "pending" || code != nil {
+		t.Fatalf("retried part %s %v: %v", status, code, err)
+	}
+	f.exec(t, `UPDATE post_deletion SET status='done' WHERE "scheduledPostId"=$1`, postID)
+	if _, err := f.repo.DeleteContentDraftPost(f.ctx, f.owner, postID); !errors.Is(err, publishing.ErrConflict) || len(starter.started) != 2 {
+		t.Fatalf("deleted post: %v, started=%v", err, starter.started)
+	}
+}
+
+// A post an API key queued publishes while the key stands, and stops once the
+// key is disabled: the key, not a person, is its scheduler.
+func TestKeyQueuedPostRechecksItsKeyWhenDue(t *testing.T) {
+	f := newPostFixture(t)
+	created, err := f.repo.CreatePost(f.ctx, f.key, f.input("Queued by an agent", f.li))
+	if err != nil || len(created.Scheduled) != 1 {
+		t.Fatalf("created=%+v err=%v", created, err)
+	}
+	post := created.Scheduled[0].ID
+	store := publishing.NewRepository(f.db.Client)
+	if claimed, err := store.Claim(f.ctx, post, "run-"+post, f.future.Add(time.Minute)); err != nil || !claimed {
+		t.Fatalf("claimed=%v err=%v", claimed, err)
+	}
+	reason := func() string {
+		t.Helper()
+		job, err := store.LoadPublishJob(f.ctx, post, "run-"+post)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return job.Ineligible
+	}
+	if got := reason(); got != "" {
+		t.Fatalf("a live key's post was refused: %q", got)
+	}
+	f.exec(t, `UPDATE apikey SET enabled=false WHERE id=$1`, f.key.KeyID)
+	if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+		t.Fatalf("a disabled key's post=%q", got)
 	}
 }

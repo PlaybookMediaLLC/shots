@@ -84,10 +84,10 @@ func TestXVerifiedSubscriptionCapabilities(t *testing.T) {
 			if caps.Articles == nil || *caps.Articles != (subscription == "Premium" || subscription == "PremiumPlus") || caps.VideoMaxBytes == nil || caps.VideoMaxDurationSeconds == nil {
 				t.Fatal("known authenticated subscription capabilities lost")
 			}
-			if long && (caps.PostTextLimit() != 25000 || *caps.VideoMaxDurationSeconds != 7500) {
+			if long && (caps.PostTextLimit() != 25000 || *caps.VideoMaxDurationSeconds != 7500 || *caps.VideoMaxBytes != 16000000000) {
 				t.Fatal("premium limits differ from documented contract")
 			}
-			if !long && (caps.PostTextLimit() != 280 || *caps.VideoMaxDurationSeconds != 1200) {
+			if !long && (caps.PostTextLimit() != 280 || *caps.VideoMaxDurationSeconds != 1200 || *caps.VideoMaxBytes != 8000000000) {
 				t.Fatal("standard limits differ from documented contract")
 			}
 			bad := 100000

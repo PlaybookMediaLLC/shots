@@ -77,13 +77,14 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 		},
 		"tenant-outbox": s.Outbox, "outbox-retention": s.OutboxRetention, "audit-drains": s.AuditDrains,
 		"communications": s.Communications, "workspace-cleanup": s.WorkspaceCleanup,
-		"audit-retention":   s.AuditRetention,
-		"notifications":     s.Notifications,
-		"account-deletions": s.AccountDeletions,
-		"webhooks":          s.DeliverWebhooks,
-		"asset-cleanup":     s.AssetCleanup,
-		"voice-cleanup":     s.VoiceCleanup,
-		"voice-commands":    s.VoiceCommands,
+		"audit-retention":        s.AuditRetention,
+		"notification-retention": s.NotificationRetention,
+		"notifications":          s.Notifications,
+		"account-deletions":      s.AccountDeletions,
+		"webhooks":               s.DeliverWebhooks,
+		"asset-cleanup":          s.AssetCleanup,
+		"voice-cleanup":          s.VoiceCleanup,
+		"voice-commands":         s.VoiceCommands,
 		"social-analytics": func(ctx context.Context) (int, error) {
 			if s.Analytics == nil {
 				return 0, nil

@@ -36,6 +36,9 @@ import {
 import { threadLabels } from '@/lib/write/numbering'
 import { cn } from '@/lib/utils'
 import { PdfCarousel } from './pdf-carousel'
+import { FacebookOptions } from './facebook-options'
+import { InstagramOptions } from './instagram-options'
+import { PinterestOptions } from './pinterest-options'
 import { AutoDmDraft } from './auto-dm-draft'
 
 /** A numbering style as the dialog shows it. */
@@ -162,6 +165,38 @@ export function VersionOptionsBar({
         onChange={(firstComment) => onChange({ ...options, firstComment })}
         readOnly={readOnly}
         value={options.firstComment ?? ''}
+      />
+    )
+  }
+  if (channel === 'instagram') {
+    tools.push(
+      <InstagramOptions
+        disabled={readOnly}
+        key="instagram"
+        onChange={(instagram) => onChange({ ...options, instagram })}
+        uploadFile={uploadFile}
+        value={options.instagram}
+      />
+    )
+  }
+  if (channel === 'facebook') {
+    tools.push(
+      <FacebookOptions
+        disabled={readOnly}
+        key="facebook"
+        onChange={(facebook) => onChange({ ...options, facebook })}
+        value={options.facebook}
+      />
+    )
+  }
+  if (channel === 'pinterest') {
+    tools.push(
+      <PinterestOptions
+        disabled={readOnly}
+        key="pinterest"
+        onChange={(pinterest) => onChange({ ...options, pinterest })}
+        setId={setId}
+        value={options.pinterest}
       />
     )
   }

@@ -68,6 +68,7 @@ import { browserTimeZone } from '@/lib/time-zones'
 import { AutomationControls } from './automation'
 import { AutoDmDraft } from './auto-dm-draft'
 import type { PreviewItem } from './preview'
+import { useLauncherFocus } from '../launcher-focus'
 import { healthLabel, SetDot } from '../sets'
 import { useWrite } from '../write-context'
 import type { SaveState } from './useDraftDocument'
@@ -508,6 +509,7 @@ export function ScheduleDialog({
   onPreview?: () => void
 }) {
   const { data } = useWrite()
+  const launcher = useLauncherFocus()
   const formatWhen = useWhen()
   const scope = useSocialSetScope()
   // The draft's set owns the queue: its weekly slots in its zone (RFC 024).
@@ -702,6 +704,11 @@ export function ScheduleDialog({
       <SheetContent
         className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[min(44rem,100vw)]"
         data-testid="schedule-dialog"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          launcher.restore()
+        }}
+        onOpenAutoFocus={launcher.remember}
         side="right"
         onKeyDown={(event) => {
           // ⌘↵ alone confirms, so the next free slot is a keyboard-only path. ⌘⇧↵ and
@@ -1349,7 +1356,12 @@ function DuplicateWarning({
                 ? (account.displayName ?? CHANNEL_META[account.channel].label)
                 : 'An account'}
               <span className="text-muted-foreground">
-                · {post.status === 'PUBLISHED' ? 'published' : 'queued'}{' '}
+                ·{' '}
+                {post.status === 'PUBLISHED'
+                  ? 'published'
+                  : post.status === 'SENT_TO_APP'
+                    ? 'sent to the app'
+                    : 'queued'}{' '}
                 <LocalTime value={post.at} zone={timeZone} />
               </span>
             </li>
@@ -1422,6 +1434,7 @@ export function PublishReview({
   onPreview: () => void
 }) {
   const { data } = useWrite()
+  const launcher = useLauncherFocus()
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState('')
   const [duplicates, setDuplicates] = React.useState<DuplicatePost[] | null>(null)
@@ -1469,6 +1482,11 @@ export function PublishReview({
       <DialogContent
         className="max-h-[92dvh] max-w-[calc(100%-1rem)] gap-6 overflow-y-auto p-5 sm:max-w-lg sm:p-6"
         data-testid="publish-review"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          launcher.restore()
+        }}
+        onOpenAutoFocus={launcher.remember}
       >
         <DialogHeader className="gap-1.5 text-left">
           <DialogTitle>Publish now</DialogTitle>

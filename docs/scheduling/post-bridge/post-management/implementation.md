@@ -39,16 +39,29 @@ Each slice is accepted by its tests and the [verification](#verification) below.
 | Deleting a workspace deletes its notes                                                                                                         | 2     |
 | A draft matches filters only when one live post meets all of them; a draft with no live post matches on its intended accounts and planned date | 3     |
 | Filters are in the URL and restore on reload; a private set's posts stay hidden                                                                | 3     |
+| A library date filter puts a post on the calendar's day, even after a retry moves it past midnight                                             | 3     |
 | Queue says it shows the next 60 days and links to the calendar                                                                                 | 3     |
 | The allowance counts active accounts against the backend's limit, and is absent when the plan has none                                         | 4     |
 
-### Known limit
-
-Filters compare `scheduledFor`, as the calendar's query does. The calendar places a card at `slotAt ?? scheduledFor`, and a rate-limit retry moves `scheduledFor`, so a post near midnight can be on one day in the calendar and match the next in a filter.
+The Queue tab lists, groups and filters posts by when they go out (`scheduledFor`), so a retried post sits under the day it runs.
 
 ## Outcome metric
 
 Weekly workspaces that use library filters or calendar notes, read beside release-kit adoption. If it does not move in a quarter of use, remove the feature rather than extend it.
+
+Recording was added on 13 November 2026 and counts from the first production deploy that carries it. The browser sends one PostHog event, `post_management_used`, when a person sets an account or date filter in the library (`feature: library_filter`) or creates a calendar note (`feature: calendar_note`). It carries the workspace ID and the feature only: `scrubEvent` (`lib/analytics-scrub.ts`) removes the URL query, where the library keeps filter values, and no title is sent. Search, tag and kind filters existed before this work and are not counted.
+
+Read the weekly number in PostHog under SQL insights:
+
+```sql
+SELECT toStartOfWeek(timestamp, 1) AS week, count(DISTINCT properties.workspace_id) AS workspaces
+FROM events
+WHERE event = 'post_management_used' AND timestamp >= toDateTime('2026-11-13')
+GROUP BY week
+ORDER BY week
+```
+
+The number is a lower bound: PostHog loads only after a person accepts analytics, and local hosts send nothing. Release-kit adoption has no report yet ([RFC 005](../../../rfcs/005-release-kit-handoffs-and-adoption.md) is proposed), so until it does, read this number alone.
 
 ## Rollback
 

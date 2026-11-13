@@ -281,3 +281,91 @@ func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
 		t.Errorf("another member found a private set's draft through its account: %+v", page.Items)
 	}
 }
+
+// A post at 23:50 in the brand's zone whose rate-limit retry moves it past
+// midnight is on the same day in the calendar and in the library's filter.
+func TestContentDraftListTimeFilterMatchesCalendarDay(t *testing.T) {
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo, w.owner
+	subscribe(t, ctx, repo, w.org, "pro")
+	zone, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Brand", TimeZone: zone.String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := "x" + w.id
+	w.exec(t, `INSERT INTO channel_connection(id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId","updatedAt",platform,"socialSetId")
+		VALUES($1,$2,'social',$1,'test-only',$3,now(),'x',$4)`, x, w.org, owner.UserID, set.ID)
+	draft, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "Late post", SocialSetID: set.ID, ChannelConnectionIDs: []string{x}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slot := time.Date(2026, 11, 4, 23, 50, 0, 0, zone).UTC()
+	post, err := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).SetContentDraftID(draft.ID).
+		SetChannelConnectionID(x).SetSocialSetID(set.ID).SetSlotAt(slot).SetScheduledFor(slot).
+		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption("post").SetIdempotencyKey(cuid.New()).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue := publishing.NewRepository(w.db.Client)
+	run := "rate-limited-" + post.ID
+	if claimed, err := queue.Claim(ctx, post.ID, run, slot); err != nil || !claimed {
+		t.Fatalf("claim=%v %v", claimed, err)
+	}
+	attempt, err := queue.StartAttempt(ctx, post, run, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryAt := slot.Add(30 * time.Minute)
+	if err := queue.Fail(ctx, post, attempt, "RATE_LIMITED", &retryAt, run); err != nil {
+		t.Fatal(err)
+	}
+
+	// The calendar reads a padded range and places each post at publishedAt ?? slotAt ?? scheduledFor.
+	wed, thu := time.Date(2026, 11, 4, 0, 0, 0, 0, zone), time.Date(2026, 11, 5, 0, 0, 0, 0, zone)
+	calendar, err := repo.ListContentDraftPostsBetween(ctx, owner, wed.AddDate(0, 0, -1), thu.AddDate(0, 0, 2), set.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calendar) != 1 || !calendar[0].ScheduledFor.Equal(retryAt) || calendar[0].SlotAt == nil || calendar[0].PublishedAt != nil {
+		t.Fatalf("calendar=%+v", calendar)
+	}
+	if got := calendar[0].SlotAt.In(zone).Format(time.DateOnly); got != "2026-11-04" {
+		t.Fatalf("calendar day=%s", got)
+	}
+	for name, c := range map[string]struct {
+		from time.Time
+		want int
+	}{"the calendar's day": {wed, 1}, "the day the retry runs": {thu, 0}} {
+		to := c.from.AddDate(0, 0, 1)
+		page, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{SocialSetID: set.ID, From: &c.from, To: &to})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Items) != c.want {
+			t.Errorf("%s: got %d drafts, want %d", name, len(page.Items), c.want)
+		}
+	}
+
+	// Once it goes out, the calendar dates it by publishedAt, and so does the filter.
+	if _, err := w.db.Client.ScheduledPost.UpdateOneID(post.ID).SetStatus(scheduledpost.StatusPUBLISHED).
+		SetPublishedAt(retryAt.Add(time.Minute)).Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		from time.Time
+		want int
+	}{"before it went out": {wed, 0}, "the day it went out": {thu, 1}} {
+		to := c.from.AddDate(0, 0, 1)
+		page, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{SocialSetID: set.ID, From: &c.from, To: &to})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Items) != c.want {
+			t.Errorf("%s: got %d drafts, want %d", name, len(page.Items), c.want)
+		}
+	}
+}

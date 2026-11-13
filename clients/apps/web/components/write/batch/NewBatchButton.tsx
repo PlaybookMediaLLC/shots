@@ -37,6 +37,18 @@ const TOOLS = [
     value: 'grid',
   },
   {
+    description:
+      'Six-second vertical videos: one image fades in under a headline, or on its own, with optional music.',
+    label: 'Fade-in videos',
+    value: 'single',
+  },
+  {
+    description:
+      'Your own clip with text over it, an AI caption assistant, an optional closing clip and optional music.',
+    label: 'UGC videos',
+    value: 'ugc',
+  },
+  {
     description: 'Any mix of photos, videos, PDFs and folders, or the rows of a CSV.',
     label: 'Mixed files or a CSV',
     value: 'mixed',

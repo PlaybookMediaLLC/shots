@@ -252,6 +252,7 @@ export async function draftTargets(
           maxWeightedCharacters: accounts.get(channelConnectionId)?.xCaptionLimit,
           articles: accounts.get(channelConnectionId)?.xArticles,
           xQuotes: accounts.get(channelConnectionId)?.xQuotes,
+          xVideoMaxSeconds: accounts.get(channelConnectionId)?.xVideoMaxSeconds,
           pollLimits: accounts.get(channelConnectionId)?.pollLimits,
           mastodonQuotes: accounts.get(channelConnectionId)?.mastodonQuotes,
         },
@@ -307,6 +308,12 @@ export async function reconcileContentDraftPost(
 ) {
   const result = await orNull(backendSDK(context).reconcileContentDraftPost(id, input))
   return result ? readPost(result.post) : null
+}
+
+/** Start deleting a published post from its platform; null when it is not in this workspace. */
+export async function deleteContentDraftPost(context: TenantContext, id: string) {
+  const result = await orNull(backendSDK(context).deleteContentDraftPost(id))
+  return result ? result.deletion : null
 }
 
 /** Stop a live post's pending follow-ups; null when it is not in this workspace. */

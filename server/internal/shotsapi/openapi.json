@@ -4,7 +4,7 @@
     "title": "Shots API",
     "version": "1.0.0",
     "summary": "Public HTTP API for Shots.",
-    "description": "Shots turns a software release into a reviewed launch: a cited brief, on-brand visuals, and channel posts that a person approves before anything is scheduled. This API exposes the same workspace operations the app uses.\n\n## Quickstart\n\n1. Create a workspace API key in **Settings → Developer API** (`https://shots.playbookmedia.io/settings/developers`). Give it only the scopes it needs. The key is shown once.\n2. Send it in the `X-API-Key` header:\n\n```bash\nexport SHOTS_API_KEY=\"ss_...\"\ncurl https://shots.playbookmedia.io/api/v1/releases -H \"X-API-Key: $SHOTS_API_KEY\"\n```\n\n3. Create a draft campaign. Every post starts as a draft; nothing is scheduled until a person approves it:\n\n```bash\ncurl -X POST https://shots.playbookmedia.io/api/v1/campaigns \\\n  -H \"X-API-Key: $SHOTS_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Idempotency-Key: recurring-invoices-launch\" \\\n  -d '{\"name\":\"Recurring invoices\",\"objective\":\"Announce recurring invoices\",\"posts\":[{\"channel\":\"linkedin\",\"copy\":\"Recurring invoices are here.\"}]}'\n```\n\n4. Submit the drafts for review with `POST /api/v1/campaigns/{campaignId}/review-requests`. Approvers decide in the app.\n\n### Publish a post\n\nWith a key that holds `post:publish`, one call writes a post and schedules or publishes it. No key has that scope unless someone chose it.\n\n1. Find the accounts with `GET /api/v1/social-sets`. Each account's `id` is what you post to. A key sees shared social sets only.\n2. To attach media, call `POST /api/v1/assets/upload-url`, `PUT` the bytes to the returned URL with `If-None-Match: *`, then call `POST /api/v1/assets/{assetId}/complete`.\n3. Publish:\n\n```bash\ncurl -X POST https://shots.playbookmedia.io/api/v1/posts \\\n  -H \"X-API-Key: $SHOTS_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Idempotency-Key: launch-post-recurring-invoices\" \\\n  -d '{\"channelConnectionIds\":[\"cl...\"],\"posts\":[{\"text\":\"Recurring invoices are here.\"}],\"publishNow\":true}'\n```\n\nSay when with exactly one of `publishNow`, `scheduledFor`, `localTime` with `timeZone`, and `queue`. Two or more `posts` make a thread. `platforms` sets one platform's own text and settings, such as a LinkedIn `firstComment`. Read each account's outcome with `GET /api/v1/content-drafts/{id}/posts`.\n\nA workspace that requires approval keeps that rule: the draft is created, nothing is queued, and `status` is `awaiting_approval`.\n\n### Typed TypeScript client\n\nThe document is OpenAPI 3.1. Generate types from it and call the API with full request and response typing:\n\n```bash\nnpx openapi-typescript https://shots.playbookmedia.io/openapi.json -o shots.d.ts\nnpm install openapi-fetch\n```\n\n```ts\nimport createClient from 'openapi-fetch'\nimport type { paths } from './shots'\n\nconst shots = createClient<paths>({\n  baseUrl: 'https://shots.playbookmedia.io',\n  headers: { 'X-API-Key': process.env.SHOTS_API_KEY! },\n})\nconst { data, error } = await shots.GET('/api/v1/campaigns/{campaignId}', {\n  params: { path: { campaignId: 'c...' } },\n})\n```\n\n## Authentication\n\n| Credential | How to send it | For |\n| --- | --- | --- |\n| Workspace API key | `X-API-Key: ss_...` | Scripts, CI, and agents. A key belongs to one workspace and carries scopes. |\n| Signed-in session | The `better-auth.session_token` cookie | Same-origin browser calls, checked against the member's role. |\n\nEach operation lists the scope it needs in its security requirement. A key can never choose another workspace: the workspace is the key's own.\n\n| Scope | Allows |\n| --- | --- |\n| `artifact:read` | Read releases, campaigns, the review queue, the publishing schedule, and link previews; sign asset downloads; use the editor utilities. |\n| `asset:write` | Complete and delete asset uploads. |\n| `draft:comment` | Add, reply, edit your own comments, and resolve discussions on workspace drafts. Never approves or publishes. |\n| `draft:write` | Create, update, and delete content drafts. Posting to your accounts takes its own scope. |\n| `onboarding:run` | Read a product site into its profile and follow the run. |\n| `post:publish` | Write and publish new posts to the accounts of your shared social sets, right away or at a time, with no review by a person unless the workspace requires approval. Cancelling them takes the scheduling scope too. |\n| `post:schedule` | Schedule campaign posts and visuals a person approved, and cancel scheduled posts. It never approves anything. |\n| `queue:write` | Change future posting-slot suggestions and time zones. Does not approve, schedule, or move existing posts. |\n| `release:create` | Create releases and draft campaigns, and submit drafts for review. |\n| `source:write` | Register and update release-intake sources. |\n| `upload:sign` | Sign asset uploads. |\n\nApproving, rejecting, or requesting changes on posts is a person's decision and takes a session only. Those operations refuse API keys with `403`, whatever the key's scopes.\n\nA key with `post:schedule` may schedule campaign posts and visuals a person approved, and cancel scheduled posts. A key with the separate `post:publish` scope may write and publish new posts with `POST /api/v1/posts`, with no review unless the workspace requires approval. A stored content draft is scheduled by a person, whatever the key's scopes. A session that schedules a variant or cancels a post needs a sign-in under 15 minutes old with two-factor enabled.\n\nShell operations (`/api/v1/me`, `/api/v1/bootstrap`, `/api/v1/organizations`) describe the signed-in user and refuse API keys.\n\n## Plans and limits\n\nThere is no free plan: every operation here needs a Pro, Business or Enterprise subscription, and a workspace without one can only sign in and choose a plan. Each gated operation publishes its gate in `x-shots-entitlement`: the `feature` it needs, the `minimumPlan` that includes it, and the `quota` it consumes.\n\n- A workspace without the feature gets `403` with code `workspace_feature_not_entitled`, plus `feature`, `currentPlan`, and `requiredPlan`.\n- A metered write past its quota gets `429` with code `workspace_quota_exceeded`, plus `Retry-After` and `X-RateLimit-*` headers.\n- Each API key is also limited to 60 requests per minute.\n\n## Idempotency\n\nCreating a release, campaign, or scheduled post accepts an `Idempotency-Key` header of up to 128 characters. `POST /api/v1/posts` requires one of 16 to 128. A retry with the same key returns the original result with `200` instead of creating a duplicate. Status changes (campaign transitions, review requests, approvals, cancellations) apply only from the current status, so a repeated request returns `409` and changes nothing.\n\n## Errors\n\nEvery failure returns one JSON envelope with a stable `code`, a human-readable `message`, and a `hint`. Branch on `code`; it is stable within `v1`. Every response carries `X-Request-Id`; send your own to correlate logs.",
+    "description": "Shots turns a software release into a reviewed launch: a cited brief, on-brand visuals, and channel posts that a person approves before anything is scheduled. This API exposes the same workspace operations the app uses.\n\n## Quickstart\n\n1. Create a workspace API key in **Settings → Developer API** (`https://shots.playbookmedia.io/settings/developers`). Give it only the scopes it needs. The key is shown once.\n2. Send it in the `X-API-Key` header:\n\n```bash\nexport SHOTS_API_KEY=\"ss_...\"\ncurl https://shots.playbookmedia.io/api/v1/releases -H \"X-API-Key: $SHOTS_API_KEY\"\n```\n\n3. Create a draft campaign. Every post starts as a draft; nothing is scheduled until a person approves it:\n\n```bash\ncurl -X POST https://shots.playbookmedia.io/api/v1/campaigns \\\n  -H \"X-API-Key: $SHOTS_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Idempotency-Key: recurring-invoices-launch\" \\\n  -d '{\"name\":\"Recurring invoices\",\"objective\":\"Announce recurring invoices\",\"posts\":[{\"channel\":\"linkedin\",\"copy\":\"Recurring invoices are here.\"}]}'\n```\n\n4. Submit the drafts for review with `POST /api/v1/campaigns/{campaignId}/review-requests`. Approvers decide in the app.\n\n### Publish a post\n\nWith a key that holds `post:publish`, one call writes a post and schedules or publishes it. No key has that scope unless someone chose it.\n\n1. Find the accounts with `GET /api/v1/social-sets`. Each account's `id` is what you post to. A key sees shared social sets only.\n2. To attach media, call `POST /api/v1/assets/upload-url`, `PUT` the bytes to the returned URL with `If-None-Match: *`, then call `POST /api/v1/assets/{assetId}/complete`.\n3. Publish:\n\n```bash\ncurl -X POST https://shots.playbookmedia.io/api/v1/posts \\\n  -H \"X-API-Key: $SHOTS_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Idempotency-Key: launch-post-recurring-invoices\" \\\n  -d '{\"channelConnectionIds\":[\"cl...\"],\"posts\":[{\"text\":\"Recurring invoices are here.\"}],\"publishNow\":true}'\n```\n\nSay when with exactly one of `publishNow`, `scheduledFor`, `localTime` with `timeZone`, and `queue`. Two or more `posts` make a thread. `platforms` sets one platform's own text and settings, such as a LinkedIn `firstComment`. Read each account's outcome with `GET /api/v1/content-drafts/{id}/posts`.\n\nA workspace that requires approval keeps that rule: the draft is created, nothing is queued, and `status` is `awaiting_approval`.\n\n### Typed TypeScript client\n\nThe document is OpenAPI 3.1. Generate types from it and call the API with full request and response typing:\n\n```bash\nnpx openapi-typescript https://shots.playbookmedia.io/openapi.json -o shots.d.ts\nnpm install openapi-fetch\n```\n\n```ts\nimport createClient from 'openapi-fetch'\nimport type { paths } from './shots'\n\nconst shots = createClient<paths>({\n  baseUrl: 'https://shots.playbookmedia.io',\n  headers: { 'X-API-Key': process.env.SHOTS_API_KEY! },\n})\nconst { data, error } = await shots.GET('/api/v1/campaigns/{campaignId}', {\n  params: { path: { campaignId: 'c...' } },\n})\n```\n\n## Authentication\n\n| Credential | How to send it | For |\n| --- | --- | --- |\n| Workspace API key | `X-API-Key: ss_...` | Scripts, CI, and agents. A key belongs to one workspace and carries scopes. |\n| Signed-in session | The `better-auth.session_token` cookie | Same-origin browser calls, checked against the member's role. |\n\nEach operation lists the scope it needs in its security requirement. A key can never choose another workspace: the workspace is the key's own.\n\n| Scope | Allows |\n| --- | --- |\n| `artifact:read` | Read releases, campaigns, the review queue, the publishing schedule, and link previews; sign asset downloads; use the editor utilities. |\n| `asset:write` | Complete and delete asset uploads. |\n| `draft:comment` | Add, reply, edit your own comments, and resolve discussions on workspace drafts. Never approves or publishes. |\n| `draft:write` | Create, update, and delete content drafts. Posting to your accounts takes its own scope. |\n| `onboarding:run` | Read a product site into its profile and follow the run. |\n| `post:delete` | Delete posts that Shots published from their platforms, with their thread parts, replies and reposts. Each delete is audited. |\n| `post:publish` | Write and publish new posts to the accounts of your shared social sets, right away or at a time, with no review by a person unless the workspace requires approval. Cancelling them takes the scheduling scope too. |\n| `post:schedule` | Schedule campaign posts and visuals a person approved, and cancel scheduled posts. It never approves anything. |\n| `queue:write` | Change future posting-slot suggestions and time zones. Does not approve, schedule, or move existing posts. |\n| `release:create` | Create releases and draft campaigns, and submit drafts for review. |\n| `source:write` | Register and update release-intake sources. |\n| `upload:sign` | Sign asset uploads. |\n\nApproving, rejecting, or requesting changes on posts is a person's decision and takes a session only. Those operations refuse API keys with `403`, whatever the key's scopes.\n\nA key with `post:schedule` may schedule campaign posts and visuals a person approved, and cancel scheduled posts. A key with the separate `post:publish` scope may write and publish new posts with `POST /api/v1/posts`, with no review unless the workspace requires approval. A stored content draft is scheduled by a person, whatever the key's scopes. A session that schedules a variant or cancels a post needs a sign-in under 15 minutes old with two-factor enabled.\n\nShell operations (`/api/v1/me`, `/api/v1/bootstrap`, `/api/v1/organizations`) describe the signed-in user and refuse API keys.\n\n## Plans and limits\n\nThere is no free plan: every operation here needs a Pro, Business or Enterprise subscription, and a workspace without one can only sign in and choose a plan. Each gated operation publishes its gate in `x-shots-entitlement`: the `feature` it needs, the `minimumPlan` that includes it, and the `quota` it consumes.\n\n- A workspace without the feature gets `403` with code `workspace_feature_not_entitled`, plus `feature`, `currentPlan`, and `requiredPlan`.\n- A metered write past its quota gets `429` with code `workspace_quota_exceeded`, plus `Retry-After` and `X-RateLimit-*` headers.\n- Each API key is also limited to 60 requests per minute.\n\n## Idempotency\n\nCreating a release, campaign, or scheduled post accepts an `Idempotency-Key` header of up to 128 characters. `POST /api/v1/posts` requires one of 16 to 128. A retry with the same key returns the original result with `200` instead of creating a duplicate. Status changes (campaign transitions, review requests, approvals, cancellations) apply only from the current status, so a repeated request returns `409` and changes nothing.\n\n## Errors\n\nEvery failure returns one JSON envelope with a stable `code`, a human-readable `message`, and a `hint`. Branch on `code`; it is stable within `v1`. Every response carries `X-Request-Id`; send your own to correlate logs.",
     "contact": {
       "name": "Shots",
       "url": "https://shots.playbookmedia.io/contact"
@@ -2497,6 +2497,18 @@
                                 "xQuotes": {
                                   "type": "boolean"
                                 },
+                                "xVideoMaxSeconds": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "mastodonQuotes": {
                                   "type": [
                                     "boolean",
@@ -2991,6 +3003,18 @@
                           "xQuotes": {
                             "type": "boolean"
                           },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "mastodonQuotes": {
                             "type": [
                               "boolean",
@@ -3331,6 +3355,18 @@
                           },
                           "xQuotes": {
                             "type": "boolean"
+                          },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "mastodonQuotes": {
                             "type": [
@@ -4067,6 +4103,18 @@
                           "xQuotes": {
                             "type": "boolean"
                           },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "mastodonQuotes": {
                             "type": [
                               "boolean",
@@ -4660,7 +4708,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -4789,7 +4838,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -4888,6 +4938,64 @@
                               "null"
                             ]
                           },
+                          "deletedAt": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "deletions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "attempts": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "failureCode": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "key": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "post",
+                                    "repost"
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "done",
+                                    "failed",
+                                    "unsupported"
+                                  ]
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "attempts",
+                                "failureCode",
+                                "key",
+                                "kind",
+                                "status",
+                                "updatedAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "campaignId": {
                             "type": [
                               "string",
@@ -4941,6 +5049,8 @@
                           "socialSetId",
                           "failureCode",
                           "publishedAt",
+                          "deletedAt",
+                          "deletions",
                           "version",
                           "calendarVersion",
                           "draftId",
@@ -9143,7 +9253,8 @@
                                       "PUBLISHED",
                                       "FAILED",
                                       "CANCELLED",
-                                      "UNKNOWN_DELIVERY"
+                                      "UNKNOWN_DELIVERY",
+                                      "SENT_TO_APP"
                                     ]
                                   },
                                   {
@@ -9691,7 +9802,8 @@
                                       "PUBLISHED",
                                       "FAILED",
                                       "CANCELLED",
-                                      "UNKNOWN_DELIVERY"
+                                      "UNKNOWN_DELIVERY",
+                                      "SENT_TO_APP"
                                     ]
                                   },
                                   {
@@ -10777,7 +10889,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         {
@@ -11114,7 +11227,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -11213,7 +11327,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -11418,7 +11533,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         "contentDraftId": {
@@ -12281,6 +12397,103 @@
         ]
       }
     },
+    "/api/v1/content-draft-posts/{id}/delete": {
+      "post": {
+        "x-shots-entitlement": {
+          "feature": "content:drafts",
+          "minimumPlan": "pro"
+        },
+        "description": "Deletes a post that Shots published from its platform, with its thread parts, the replies Shots posted and its reposts. Each part gets a receipt; a part the platform already removed counts as deleted. Platforms without a delete call record the part as unsupported. Requires the `post:delete` scope.",
+        "operationId": "deleteContentDraftPost",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The delete started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDeletion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller may not publish to this account, or the key lacks `post:delete`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The post was not found in this workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The post is not live, or it was already deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceApiKey": [
+              "post:delete"
+            ]
+          },
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Delete a published post from its platform",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
     "/api/v1/posts": {
       "post": {
         "x-shots-entitlement": {
@@ -12699,7 +12912,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -12725,7 +12938,10 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest",
+                                      "gmb"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -12761,6 +12977,20 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -12772,6 +13002,9 @@
                                       "tiktok": {
                                         "type": "object",
                                         "properties": {
+                                          "sendToApp": {
+                                            "type": "boolean"
+                                          },
                                           "privacy": {
                                             "type": "string",
                                             "enum": [
@@ -12817,6 +13050,83 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "facebook": {
+                                        "type": "object",
+                                        "properties": {
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -12959,6 +13269,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -13105,6 +13416,12 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
+                        "sentToAppPosts": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "scratchpad": {
                           "type": "string"
                         },
@@ -13216,6 +13533,7 @@
                         "planTimeZone",
                         "platformVersions",
                         "queuedPosts",
+                        "sentToAppPosts",
                         "scratchpad",
                         "sourceDraftId",
                         "tagIds",
@@ -13255,7 +13573,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -13384,7 +13703,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -13483,6 +13803,64 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "deletedAt": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "deletions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "attempts": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "failureCode": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "key": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "post",
+                                    "repost"
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "done",
+                                    "failed",
+                                    "unsupported"
+                                  ]
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "attempts",
+                                "failureCode",
+                                "key",
+                                "kind",
+                                "status",
+                                "updatedAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -13505,7 +13883,9 @@
                           "slotAt",
                           "socialSetId",
                           "failureCode",
-                          "publishedAt"
+                          "publishedAt",
+                          "deletedAt",
+                          "deletions"
                         ],
                         "additionalProperties": false
                       }
@@ -13919,7 +14299,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -13945,7 +14325,10 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest",
+                                      "gmb"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -13981,6 +14364,20 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -13992,6 +14389,9 @@
                                       "tiktok": {
                                         "type": "object",
                                         "properties": {
+                                          "sendToApp": {
+                                            "type": "boolean"
+                                          },
                                           "privacy": {
                                             "type": "string",
                                             "enum": [
@@ -14037,6 +14437,83 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "facebook": {
+                                        "type": "object",
+                                        "properties": {
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -14179,6 +14656,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -14325,6 +14803,12 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
+                        "sentToAppPosts": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "scratchpad": {
                           "type": "string"
                         },
@@ -14436,6 +14920,7 @@
                         "planTimeZone",
                         "platformVersions",
                         "queuedPosts",
+                        "sentToAppPosts",
                         "scratchpad",
                         "sourceDraftId",
                         "tagIds",
@@ -14475,7 +14960,8 @@
                               "PUBLISHED",
                               "FAILED",
                               "CANCELLED",
-                              "UNKNOWN_DELIVERY"
+                              "UNKNOWN_DELIVERY",
+                              "SENT_TO_APP"
                             ]
                           },
                           "metrics": {
@@ -14604,7 +15090,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -14703,6 +15190,64 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "deletedAt": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "deletions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "attempts": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "failureCode": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "key": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "post",
+                                    "repost"
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "done",
+                                    "failed",
+                                    "unsupported"
+                                  ]
+                                },
+                                "updatedAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "attempts",
+                                "failureCode",
+                                "key",
+                                "kind",
+                                "status",
+                                "updatedAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -14725,7 +15270,9 @@
                           "slotAt",
                           "socialSetId",
                           "failureCode",
-                          "publishedAt"
+                          "publishedAt",
+                          "deletedAt",
+                          "deletions"
                         ],
                         "additionalProperties": false
                       }
@@ -15434,7 +15981,7 @@
           "feature": "content:drafts",
           "minimumPlan": "pro"
         },
-        "description": "Lists a draft's history, newest first: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who and when. Viewing a draft is never recorded.",
+        "description": "Lists a draft's history, newest first (by time, then id), 50 events a page: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who, through what, and when. Viewing a draft is never recorded. Pass `nextCursor` as `cursor` for the next page.",
         "operationId": "listContentDraftActivity",
         "parameters": [
           {
@@ -15444,6 +15991,15 @@
             "schema": {
               "type": "string",
               "pattern": "^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 500
             }
           }
         ],
@@ -22488,7 +23044,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -22514,7 +23070,10 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -22550,6 +23109,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -22561,6 +23134,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -22606,6 +23182,83 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -22748,6 +23401,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -22894,6 +23548,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -23005,6 +23665,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -23045,7 +23706,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "metrics": {
@@ -23174,7 +23836,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -23273,6 +23936,64 @@
                     "string",
                     "null"
                   ]
+                },
+                "deletedAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deletions": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attempts": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "failureCode": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "post",
+                          "repost"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "done",
+                          "failed",
+                          "unsupported"
+                        ]
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "attempts",
+                      "failureCode",
+                      "key",
+                      "kind",
+                      "status",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -23295,7 +24016,9 @@
                 "slotAt",
                 "socialSetId",
                 "failureCode",
-                "publishedAt"
+                "publishedAt",
+                "deletedAt",
+                "deletions"
               ],
               "additionalProperties": false
             }
@@ -24120,7 +24843,10 @@
               "youtube",
               "threads",
               "mastodon",
-              "mastodon-custom"
+              "mastodon-custom",
+              "facebook",
+              "pinterest",
+              "gmb"
             ]
           },
           "instanceServer": {
@@ -24156,8 +24882,8 @@
             "const": 1
           },
           "providers": {
-            "minItems": 12,
-            "maxItems": 12,
+            "minItems": 15,
+            "maxItems": 15,
             "type": "array",
             "items": {
               "type": "object",
@@ -24176,7 +24902,10 @@
                     "bluesky",
                     "instagram",
                     "instagram-standalone",
-                    "substack"
+                    "substack",
+                    "facebook",
+                    "pinterest",
+                    "gmb"
                   ]
                 },
                 "status": {
@@ -26423,7 +27152,8 @@
                         "PUBLISHED",
                         "FAILED",
                         "CANCELLED",
-                        "UNKNOWN_DELIVERY"
+                        "UNKNOWN_DELIVERY",
+                        "SENT_TO_APP"
                       ]
                     },
                     {
@@ -26778,7 +27508,8 @@
                             "PUBLISHED",
                             "FAILED",
                             "CANCELLED",
-                            "UNKNOWN_DELIVERY"
+                            "UNKNOWN_DELIVERY",
+                            "SENT_TO_APP"
                           ]
                         },
                         {
@@ -27012,7 +27743,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "contentDraftId": {
@@ -27488,7 +28220,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -27514,7 +28246,10 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -27550,6 +28285,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -27561,6 +28310,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -27606,6 +28358,83 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -27748,6 +28577,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -27894,6 +28724,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -28005,6 +28841,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -28397,7 +29234,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -28423,7 +29260,10 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -28459,6 +29299,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -28470,6 +29324,9 @@
                               "tiktok": {
                                 "type": "object",
                                 "properties": {
+                                  "sendToApp": {
+                                    "type": "boolean"
+                                  },
                                   "privacy": {
                                     "type": "string",
                                     "enum": [
@@ -28515,6 +29372,83 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -28657,6 +29591,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -28803,6 +29738,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "sentToAppPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "scratchpad": {
                   "type": "string"
                 },
@@ -28914,6 +29855,7 @@
                 "planTimeZone",
                 "platformVersions",
                 "queuedPosts",
+                "sentToAppPosts",
                 "scratchpad",
                 "sourceDraftId",
                 "tagIds",
@@ -28958,7 +29900,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -28984,7 +29926,10 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29020,6 +29965,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -29031,6 +29990,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -29076,6 +30038,83 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -29218,6 +30257,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -29230,7 +30270,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -29440,7 +30479,10 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -29492,7 +30534,10 @@
               "bluesky",
               "mastodon",
               "tiktok",
-              "youtube"
+              "youtube",
+              "facebook",
+              "pinterest",
+              "gmb"
             ]
           },
           "releaseId": {
@@ -29894,7 +30939,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -29920,7 +30965,10 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29956,6 +31004,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -29967,6 +31029,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -30012,6 +31077,83 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -30154,6 +31296,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30300,6 +31443,12 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "sentToAppPosts": {
+            "default": 0,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "scratchpad": {
             "type": "string"
           },
@@ -30411,6 +31560,7 @@
           "planTimeZone",
           "platformVersions",
           "queuedPosts",
+          "sentToAppPosts",
           "scratchpad",
           "sourceDraftId",
           "tagIds",
@@ -30446,7 +31596,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -30472,7 +31622,10 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -30508,6 +31661,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -30519,6 +31686,9 @@
                         "tiktok": {
                           "type": "object",
                           "properties": {
+                            "sendToApp": {
+                              "type": "boolean"
+                            },
                             "privacy": {
                               "type": "string",
                               "enum": [
@@ -30564,6 +31734,83 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -30706,6 +31953,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30718,7 +31966,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -30928,7 +32175,10 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -30988,7 +32238,10 @@
                   "bluesky",
                   "mastodon",
                   "tiktok",
-                  "youtube"
+                  "youtube",
+                  "facebook",
+                  "pinterest",
+                  "gmb"
                 ]
               },
               {
@@ -31050,7 +32303,8 @@
                     "PUBLISHED",
                     "FAILED",
                     "CANCELLED",
-                    "UNKNOWN_DELIVERY"
+                    "UNKNOWN_DELIVERY",
+                    "SENT_TO_APP"
                   ]
                 },
                 "metrics": {
@@ -31179,7 +32433,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -31278,6 +32533,64 @@
                     "string",
                     "null"
                   ]
+                },
+                "deletedAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deletions": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attempts": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "failureCode": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "post",
+                          "repost"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "done",
+                          "failed",
+                          "unsupported"
+                        ]
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "attempts",
+                      "failureCode",
+                      "key",
+                      "kind",
+                      "status",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -31300,7 +32613,9 @@
                 "slotAt",
                 "socialSetId",
                 "failureCode",
-                "publishedAt"
+                "publishedAt",
+                "deletedAt",
+                "deletions"
               ],
               "additionalProperties": false
             }
@@ -31308,6 +32623,39 @@
         },
         "required": [
           "posts"
+        ],
+        "additionalProperties": false
+      },
+      "PostDeletion": {
+        "type": "object",
+        "properties": {
+          "deletion": {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "postId": {
+                "type": "string"
+              },
+              "requestedBy": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "organizationId",
+              "platform",
+              "postId",
+              "requestedBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "deletion"
         ],
         "additionalProperties": false
       },
@@ -31355,7 +32703,10 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -31364,13 +32715,45 @@
                 "options": {
                   "type": "object",
                   "properties": {
+                    "facebook": {
+                      "type": "object",
+                      "properties": {
+                        "placement": {
+                          "type": "string",
+                          "enum": [
+                            "story"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "firstComment": {
                       "type": "string",
                       "maxLength": 1250
                     },
+                    "pinterest": {
+                      "type": "object",
+                      "properties": {
+                        "boardId": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,30}$"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string",
+                          "maxLength": 2048
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "tiktok": {
                       "type": "object",
                       "properties": {
+                        "sendToApp": {
+                          "type": "boolean"
+                        },
                         "privacy": {
                           "type": "string",
                           "enum": [
@@ -31443,6 +32826,20 @@
                         },
                         "madeForKids": {
                           "type": "boolean"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "containsSyntheticMedia": {
+                          "type": "boolean"
+                        },
+                        "thumbnailAssetId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
                         }
                       },
                       "required": [
@@ -31909,7 +33306,7 @@
                     "const": 1
                   },
                   "versions": {
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -31935,7 +33332,10 @@
                             "bluesky",
                             "mastodon",
                             "tiktok",
-                            "youtube"
+                            "youtube",
+                            "facebook",
+                            "pinterest",
+                            "gmb"
                           ]
                         },
                         "forkedFromVersion": {
@@ -31971,6 +33371,20 @@
                                 },
                                 "madeForKids": {
                                   "type": "boolean"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "containsSyntheticMedia": {
+                                  "type": "boolean"
+                                },
+                                "thumbnailAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               },
                               "required": [
@@ -31982,6 +33396,9 @@
                             "tiktok": {
                               "type": "object",
                               "properties": {
+                                "sendToApp": {
+                                  "type": "boolean"
+                                },
                                 "privacy": {
                                   "type": "string",
                                   "enum": [
@@ -32027,6 +33444,83 @@
                                 "madeWithAi",
                                 "consent"
                               ],
+                              "additionalProperties": false
+                            },
+                            "instagram": {
+                              "type": "object",
+                              "properties": {
+                                "collaborators": {
+                                  "maxItems": 3,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                  }
+                                },
+                                "userTags": {
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                  }
+                                },
+                                "coverAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "shareToFeed": {
+                                  "type": "boolean"
+                                },
+                                "trialReel": {
+                                  "type": "boolean"
+                                },
+                                "trialGraduation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "MANUAL",
+                                    "SS_PERFORMANCE"
+                                  ]
+                                },
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "story"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "pinterest": {
+                              "type": "object",
+                              "properties": {
+                                "boardId": {
+                                  "type": "string",
+                                  "pattern": "^[0-9]{1,30}$"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "link": {
+                                  "type": "string",
+                                  "maxLength": 2048
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "facebook": {
+                              "type": "object",
+                              "properties": {
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "story"
+                                  ]
+                                }
+                              },
                               "additionalProperties": false
                             },
                             "autoDm": {
@@ -32169,6 +33663,7 @@
                                             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                           },
                                           "days": {
+                                            "default": 0,
                                             "type": "integer",
                                             "minimum": 0,
                                             "maximum": 30
@@ -32315,6 +33810,12 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "sentToAppPosts": {
+                "default": 0,
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
               "scratchpad": {
                 "type": "string"
               },
@@ -32426,6 +33927,7 @@
               "planTimeZone",
               "platformVersions",
               "queuedPosts",
+              "sentToAppPosts",
               "scratchpad",
               "sourceDraftId",
               "tagIds",
@@ -32487,6 +33989,18 @@
                     "type": "string"
                   },
                   "additionalProperties": {}
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "person",
+                    "api",
+                    "mcp",
+                    "workflow",
+                    "callback",
+                    "support",
+                    "automation"
+                  ]
                 }
               },
               "required": [
@@ -32497,14 +34011,22 @@
                 "at",
                 "entityId",
                 "id",
-                "metadata"
+                "metadata",
+                "source"
               ],
               "additionalProperties": false
             }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
-          "items"
+          "items",
+          "nextCursor"
         ],
         "additionalProperties": false
       },
@@ -33240,7 +34762,10 @@
                       "bluesky",
                       "instagram",
                       "tiktok",
-                      "youtube"
+                      "youtube",
+                      "facebook",
+                      "pinterest",
+                      "gmb"
                     ]
                   },
                   "postId": {

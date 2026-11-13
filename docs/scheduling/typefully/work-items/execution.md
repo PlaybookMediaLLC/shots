@@ -1,6 +1,6 @@
 # Typefully implementation and verification record
 
-Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 32 Exists, 71 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. No live social-provider certification is claimed.
+Branch `codex/typefully-backlog-completion`, targeting `develop`. Original baseline `19390194` (2.36.4), reconciled with `develop` at `65e3f42f`. [Coverage](coverage.md) accounts for all 109 entries and 47 work items. Current classifications are 43 Exists, 60 Partial, one Later and five Skip. Partial includes provider outcomes and activation decisions that local fixtures cannot verify. Live provider evidence is limited to the posts in [Live provider evidence](#live-provider-evidence).
 
 ## Develop integration
 
@@ -109,6 +109,67 @@ All browser commands use `/tmp/typefully-lifecycle.sh e2e <files> [--grep ...]` 
 
 The continuous test worker is compiled only with `-tags=e2e`, requires an explicitly opted-in loopback test database and isolated Temporal queues, and replaces only the last provider peer. Production account checks, commands, signing, activities, receipts, fanout and observation storage remain real. It cannot certify a native provider permission or app-review outcome. To reproduce that boundary, run `node test/e2e/fixtures/fake-social.mjs` with `SOCIAL_E2E_PORT`, the notification fixture from `test/e2e/fixtures/`, and `go test -tags=e2e ./internal/social/tenantpublishing -run '^TestTypefullyBrowserWorker$' -timeout=60m` with `TYPEFULLY_E2E_WORKER=1`, a loopback test `DATABASE_URL`, matching isolated Temporal queues, `SOCIAL_E2E_URL` and the existing storage/notification environment. The web/API/collaboration services and Playwright must target that same disposable database. Stop this fixture worker before restoring the normal app runtime.
 
+## Live provider evidence
+
+Coverage key **L1**. Each post was scheduled through Write from a local stack (not production), confirmed by its native receipt and public post, then deleted. Full records, workflow IDs and screenshots are in [social publishing verification](../../../social-publishing-verification.md).
+
+| Date (UTC) | Account | Content | Receipt | Deletion |
+|---|---|---|---|---|
+| 2026-11-03 20:36 | LinkedIn member `yoanyomba` | Image | `urn:li:share:7523483230369632256` | Removal verified by 20:38:06 |
+| 2026-11-03 20:38 | LinkedIn member `yoanyomba` | 8-second video, playback checked | `urn:li:ugcPost:7523483737280581632` | Removal verified by 20:45:43 |
+| 2026-11-03 21:59 | X `@yoanyombax` | Image | `2117738344759050285` | Removal verified by 22:00:02 |
+| 2026-11-03 22:01 | X `@yoanyombax` | 8-second video, playback checked | `2117738932251041793` | Removal verified by 22:02:11 |
+
+The same run also published to Instagram `@get.eigenn`, TikTok `@the_dark_lightskin` and YouTube `@getconduitt`; no Typefully row depends on those networks alone.
+
+Coverage key **L2**. Each check ran through Write from a local stack (not production) on 2026-11-13. The X posts used X API credit. Each post was confirmed by its receipt, one successful attempt and the public post, and its native ID matched the receipt. Each post was then deleted with the network's own Delete control in the signed-in browser. The worker read signed media through a public quick tunnel (`R2_DELIVERY_ENDPOINT`), as in L1.
+
+| Date (UTC) | Account | Content | Receipt | Deletion |
+|---|---|---|---|---|
+| 2026-11-13 01:45 | X `@yoanyombax` | Poll, 2 choices, 5 minutes, rendered natively (TF-036). Before deletion, Analyze showed its stored metrics observation (TF-003) | `2121056706041925765` | Removal verified by 01:47:33 |
+| 2026-11-13 01:49 | X `@yoanyombax` | Replies limited to accounts you follow; X showed the restriction (TF-107) | `2121057905294090370` | Removal verified by 01:51:04 |
+| 2026-11-13 01:52 | X `@yoanyombax` | Made with AI and Paid partnership labels (TF-097) | `2121058611589722292` | Removal verified by 01:53:32 |
+| 2026-11-13 01:58 | X `@yoanyombax` | Two images, Publish now. The worker could not read the media source before any X call | `UNKNOWN_DELIVERY`, no native ID | Nothing delivered. After a profile check at 03:22, reconciled as not live at 03:23:17; the attempt keeps its `UNKNOWN_DELIVERY` result |
+| 2026-11-13 02:50 | X `@yoanyombax` | Publish now on a draft scheduled for 16:15 (TF-069). A 7.9 MB PNG went as a recorded 4.08 MB resized derivative (TF-068), then a 13 KB PNG, in draft order (TF-092), with ALT text on both (TF-007) | `2121073120832311594` | Removal verified by 02:51:40 |
+| 2026-11-13 02:53 | X `@yoanyombax` | Auto-repost after 1 hour and auto-plug at 1 like (TF-011, TF-027, TF-064) | `2121073956824183158` | Repost undone, plug reply and post deleted; removal verified by 03:56:01 |
+| 2026-11-13 02:56 | LinkedIn member `yoanyomba` | Post with a first comment (TF-071). The post published; the comment receipt is `failed`, `provider_error` | `urn:li:share:7526840307548594176` | Removal verified by 03:01:06, after the repost |
+| 2026-11-13 02:59 | LinkedIn member `yoanyomba` | Repost of the 02:56 post with commentary; the original showed embedded (TF-098) | `urn:li:share:7526841103610929152` | Removal verified by 03:01:06 |
+| 2026-11-13 03:05 | LinkedIn member `yoanyomba` | Poll, 2 options, 1 day, rendered natively (TF-109) | `urn:li:ugcPost:7526842603464720385` | Removal verified by 03:06:23 |
+| 2026-11-13 03:08 | LinkedIn member `yoanyomba` | 2-page PDF titled "Shots live test PDF"; both pages showed (TF-083) | `urn:li:ugcPost:7526843401661661184` | Removal verified by 03:09:38 |
+| 2026-11-13 04:11 | X `@yoanyombax` | Retest of the #544 fix on a stack built from its branch: Publish now with Auto-RT "Days later at", 0 days, 04:18 UTC (TF-064). The draft stored `days: 0`, reopened, and the Publish review loaded | `2121093675342008401` | Repost undone, post deleted; removal verified by 04:20 |
+
+For the 02:53 post, the plug reply (`2121081510233010373`) went out at 03:23:34 after the owner liked the post. The repost went out at 03:53:48. Both receipts are `done`. The repost was undone in X before the reply and the post were deleted.
+
+For the 04:11 post, the repost receipt was `done` at 04:18:00, and X showed one repost.
+
+Checks without a post:
+
+- The X composer suggested "Lysol (@getsol)" for `@getsol` (TF-001). The lookup matches an exact handle.
+- The LinkedIn lookup of the Page `getsolomonai` (106498803) returned HTTP 500 (TF-077), so no mention post was sent.
+- The cross-post (TF-035) did not run. X and LinkedIn are in different profiles, and moving a connection disables it.
+
+Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots had no control to delete a published post; draft PR #557 adds one.
+
+#### Delete through Shots (#557)
+
+On 2026-11-13 the stack ran the #557 branch with its migration. Each post was deleted with "Delete from <network>" in Write, not in the network's app.
+
+| Date (UTC) | Account | Content | Receipt | Deletion through Shots |
+|---|---|---|---|---|
+| 2026-11-13 16:03 | X `@yoanyombax` | Thread of 2 posts | `2121272764971520079`, reply `2121272766519251072` | The first request failed both parts with `ACCOUNT_RECONNECT`: the plan named the connection row, not the social account (fixed in #557, `910a3670`). A second request after the fix deleted both parts at 16:08:00 (`done`, 2 attempts). The profile was back to 33 posts with no test text |
+| 2026-11-13 16:09 | LinkedIn member `yoanyomba` | One post | `urn:li:share:7527040024203137024` | Deleted at 16:10:30 (`done`, 1 attempt). The post page, public before the delete, then sent to the sign-up page |
+
+The failed first request also proved two review fixes: a refusal from Shots itself is not counted as deleted, and a failed part can be requested again. Both cards then showed "Deleted from <network>" with a receipt for each part.
+
+### Open defects found by L2
+
+- A same-day Auto-RT rule ("Days later at", 0 days) is stored without `days` (fixed in #544; the fix passed a live retest at 04:11). `RetweetRule.Days` has `omitempty` (`server/internal/postoptions/postoptions.go`), and the web's strict `retweetRuleSchema` requires `days`. The draft then returns 400 on read and 409 on save, and Publish returns 500 for that profile. The draft was repaired by removing the rule. The shortest working delay is "After 1 hour".
+- A failed read of the X media source, before any X call, is recorded as `UNKNOWN_DELIVERY` and not as a retryable failure (`stageMedia` in `x/media_source.go`; fixed in #544).
+- The LinkedIn adapter keeps no status or body for a 4xx refusal (`linkedin/mutation.go`). The failed first comment therefore records only `provider_error`.
+- A refused mention lookup reaches the client as HTTP 500. `Publisher.Mentions` returns a `socialapi` 502 with a reason, but `writeStoreError` (`internal/httpapi/server.go`) has no case for it.
+- Analyze labels a post by its draft title ("Untitled draft"), not by its text.
+- The Auto-RT dialog preview for a same-day rule can show the repost before the post. For a post at 09:00 and a rule at 04:18, it says "reposts Nov 14, 2026, 4:18 AM".
+
 ## Defects found and resolved during verification
 
 - Repurposing returned an empty editor. It now copies confirmed immutable publication text/media and posted replies, retains native PDF options, validates source visibility and excludes private later edits, approval and unfinished replies.
@@ -130,14 +191,14 @@ Initial test failures are retained in local logs. Regression checks also repaire
 
 | Boundary | Exact unresolved dependency |
 |---|---|
-| X | Registered app credentials, current access tier/read-write grant and account capability proof; Premium/Articles/video/reply restrictions cannot be inferred from a display badge. Mixed-image/video capability and provider transcoding remain unpromised. |
-| LinkedIn | Authorized member/page scopes and required app products/review for Posts, document upload, mentions, reposts, polls and analytics; no controlled live account was available. |
-| Threads / Instagram | Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
-| Mastodon | A real instance's advertised poll limits, API version/native-quote support and source quote permission; pending federation approval is not a failed root publication. |
-| Bluesky | Authorized account and native record/CID resolution against a live PDS; protocol fixtures do not prove live remote behavior. |
-| Slack / email | Real workspace grant, destination access and delivery. The task verified controlled OAuth/HTTP peers with actual fanout/Temporal. |
-| AI / GIPHY | Production credentials and permitted models/search access; transcription accuracy and generated writing quality remain unverified. |
+| X | App 33604797 credentials and the read-write grant on `@yoanyombax` are live-verified for images and standard video (L1). They are also live-verified for polls, the following-only reply restriction, disclosures, Publish now, resized multi-image posts with ALT text, a timed repost, a plug reply, analytics reads and mention lookup (L2). Still unresolved: long posts and Articles need X Premium. Video length follows the verified `subscription_type` (20 minutes standard, 125 Premium; X docs read 2026-11-13) and needs a live long-video post, and 1080p playback is X's choice. Native and finisher quotes need X Enterprise API access (`PLATFORM_X_ENTERPRISE_QUOTES_ENABLED`). The X API does not allow photos and video in one post. Communities need a Community that the account belongs to. Photo tags and multiple accounts need a second X account. A same-day Auto-RT rule failed in L2; the #544 fix passed a live retest. Repost removal and like-gated reposts have not run live. |
+| LinkedIn | Member publishing with `w_member_social` is live-verified on `yoanyomba` for images and video (L1), and for polls, PDF documents and reposts (L2). Still unresolved: LinkedIn refused the first comment, and Shots kept no reason. The company lookup returns HTTP 500. Page publishing, people mentions (a Page connection and People Typeahead) and Page analytics wait for LinkedIn's Community Management review of app 266682906. |
+| Threads / Instagram | Threads needs `THREADS_APP_ID`/`THREADS_APP_SECRET` and a tester account. Instagram needs Meta app review and correct publish/insight grants. Threads poll duration remains native; unsupported metrics show unavailable. |
+| Mastodon | An account and `PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED`. The instance's advertised poll limits, API version/native-quote support and source quote permission apply; pending federation approval is not a failed root publication. The server makes link cards and its API cannot turn them off. |
+| Bluesky | An app password and `PLATFORM_SOCIAL_BLUESKY_ENABLED`; then native record/CID resolution against a live PDS. Bluesky has no polls. |
+| Slack / email | Slack needs `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET` and a workspace. Email needs `RESEND_API_KEY` or SMTP. The task verified controlled OAuth/HTTP peers with actual fanout/Temporal. |
+| AI / GIPHY | AI needs `OPENROUTER_API_KEY` and the production model IDs; transcription accuracy and generated writing quality remain unverified. GIPHY needs a production key. |
 | Native/external clients | Raycast macOS execution, Apple Shortcut import/signing, hosted Zapier workflows and ChatGPT/Claude directory approval require their external environments. |
-| Deferred products | Public analytics sharing is now implemented by develop with explicit enable and revoke. Auto-DM has a default-off ledger/adapter and still needs an accepted consent/abuse model and provider scope. Substack Notes alone remains Later because no supported official publishing contract is established. Five Typefully-specific products/releases remain Skip with reasons in coverage. |
+| Deferred products | Public analytics sharing is now implemented by develop with explicit enable and revoke. Auto-DM has a default-off ledger/adapter and still needs an accepted consent/abuse model and provider scope. Substack Notes alone remains Later: on 2026-11-13 Substack offered no public Notes publishing API, only access it grants to selected tools. Five Typefully-specific products/releases remain Skip with reasons in coverage. |
 
-Do not activate restricted provider features from fixture success. Supported local authoring, organization, media, scheduling controls, preferences, contracts and reports passed the recorded checks and can be reviewed behind current product gates. Publishing still requires a healthy authorized connection, applicable entitlement and approval. The build warnings above and the provider/native-client boundaries remain release considerations. API-key draft publishing and autonomous approval remain deliberately unavailable. No production deployment, live public post or vendor message has been performed. The user authorized a work PR and merge into develop; this does not authorize a production promotion.
+Do not activate restricted provider features from fixture success. Supported local authoring, organization, media, scheduling controls, preferences, contracts and reports passed the recorded checks and can be reviewed behind current product gates. Publishing still requires a healthy authorized connection, applicable entitlement and approval. The build warnings above and the provider/native-client boundaries remain release considerations. API-key draft publishing and autonomous approval remain deliberately unavailable. No production deployment or vendor message has been performed; the only live posts in this record are those under [Live provider evidence](#live-provider-evidence), each deleted after verification. The user authorized a work PR and merge into develop; this does not authorize a production promotion.

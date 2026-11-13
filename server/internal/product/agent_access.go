@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/agentauthorization"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
@@ -27,7 +28,7 @@ import (
 // credential (RFC 026): this file is the consent and the code exchange.
 
 // APIKeyScopes mirrors apiKeyScopes in lib/auth/api-key-scopes.ts.
-var APIKeyScopes = []string{"artifact:read", "asset:write", "draft:comment", "draft:write", "onboarding:run", "post:publish", "post:schedule", "queue:write", "release:create", "source:write", "upload:sign"}
+var APIKeyScopes = []string{"artifact:read", "asset:write", "draft:comment", "draft:write", "onboarding:run", "post:delete", "post:publish", "post:schedule", "queue:write", "release:create", "source:write", "upload:sign"}
 
 // ErrInvalidGrant is an authorization code that is unknown, expired, used,
 // or presented by another client, redirect URI, or PKCE verifier.
@@ -241,6 +242,16 @@ func (c *Configuration) ExchangeAgentCode(ctx context.Context, clientID, code, c
 	if subtle.ConstantTimeCompare([]byte(grant.ClientID), []byte(clientID)) != 1 ||
 		!time.Now().UTC().Before(grant.ExpiresAt) || (redirectURI != "" && redirectURI != grant.RedirectURI) ||
 		!verifierMatches(grant.CodeChallenge, codeVerifier) {
+		return nil, ErrInvalidGrant
+	}
+	// The consenting member may have left since: their consent leaves with them.
+	// The row lock orders this exchange with a removal, which revokes the key it mints.
+	current := false
+	if err := tx.PlatformQuery(ctx, `SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2 FOR SHARE`, []any{grant.OrganizationID, grant.UserID},
+		func(row entsql.ColumnScanner) error { current = true; var id string; return row.Scan(&id) }); err != nil {
+		return nil, err
+	}
+	if !current {
 		return nil, ErrInvalidGrant
 	}
 	var expiresAt *time.Time

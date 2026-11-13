@@ -14,8 +14,9 @@ import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import {
   CONNECT_PROVIDERS,
-  HEALTH_GUIDANCE,
   connectHref,
+  HEALTH_GUIDANCE,
+  providerFor,
   useSocialSets,
 } from '@/components/settings/social-sets/api'
 import { useSocialSetScope } from '@/components/settings/social-sets/scope'
@@ -67,6 +68,9 @@ const ORDER = [
   'threads',
   'youtube',
   'mastodon',
+  'facebook',
+  'pinterest',
+  'gmb',
 ]
 
 /** One row per platform the connect routes support, from the same registry the brand pages use. */
@@ -75,7 +79,7 @@ const ROWS = [...CONNECT_PROVIDERS].sort(
 )
 
 /** Networks with no connection in the catalog yet. Bluesky joins them while its rollout flag is off. */
-const NOT_YET = ['Facebook', 'Pinterest']
+const NOT_YET: string[] = []
 
 /** Platform names that are another row's platform. */
 const ALIASES: Record<string, string> = {
@@ -97,6 +101,9 @@ const CONNECTED: Record<string, string> = {
   tiktok: 'TikTok is connected. Approved TikTok posts can be scheduled to it.',
   x: 'X is connected. Approved X posts can be scheduled to it.',
   youtube: 'YouTube is connected. Approved YouTube posts can be scheduled to it.',
+  facebook: 'Facebook Page is connected. Approved Facebook posts can be scheduled to it.',
+  pinterest: 'Pinterest is connected. Approved pins can be scheduled to it.',
+  gmb: 'Google Business is connected. Approved posts can be scheduled to its location.',
 }
 
 /** The help tip ID that remembers the banner was dismissed. */
@@ -145,6 +152,8 @@ function profileUrl(platform: string, handle: string | null | undefined): string
     tiktok: `https://www.tiktok.com/@${name}`,
     x: `https://x.com/${name}`,
     youtube: `https://www.youtube.com/@${name}`,
+    facebook: `https://www.facebook.com/${name}`,
+    pinterest: `https://www.pinterest.com/${name}/`,
   }
   return pages[row] ?? null
 }
@@ -278,7 +287,8 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
   }
 
   const reconnectHref = (connection: ChannelConnection) => {
-    const provider = ROWS.find((row) => row.platform === rowOf(connection.platform))?.provider
+    // Reconnect through the account's own adapter: the backend refuses any other.
+    const provider = providerFor(connection.platform)
     // The start route refuses a provider the catalog says is not ready.
     if (!provider || comingSoon(provider)) return null
     return connection.socialSetId
@@ -581,7 +591,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                       </a>
                     </Button>
                   ) : hasAccount ? null : (
-                    <span className="text-sm text-muted-foreground sm:text-center">Coming soon</span>
+                    <span className="text-sm text-muted-foreground sm:text-center">
+                      Coming soon
+                    </span>
                   )}
                 </div>
               )
@@ -597,9 +609,11 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                 <div className="flex min-w-0 flex-wrap items-center gap-2">{others.map(chip)}</div>
               </div>
             ) : null}
-            <p className="px-4 py-3 text-sm text-muted-foreground">
-              Coming soon: {notYet.join(', ')}.
-            </p>
+            {notYet.length ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                Coming soon: {notYet.join(', ')}.
+              </p>
+            ) : null}
           </>
         )}
       </Group>

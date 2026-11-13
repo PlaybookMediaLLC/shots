@@ -134,6 +134,12 @@ func (m *memoryObjects) Exists(_ context.Context, key string) (bool, error) {
 	_, ok := m.data[key]
 	return ok, nil
 }
+func (m *memoryObjects) Copy(_ context.Context, from, to string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.data[to] = m.data[from]
+	return nil
+}
 func (m *memoryObjects) Put(_ context.Context, key, _ string, body io.Reader) error {
 	data, err := io.ReadAll(body)
 	if err != nil {

@@ -251,6 +251,18 @@ func missingObject(err error) bool {
 	return errors.As(err, &apiError) && (apiError.ErrorCode() == "NotFound" || apiError.ErrorCode() == "NoSuchKey")
 }
 
+// Copy copies an object inside the bucket on the storage side, without
+// reading it through this process.
+func (s *S3Store) Copy(ctx context.Context, from, to string) error {
+	_, err := s.client.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(to), CopySource: aws.String(s.bucket + "/" + url.PathEscape(from)),
+	})
+	if err != nil {
+		return fmt.Errorf("copy media object: %w", err)
+	}
+	return nil
+}
+
 func (s *S3Store) Delete(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
 	return err

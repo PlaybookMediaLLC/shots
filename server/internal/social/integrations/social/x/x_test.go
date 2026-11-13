@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -494,6 +495,25 @@ func TestFollowUps(t *testing.T) {
 	}
 	if done, err := provider.AutoRepostPost(ctx, account, "42", map[string]string{"likesAmount": "200"}); err != nil || !done {
 		t.Fatalf("like-gated repost past 100 likes = %v, %v", done, err)
+	}
+}
+
+// A delete removes a post by DELETE; a post that is already gone reports 404.
+func TestDeletePost(t *testing.T) {
+	calls, done := fakePublishingX(t, func(r recorded) (int, string) {
+		if r.method == "DELETE" && r.path == "/2/tweets/42" {
+			return 200, `{"data":{"deleted":true}}`
+		}
+		return 404, `{"title":"Not Found Error"}`
+	})
+	defer done()
+	provider, account := New(), publishingAccount()
+	if err := provider.DeletePost(context.Background(), account, "42"); err != nil || len(*calls) != 1 {
+		t.Fatalf("delete = %v, calls %d", err, len(*calls))
+	}
+	var status interface{ HTTPStatus() int }
+	if err := provider.DeletePost(context.Background(), account, "43"); !errors.As(err, &status) || status.HTTPStatus() != 404 {
+		t.Fatalf("missing post = %v", err)
 	}
 }
 

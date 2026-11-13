@@ -308,9 +308,25 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	revokedOwner, revokedAccounts := workspace("main:linkedin")
 	revoked := schedule(revokedOwner, "revoked post", revokedAccounts["main"])
 	exec(`UPDATE channel_connection SET status='REVOKED' WHERE id=$1`, revokedAccounts["main"])
+	// Separate workspaces whose publisher is removed, or demoted, after queueing a post.
+	departed := func(caption, change string) *product.ScheduleContentDraftResult {
+		t.Helper()
+		user := "publisher_" + cuid.New()
+		// Registered first, so it runs after the workspace's own cleanup.
+		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM "user" WHERE id=$1`, user) })
+		boss, accounts := workspace("main:linkedin")
+		exec(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Publisher',$2,true,now(),now())`, user, user+"@example.test")
+		exec(`INSERT INTO session (id,"expiresAt",token,"createdAt","updatedAt","userId","activeOrganizationId") VALUES ($1,now()+interval '1 hour',$1,now(),now(),$2,$3)`, "session_"+user, user, boss.OrganizationID)
+		exec(`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'writer_publisher',now())`, "member_"+user, boss.OrganizationID, user)
+		result := schedule(product.Actor{OrganizationID: boss.OrganizationID, UserID: user, SessionID: "session_" + user, RequestID: "request_" + user}, caption, accounts["main"])
+		exec(change, user)
+		return result
+	}
+	removed := departed("removed publisher post", `DELETE FROM member WHERE "userId"=$1`)
+	demoted := departed("demoted publisher post", `UPDATE member SET role='viewer' WHERE "userId"=$1`)
 
 	// The API wakes each post's workflow; the late and restart posts' wakeups are "lost".
-	for _, result := range []*product.ScheduleContentDraftResult{ok, refused, lost, busy, split, cancelled, slow, receipt, media, approval, revoked} {
+	for _, result := range []*product.ScheduleContentDraftResult{ok, refused, lost, busy, split, cancelled, slow, receipt, media, approval, revoked, removed, demoted} {
 		for _, row := range result.Scheduled {
 			start(row)
 		}
@@ -464,6 +480,14 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	t.Run("an account revoked after scheduling stops its post before sending", func(t *testing.T) {
 		if row := settle(revoked.Posts[0].ID, scheduledpost.StatusCANCELLED); code(row) != publishing.FailureAccountUnavailable || provider.count("revoked post") != 0 {
 			t.Fatalf("revoked=%+v calls=%d", row, provider.count("revoked post"))
+		}
+	})
+
+	t.Run("a post whose scheduler was removed or demoted stops before sending", func(t *testing.T) {
+		for caption, result := range map[string]*product.ScheduleContentDraftResult{"removed publisher post": removed, "demoted publisher post": demoted} {
+			if row := settle(result.Posts[0].ID, scheduledpost.StatusCANCELLED); code(row) != publishing.FailureSchedulerUnauthorized || provider.count(caption) != 0 {
+				t.Fatalf("%s=%+v calls=%d", caption, row, provider.count(caption))
+			}
 		}
 	})
 

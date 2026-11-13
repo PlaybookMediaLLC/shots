@@ -13,6 +13,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 )
 
@@ -136,6 +137,38 @@ func TestSubmitContentBatchSaysARetryIsSafeWhenTheWorkflowDoesNotStart(t *testin
 	}
 }
 
+type postDeletionFake struct {
+	fakeConfiguration
+	err error
+}
+
+func (f *postDeletionFake) DeleteContentDraftPost(_ context.Context, actor product.Actor, id string) (*product.DeletionRequest, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &product.DeletionRequest{OrganizationID: actor.OrganizationID, PostID: id, Platform: "x"}, nil
+}
+
+// A started delete answers 202 with its request; one whose workflow did not
+// start says a retry is safe; a refused one keeps its status.
+func TestDeleteContentDraftPostAnswers(t *testing.T) {
+	for _, tc := range []struct {
+		err    error
+		status int
+		body   string
+	}{
+		{nil, http.StatusAccepted, `"postId":"c123456789012345678901234"`},
+		{product.ErrPostDeletionNotStarted, http.StatusServiceUnavailable, "deleted only once"},
+		{publishing.ErrConflict, http.StatusConflict, ""},
+	} {
+		handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", &postDeletionFake{err: tc.err})
+		response := configurationRequest(handler, http.MethodPost, "/v1/content-draft-posts/c123456789012345678901234/delete", "")
+		if response.Code != tc.status || !strings.Contains(response.Body.String(), tc.body) {
+			t.Fatalf("%v: status=%d body=%s", tc.err, response.Code, response.Body.String())
+		}
+	}
+}
+
 type takenSlotFake struct{ fakeConfiguration }
 
 func (*takenSlotFake) ScheduleContentDraft(context.Context, product.Actor, string, product.ScheduleContentDraftInput) (*product.ScheduleContentDraftResult, error) {
@@ -187,5 +220,29 @@ func TestScheduleContentDraftNamesTheDuplicatesItFound(t *testing.T) {
 	}
 	if response.Code != http.StatusConflict || body.Code != "duplicate_content" || len(body.Duplicates) != 1 || body.Duplicates[0].PostID != "p1" || !fake.input.ConfirmDuplicate {
 		t.Fatalf("status=%d body=%+v confirm=%v", response.Code, body, fake.input.ConfirmDuplicate)
+	}
+}
+
+// A share link's guest endpoints answer only the web app's service credential:
+// no session, API key or guessed token reads a shared draft or comments on it.
+func TestGuestShareEndpointsAdmitOnlyTheWebService(t *testing.T) {
+	// The embedded store is nil, so a request that got past authentication would panic.
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", &fakeConfiguration{})
+	share := "/v1/internal/content-draft-shares/abcdefghijklmnopqrstuvwxyz012345"
+	for _, call := range []struct{ method, path string }{
+		{http.MethodGet, share}, {http.MethodGet, share + "/image"}, {http.MethodPost, share + "/comments"},
+	} {
+		for _, credential := range []string{"", "Bearer guessed", "Bearer shk_agentkey"} {
+			request := httptest.NewRequest(call.method, call.path, strings.NewReader(`{"name":"Ana","body":"Hi"}`))
+			if credential != "" {
+				request.Header.Set("Authorization", credential)
+			}
+			request.Header.Set("X-Organization-ID", "org-1")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("%s %s with %q: status=%d", call.method, call.path, credential, response.Code)
+			}
+		}
 	}
 }

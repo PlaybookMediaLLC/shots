@@ -527,6 +527,7 @@ func (p *Provider) PostPending(ctx context.Context, _ string, accessToken string
 		Status  struct {
 			PrivacyStatus           *string `json:"privacyStatus,omitempty"`
 			SelfDeclaredMadeForKids bool    `json:"selfDeclaredMadeForKids"`
+			ContainsSyntheticMedia  bool    `json:"containsSyntheticMedia"`
 		} `json:"status"`
 	}{Snippet: snippet{Title: settings.Title, Description: firstPost.Message}}
 	for _, tag := range settings.Tags {
@@ -538,6 +539,7 @@ func (p *Provider) PostPending(ctx context.Context, _ string, accessToken string
 	}
 	body.Status.PrivacyStatus = settings.Type
 	body.Status.SelfDeclaredMadeForKids = settings.SelfDeclaredMadeForKids != nil && *settings.SelfDeclaredMadeForKids == "yes"
+	body.Status.ContainsSyntheticMedia = settings.ContainsSyntheticMedia
 	payload, _ := json.Marshal(body)
 
 	// Start a resumable upload session: nothing exists on the channel until
@@ -665,9 +667,7 @@ func (p *Provider) FinalizePost(ctx context.Context, accessToken string, raw jso
 	}
 
 	if data.Thumbnail != "" {
-		if _, err := integrations.RunInConcurrent(p.Base, func() (any, error) {
-			return nil, setThumbnail(ctx, accessToken, id, data.Thumbnail)
-		}); err != nil {
+		if err := p.SetThumbnail(ctx, accessToken, id, data.Thumbnail); err != nil {
 			return nil, err
 		}
 	}
@@ -737,6 +737,15 @@ func uploadChunk(ctx context.Context, accessToken string, data pendingData, star
 		message = handled.Value
 	}
 	return 0, "", temporalx.BadBody(identifier, string(text), "{}", message)
+}
+
+// SetThumbnail sets a live video's custom thumbnail, as a follow-up apart
+// from the upload: its failure never fails the video.
+func (p *Provider) SetThumbnail(ctx context.Context, accessToken, videoID, thumbnail string) error {
+	_, err := integrations.RunInConcurrent(p.Base, func() (any, error) {
+		return nil, setThumbnail(ctx, accessToken, videoID, thumbnail)
+	})
+	return err
 }
 
 // setThumbnail is youtube.thumbnails.set with the thumbnail streamed from the

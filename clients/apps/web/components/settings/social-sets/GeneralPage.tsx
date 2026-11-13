@@ -33,6 +33,7 @@ import { SET_COLORS } from './colors'
 import { ConnectionLauncher } from '@/components/social-connections/ConnectionLauncher'
 import { socialConnectionProviderSchema } from 'screenshot-studio-backend-sdk'
 import type { SetPermissions } from './SocialSetSettings'
+import { MoveToWorkspace } from './MoveToWorkspace'
 
 function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
   const save = useSaveSocialSet(set.id)
@@ -287,6 +288,7 @@ function DangerZone({ permissions, set }: { permissions: SetPermissions; set: So
   const list = SETTINGS_SECTIONS.find((section) => section.id === 'social-sets')!
   return (
     <Group className="ring-red-500/30">
+      <MoveToWorkspace allowed={allowed} set={set} />
       <Row
         description="Its accounts are disabled so nothing more publishes through them, its drafts are archived, and its published posts keep their history. A set with queued or publishing posts cannot be deleted; cancel them first."
         label="Delete profile"

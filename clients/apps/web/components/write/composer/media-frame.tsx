@@ -18,11 +18,10 @@ import {
 import { designDocumentSchema, DESIGN_DOCUMENT_VERSION } from '@/lib/design/document'
 import { brandKitDefinitionSchema } from '@/lib/tenant/schemas'
 import { renderDocument } from '@/lib/render/scene-renderer'
-import { call } from '@/lib/content-drafts/client'
 import { assetContentUrl } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
-import { saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { attachmentEntry } from '@/lib/write/media-operations'
+import { applyDerivedImage } from './derived-image'
 
 type Frame = { color: string; padding: number; radius: number }
 
@@ -122,35 +121,22 @@ export function MediaFrame({
     if (!result || result.settings !== JSON.stringify(settings)) return
     setBusy(true)
     try {
-      const saved = await saveExportToWorkspace({
+      await applyDerivedImage({
+        alt: String(original?.alt ?? ''),
         blob: result.blob,
+        client,
+        editor,
+        expectedAssetId: original?.assetId,
         fileName: 'framed-image.png',
-        classification: 'derived',
-        parentAssetId: sourceId,
-        trpcClient: client,
-      })
-      await call(`/api/v1/assets/${encodeURIComponent(saved.assetId)}/alt-text`, {
-        method: 'PUT',
-        body: { altText: String(original?.alt ?? '') },
-      })
-      const entry = attachmentEntry(editor, id)
-      if (!entry || entry[0].assetId !== original?.assetId)
-        throw new Error(
-          'This image changed while the frame editor was open. Reopen it to apply a frame.'
-        )
-      editor.tf.setNodes(
-        {
-          assetId: saved.assetId,
-          url: assetContentUrl(saved.assetId),
-          sourceAssetId: sourceId,
-          frameSettings: settings,
-          mimeType: 'image/png',
-          width: result.width,
+        id,
+        image: {
           height: result.height,
-          processingStatus: 'ready',
+          mimeType: 'image/png',
+          sourceAssetId: sourceId,
+          width: result.width,
         },
-        { at: entry[1] }
-      )
+        settings: { frameSettings: settings },
+      })
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The framed image did not save.')
