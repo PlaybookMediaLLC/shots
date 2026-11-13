@@ -58,9 +58,13 @@ test(
     await page.getByRole('button', { name: 'Auto-DM settings', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Delivery is off')
-    await dialog
-      .getByRole('textbox', { name: 'Direct message', exact: true })
-      .fill('Hello {{first_name}}, here is the guide.')
+    // The box takes what the rules allow, counted in characters: 6,000 emoji are
+    // 12,000 UTF-16 units, past what a browser maxlength of 10,000 would let in.
+    const message = dialog.getByRole('textbox', { name: 'Direct message', exact: true })
+    await message.focus()
+    await page.keyboard.insertText('\u{1F600}'.repeat(6_000))
+    await expect(message).toHaveValue('\u{1F600}'.repeat(6_000))
+    await message.fill('Hello {{first_name}}, here is the guide.')
     await dialog.getByRole('button', { name: 'Save prepared settings' }).click()
     await expectSaved(page)
     await app.reload()
