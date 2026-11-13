@@ -24,13 +24,19 @@ import { useSocialSetScope } from './scope'
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
+/** A size in megabytes, at least 0.1 MB. */
+const megabytes = (bytes: number) => `${Math.max(0.1, bytes / 1_000_000).toFixed(1)} MB`
+
 /** What moving the set does, from its preview. */
 function Consequences({ preview }: { preview: SocialSetTransferPreview }) {
   return (
     <ul className="grid list-disc gap-1 pl-5" data-testid="move-consequences">
       <li>
         {plural(preview.drafts, 'draft')} move with their comments, backups and tags
-        {preview.mediaFiles > 0 ? `, and ${plural(preview.mediaFiles, 'file')} are copied` : ''}.
+        {preview.mediaFiles > 0
+          ? `, and ${plural(preview.mediaFiles, 'file')} (${megabytes(preview.mediaBytes)}) are copied`
+          : ''}
+        .
       </li>
       {preview.queuedPosts > 0 ? (
         <li>

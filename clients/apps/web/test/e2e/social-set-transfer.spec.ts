@@ -9,7 +9,7 @@ import {
   test,
 } from './framework'
 
-test.use({ workspaceOptions: { plan: 'business' } })
+test.use({ workspaceOptions: { plan: 'pro' } })
 
 const idSchema = z.object({ id: z.string() })
 const setsSchema = z.object({ items: z.array(z.object({ id: z.string(), name: z.string() })) })

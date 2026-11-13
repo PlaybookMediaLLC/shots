@@ -54,7 +54,8 @@ func (f *transferFixture) value(t *testing.T, query string, args ...any) string 
 func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	f := newTransferFixture(t)
 	ctx, owner, repo := f.ctx, f.owner, f.repo
-	if _, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Stays"}); err != nil {
+	shared, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Stays"})
+	if err != nil {
 		t.Fatal(err)
 	}
 	set, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Brand"})
@@ -69,6 +70,11 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	f.objects.stored[key] = []byte("png")
 	f.exec(t, `INSERT INTO asset(id,"organizationId","objectKey","mediaType",bytes,status,width,height,"createdAt","updatedAt") VALUES($1,$2,$3,'image/png',3,'UPLOADED',1,1,now(),now())`,
 		file, f.org, key)
+	cover := cuid.New()
+	coverKey := "org/" + f.org + "/input/" + cover + "/1/cover.png"
+	f.objects.stored[coverKey] = []byte("cov")
+	f.exec(t, `INSERT INTO asset(id,"organizationId","objectKey","mediaType",bytes,status,width,height,"createdAt","updatedAt") VALUES($1,$2,$3,'image/png',3,'UPLOADED',1,1,now(),now())`,
+		cover, f.org, coverKey)
 	tag, err := repo.CreateContentDraftTag(ctx, owner, set.ID, ContentDraftTagInput{Name: ptr("Launch")})
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +87,9 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	if _, err := repo.UpdateContentDraft(ctx, owner, queued.ID, ContentDraftUpdate{BaseVersion: 1, Title: &title}); err != nil {
 		t.Fatal(err)
 	}
-	f.exec(t, `UPDATE content_draft SET "assetIds"=$2::jsonb, body=$3::jsonb, "tagIds"=$4::jsonb, discussions='{"threads":[{"id":"t1","comments":[{"id":"c1","text":"Ship it"}]}]}' WHERE id=$1`,
-		queued.ID, `["`+file+`"]`, `[{"type":"img","assetId":"`+file+`","children":[{"text":""}]}]`, `["`+tag.ID+`"]`)
+	f.exec(t, `UPDATE content_draft SET "assetIds"=$2::jsonb, body=$3::jsonb, "tagIds"=$4::jsonb, discussions='{"threads":[{"id":"t1","comments":[{"id":"c1","text":"Ship it"}]}]}', article=$5::jsonb,
+		status='scheduled', "channelConnectionIds"=$6::jsonb WHERE id=$1`,
+		queued.ID, `["`+file+`"]`, `[{"type":"img","assetId":"`+file+`","children":[{"text":""}]}]`, `["`+tag.ID+`"]`, `{"coverAssetId":"`+cover+`"}`, `["`+account+`"]`)
 	published, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "Published", SocialSetID: set.ID})
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +101,11 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 		return id
 	}
 	queuedPost, livePost := post(queued.ID, "SCHEDULED"), post(published.ID, "PUBLISHED")
+	// The set's writing sample, finisher and the account's analytics.
+	f.exec(t, `INSERT INTO social_set_writing_sample(id,"organizationId","socialSetId",text,source) VALUES($1,$2,$3,'In our voice','manual')`, "ws_"+f.id, f.org, set.ID)
+	f.exec(t, `INSERT INTO content_draft_finisher(id,"organizationId","socialSetId",name,text) VALUES($1,$2,$3,'Sign-off','Thanks')`, "fin_"+f.id, f.org, set.ID)
+	f.exec(t, `INSERT INTO platform_social_observation(id,"organizationId","socialSetId","connectionId","subjectId",kind,platform,day,status) VALUES($1,$2,$3,$4,$5,'post','x',now(),'available')`,
+		"obs_"+f.id, f.org, set.ID, account, livePost)
 
 	// A notification about the draft, read in the source workspace.
 	event, delivery := cuid.New(), cuid.New()
@@ -107,13 +119,19 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 		t.Fatalf("control: the notification opens %q: %v", target, err)
 	}
 
+	// A workspace the person administers without a plan is not offered.
+	unplanned := "unplanned_" + f.id
+	f.exec(t, `INSERT INTO organization (id,name,slug,"createdAt") VALUES ($1,'Unplanned',$1,now())`, unplanned)
+	t.Cleanup(func() { _, _ = f.db.SQL.ExecContext(ctx, `DELETE FROM organization WHERE id=$1`, unplanned) })
+	f.exec(t, `INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'owner',now())`, "member_unplanned_"+f.id, unplanned, owner.UserID)
+
 	preview, err := repo.PreviewSocialSetTransfer(ctx, owner, set.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if preview.Blocked != "" || len(preview.Destinations) != 1 || preview.Destinations[0].OrganizationID != f.destination ||
 		preview.Drafts != 2 || preview.QueuedPosts != 1 || preview.PublishedPosts != 1 || len(preview.Accounts) != 1 ||
-		preview.MediaFiles != 1 || preview.MediaBytes != 3 {
+		preview.MediaFiles != 2 || preview.MediaBytes != 6 {
 		t.Fatalf("preview=%+v", preview)
 	}
 	move := SocialSetTransferInput{DestinationOrganizationID: f.destination, Version: preview.Version}
@@ -132,7 +150,7 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 		t.Fatalf("moved into a workspace the person does not administer: %v", err)
 	}
 	if preview, err := repo.PreviewSocialSetTransfer(ctx, owner, set.ID); err != nil || len(preview.Destinations) != 0 ||
-		!strings.Contains(preview.NoDestination, "not an owner or admin of another workspace") {
+		!strings.Contains(preview.NoDestination, "has a plan that includes drafts") {
 		t.Fatalf("no destination: %+v %v", preview, err)
 	}
 	f.exec(t, `UPDATE member SET role='admin' WHERE id=$1`, "member_dest_"+f.id)
@@ -144,6 +162,11 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	if got := f.value(t, `SELECT "organizationId" FROM social_set WHERE id=$1`, set.ID); got != f.org {
 		t.Fatalf("a refused move changed the set: %s", got)
 	}
+	// Stale, key and destination refusals copy nothing; the move refused
+	// inside its transaction deleted its two copies.
+	if len(f.objects.stored) != 2 || len(f.objects.deleted) != 2 {
+		t.Fatalf("refused moves left copies: stored %d, deleted %v", len(f.objects.stored), f.objects.deleted)
+	}
 
 	result, err := repo.TransferSocialSet(ctx, owner, set.ID, move)
 	if err != nil {
@@ -154,10 +177,13 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	}
 	// The set, its drafts, backups, comments and tags are the destination's now.
 	for query, want := range map[string]string{
-		`SELECT "organizationId"||':'||version FROM social_set WHERE id=$1`:                                                                                       f.destination + ":" + strconv.Itoa(preview.Version+1),
-		`SELECT count(*)::text FROM content_draft WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                                 "2",
-		`SELECT count(*)::text FROM content_draft_tag WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                             "1",
-		`SELECT count(*)::text FROM content_draft_revision r JOIN content_draft d ON d.id=r."contentDraftId" WHERE d."socialSetId"=$1 AND r."organizationId"<>$2`: "0",
+		`SELECT "organizationId"||':'||version FROM social_set WHERE id=$1`:                                                                                             f.destination + ":" + strconv.Itoa(preview.Version+1),
+		`SELECT count(*)::text FROM content_draft WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                                       "2",
+		`SELECT count(*)::text FROM content_draft_tag WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                                   "1",
+		`SELECT count(*)::text FROM content_draft_revision r JOIN content_draft d ON d.id=r."contentDraftId" WHERE d."socialSetId"=$1 AND r."organizationId"<>$2`:       "0",
+		`SELECT (count(*)>0)::text FROM content_draft_revision WHERE "contentDraftId" IN (SELECT id FROM content_draft WHERE "socialSetId"=$1) AND "organizationId"=$2`: "true",
+		`SELECT count(*)::text FROM social_set_writing_sample WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                           "1",
+		`SELECT count(*)::text FROM content_draft_finisher WHERE "socialSetId"=$1 AND "organizationId"=$2`:                                                              "1",
 	} {
 		args := []any{set.ID, f.destination}
 		if !strings.Contains(query, "$2") {
@@ -171,7 +197,7 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if moved.Title != "Queued, edited" || len(moved.TagIDs) != 1 || moved.TagIDs[0] != tag.ID || len(moved.AssetIDs) != 1 || moved.AssetIDs[0] == file ||
+	if moved.Title != "Queued, edited" || moved.Status != "draft" || len(moved.TagIDs) != 1 || moved.TagIDs[0] != tag.ID || len(moved.AssetIDs) != 1 || moved.AssetIDs[0] == file ||
 		!strings.Contains(string(encode(t, moved.Discussions)), "Ship it") || len(moved.ChannelConnectionIDs) != 0 {
 		t.Fatalf("moved draft=%+v", moved)
 	}
@@ -183,6 +209,11 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	}
 	if got := f.value(t, `SELECT "organizationId" FROM asset WHERE id=$1`, file); got != f.org {
 		t.Fatalf("the source's file moved: %s", got)
+	}
+	// An article's cover is a file too: copied, and the article points at the copy.
+	coverCopy := f.value(t, `SELECT article->>'coverAssetId' FROM content_draft WHERE id=$1`, queued.ID)
+	if coverCopy == cover || f.value(t, `SELECT "organizationId" FROM asset WHERE id=$1`, coverCopy) != f.destination {
+		t.Fatalf("the cover was not copied: %s", coverCopy)
 	}
 	if _, err := repo.GetContentDraft(ctx, owner, queued.ID); !errors.Is(err, publishing.ErrNotFound) {
 		t.Fatalf("the source still reads a moved draft: %v", err)
@@ -205,6 +236,14 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 			t.Errorf("post %s = %s, want %s", id, got, want)
 		}
 	}
+	// The account's analytics stay with it, in the deleted copy.
+	if got := f.value(t, `SELECT "socialSetId"||':'||"organizationId" FROM platform_social_observation WHERE id=$1`, "obs_"+f.id); got != remnant+":"+f.org {
+		t.Fatalf("analytics=%s", got)
+	}
+	// Only the move's two copies were added.
+	if len(f.objects.stored) != 4 {
+		t.Fatalf("stored %d objects", len(f.objects.stored))
+	}
 	for org, action := range map[string]string{f.org: "product.social_set_moved_out", f.destination: "product.social_set_moved_in"} {
 		if got := f.value(t, `SELECT count(*)::text FROM audit_log WHERE "organizationId"=$1 AND action=$2 AND "entityId"=$3`, org, action, set.ID); got != "1" {
 			t.Errorf("%s audit %s = %s", org, action, got)
@@ -213,6 +252,24 @@ func TestSocialSetMovesToAnotherWorkspace(t *testing.T) {
 	// The source's notification about a moved draft opens nothing.
 	if target, err := inbox.Resolve(ctx, reader, delivery); err != nil || target != "" {
 		t.Fatalf("a moved draft's notification opens %q: %v", target, err)
+	}
+	// A private set moves only for its owner, and needs no shared set left behind.
+	private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Mine", Visibility: "PRIVATE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.addMember(t, "admin", "admin")
+	if _, err := repo.PreviewSocialSetTransfer(ctx, f.actor("admin"), private.ID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("another admin previewed a private set: %v", err)
+	}
+	if _, err := repo.TransferSocialSet(ctx, owner, private.ID, SocialSetTransferInput{DestinationOrganizationID: f.destination, Version: private.Version}); err != nil {
+		t.Fatalf("the owner's private set: %v", err)
+	}
+	// With no other workspace to manage, the preview says so.
+	f.exec(t, `DELETE FROM member WHERE id IN ($1,$2)`, "member_dest_"+f.id, "member_unplanned_"+f.id)
+	if preview, err := repo.PreviewSocialSetTransfer(ctx, owner, shared.ID); err != nil || len(preview.Destinations) != 0 ||
+		!strings.Contains(preview.NoDestination, "not an owner or admin of another workspace") {
+		t.Fatalf("no managed workspace: %+v %v", preview, err)
 	}
 	// A repeat finds nothing to move: the set is in one workspace.
 	if _, err := repo.TransferSocialSet(ctx, owner, set.ID, move); !errors.Is(err, publishing.ErrNotFound) {

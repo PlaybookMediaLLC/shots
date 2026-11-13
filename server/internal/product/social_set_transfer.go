@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -13,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -65,10 +68,8 @@ type SocialSetTransferResult struct {
 
 // transferAsset is a file a moved draft uses and the copy made for the destination.
 type transferAsset struct {
-	row    *ent.Asset
-	id     string
-	key    string
-	copied bool
+	id  string
+	key string
 }
 
 // transferSet loads a set the session may move: its owner or a workspace
@@ -126,7 +127,7 @@ func (c *Configuration) PreviewSocialSetTransfer(ctx context.Context, actor Acto
 		scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED)).Count(ctx); err != nil {
 		return nil, err
 	}
-	assets, err := transferAssets(ctx, tx, actor.OrganizationID, set.ID)
+	assets, _, err := transferAssets(ctx, tx, actor.OrganizationID, set.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +143,9 @@ func (c *Configuration) PreviewSocialSetTransfer(ctx context.Context, actor Acto
 func (c *Configuration) transferDestinations(ctx context.Context, actor Actor) ([]SocialSetTransferDestination, string, error) {
 	managed := []SocialSetTransferDestination{}
 	err := c.client.PlatformQuery(ctx, `SELECT o.id, o.name FROM member m JOIN organization o ON o.id=m."organizationId"
-		JOIN "user" u ON u.id=m."userId" WHERE m."userId"=$1 AND m.role IN ('owner','admin') AND o.id<>$2
+		JOIN "user" u ON u.id=m."userId" WHERE m."userId"=$1 AND m.role=ANY($3) AND o.id<>$2
 		AND coalesce(u.banned,false)=false AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=o.id AND d.status<>'CANCELLED')
-		ORDER BY o.name, o.id`, []any{actor.UserID, actor.OrganizationID}, func(row entsql.ColumnScanner) error {
+		ORDER BY o.name, o.id`, []any{actor.UserID, actor.OrganizationID, socialSetManageRoles}, func(row entsql.ColumnScanner) error {
 		var destination SocialSetTransferDestination
 		if err := row.Scan(&destination.OrganizationID, &destination.Name); err != nil {
 			return err
@@ -224,71 +225,87 @@ func connectionIDs(connections []*ent.ChannelConnection) []string {
 }
 
 func setDraftIDs(ctx context.Context, tx *ent.Tx, org, setID string) ([]string, error) {
-	ids := []string{}
-	err := tx.PlatformQuery(ctx, `SELECT id FROM content_draft WHERE "organizationId"=$1 AND "socialSetId"=$2 ORDER BY id`,
-		[]any{org, setID}, func(row entsql.ColumnScanner) error {
-			var id string
-			if err := row.Scan(&id); err != nil {
-				return err
-			}
-			ids = append(ids, id)
-			return nil
-		})
-	return ids, err
+	return tx.ContentDraft.Query().Where(contentdraft.OrganizationID(org), contentdraft.SocialSetID(setID)).
+		Order(ent.Asc(contentdraft.FieldID)).IDs(ctx)
 }
 
-// transferAssets are the uploaded files a set's drafts use: in assetIds and
-// wherever their documents name an assetId.
-func transferAssets(ctx context.Context, tx *ent.Tx, org, setID string) ([]*ent.Asset, error) {
-	ids := map[string]bool{}
-	var collect func(any)
-	collect = func(node any) {
+// transferAssets are the uploaded files a set's drafts use, and which files
+// each draft uses: every assetId, coverAssetId, assetIds and the like
+// anywhere in a draft's row.
+func transferAssets(ctx context.Context, tx *ent.Tx, org, setID string) ([]*ent.Asset, map[string][]string, error) {
+	uses := map[string][]string{}
+	all := map[string]bool{}
+	var collect func(any, map[string]bool)
+	collect = func(node any, ids map[string]bool) {
 		switch value := node.(type) {
 		case []any:
 			for _, child := range value {
-				collect(child)
+				collect(child, ids)
 			}
 		case map[string]any:
 			for key, child := range value {
-				if id, ok := child.(string); ok && key == "assetId" && id != "" {
+				name := strings.ToLower(key)
+				if id, ok := child.(string); ok && strings.HasSuffix(name, "assetid") && id != "" {
 					ids[id] = true
 				}
-				collect(child)
+				if list, ok := child.([]any); ok && strings.HasSuffix(name, "assetids") {
+					for _, item := range list {
+						if id, ok := item.(string); ok && id != "" {
+							ids[id] = true
+						}
+					}
+				}
+				collect(child, ids)
 			}
 		}
 	}
-	err := tx.PlatformQuery(ctx, `SELECT "assetIds", body, "platformVersions", article FROM content_draft WHERE "organizationId"=$1 AND "socialSetId"=$2`,
+	err := tx.PlatformQuery(ctx, `SELECT id, to_jsonb(d) FROM content_draft d WHERE "organizationId"=$1 AND "socialSetId"=$2`,
 		[]any{org, setID}, func(row entsql.ColumnScanner) error {
-			var assetIDs, body, versions, article []byte
-			if err := row.Scan(&assetIDs, &body, &versions, &article); err != nil {
+			var id string
+			var document []byte
+			if err := row.Scan(&id, &document); err != nil {
 				return err
 			}
-			var listed []string
-			if len(assetIDs) > 0 {
-				if err := json.Unmarshal(assetIDs, &listed); err != nil {
-					return err
-				}
+			var parsed any
+			if err := json.Unmarshal(document, &parsed); err != nil {
+				return err
 			}
-			for _, id := range listed {
-				ids[id] = true
-			}
-			for _, document := range [][]byte{body, versions, article} {
-				var parsed any
-				if len(document) > 0 && json.Unmarshal(document, &parsed) == nil {
-					collect(parsed)
-				}
+			ids := map[string]bool{}
+			collect(parsed, ids)
+			for asset := range ids {
+				uses[id] = append(uses[id], asset)
+				all[asset] = true
 			}
 			return nil
 		})
-	if err != nil || len(ids) == 0 {
-		return []*ent.Asset{}, err
+	if err != nil || len(all) == 0 {
+		return []*ent.Asset{}, map[string][]string{}, err
 	}
-	list := make([]string, 0, len(ids))
-	for id := range ids {
+	list := make([]string, 0, len(all))
+	for id := range all {
 		list = append(list, id)
 	}
-	return tx.Asset.Query().Where(asset.OrganizationID(org), asset.IDIn(list...), asset.StatusEQ(asset.StatusUPLOADED)).
+	rows, err := tx.Asset.Query().Where(asset.OrganizationID(org), asset.IDIn(list...), asset.StatusEQ(asset.StatusUPLOADED)).
 		Order(ent.Asc(asset.FieldID)).All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Only this workspace's uploaded files count; other ids are not files.
+	files := map[string]bool{}
+	for _, row := range rows {
+		files[row.ID] = true
+	}
+	for draft, ids := range uses {
+		kept := ids[:0]
+		for _, id := range ids {
+			if files[id] {
+				kept = append(kept, id)
+			}
+		}
+		slices.Sort(kept)
+		uses[draft] = kept
+	}
+	return rows, uses, nil
 }
 
 // movedObjectKey is where a file's copy lives in the destination workspace.
@@ -305,15 +322,9 @@ func movedObjectKey(key, source, destination, oldID, newID string) (string, erro
 	return "org/" + destination + "/" + rest, nil
 }
 
-// TransferSocialSet moves a set, at the version its preview showed, to
-// another workspace the person owns or administers. The set keeps its ID and
-// settings, and its drafts move with their comments, backups, tags, finishers
-// and writing samples; their files are copied into the destination's
-// library. Queued posts are cancelled and the drafts arrive unscheduled.
-// Accounts stay behind, disconnected, to be connected again in the
-// destination. Published history, analytics and audit stay in the source,
-// with a deleted copy of the set that keeps their visibility. The set row is
-// locked and its version checked, so a repeat or a race moves it once.
+// TransferSocialSet moves a set to another workspace the person owns or
+// administers, as RFC 024 describes, at the version its preview showed. A
+// refused or failed move changes nothing, and a repeat or a race moves it once.
 func (c *Configuration) TransferSocialSet(ctx context.Context, actor Actor, id string, input SocialSetTransferInput) (*SocialSetTransferResult, error) {
 	set, err := c.transferSet(ctx, actor, id)
 	if err != nil {
@@ -323,71 +334,104 @@ func (c *Configuration) TransferSocialSet(ctx context.Context, actor Actor, id s
 	if destination == "" || destination == actor.OrganizationID || input.Version < 1 {
 		return nil, invalid("Choose another workspace, and the profile version you previewed.")
 	}
+	// The version and the destination are checked before anything is copied;
+	// the transaction checks both again.
+	if set.Version != input.Version {
+		return nil, conflict("This profile changed since you previewed the move. Review it again, then move it.")
+	}
+	if err := managesWorkspace(ctx, c.client, destination, actor.UserID, ""); err != nil {
+		return nil, err
+	}
 	if err := c.requireWorkspaceFeature(ctx, destination, contentDraftFeature); err != nil {
 		return nil, err
 	}
 	files, err := c.copyTransferAssets(ctx, actor.OrganizationID, destination, set.ID)
+	kept := map[string]bool{}
 	defer func() {
-		if files != nil {
-			// Copies a committed move uses are marked kept below.
-			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-			defer cancel()
-			for _, file := range files {
-				if file.copied {
-					_ = c.objects.Delete(cleanup, file.key)
-				}
+		// A failed move removes every copy; a committed one, those it did not use.
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		for old, file := range files {
+			if !kept[old] {
+				_ = c.objects.Delete(cleanup, file.key)
 			}
 		}
 	}()
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.commitTransfer(ctx, actor, set, destination, input.Version, files)
-	if err != nil {
-		return nil, err
-	}
-	files = nil
-	return result, nil
+	return c.commitTransfer(ctx, actor, set, destination, input.Version, files, kept)
 }
 
 // copyTransferAssets copies the set's files to new keys in the destination
-// before the move's transaction; a move that does not commit deletes them.
+// before the move's transaction, a few at a time, once the destination has
+// room for them; the caller deletes copies the move does not keep.
 func (c *Configuration) copyTransferAssets(ctx context.Context, source, destination, setID string) (map[string]*transferAsset, error) {
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := transferAssets(ctx, tx, source, setID)
+	rows, _, err := transferAssets(ctx, tx, source, setID)
 	_ = tx.Rollback()
-	if err != nil {
-		return nil, err
-	}
-	files := map[string]*transferAsset{}
-	if len(rows) == 0 {
-		return files, nil
+	if err != nil || len(rows) == 0 {
+		return map[string]*transferAsset{}, err
 	}
 	if c.objects == nil {
-		return files, ErrStorageUnavailable
+		return map[string]*transferAsset{}, ErrStorageUnavailable
 	}
+	// Refuse before copying; reserveStorage decides under its lock.
+	plan, err := c.transferStorageCheck(ctx, c.client, destination, rows)
+	if err != nil {
+		return map[string]*transferAsset{}, err
+	}
+	used, err := storageUsed(ctx, c.client, destination)
+	if err != nil {
+		return map[string]*transferAsset{}, err
+	}
+	for _, row := range rows {
+		used += int64(row.Bytes)
+	}
+	if used > storageLimits[plan] {
+		return map[string]*transferAsset{}, ErrStorageQuota
+	}
+	keys := map[string]*transferAsset{}
 	for _, row := range rows {
 		id := cuid.New()
 		key, err := movedObjectKey(row.ObjectKey, source, destination, row.ID, id)
 		if err != nil {
-			return files, err
+			return map[string]*transferAsset{}, err
 		}
-		file := &transferAsset{row: row, id: id, key: key}
-		files[row.ID] = file
-		if err := c.objects.Copy(ctx, row.ObjectKey, key); err != nil {
-			return files, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
-		}
-		file.copied = true
+		keys[row.ID] = &transferAsset{id: id, key: key}
 	}
-	return files, nil
+	files := map[string]*transferAsset{}
+	var mu sync.Mutex
+	var failed error
+	slots := make(chan struct{}, 4)
+	var wait sync.WaitGroup
+	for _, row := range rows {
+		id, key := keys[row.ID].id, keys[row.ID].key
+		wait.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer func() { <-slots; wait.Done() }()
+			err := c.objects.Copy(ctx, row.ObjectKey, key)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				failed = fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+				return
+			}
+			files[row.ID] = &transferAsset{id: id, key: key}
+		}()
+	}
+	wait.Wait()
+	return files, failed
 }
 
-// commitTransfer moves the set in one transaction under its row lock.
+// commitTransfer moves the set in one transaction under its row lock, and
+// marks in kept the copies the moved drafts use.
 func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepared *ent.SocialSet, destination string,
-	version int, files map[string]*transferAsset) (*SocialSetTransferResult, error) {
+	version int, files map[string]*transferAsset, kept map[string]bool) (*SocialSetTransferResult, error) {
 	source := actor.OrganizationID
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
@@ -408,18 +452,18 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 		return nil, conflict("This profile changed since you previewed the move. Review it again, then move it.")
 	}
 	// The person must still own or administer the destination.
-	admitted := false
-	if err := tx.PlatformQuery(ctx, `SELECT m.id FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND m."userId"=$2
-		AND m.role IN ('owner','admin') AND coalesce(u.banned,false)=false
-		AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=$1 AND d.status<>'CANCELLED') FOR SHARE OF m`,
-		[]any{destination, actor.UserID}, func(entsql.ColumnScanner) error {
-			admitted = true
-			return nil
-		}); err != nil {
+	if err := managesWorkspace(ctx, tx, destination, actor.UserID, " FOR SHARE OF m"); err != nil {
 		return nil, err
 	}
-	if !admitted {
-		return nil, publishing.ErrForbidden
+	// Lock the set's drafts and accounts, and make writes that read them before
+	// the move miss: an edit, a schedule or a save checks the version it read.
+	if _, err := tx.PlatformExec(ctx, `UPDATE content_draft SET version=version+1, "calendarVersion"="calendarVersion"+1
+		WHERE "organizationId"=$1 AND "socialSetId"=$2`, source, set.ID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM channel_connection WHERE "organizationId"=$1 AND "socialSetId"=$2 FOR UPDATE`,
+		source, set.ID); err != nil {
+		return nil, err
 	}
 	if blocked, err := transferBlocked(ctx, tx, source, set); err != nil {
 		return nil, err
@@ -431,7 +475,7 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 		return nil, err
 	}
 	// Every file the drafts use now was copied before the transaction.
-	used, err := transferAssets(ctx, tx, source, set.ID)
+	used, uses, err := transferAssets(ctx, tx, source, set.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -442,17 +486,6 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 		}
 		total += row.Bytes
 	}
-	if err := c.reserveTransferStorage(ctx, tx, destination, used, total); err != nil {
-		return nil, err
-	}
-	for _, row := range used {
-		file := files[row.ID]
-		if err := copyRow(ctx, tx, "asset", row.ID, map[string]any{"id": file.id, "organizationId": destination,
-			"objectKey": file.key, "captureId": nil, "parentAssetId": nil, "uploadId": nil,
-			"createdAt": rawSQL("now()"), "updatedAt": rawSQL("now()")}); err != nil {
-			return nil, err
-		}
-	}
 	connections, err := tx.ChannelConnection.Query().Where(channelconnection.OrganizationID(source),
 		channelconnection.SocialSetID(set.ID)).IDs(ctx)
 	if err != nil {
@@ -462,8 +495,14 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 	if err != nil {
 		return nil, err
 	}
-	// A deleted copy of the set keeps the source's history and accounts, with
-	// the visibility they had.
+	// A post claimed between the first check and the cancellation is publishing now.
+	if blocked, err := transferBlocked(ctx, tx, source, set); err != nil {
+		return nil, err
+	} else if blocked != "" {
+		return nil, conflict(blocked)
+	}
+	// A deleted copy of the set keeps the source's accounts, posts, analytics
+	// and mentions, with the visibility they had.
 	remnant := cuid.New()
 	if err := copyRow(ctx, tx, "social_set", set.ID, map[string]any{"id": remnant, "publicSlug": randomSlug(),
 		"publicProfile": rawSQL("false"), "deletedAt": rawSQL("now()"), "updatedAt": rawSQL("now()")}); err != nil {
@@ -472,24 +511,31 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 	for _, statement := range []string{
 		`UPDATE channel_connection SET "socialSetId"=$3, status=CASE WHEN status='ACTIVE' THEN 'DISABLED' ELSE status END, "updatedAt"=now() WHERE "organizationId"=$1 AND "socialSetId"=$2`,
 		`UPDATE scheduled_post SET "socialSetId"=$3 WHERE "organizationId"=$1 AND "socialSetId"=$2`,
+		`UPDATE platform_social_mention SET "socialSetId"=$3 WHERE "organizationId"=$1 AND "socialSetId"=$2`,
+		`UPDATE platform_social_observation SET "socialSetId"=$3 WHERE "organizationId"=$1 AND "socialSetId"=$2`,
 	} {
 		if _, err := tx.PlatformExec(ctx, statement, source, set.ID, remnant); err != nil {
 			return nil, err
 		}
 	}
-	for _, draft := range drafts {
-		// A draft's published, failed and cancelled posts stay in the source;
-		// they keep a copy of the draft there, in the deleted set.
-		history, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(source), scheduledpost.ContentDraftID(draft)).Exist(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if !history {
-			continue
-		}
+	// A draft's published, failed and cancelled posts stay in the source;
+	// they keep a copy of the draft there, in the deleted set.
+	var history []string
+	if err := tx.PlatformQuery(ctx, `SELECT DISTINCT "contentDraftId" FROM scheduled_post WHERE "organizationId"=$1 AND "contentDraftId"=ANY($2) ORDER BY 1`,
+		[]any{source, drafts}, func(row entsql.ColumnScanner) error {
+			var draft string
+			if err := row.Scan(&draft); err != nil {
+				return err
+			}
+			history = append(history, draft)
+			return nil
+		}); err != nil {
+		return nil, err
+	}
+	for _, draft := range history {
 		snapshot := cuid.New()
 		if err := copyRow(ctx, tx, "content_draft", draft, map[string]any{"id": snapshot, "socialSetId": remnant,
-			"shareToken": nil, "sourceDraftId": nil}); err != nil {
+			"shareToken": nil, "sourceDraftId": nil, "collabState": nil, "tagIds": rawSQL(`'[]'::jsonb`)}); err != nil {
 			return nil, err
 		}
 		if _, err := tx.PlatformExec(ctx, `UPDATE scheduled_post SET "contentDraftId"=$3 WHERE "organizationId"=$1 AND "contentDraftId"=$2`,
@@ -497,21 +543,27 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 			return nil, err
 		}
 	}
-	// No row may point across workspaces once the drafts leave.
+	// No row may point across workspaces once the drafts leave: the moved
+	// drafts lose their accounts and their links to the source's campaigns,
+	// releases, voice notes and other drafts, and the source loses its links
+	// to them.
 	for _, statement := range []string{
+		`UPDATE content_draft SET status=CASE WHEN status='scheduled' THEN 'draft' ELSE status END,
+			"channelConnectionIds"='[]', "campaignId"=NULL, "campaignPostId"=NULL, "releaseId"=NULL,
+			"sourceVoiceRevisionId"=NULL, "sourceDraftId"=CASE WHEN "sourceDraftId"=ANY($2) THEN "sourceDraftId" END,
+			target=CASE WHEN jsonb_typeof(target)='object' THEN target-'sourceDraftId'-'sourcePostId' ELSE target END,
+			"reviewStatus"='none', "approvedVersion"=NULL, "reviewedByUserId"=NULL, "shareToken"=NULL,
+			"collabState"=NULL, "collabGeneration"="collabGeneration"+1
+			WHERE "organizationId"=$1 AND id=ANY($2)`,
 		`UPDATE content_draft SET "sourceDraftId"=NULL WHERE "organizationId"=$1 AND "sourceDraftId"=ANY($2) AND NOT (id=ANY($2))`,
-		`UPDATE content_draft SET "channelConnectionIds"='[]' WHERE "organizationId"=$1 AND id=ANY($2)`,
-		`UPDATE content_draft SET "sourceDraftId"=NULL WHERE "organizationId"=$1 AND id=ANY($2) AND NOT ("sourceDraftId"=ANY($2))`,
 		`UPDATE voice_command SET "contentDraftId"=NULL WHERE "organizationId"=$1 AND "contentDraftId"=ANY($2)`,
 	} {
 		if _, err := tx.PlatformExec(ctx, statement, source, drafts); err != nil {
 			return nil, err
 		}
 	}
-	for old, file := range files {
-		if _, err := tx.PlatformExec(ctx, `UPDATE content_draft SET "assetIds"=replace("assetIds"::text,$2,$3)::jsonb,
-			body=replace(body::text,$2,$3)::jsonb, "platformVersions"=replace("platformVersions"::text,$2,$3)::jsonb,
-			article=replace(article::text,$2,$3)::jsonb WHERE id=ANY($1)`, drafts, old, file.id); err != nil {
+	for _, table := range []struct{ name, key string }{{"content_draft", "id"}, {"content_draft_revision", "contentDraftId"}} {
+		if err := rewriteDraftAssets(ctx, tx, table.name, table.key, uses, files); err != nil {
 			return nil, err
 		}
 	}
@@ -521,12 +573,22 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 		args      []any
 	}{
 		{`UPDATE social_set SET "organizationId"=$2, version=version+1, "updatedAt"=now() WHERE id=$1`, []any{set.ID, destination}},
-		{`UPDATE content_draft_revision SET "organizationId"=$1 WHERE "contentDraftId"=ANY($2)`, []any{destination, drafts}},
-		{`UPDATE platform_draft_import SET "organizationId"=$1 WHERE "draftId"=ANY($2)`, []any{destination, drafts}},
-		{`DELETE FROM platform_social_mention WHERE "socialSetId"=$1`, []any{set.ID}},
-		{`DELETE FROM platform_social_observation WHERE "socialSetId"=$1`, []any{set.ID}},
+		{`UPDATE content_draft_revision SET "organizationId"=$2 WHERE "organizationId"=$1 AND "contentDraftId"=ANY($3)`, []any{source, destination, drafts}},
+		{`UPDATE platform_draft_import SET "organizationId"=$2 WHERE "organizationId"=$1 AND "draftId"=ANY($3)`, []any{source, destination, drafts}},
 	} {
 		if _, err := tx.PlatformExec(ctx, step.statement, step.args...); err != nil {
+			return nil, err
+		}
+	}
+	// The destination's storage lock is held only from here to the commit.
+	if err := c.reserveTransferStorage(ctx, tx, destination, used, total); err != nil {
+		return nil, err
+	}
+	for _, row := range used {
+		file := files[row.ID]
+		if err := copyRow(ctx, tx, "asset", row.ID, map[string]any{"id": file.id, "organizationId": destination,
+			"objectKey": file.key, "captureId": nil, "parentAssetId": nil, "uploadId": nil,
+			"createdAt": rawSQL("now()"), "updatedAt": rawSQL("now()")}); err != nil {
 			return nil, err
 		}
 	}
@@ -547,11 +609,105 @@ func (c *Configuration) commitTransfer(ctx context.Context, actor Actor, prepare
 			return nil, err
 		}
 	}
+	// A commit whose outcome is unknown may have landed: keep its copies.
+	for _, row := range used {
+		kept[row.ID] = true
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	// Open co-editing sessions recheck access and lose the moved drafts.
+	c.collabAccessChanged(ctx, source)
 	return &SocialSetTransferResult{CancelledPostIDs: cancelled, MovedDrafts: len(drafts), OrganizationID: destination,
 		SocialSetID: set.ID}, nil
+}
+
+// platformQuerier runs raw SQL on a client or a transaction.
+type platformQuerier interface {
+	PlatformQuery(ctx context.Context, query string, args []any, scan func(entsql.ColumnScanner) error) error
+}
+
+// managesWorkspace refuses unless the user owns or administers the
+// workspace, is not banned, and the workspace is not being deleted. lock is
+// appended to the query, so a transaction can hold the membership row.
+func managesWorkspace(ctx context.Context, db platformQuerier, organization, user, lock string) error {
+	admitted := false
+	if err := db.PlatformQuery(ctx, `SELECT m.id FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND m."userId"=$2
+		AND m.role=ANY($3) AND coalesce(u.banned,false)=false
+		AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=$1 AND d.status<>'CANCELLED')`+lock,
+		[]any{organization, user, socialSetManageRoles}, func(entsql.ColumnScanner) error {
+			admitted = true
+			return nil
+		}); err != nil {
+		return err
+	}
+	if !admitted {
+		return publishing.ErrForbidden
+	}
+	return nil
+}
+
+// rewriteDraftAssets points each moved draft that uses files, or its backups,
+// at the files' copies in every JSON column of table, one write per draft.
+func rewriteDraftAssets(ctx context.Context, tx *ent.Tx, table, key string, uses map[string][]string, files map[string]*transferAsset) error {
+	if len(uses) == 0 {
+		return nil
+	}
+	var columns []string
+	if err := tx.PlatformQuery(ctx, `SELECT attname FROM pg_attribute WHERE attrelid=$1::regclass AND attnum>0
+		AND NOT attisdropped AND atttypid='jsonb'::regtype ORDER BY attnum`, []any{table}, func(row entsql.ColumnScanner) error {
+		var column string
+		if err := row.Scan(&column); err != nil {
+			return err
+		}
+		columns = append(columns, column)
+		return nil
+	}); err != nil {
+		return err
+	}
+	drafts := make([]string, 0, len(uses))
+	for draft := range uses {
+		drafts = append(drafts, draft)
+	}
+	slices.Sort(drafts)
+	for _, draft := range drafts {
+		ids := uses[draft]
+		if len(ids) == 0 {
+			continue
+		}
+		args := []any{draft}
+		sets := make([]string, len(columns))
+		for index, column := range columns {
+			expression := `"` + column + `"::text`
+			for position := range ids {
+				expression = fmt.Sprintf("replace(%s,$%d,$%d)", expression, 2*position+2, 2*position+3)
+			}
+			sets[index] = `"` + column + `"=` + expression + `::jsonb`
+		}
+		for _, id := range ids {
+			args = append(args, id, files[id].id)
+		}
+		if _, err := tx.PlatformExec(ctx, `UPDATE `+table+` SET `+strings.Join(sets, ",")+` WHERE "`+key+`"=$1`, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// transferStorageCheck refuses a file larger than the destination plan's
+// upload limit and returns that plan.
+func (c *Configuration) transferStorageCheck(ctx context.Context, client *ent.Client, destination string, files []*ent.Asset) (string, error) {
+	entitlement, err := client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(destination)).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return "", err
+	}
+	plan, _, _ := evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
+	for _, file := range files {
+		if file.Bytes > medialimits.UploadBytes(file.MediaType, plan) {
+			return "", invalid("A file in this profile is larger than the destination plan allows.")
+		}
+	}
+	return plan, nil
 }
 
 // reserveTransferStorage holds room in the destination's storage for the
@@ -560,15 +716,9 @@ func (c *Configuration) reserveTransferStorage(ctx context.Context, tx *ent.Tx, 
 	if len(files) == 0 {
 		return nil
 	}
-	entitlement, err := tx.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(destination)).Only(ctx)
-	if err != nil && !ent.IsNotFound(err) {
+	plan, err := c.transferStorageCheck(ctx, tx.Client(), destination, files)
+	if err != nil {
 		return err
-	}
-	plan, _, _ := evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
-	for _, file := range files {
-		if file.Bytes > medialimits.UploadBytes(file.MediaType, plan) {
-			return invalid("A file in this profile is larger than the destination plan allows.")
-		}
 	}
 	return reserveStorage(ctx, tx, destination, plan, total)
 }
@@ -581,8 +731,8 @@ type rawSQL string
 // values are bound; nil is NULL; rawSQL is written as is.
 func copyRow(ctx context.Context, tx *ent.Tx, table, id string, set map[string]any) error {
 	var columns []string
-	if err := tx.PlatformQuery(ctx, `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
-		AND table_name=$1 AND is_generated='NEVER' ORDER BY ordinal_position`, []any{table}, func(row entsql.ColumnScanner) error {
+	if err := tx.PlatformQuery(ctx, `SELECT attname FROM pg_attribute WHERE attrelid=$1::regclass AND attnum>0
+		AND NOT attisdropped AND attgenerated='' ORDER BY attnum`, []any{table}, func(row entsql.ColumnScanner) error {
 		var name string
 		if err := row.Scan(&name); err != nil {
 			return err

@@ -239,7 +239,12 @@ func (s *Server) transferSocialSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := s.configuration.TransferSocialSet(r.Context(), workspaceActor(r), id, input)
-	respond(w, http.StatusOK, result, err)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	s.stopCancelledPosts(r.Context(), result.CancelledPostIDs)
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) deleteSocialSet(w http.ResponseWriter, r *http.Request) {
