@@ -25,13 +25,13 @@
       }
     },
     {
-      "label": "a long URL counts 23 on X",
+      "label": "a long link counts 23 on X and Mastodon",
       "text": "see https://example.com/a/very/long/path?with=query.",
       "lengths": {
         "bluesky": 52,
         "instagram": 52,
         "linkedin": 52,
-        "mastodon": 52,
+        "mastodon": 28,
         "threads": 52,
         "tiktok": 52,
         "x": 28,
@@ -39,7 +39,7 @@
       }
     },
     {
-      "label": "a bare domain is a link on X",
+      "label": "a bare domain is a link on X, not on Mastodon",
       "text": "www.example.com",
       "lengths": {
         "bluesky": 15,
@@ -269,7 +269,7 @@
         "bluesky": 85,
         "instagram": 86,
         "linkedin": 86,
-        "mastodon": 85,
+        "mastodon": 45,
         "threads": 86,
         "tiktok": 86,
         "x": 46,
@@ -288,6 +288,104 @@
         "tiktok": 18,
         "x": 18,
         "youtube": 18
+      }
+    },
+    {
+      "label": "a short link counts 23 on X and Mastodon",
+      "text": "https://x.com",
+      "lengths": {
+        "bluesky": 13,
+        "instagram": 13,
+        "linkedin": 13,
+        "mastodon": 23,
+        "threads": 13,
+        "tiktok": 13,
+        "x": 23,
+        "youtube": 13
+      }
+    },
+    {
+      "label": "a link counts 23 on Mastodon only once its host is complete",
+      "text": "https://a-very-long-subdomain-name-for-testing.example.com",
+      "lengths": {
+        "bluesky": 58,
+        "instagram": 58,
+        "linkedin": 58,
+        "mastodon": 23,
+        "threads": 58,
+        "tiktok": 58,
+        "x": 23,
+        "youtube": 58
+      }
+    },
+    {
+      "label": "a remote mention counts without its domain on Mastodon",
+      "text": "@alice@mastodon.social hi",
+      "lengths": {
+        "bluesky": 25,
+        "instagram": 25,
+        "linkedin": 25,
+        "mastodon": 9,
+        "threads": 25,
+        "tiktok": 25,
+        "x": 25,
+        "youtube": 25
+      }
+    },
+    {
+      "label": "a profile path without a protocol is text on Mastodon",
+      "text": "mastodon.social/@alice@example.org",
+      "lengths": {
+        "bluesky": 34,
+        "instagram": 34,
+        "linkedin": 34,
+        "mastodon": 34,
+        "threads": 34,
+        "tiktok": 34,
+        "x": 23,
+        "youtube": 34
+      }
+    },
+    {
+      "label": "a mention inside a link is part of the link",
+      "text": "https://example.com/?a=1&@alice@example.org",
+      "lengths": {
+        "bluesky": 43,
+        "instagram": 43,
+        "linkedin": 43,
+        "mastodon": 23,
+        "threads": 43,
+        "tiktok": 43,
+        "x": 23,
+        "youtube": 43
+      }
+    },
+    {
+      "label": "a mention followed by another at sign is not a mention",
+      "text": "@alice@example.org@x",
+      "lengths": {
+        "bluesky": 20,
+        "instagram": 20,
+        "linkedin": 20,
+        "mastodon": 20,
+        "threads": 20,
+        "tiktok": 20,
+        "x": 20,
+        "youtube": 20
+      }
+    },
+    {
+      "label": "accents around a link and a remote mention",
+      "text": "Ünïcode https://x.com/é then @bob@ex.org.",
+      "lengths": {
+        "bluesky": 41,
+        "instagram": 41,
+        "linkedin": 41,
+        "mastodon": 42,
+        "threads": 41,
+        "tiktok": 41,
+        "x": 49,
+        "youtube": 41
       }
     }
   ]

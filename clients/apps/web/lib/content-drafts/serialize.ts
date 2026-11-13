@@ -1,3 +1,4 @@
+import twitterText from 'twitter-text'
 import { z } from 'zod'
 import { draftChannelSchema, type Numbering } from '@/lib/write/document'
 import { numberCaptions } from '@/lib/write/numbering'
@@ -546,20 +547,61 @@ export function captionLength(caption: string): number {
 
 const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
+/** Mastodon's Account::MENTION_RE (v4.7): `@user`, then an optional `@domain`. */
+const mastodonMention =
+  /(?<![=/\p{L}\p{M}\p{Nd}\p{Pc}])@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@([\p{L}\p{M}\p{Nd}\p{Pc}]+(?:[.-]+[\p{L}\p{M}\p{Nd}\p{Pc}]+)*))?/giu
+
+/** twitter-text's end_mention_match: an at sign or a Latin accent right after (or `://`) means no mention. */
+const mastodonMentionEnd =
+  /[\u0300-\u036f@＠\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u0253\u0254\u0256\u0257\u0259\u025b\u0263\u0268\u026f\u0272\u0289\u028b\u02bb\u1e00-\u1eff]/
+
+/**
+ * The text Mastodon's StatusLengthValidator counts: each link with a protocol
+ * becomes 23 characters and each mention drops its domain.
+ */
+function mastodonCountable(caption: string): string {
+  // shortcut: stock twitter-text 3.1.0 finds the links; Mastodon's own regex also takes dat://, gemini:// and other protocols, any non-space path character and Unicode queries, and stops a path before a trailing '='. Port config/initializers/twitter_regex.rb on both sides if those links matter.
+  const links = twitterText
+    .extractUrlsWithIndices(caption, { extractUrlsWithoutProtocol: false })
+    .map(({ indices: [start, end] }) => ({ start, end, text: 'x'.repeat(23) }))
+  const mentions = [...caption.matchAll(mastodonMention)]
+    .map((match) => ({
+      start: match.index,
+      end: match.index + match[0].length,
+      text: `@${match[1]}`,
+      domain: match[2] ?? '',
+    }))
+    .filter(
+      ({ end, domain }) =>
+        !mastodonMentionEnd.test(caption[end] ?? '') &&
+        !caption.startsWith('://', end) &&
+        [...domain].length <= 253
+    )
+  let [countable, at] = ['', 0]
+  for (const entity of [...links, ...mentions].sort((a, b) => a.start - b.start)) {
+    if (entity.start < at) continue // overlaps the entity before, as remove_overlapping_entities drops it
+    countable += caption.slice(at, entity.start) + entity.text
+    at = entity.end
+  }
+  return countable + caption.slice(at)
+}
+
 /**
  * A caption's length as the platform counts it: X's weighted count of the
- * trimmed text (links are 23), grapheme clusters on Bluesky and Mastodon, and
- * UTF-16 units elsewhere. Go's `draftPostLength` is the same rule; both are
- * tested against `server/internal/product/testdata/caption-length-cases.json`.
+ * trimmed text (links are 23), Mastodon's (links with a protocol are 23,
+ * mentions drop their domain, then grapheme clusters), grapheme clusters on
+ * Bluesky, and UTF-16 units elsewhere. Go's `draftPostLength` is the same
+ * rule; both are tested against
+ * `server/internal/product/testdata/caption-length-cases.json`.
  */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
   // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption starts or ends with one.
   if (channel === 'x') return xLength(caption.trim())
-  if (channel === 'bluesky' || channel === 'mastodon')
+  if (channel === 'bluesky' || channel === 'mastodon') {
+    const text = channel === 'mastodon' ? mastodonCountable(caption) : caption
     // Each printable ASCII character, tab and line feed is a grapheme: skip the segmenter.
-    return /^[ -~\t\n]*$/.test(caption)
-      ? caption.length
-      : Array.from(graphemes.segment(caption)).length
+    return /^[ -~\t\n]*$/.test(text) ? text.length : Array.from(graphemes.segment(text)).length
+  }
   return captionLength(caption)
 }
 
@@ -569,15 +611,31 @@ export function overflowAt(channel: DraftChannel, caption: string, limit: number
   if (channel !== 'x') {
     // Units and graphemes only grow as a prefix grows by whole code points, so
     // halve the range. X's link weighting can make a longer prefix count less.
+    // So can Mastodon's links and mentions, but only from a word's first '@'
+    // or five characters ('https') before its first '://' to the word's end:
+    // halve the cuts outside those spans, then step back through the one span
+    // where the count passes the limit.
+    // shortcut: a long unspaced span (CJK text with a link before more text) steps back one code point at a time, like X; find tighter safe cuts if it gets slow.
+    const risky = new Uint8Array(caption.length + 1)
+    if (channel === 'mastodon')
+      for (const word of caption.matchAll(/\S+/g)) {
+        const entity = word[0].search(/:\/\/|@/)
+        if (entity >= 0)
+          risky.fill(1, word.index + Math.max(1, entity - 4), word.index + word[0].length)
+      }
     const ends = [0]
     for (const character of caption) ends.push(ends[ends.length - 1] + character.length)
-    let [low, high] = [0, ends.length - 1]
+    const cuts = ends.filter((end) => !risky[end])
+    let [low, high] = [0, cuts.length - 1]
     while (low < high) {
       const middle = Math.ceil((low + high) / 2)
-      if (fits(ends[middle])) low = middle
+      if (fits(cuts[middle])) low = middle
       else high = middle - 1
     }
-    return ends[low]
+    if (low === cuts.length - 1) return cuts[low]
+    for (let index = ends.indexOf(cuts[low + 1]) - 1; ends[index] > cuts[low]; index--)
+      if (fits(ends[index])) return ends[index]
+    return cuts[low]
   }
   let at = caption.length
   while (at > 0 && !fits(at)) {
