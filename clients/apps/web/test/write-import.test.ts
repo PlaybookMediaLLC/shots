@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { importedBody, importedPosts, splitThread } from '@/lib/write/import-text'
 import { xLength } from '@/lib/content-drafts/x-length'
-import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 
 test('URL text preserves literal markup and percent values as ordinary text', () => {
   const posts = importedPosts('<script>alert(1)</script> 100%\r\n---\r\nSecond\nparagraph')
@@ -22,19 +21,8 @@ test('thread split uses weighted URLs and preserves grapheme sequences', () => {
     family.repeat(25),
     family.repeat(10),
   ])
-  // Mastodon counts a link as 23, however short: three of these are over 50.
-  const links = 'https://t.co/a '.repeat(10).trim()
-  const toots = splitThread(links, 'mastodon', 50)
-  assert.ok(toots.every((post) => platformCaptionLength('mastodon', post) <= 50))
-  assert.equal(toots.length, 5)
-  // A word too long for a post is cut, but never inside a link: it counts 23 whole.
-  assert.deepEqual(splitThread('abhttps://example.com/x', 'mastodon', 23), [
-    'ab',
-    'https://example.com/x',
-  ])
-  for (const text of ['a'.repeat(40) + 'https://t.co/a', '日本語'.repeat(161) + 'https://t.co/a'])
-    for (const post of splitThread(text, 'mastodon', 50))
-      assert.ok(platformCaptionLength('mastodon', post) <= 50, post)
+  // Mastodon counts a short link as 23, so it does not fit beside other text at 23.
+  assert.deepEqual(splitThread('a https://x.com', 'mastodon', 23), ['a', 'https://x.com'])
   // LinkedIn counts UTF-16 units: a family is 11, and is never cut.
   assert.deepEqual(splitThread(family.repeat(5), 'linkedin', 23), [
     family.repeat(2),

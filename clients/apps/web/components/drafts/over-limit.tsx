@@ -17,9 +17,9 @@ import { postRanges } from './thread'
  * serialized post, so numbering and links count as they will publish), and
  * the trailing characters worth that much are marked.
  * shortcut: marks trailing visible characters by the serialized excess; a link
- * (23 on X and Mastodon), a Mastodon remote mention or a list marker counts
- * where it stands in the published text, so the mark can start a few characters
- * off there. Map serialized offsets back to Slate points if that matters to writers.
+ * (23 on X) or list marker counts where it stands in the published text, so the
+ * mark can start a few characters off there. Map serialized offsets back to
+ * Slate points if that matters to writers.
  */
 
 /** Post number (1-based) to characters over the limit. */

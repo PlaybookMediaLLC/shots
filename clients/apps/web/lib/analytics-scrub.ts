@@ -4,6 +4,12 @@
  * reset links carry secrets in their path or query.
  */
 
+/**
+ * The post-management use event (`lib/plan/feature-use.ts`). It loses its URL
+ * queries and fragments, where the library keeps filter values.
+ */
+export const POST_MANAGEMENT_USED = 'post_management_used'
+
 const TOKEN_PATH = /\/(s|review)\/[^/?#]+/g
 const SECRET_PARAMS = ['token', 'invitationId', 'callbackURL']
 
@@ -17,13 +23,18 @@ export function scrubUrl(value: string): string {
 }
 
 /** Scrubs every string property of an analytics event in place and returns it. */
-export function scrubEvent<T extends { properties?: Record<string, unknown>; $set?: Record<string, unknown> } | null>(
-  event: T,
-): T {
+export function scrubEvent<
+  T extends {
+    event?: string
+    properties?: Record<string, unknown>
+    $set?: Record<string, unknown>
+  } | null,
+>(event: T): T {
+  const bare = event?.event === POST_MANAGEMENT_USED
   for (const bag of [event?.properties, event?.$set]) {
     if (!bag) continue
     for (const [key, value] of Object.entries(bag)) {
-      if (typeof value === 'string') bag[key] = scrubUrl(value)
+      if (typeof value === 'string') bag[key] = scrubUrl(bare ? value.split(/[?#]/)[0]! : value)
     }
   }
   return event

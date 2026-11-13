@@ -1,4 +1,4 @@
-import { mastodonEntities, platformCaptionLength } from '@/lib/content-drafts/serialize'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from './document'
 import { postBreak } from './versions'
 
@@ -31,54 +31,37 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  const measure = (value: string) => platformCaptionLength(channel, value)
+  // Only X's and Mastodon's counts (a short link is 23) exceed UTF-16 units: elsewhere, a text within the limit in units fits.
+  const fits = (value: string) =>
+    (channel !== 'x' && channel !== 'mastodon' && value.length <= limit) ||
+    platformCaptionLength(channel, value) <= limit
   const posts: string[] = []
   let current = ''
-  // What `current` counts. A token is a word and the space after it, so no
-  // link, mention or grapheme crosses one: a post counts its tokens added up.
-  // X weighs the whole text, so it is measured whole.
-  let counted = 0
-  const fits = (piece: string) =>
-    (channel === 'x' ? measure((current + piece).trim()) : counted + measure(piece.trimEnd())) <=
-    limit
-  const add = (piece: string) => {
-    current += piece
-    if (channel !== 'x') counted += measure(piece)
-  }
   const push = () => {
     if (current.trim()) posts.push(current.trim())
     current = ''
-    counted = 0
     if (posts.length > THREAD_POST_LIMIT)
       throw new Error(
         `This text needs more than ${THREAD_POST_LIMIT} posts. Shorten it or increase the limit.`
       )
   }
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    if (fits(token)) {
-      add(token)
+    if (fits((current + token).trim())) {
+      current += token
       continue
     }
     push()
-    if (fits(token)) {
-      add(token)
+    if (fits(token.trim())) {
+      current = token
       continue
     }
-    // A word too long for one post is cut between graphemes, never inside a
-    // link or mention Mastodon counts as one: each piece then counts alone.
-    const spans = channel === 'mastodon' ? mastodonEntities(token) : []
-    let next = 0
-    for (const { index, segment } of new Intl.Segmenter(undefined, {
-      granularity: 'grapheme',
-    }).segment(token)) {
-      if (index < next) continue
-      const span = spans.find(([start]) => start === index)
-      const piece = span ? token.slice(...span) : segment
-      next = index + piece.length
-      if (measure(piece) > limit)
+    for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
+      token
+    )) {
+      if (!fits(segment))
         throw new Error('A character sequence exceeds the selected limit.')
-      if (!fits(piece)) push()
-      add(piece)
+      if (!fits((current + segment).trim())) push()
+      current += segment
     }
   }
   push()

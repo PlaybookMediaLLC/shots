@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/dlclark/regexp2"
 	"golang.org/x/text/unicode/norm"
@@ -117,7 +118,7 @@ func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, va
 
 	// Hash all entities by their startIndex for fast lookup
 	urlEntities := map[int]int{}
-	for _, u := range extractURLsWithIndices(shifted) {
+	for _, u := range extractURLsWithIndices(shifted, true) {
 		urlEntities[u.start] = len(u.url)
 	}
 	emojiEntities := map[int]int{}
@@ -180,9 +181,32 @@ type urlEntity struct {
 	start, end int
 }
 
-// extractURLsWithIndices is twitter-text's extractUrlsWithIndices with
-// extractUrlsWithoutProtocol: true, on surrogate-shifted units.
-func extractURLsWithIndices(text []rune) []*urlEntity {
+// LinkSpans are the byte ranges of the links in text that start with a
+// protocol: twitter-text's extractUrlsWithIndices with
+// extractUrlsWithoutProtocol: false, as Mastodon finds the links it counts.
+func LinkSpans(text string) [][2]int {
+	// Only a link with a protocol counts, and the scan is slow on long runs.
+	if !strings.Contains(text, "://") {
+		return nil
+	}
+	offsets := make([]int, 0, len(text)+1) // the byte offset of each UTF-16 unit
+	for i, r := range text {
+		offsets = append(offsets, i)
+		if r > 0xffff {
+			offsets = append(offsets, i)
+		}
+	}
+	offsets = append(offsets, len(text))
+	var spans [][2]int
+	for _, u := range extractURLsWithIndices(shiftSurrogates(utf16Units(text)), false) {
+		spans = append(spans, [2]int{offsets[u.start], offsets[u.end]})
+	}
+	return spans
+}
+
+// extractURLsWithIndices is twitter-text's extractUrlsWithIndices, on
+// surrogate-shifted units.
+func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 	if !slices.Contains(text, '.') {
 		return nil
 	}
@@ -207,6 +231,9 @@ func extractURLsWithIndices(text []rune) []*urlEntity {
 
 		// extract ASCII-only domains.
 		if len(protocol) == 0 {
+			if !withoutProtocol {
+				continue
+			}
 			if ok, _ := invalidURLWithoutProtoRe.MatchRunes(before); ok {
 				continue
 			}

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { followUpLines, retweetAt, ruleLabel } from '../lib/write/automation'
-import { fenced } from '../lib/write/refine-actions'
 import { autoDmSchema } from '../lib/write/document'
+import { fenced } from '../lib/write/refine-actions'
 
 test('repost times match the Go plan, across a daylight-saving change', () => {
   // 2026-03-07 20:00 in New York; the clocks go forward the next night.
@@ -66,15 +66,6 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
   assert.ok(autoDmSchema.safeParse(valid).success)
   // Go's TrimSpace keeps U+FEFF: a draft it stored must still load here.
   assert.ok(autoDmSchema.safeParse({ ...valid, message: '\uFEFF' }).success)
-  // Lengths count characters (code points), as Go's runes do: an emoji is one, not two units.
-  const emoji = '\u{1F600}'
-  assert.ok(
-    autoDmSchema.safeParse({
-      ...valid,
-      message: emoji.repeat(10_000),
-      replyText: emoji.repeat(100),
-    }).success
-  )
   for (const [name, change] of Object.entries({
     variable: { message: 'Hi {{email}}' },
     blank: { message: ' \u0085\u3000 ' },
@@ -82,9 +73,18 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
     'reply filter without replies': { replies: false, reposts: true },
     'long message': { message: 'x'.repeat(10_001) },
     'long reply filter': { replyText: 'x'.repeat(101) },
-    'long emoji message': { message: '\u{1F600}'.repeat(10_001) },
-    'long emoji reply filter': { replyText: '\u{1F600}'.repeat(101) },
   })) {
     assert.equal(autoDmSchema.safeParse({ ...valid, ...change }).success, false, name)
   }
+  const base = { match: 'any', reposts: false, replies: true, requireFollow: false }
+  const accepts = (value: object) => autoDmSchema.safeParse({ ...base, ...value }).success
+  // Go counts runes. zod 4.5+ counts code points for string lengths, so an emoji
+  // counts once here too, though it is two UTF-16 units; an older zod breaks this.
+  assert.equal(accepts({ message: '😀'.repeat(6_000) }), true)
+  assert.equal(accepts({ message: '😀'.repeat(10_000) }), true)
+  assert.equal(accepts({ message: '😀'.repeat(10_001) }), false)
+  assert.equal(accepts({ message: '' }), false)
+  assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(100) }), true)
+  assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(101) }), false)
+  assert.equal(accepts({ message: 'Hi', replies: false }), false)
 })
