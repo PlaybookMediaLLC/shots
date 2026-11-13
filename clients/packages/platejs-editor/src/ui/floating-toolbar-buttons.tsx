@@ -68,7 +68,7 @@ export function FloatingToolbarButtons() {
 
           <ToolbarGroup>
             {editor.plugins[KEYS.comment] && <CommentToolbarButton />}
-            <SuggestionToolbarButton />
+            {editor.plugins[KEYS.suggestion] && <SuggestionToolbarButton />}
           </ToolbarGroup>
           <ToolbarGroup>
             <TurnIntoToolbarButton />

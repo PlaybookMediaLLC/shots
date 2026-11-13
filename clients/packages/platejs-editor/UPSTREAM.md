@@ -136,9 +136,11 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   `src/ui/block-menu.tsx`: an entry that calls an optional plugin's API shows
   only when the editor loads that plugin. The slash menu's AI group, the
   toolbar's Ask AI and the block menu's Ask AI need `aiChat`; the block menu's
-  Comment needs `comment`. Upstream shows them always, so an editor without
-  AIKit or CommentKit threw. `src/ui/optional-plugin-entries.test.ts` (new)
-  renders them in jsdom, which `test/dom.ts` (new) sets up.
+  Comment needs `comment`; the toolbar's Suggestion needs `suggestion`.
+  Upstream shows them always, so an editor without AIKit or CommentKit threw,
+  and one without SuggestionKit showed a Suggestion button that did nothing.
+  `src/ui/optional-plugin-entries.test.ts` (new) renders them in jsdom, which
+  `test/dom.ts` (new) sets up.
 
 ## Pulling a later fix from oppulence-canvas
 
