@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { followUpLines, retweetAt, ruleLabel } from '../lib/write/automation'
-import { fenced } from '../lib/write/refine-actions'
 import { autoDmSchema } from '../lib/write/document'
+import { fenced } from '../lib/write/refine-actions'
 
 test('repost times match the Go plan, across a daylight-saving change', () => {
   // 2026-03-07 20:00 in New York; the clocks go forward the next night.
@@ -76,4 +76,15 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
   })) {
     assert.equal(autoDmSchema.safeParse({ ...valid, ...change }).success, false, name)
   }
+  const base = { match: 'any', reposts: false, replies: true, requireFollow: false }
+  const accepts = (value: object) => autoDmSchema.safeParse({ ...base, ...value }).success
+  // Go counts runes. zod 4.5+ counts code points for string lengths, so an emoji
+  // counts once here too, though it is two UTF-16 units; an older zod breaks this.
+  assert.equal(accepts({ message: '😀'.repeat(6_000) }), true)
+  assert.equal(accepts({ message: '😀'.repeat(10_000) }), true)
+  assert.equal(accepts({ message: '😀'.repeat(10_001) }), false)
+  assert.equal(accepts({ message: '' }), false)
+  assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(100) }), true)
+  assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(101) }), false)
+  assert.equal(accepts({ message: 'Hi', replies: false }), false)
 })
