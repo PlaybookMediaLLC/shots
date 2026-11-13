@@ -266,13 +266,17 @@ export async function expectSaved(page: Page): Promise<void> {
 const PLATFORM_LABELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X' }
 
 /**
- * Open an empty draft and return its id. A blank post is only saved at its
+ * Open a new draft and return its id. A blank post is only saved at its
  * first word, so this makes the row through the API, for specs that start
- * from an empty saved draft. `startPostByTyping` is the path a person takes.
+ * from a saved draft; `fields` seeds it, such as an older draft's body.
+ * `startPostByTyping` is the path a person takes.
  */
-export async function openNewDraft(page: Page): Promise<string> {
+export async function openNewDraft(
+  page: Page,
+  fields: Record<string, unknown> = {}
+): Promise<string> {
   await page.goto('/publish')
-  const created = await apiRequest(page, '/api/v1/content-drafts', { method: 'POST', body: {} })
+  const created = await apiRequest(page, '/api/v1/content-drafts', { method: 'POST', body: fields })
   expect(created.status, JSON.stringify(created.body)).toBe(201)
   const { id } = created.body as { id: string }
   await page.goto(`/publish/${id}`)

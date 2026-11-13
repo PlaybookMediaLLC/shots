@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
@@ -55,6 +56,21 @@ func publicationPaths(post integrations.PostDetails) map[string]func(*ent.Integr
 			_, err := p.ReplyTo(ctx, in, "42", post.Message)
 			return err
 		},
+	}
+}
+
+// Shots running out of time counting a post's or an Article's links sent
+// nothing: the error is the one the publisher retries, not a rejection.
+func TestTextTooComplexToCountIsNotARejection(t *testing.T) {
+	caps := socialidentity.XVerifiedAccountLimits("read-write", ptr("Premium"))
+	articles := true
+	caps.Articles = &articles
+	crafted := "https://a.co/" + strings.Repeat("(a)", 8000)
+	for _, article := range []bool{false, true} {
+		err := checkPublishingContent(caps, crafted, pendingSettings{ArticleTitle: ptr("Notes"), ArticleStatus: ptr("draft")}, 0, article)
+		if !errors.Is(err, helpers.ErrTextTooComplex) || temporalx.FailureType(err) == temporalx.TypePublicationRejected {
+			t.Fatalf("article=%v: %v", article, err)
+		}
 	}
 }
 
