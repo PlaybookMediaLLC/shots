@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.52.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.51.0...v2.52.0) (2026-11-14)
+
+
+### Features
+
+* **capture:** navigate verified features with bounded AI actions ([#594](https://github.com/PlaybookMediaLLC/shots/issues/594)) ([4384480](https://github.com/PlaybookMediaLLC/shots/commit/438448002818186fdb5950e9145f13221314e03f))
+
+
+### Bug Fixes
+
+* **automation:** hand captured campaigns to editable drafts ([#596](https://github.com/PlaybookMediaLLC/shots/issues/596)) ([80eda25](https://github.com/PlaybookMediaLLC/shots/commit/80eda258e70f0935aedf118b33f593a6313ce606))
+* **automation:** preserve edited drafts during generation replay ([#583](https://github.com/PlaybookMediaLLC/shots/issues/583)) ([d5c919a](https://github.com/PlaybookMediaLLC/shots/commit/d5c919a29601ade1e43f4758e428eb4e575c5a47))
+* **capture:** preserve renewed session cookie attributes ([#590](https://github.com/PlaybookMediaLLC/shots/issues/590)) ([6961420](https://github.com/PlaybookMediaLLC/shots/commit/69614202e951d2d98b512eb0ed802b8539a5d3c5))
+* **capture:** recover sign-in views and diagnose session failures ([#599](https://github.com/PlaybookMediaLLC/shots/issues/599)) ([0dbb347](https://github.com/PlaybookMediaLLC/shots/commit/0dbb347d6f7d8eacb0676011b5b0de093effe56c))
+* preserve staging deployment capture boundaries ([#586](https://github.com/PlaybookMediaLLC/shots/issues/586)) ([8346132](https://github.com/PlaybookMediaLLC/shots/commit/8346132e8c14bf11cb73e1968220ee941dafb612))
+* reject incomplete automation campaign copy ([#588](https://github.com/PlaybookMediaLLC/shots/issues/588)) ([aa9bb52](https://github.com/PlaybookMediaLLC/shots/commit/aa9bb52aa0b23031a8c15ec8580c1a13c94a409d))
+
 ## [2.51.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.50.1...v2.51.0) (2026-11-13)
 
 
