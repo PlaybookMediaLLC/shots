@@ -116,3 +116,48 @@ Oppulence-Engineering. A manual capture does not prove webhook intake.
 Implementation and local validation are separate from merge, deployment and
 production verification. PRs, immutable revisions and terminal deployment results
 will be recorded here as each step completes.
+
+- Work commit: `161c1ff8f6b58a77e73059e19e7d0aba6e5d2894`.
+- Work PR [#599](https://github.com/PlaybookMediaLLC/shots/pull/599) merged into
+  develop as `0dbb347d6f7d8eacb0676011b5b0de093effe56c` after local checks,
+  independent reviews and real-provider validation, while hosted CI was pending.
+- Release PR [#600](https://github.com/PlaybookMediaLLC/shots/pull/600) merged
+  develop into main with merge commit `f94ba8c9e4751e2b03fb8f6e2d1afdf5dd8be15c`.
+  Both branch trees exactly matched the locally validated tree. Live repository
+  rules were checked, Branch policy passed, and no bypass or force push was used.
+- Work-PR CI `43573481399` was cancelled during merge. Its CI validation gate
+  failed because required jobs were cancelled; this is not a successful run.
+  Push-to-develop full CI `43573569111` is the subsequent integration check.
+- Main CI: `43573654641`. Backend deployment: `43573654622`. Web deployment:
+  `43573654743`. These are pending until terminal results are recorded below.
+- Temporary local validation containers were removed; the shared development
+  stack and unrelated worktrees were preserved.
+
+- Integration CI [43573569111](https://github.com/PlaybookMediaLLC/shots/actions/runs/43573569111)
+  completed successfully, including all six browser shards, dependency recovery,
+  real local-provider social gate and the CI validation gate.
+- Backend deployment [43573654622](https://github.com/PlaybookMediaLLC/shots/actions/runs/43573654622)
+  and web deployment [43573654743](https://github.com/PlaybookMediaLLC/shots/actions/runs/43573654743)
+  both succeeded. Final DigitalOcean deployment
+  `d31e4822-2204-4785-8c37-cc8e0f328c88` is ACTIVE; web, backend and collaboration
+  image tags all end in `f94ba8c9e4751e2b03fb8f6e2d1afdf5dd8be15c`.
+- Checks after confirming that deployed revision: `/api/health` returned HTTP
+  200 with `status: ok`; anonymous `/api/auth/get-session` returned null; the new
+  `capture.refreshConnect` operation rejected an anonymous caller with HTTP 401.
+- No new production screenshot, campaign, post, draft edit or second end-to-end
+  run is claimed. The user-deferred UI check and GitHub installation grant remain
+  the next acceptance work. Deployed infrastructure checks do not replace them.
+
+- Downloaded integration reports: 348 expected passes (including dependency
+  recovery), 22 skips, zero unexpected failures and zero flaky tests. Skips
+  include opt-in provider fixtures and three dedicated release-automation fixture
+  cases; the eight social-gate cases run separately in the successful social gate.
+  The green general suite does not establish real-provider release acceptance.
+
+- Main CI [43573654641](https://github.com/PlaybookMediaLLC/shots/actions/runs/43573654641)
+  completed successfully, including the separate social integration gate.
+  Its plan skips the browser matrix; the identical promoted tree's complete
+  browser result is the successful develop run above.
+- Final production health recheck remained HTTP 200 with `status: ok`.
+  Scoped implementation verdict: **Ship**. Complete release-to-campaign
+  acceptance: **not yet demonstrated**, for the explicit remaining reasons above.
