@@ -27,6 +27,8 @@ test('capture failure codes read as sentences, unknown ones included', () => {
 test('every safe code from signed-in capture has its own sentence', () => {
   for (const code of [
     'needs_auth',
+    'sign_in_incomplete',
+    'session_restore_failed',
     'wrong_account',
     'waiting_for_deployment',
     'deployment_unverified',

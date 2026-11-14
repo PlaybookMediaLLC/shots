@@ -30,6 +30,12 @@ open ([implementation status](authenticated-release-capture-review.md#10-impleme
 
 ## Existing foundation
 
+The [managed AI capture and sign-in recovery addendum](authenticated-capture-runtime-and-recovery.md)
+records the 2026-11-14 Verifier evidence, immediate reliability corrections,
+managed-agent evaluation, and deferred self-hosting design. It distinguishes
+successful saved-session verification from the still-required capture-to-draft
+and real-release acceptance gates.
+
 The [Go capture client](../../server/internal/capture/capture.go) captures
 public URLs. [Surface history](../../server/internal/product/surfaces.go)
 records assets and capture origins; the

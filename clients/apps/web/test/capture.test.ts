@@ -143,6 +143,7 @@ test('the sign-in link opens without sharing a referrer or reaching autocapture'
     createElement(SignInPanel, {
       busy: false,
       onFinish: () => undefined,
+      onRefresh: () => undefined,
       start: {
         expiresAt: '2026-11-04T12:00:00Z',
         intentId: 'intent',
@@ -266,6 +267,7 @@ test('the SDK calls each capture route in the workspace scope', async () => {
   )
   await sdk.captureOverview()
   await sdk.startCaptureConnect('c/1')
+  await sdk.refreshCaptureConnect('c/1')
   await sdk.finishCaptureConnect('c1', 'intent')
   await sdk.revokeCaptureConnection('c1')
   await sdk.activateCaptureRecipe('r1')
@@ -275,6 +277,7 @@ test('the SDK calls each capture route in the workspace scope', async () => {
   assert.deepEqual(requests, [
     'GET /v1/capture',
     'POST /v1/capture/connections/c%2F1/connect',
+    'POST /v1/capture/connections/c%2F1/connect/refresh',
     'POST /v1/capture/connections/c1/connect/finish {"intentId":"intent"}',
     'POST /v1/capture/connections/c1/revoke',
     'POST /v1/capture/recipes/r1/activate',

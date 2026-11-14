@@ -5254,6 +5254,14 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Reopens the current person's sign-in browser without replacing its session. */
+  async refreshCaptureConnect(id: string) {
+    return this.request<CaptureConnectStart>(
+      `v1/capture/connections/${encodeURIComponent(id)}/connect/refresh`,
+      { method: 'POST' }
+    )
+  }
+
   async revokeCaptureConnection(id: string) {
     return this.request<{ revoked: true }>(
       `v1/capture/connections/${encodeURIComponent(id)}/revoke`,
