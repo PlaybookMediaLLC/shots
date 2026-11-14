@@ -45,7 +45,7 @@ func (f *Failure) Error() string { return string(f.Code) }
 
 // Retryable reports whether trying again later could succeed on its own.
 func (f *Failure) Retryable() bool {
-	return f.Code == WaitingForDeployment || f.Code == DeploymentUnverified || f.Code == ProviderUnavailable || f.Code == PageFailed
+	return f.Code == WaitingForDeployment || f.Code == DeploymentUnverified || f.Code == ProviderUnavailable || f.Code == PageFailed || f.Code == NavigationUnavailable
 }
 
 const (
@@ -424,15 +424,18 @@ type RunInput struct {
 	Recipe           Recipe
 	State            *State
 	ExpectedRevision string
+	NextNavigation   NextNavigationAction
 }
 
 // RunResult is a verified image and, when the app rotated tokens, new state.
 type RunResult struct {
-	Image            []byte
-	Width, Height    int
-	ObservedRevision string
-	State            *State
-	RefusedRequests  int
+	Image             []byte
+	Width, Height     int
+	ObservedRevision  string
+	State             *State
+	RefusedRequests   int
+	SourcePath        string
+	NavigationActions []NavigationAction
 }
 
 // Run restores state into a fresh context and executes the recipe, refusing
@@ -481,12 +484,20 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 				return nil, err
 			}
 		case StepSelectTab:
-			if err := s.selectTab(ctx, step, requested); err != nil {
+			if err := s.selectTab(ctx, step, requested, ""); err != nil {
 				return nil, err
 			}
 		}
 	}
 	result := &RunResult{}
+	if input.Recipe.Navigation != nil {
+		if result.NavigationActions, err = s.navigateFeature(ctx, input); err != nil {
+			return nil, err
+		}
+		if err := s.checkIdentity(ctx, input.Target, requested); err != nil {
+			return nil, err
+		}
+	}
 	if input.ExpectedRevision != "" {
 		if result.ObservedRevision, err = s.proveRevision(ctx, input.Recipe.Version, input.ExpectedRevision); err != nil {
 			return nil, err
@@ -510,6 +521,11 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	if err := s.applyMasks(ctx, input.Recipe.Masks); err != nil {
 		return nil, err
 	}
+	here, err := s.location()
+	if err != nil || here.Scheme+"://"+here.Host != input.Target.Origin {
+		return nil, &Failure{Code: OriginRefused}
+	}
+	result.SourcePath = here.EscapedPath()
 	shot, err := s.page.Context(ctx).Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng})
 	if err != nil {
 		return nil, &Failure{Code: PageFailed}
@@ -528,17 +544,22 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 }
 
 // selectTab clicks only an element that declares itself a tab.
-func (s *scope) selectTab(ctx context.Context, step Step, requested string) error {
+func (s *scope) selectTab(ctx context.Context, step Step, requested, expectedLabel string) error {
 	if err := s.waitFor(ctx, step.Selector, stepTimeout(step), requested, MarkerMissing); err != nil {
 		return err
 	}
-	isTab, err := s.evalBool(ctx, `(selector) => { const e = document.querySelector(selector); return e.getAttribute('role') === 'tab' || e.hasAttribute('aria-selected') }`, step.Selector)
-	if err != nil || !isTab {
-		return &Failure{Code: RecipeInvalid}
-	}
-	clicked, err := s.evalBool(ctx, `(selector) => { document.querySelector(selector).click(); return true }`, step.Selector)
-	if err != nil || !clicked {
+	clicked, err := s.evalBool(ctx, `(selector, expected) => {
+		const e = document.querySelector(selector);
+		if (!e || (e.getAttribute('role') !== 'tab' && !e.hasAttribute('aria-selected'))) return false;
+		if (expected && ((e.innerText || e.getAttribute('aria-label') || '').trim().replace(/\s+/g,' ').replace(/[^\s@]+@[^\s@]+/g,'[private]').slice(0,120) !== expected ||
+			!e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) || e.disabled || e.getAttribute('aria-disabled')==='true')) return false;
+		e.click(); return true;
+	}`, step.Selector, expectedLabel)
+	if err != nil {
 		return &Failure{Code: PageFailed}
+	}
+	if !clicked {
+		return &Failure{Code: RecipeInvalid}
 	}
 	return nil
 }

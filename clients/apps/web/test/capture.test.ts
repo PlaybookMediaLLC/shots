@@ -30,7 +30,32 @@ const recipeForm = {
   surfaceId: 'surface_1',
   versionPath: ' ',
   width: '1440',
+  objective: '',
+  navigationSteps: '4',
+  navigationCredits: '10',
 }
+
+test('AI capture settings persist only when a bounded objective is enabled', () => {
+  assert.equal(captureRecipeInput(recipeForm).definition.navigation, undefined)
+  const input = captureRecipeInput({ ...recipeForm, objective: '  Show the invoice history  ' })
+  assert.deepEqual(captureRecipeInputSchema.parse(input).definition.navigation, {
+    objective: 'Show the invoice history',
+    maxSteps: 4,
+    creditLimit: 10,
+  })
+  for (const override of [
+    { navigationSteps: '0' },
+    { navigationSteps: '7' },
+    { navigationCredits: '21' },
+  ]) {
+    assert.equal(
+      captureRecipeInputSchema.safeParse(
+        captureRecipeInput({ ...recipeForm, objective: 'Show invoices', ...override })
+      ).success,
+      false
+    )
+  }
+})
 
 const connection = {
   createdAt: '2026-11-04T12:00:00Z',

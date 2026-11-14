@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
@@ -28,6 +30,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/go-rod/rod/lib/proto"
@@ -233,6 +236,137 @@ func (w *captureWorld) request(t *testing.T, recipeID string) *CaptureJobRecord 
 		t.Fatal(err)
 	}
 	return record
+}
+
+type captureNavigationModel struct {
+	calls  int
+	prompt string
+	err    error
+}
+
+func (m *captureNavigationModel) Structured(_ context.Context, request platformai.Request, out any) (platformai.Usage, error) {
+	m.calls++
+	m.prompt = request.Prompt
+	if m.err != nil {
+		return platformai.Usage{}, m.err
+	}
+	return platformai.Usage{CostUSD: 0.01, InputTokens: 100, OutputTokens: 20}, json.Unmarshal([]byte(`{"action":"capture","controlId":-1}`), out)
+}
+
+func TestCaptureNavigationPersistsProvenanceAndBillsOnlyExecutedAttempts(t *testing.T) {
+	w := newCaptureWorld(t)
+	connection := w.connection(t)
+	w.signIn(t, connection.ID)
+	model, meter := &captureNavigationModel{}, &recordingMonthlyMeter{}
+	w.repo.WithAutomationModel(model).WithMonthlyMeter(meter)
+	recipe := w.recipe(t, connection.ID, func(r *browser.Recipe) {
+		r.Navigation = &browser.Navigation{Objective: "Show report details", MaxSteps: 2, CreditLimit: 2}
+	})
+	run := w.browser.run
+	w.browser.run = func(input browser.RunInput) (*browser.RunResult, error) {
+		if input.NextNavigation == nil {
+			t.Fatal("model was not connected to the durable capture job")
+		}
+		choice, err := input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Headings: []string{"Reports"}, Ready: true})
+		if err != nil {
+			return nil, err
+		}
+		if choice.Action != "capture" {
+			t.Fatal("model choice was lost")
+		}
+		result, err := run(input)
+		result.SourcePath = "/reports"
+		result.NavigationActions = []browser.NavigationAction{{Kind: "link", Path: "/reports"}}
+		return result, err
+	}
+	job, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipe.ID, CaptureJobRequest{Test: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.run(t, job.ID)
+	saved := w.job(t, job.ID)
+	if saved.Phase != "SUCCEEDED" || saved.AssetID == nil {
+		t.Fatalf("capture outcome: %+v", saved)
+	}
+	attempt := w.db.Client.CaptureAttempt.Query().Where(captureattempt.CaptureJobID(job.ID)).OnlyX(w.ctx)
+	if attempt.SourceURL != "https://app.example.com/reports" {
+		t.Fatalf("source URL=%q", attempt.SourceURL)
+	}
+	media := w.db.Client.Asset.GetX(w.ctx, *saved.AssetID)
+	if media.CaptureID == nil || *media.CaptureID != attempt.ID {
+		t.Fatal("original image lost capture provenance")
+	}
+	audit := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.capture_navigation_completed")).OnlyX(w.ctx)
+	if audit.Metadata["assetId"] != media.ID || audit.Metadata["captureJobId"] != job.ID || audit.Metadata["path"] != "/reports" {
+		t.Fatal("navigation evidence was not persisted")
+	}
+	if strings.Contains(model.prompt, captureSecret) || strings.Contains(model.prompt, "demo@example.com") {
+		t.Fatal("session or account material reached the model")
+	}
+	w.run(t, job.ID)
+	if model.calls != 1 {
+		t.Fatal("completed capture called the model again")
+	}
+	used := int64(0)
+	for _, n := range meter.used {
+		used += n
+	}
+	if used != 1 {
+		t.Fatalf("charged %d credits, want 1", used)
+	}
+}
+
+func TestCaptureNavigationStopsAtBudgetAndProviderFailures(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		modelError error
+		expected   browser.Code
+		budget     bool
+	}{
+		{name: "budget", expected: browser.NavigationBudget, budget: true},
+		{name: "invalid output", modelError: platformai.ErrSchema, expected: browser.NavigationInvalid},
+		{name: "timeout", modelError: context.DeadlineExceeded, expected: browser.NavigationRetryLimit},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			w := newCaptureWorld(t)
+			connection := w.connection(t)
+			w.signIn(t, connection.ID)
+			model := &captureNavigationModel{err: test.modelError}
+			w.repo.WithAutomationModel(model).WithMonthlyMeter(&recordingMonthlyMeter{})
+			recipe := w.recipe(t, connection.ID, func(r *browser.Recipe) {
+				r.Navigation = &browser.Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 1}
+			})
+			w.browser.run = func(input browser.RunInput) (*browser.RunResult, error) {
+				_, err := input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Ready: true})
+				if test.budget && err == nil {
+					_, err = input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Ready: true})
+				}
+				return nil, err
+			}
+			job, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipe.ID, CaptureJobRequest{Test: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.run(t, job.ID)
+			wantCalls := 1
+			if test.expected == browser.NavigationRetryLimit {
+				if saved := w.job(t, job.ID); saved.Phase != "QUEUED" || saved.AssetID != nil {
+					t.Fatal("transient failure did not remain retryable")
+				}
+				for range 3 {
+					w.run(t, job.ID)
+				}
+				wantCalls = 3
+			}
+			saved := w.job(t, job.ID)
+			if saved.Phase != "FAILED" || saved.FailureCode == nil || *saved.FailureCode != string(test.expected) || saved.AssetID != nil {
+				t.Fatalf("unexpected failure outcome: %+v", saved)
+			}
+			if model.calls != wantCalls || w.browser.open() != 0 {
+				t.Fatalf("model calls=%d open sessions=%d", model.calls, w.browser.open())
+			}
+		})
+	}
 }
 
 func TestCaptureConnectJourneyProvesAFreshSession(t *testing.T) {

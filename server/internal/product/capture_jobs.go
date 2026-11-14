@@ -676,6 +676,13 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if err != nil {
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.RecipeInvalid})
 	}
+	navigate := c.captureNavigator(org, recipe.Navigation)
+	if recipe.Navigation != nil && claim.job.Attempts > 3 {
+		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.NavigationRetryLimit})
+	}
+	if recipe.Navigation != nil && navigate == nil {
+		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.NavigationUnavailable})
+	}
 	session, err := c.captureRunner.Allocate(ctx, claim.connection.Hosts, captureRunKeepAlive)
 	if err != nil {
 		return c.failCapture(ctx, claim, err)
@@ -689,7 +696,7 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if claim.job.ExpectedRevision != nil {
 		expected = *claim.job.ExpectedRevision
 	}
-	result, runErr := c.captureRunner.Run(ctx, session, browser.RunInput{Target: captureTarget(claim.connection), Recipe: recipe, State: state, ExpectedRevision: expected})
+	result, runErr := c.captureRunner.Run(ctx, session, browser.RunInput{Target: captureTarget(claim.connection), Recipe: recipe, State: state, ExpectedRevision: expected, NextNavigation: navigate})
 	cleanup := context.WithoutCancel(ctx)
 	if err := c.captureRunner.Close(cleanup, session); err == nil {
 		if err := c.client.CaptureAttempt.UpdateOneID(claim.attempt.ID).SetBrowserClosedAt(time.Now().UTC()).Exec(cleanup); err != nil {
@@ -707,13 +714,33 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if err != nil {
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.ProviderUnavailable})
 	}
-	update := c.client.CaptureAttempt.UpdateOneID(claim.attempt.ID).SetAssetID(stored).SetRefusedRequests(result.RefusedRequests)
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	update := tx.CaptureAttempt.UpdateOneID(claim.attempt.ID).SetAssetID(stored).SetRefusedRequests(result.RefusedRequests)
+	if result.SourcePath != "" {
+		update.SetSourceURL(claim.connection.Origin + result.SourcePath)
+	}
 	var observed *string
 	if result.ObservedRevision != "" {
 		observed = &result.ObservedRevision
 		update.SetObservedRevision(result.ObservedRevision)
 	}
 	if err := update.Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := tx.Asset.UpdateOneID(stored).SetCaptureID(claim.attempt.ID).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if recipe.Navigation != nil {
+		if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_navigation_completed", "capture", claim.attempt.ID,
+			map[string]any{"captureJobId": claim.job.ID, "recipeId": claim.recipe.ID, "assetId": stored, "path": result.SourcePath, "actions": result.NavigationActions}); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	var rotated *browser.State

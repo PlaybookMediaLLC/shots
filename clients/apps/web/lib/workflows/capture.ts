@@ -123,6 +123,9 @@ export type CaptureRecipeForm = {
   versionPath: string
   width: string
   height: string
+  objective: string
+  navigationSteps: string
+  navigationCredits: string
 }
 
 /**
@@ -132,6 +135,7 @@ export type CaptureRecipeForm = {
 export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput {
   const masks = selectorList(form.masks)
   const versionPath = form.versionPath.trim()
+  const objective = form.objective.trim()
   return {
     connectionId: form.connectionId,
     definition: {
@@ -141,6 +145,15 @@ export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput 
       viewport: { height: Number(form.height), width: Number(form.width) },
       ...(masks.length ? { masks } : {}),
       ...(versionPath ? { version: { path: versionPath } } : {}),
+      ...(objective
+        ? {
+            navigation: {
+              objective,
+              maxSteps: Number(form.navigationSteps),
+              creditLimit: Number(form.navigationCredits),
+            },
+          }
+        : {}),
     },
     name: form.name,
     surfaceId: form.surfaceId,

@@ -54,6 +54,7 @@ export type CaptureRecipeDefinition = {
   masks?: string[]
   version?: { path?: string; selector?: string }
   allowedPostPaths?: string[]
+  navigation?: { objective: string; maxSteps: number; creditLimit: number }
 }
 /** One immutable recipe version. */
 export type CaptureRecipe = {

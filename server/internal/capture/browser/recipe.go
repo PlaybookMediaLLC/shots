@@ -10,6 +10,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // Limits are enforced on the server, whatever a recipe or a model asks for.
@@ -22,6 +23,7 @@ const (
 	MaxWidth            = 1920
 	MaxHeight           = 1080
 	MaxStepTimeoutMs    = 30_000
+	MaxNavigationSteps  = 6
 	maxPathLength       = 256
 	maxSelectorLength   = 200
 )
@@ -73,6 +75,16 @@ type Recipe struct {
 	// AllowedPostPaths are the exact paths the customer confirms are read-only.
 	// Every other POST, and every PUT, PATCH, and DELETE, is refused.
 	AllowedPostPaths []string `json:"allowedPostPaths,omitempty"`
+	// Navigation chooses among observed links and tabs after the fixed steps.
+	// Markers still prove the destination; a model cannot waive them.
+	Navigation *Navigation `json:"navigation,omitempty"`
+}
+
+// Navigation is an explicit, bounded feature objective for this recipe.
+type Navigation struct {
+	Objective   string `json:"objective"`
+	MaxSteps    int    `json:"maxSteps"`
+	CreditLimit int    `json:"creditLimit"`
 }
 
 var (
@@ -99,6 +111,10 @@ func ValidHost(value string) bool { return len(value) <= 253 && safeHost.MatchSt
 func (r Recipe) Validate() error {
 	if r.SchemaVersion != RecipeSchemaVersion {
 		return errors.New("Use recipe schema version 1.")
+	}
+	if r.Navigation != nil && (strings.TrimSpace(r.Navigation.Objective) == "" || utf8.RuneCountInString(r.Navigation.Objective) > 1000 ||
+		r.Navigation.MaxSteps < 1 || r.Navigation.MaxSteps > MaxNavigationSteps || r.Navigation.CreditLimit < 1 || r.Navigation.CreditLimit > 20) {
+		return errors.New("AI navigation needs an objective, 1–6 actions, and a budget of 1–20 credits.")
 	}
 	if r.Viewport.Width < 320 || r.Viewport.Height < 320 || r.Viewport.Width > MaxWidth || r.Viewport.Height > MaxHeight {
 		return errors.New("Use a viewport from 320×320 up to 1920×1080.")
