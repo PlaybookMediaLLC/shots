@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { browserRequest, expect, requestJson, test } from './framework'
+import { browserRequest, closeSharedDatabase, db, expect, requestJson, test } from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -58,6 +58,7 @@ async function verifyServiceRecovery(
 
 test('required dependencies return a safe failure or recover without data loss', async ({
   page,
+  workspace,
 }) => {
   const identifier = `e2e-recovery-${randomUUID()}`
   const screenshotRequest = () =>
@@ -73,6 +74,9 @@ test('required dependencies return a safe failure or recover without data loss',
       { 'x-forwarded-for': identifier }
     )
 
+  // Close only the fixture's idle connection before outages: Compose may
+  // recreate Postgres when restarting a dependent service. The app stays connected.
+  await closeSharedDatabase()
   await verifyServiceRecovery('redis', async () => (await screenshotRequest()).status, 503, 200)
   await verifyServiceRecovery('rustfs', async () => (await screenshotRequest()).status, 200, 200)
   // The web has no database or storage credentials: every product request
@@ -89,4 +93,7 @@ test('required dependencies return a safe failure or recover without data loss',
     503,
     200
   )
+  expect(await db.row('SELECT id FROM organization WHERE id = $1', [workspace.id])).toEqual({
+    id: workspace.id,
+  })
 })
