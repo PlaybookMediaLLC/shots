@@ -136,7 +136,10 @@ Follow these rules:
 5. Wait for a state, not for a time. Use web-first assertions and
    `expect.poll`. After you move the caret in a draft, call
    `settleSelection(page)`.
-6. Query the database with `db`. Do not open or close a pool.
+6. Query the database with `db`. Do not open or close a pool. The dependency
+   recovery test alone closes the fixture pool before intentionally stopping
+   Postgres; it leaves the application's connections open and checks persisted
+   data after recovery.
 7. Keep a test under 60 seconds. Tag a longer journey
    `{ tag: '@journey' }` (five minutes). Only a test that needs more than
    five minutes sets `test.setTimeout`, with a comment that says why.
