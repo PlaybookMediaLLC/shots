@@ -224,7 +224,7 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
-		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports":
+		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail":
 			if !signed {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
@@ -237,6 +237,8 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 			extra := ""
 			switch r.URL.Path {
+			case "/feature-shell", "/feature-shell-detail":
+				extra = `<h1>Reports</h1><nav><a href="/feature-shell-detail">Detailed report</a></nav>`
 			case "/features":
 				extra = `<h1>Product overview</h1><nav><a href="/feature-reports">Reports</a><a href="/logout">Sign out</a><a href="/feature-reports?token=private">Private link</a><a href="https://other.example.test/">External</a></nav><h2 data-testid="secret">Hidden private heading</h2><h2>Nested <span data-testid="secret">private heading</span></h2><form><h2>Private form</h2><input value="secret-value"></form>`
 			case "/feature-reports":
@@ -424,6 +426,30 @@ func TestRealBrowserNavigatesObservedFeature(t *testing.T) {
 		failed(t, err, WaitingForDeployment)
 		if image != nil || calls != before {
 			t.Fatal("old deployment ran navigation or returned an image")
+		}
+	})
+
+	t.Run("same shell on another route", func(t *testing.T) {
+		routeRecipe := recipe
+		routeRecipe.Steps = []Step{{Kind: StepNavigate, Path: "/feature-shell"}}
+		routeRecipe.Markers = []string{"[data-testid=ready]"}
+		result, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: routeRecipe, State: state, NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			if view.Path == "/feature-shell-detail" {
+				return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+			}
+			for _, control := range view.Controls {
+				if control.Path == "/feature-shell-detail" {
+					return NavigationChoice{Action: "select", ControlID: &control.ID}, nil
+				}
+			}
+			t.Fatal("detail route was not offered")
+			return NavigationChoice{}, nil
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.SourcePath != "/feature-shell-detail" || len(result.Image) == 0 || len(result.NavigationActions) != 2 {
+			t.Fatal("route change did not produce an attributed capture")
 		}
 	})
 

@@ -139,7 +139,7 @@ func (s *scope) waitNavigation(ctx context.Context, input RunInput, before Navig
 		if err != nil {
 			return err
 		}
-		changed := (!before.Ready && view.Ready) || !slices.Equal(view.Headings, before.Headings)
+		changed := view.Path != before.Path || (!before.Ready && view.Ready) || !slices.Equal(view.Headings, before.Headings)
 		for _, control := range view.Controls {
 			if !slices.ContainsFunc(before.Controls, func(old NavigationControl) bool {
 				return old.Kind == control.Kind && old.Label == control.Label && old.Path == control.Path
