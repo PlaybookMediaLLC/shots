@@ -54,7 +54,7 @@ test(
   'a pasted block becomes separate posts, scheduled as one run and edited from the queue',
   { tag: '@journey' },
   async ({ page, startWorkspace }) => {
-    await startWorkspace({ channels: ['x'] })
+    const workspace = await startWorkspace({ channels: ['x'] })
     await weeklySlots(page)
     await page.goto('/publish')
 
@@ -79,7 +79,9 @@ test(
       .poll(async () =>
         (
           await db.rows<{ title: string }>(
-            `SELECT title FROM content_draft WHERE title LIKE 'Storytelling%' ORDER BY title`
+            `SELECT title FROM content_draft
+              WHERE "organizationId" = $1 AND title LIKE 'Storytelling%' ORDER BY title`,
+            [workspace.id]
           )
         ).map((row) => row.title)
       )
@@ -97,7 +99,8 @@ test(
             await db.rows<{ count: string }>(
               `SELECT count(*)::text AS count FROM scheduled_post p
                  JOIN content_draft d ON d.id = p."contentDraftId"
-                WHERE d.title LIKE 'Storytelling%' AND p.status = 'SCHEDULED'`
+                WHERE d."organizationId" = $1 AND d.title LIKE 'Storytelling%' AND p.status = 'SCHEDULED'`,
+              [workspace.id]
             )
           )[0]?.count,
         { timeout: 60_000 }
@@ -116,7 +119,8 @@ test(
     const before = await db.rows<{ at: string }>(
       `SELECT "scheduledFor"::text AS at FROM scheduled_post p
          JOIN content_draft d ON d.id = p."contentDraftId"
-        WHERE d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`
+        WHERE d."organizationId" = $1 AND d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`,
+      [workspace.id]
     )
     await group.getByRole('button', { name: 'Select the run' }).click()
     const bar = page.getByTestId('queue-bulk-bar')
@@ -129,7 +133,8 @@ test(
             await db.rows<{ at: string }>(
               `SELECT "scheduledFor"::text AS at FROM scheduled_post p
                  JOIN content_draft d ON d.id = p."contentDraftId"
-                WHERE d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`
+                WHERE d."organizationId" = $1 AND d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`,
+              [workspace.id]
             )
           ).map((row) => row.at),
         { timeout: 60_000 }
