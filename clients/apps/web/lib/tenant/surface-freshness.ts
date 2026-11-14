@@ -42,6 +42,17 @@ const CAPTURE_FAILURES: Record<string, string> = {
   image_invalid: 'The screenshot came back empty or at the wrong size.',
   page_failed: 'The page failed to load.',
   provider_unavailable: 'The browser provider is unavailable. Try again shortly.',
+  navigation_unavailable:
+    'AI navigation is unavailable or timed out. Check the AI provider and retry.',
+  navigation_invalid: 'The AI returned an invalid navigation choice. No screenshot was accepted.',
+  navigation_failed:
+    'The AI could not verify the requested feature. Clarify the objective and test again.',
+  navigation_limit:
+    'Navigation reached its action limit or repeated a step. Clarify the objective and test again.',
+  navigation_budget:
+    'AI navigation exhausted its credit budget or the workspace allowance. Check the budget and retry.',
+  navigation_retry_limit:
+    'AI capture stopped after three attempts. Check the earlier failure and retry when it is resolved.',
   connection_missing: 'The connection for this recipe no longer exists.',
   connection_revoked: 'The connection was revoked, so this capture stopped.',
   connect_expired: 'The sign-in window expired before it finished. Start the sign-in again.',

@@ -46,6 +46,9 @@ const blankRecipe: CaptureRecipeForm = {
   surfaceId: '',
   versionPath: '',
   width: '1440',
+  objective: '',
+  navigationSteps: '4',
+  navigationCredits: '10',
 }
 
 /** A test's outcome. The image goes through the authorized asset route, which rechecks access. */
@@ -120,6 +123,13 @@ function RecipeRow({
               ? `Tested ${relativeTime(recipe.testedAt)}`
               : 'Needs a successful test before it can run after deployment'}
           </p>
+          {recipe.definition.navigation ? (
+            <p className="text-xs text-muted-foreground">
+              AI objective: {recipe.definition.navigation.objective} · Up to{' '}
+              {recipe.definition.navigation.maxSteps} actions ·{' '}
+              {recipe.definition.navigation.creditLimit} credits per attempt
+            </p>
+          ) : null}
         </div>
         {canManage && recipe.status !== 'ARCHIVED' ? (
           <div className="flex flex-wrap gap-2">
@@ -261,6 +271,44 @@ function RecipeForm({
           </Select>
         </CaptureField>
         {text('path', 'Path', 'On the connected app: /billing.')}
+        <CaptureField
+          hint="AI can follow the app's navigation links and tabs to find this feature. Leave empty to capture the path directly. Page paths, headings and navigation labels are sent to the AI provider; the account marker, form values, and configured masks are excluded."
+          label="Feature to find (optional)"
+        >
+          <Textarea
+            maxLength={1000}
+            onChange={(event) => set('objective', event.target.value)}
+            rows={3}
+            value={form.objective}
+          />
+        </CaptureField>
+        {form.objective.trim() ? (
+          <div className="grid grid-cols-2 gap-4">
+            <CaptureField hint="1–6 navigation actions." label="Action limit">
+              <Input
+                max={6}
+                min={1}
+                onChange={(event) => set('navigationSteps', event.target.value)}
+                required
+                type="number"
+                value={form.navigationSteps}
+              />
+            </CaptureField>
+            <CaptureField
+              hint="1–20 credits per attempt. A retry has its own budget."
+              label="AI credit limit"
+            >
+              <Input
+                max={20}
+                min={1}
+                onChange={(event) => set('navigationCredits', event.target.value)}
+                required
+                type="number"
+                value={form.navigationCredits}
+              />
+            </CaptureField>
+          </div>
+        ) : null}
         {text(
           'marker',
           'Element that proves the screen',

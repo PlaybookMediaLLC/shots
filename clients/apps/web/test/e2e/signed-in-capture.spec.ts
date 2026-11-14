@@ -1,4 +1,5 @@
 import { createWorkspace, db, expect, test, trpcMutation, trpcQuery } from './framework'
+import { z } from 'zod'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -61,6 +62,51 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
   await app.open('/workflows/connections')
   await expect(page.getByRole('heading', { name: 'Staging app' })).toBeVisible()
 
+  const surface = z.object({ productSurface: z.object({ id: z.string() }) }).parse(
+    (
+      await trpcMutation(page, 'productSurface.create', {
+        name: 'Reports',
+        url: 'https://app.example.com/reports',
+        environment: 'staging',
+      })
+    ).body
+  ).productSurface
+  await page.reload()
+  const screen = page
+    .locator('form')
+    .filter({ has: page.getByRole('heading', { name: 'Add a screen', exact: true }) })
+  await screen.getByRole('textbox', { name: /^Name\b/ }).fill('Detailed reports')
+  await screen.getByRole('combobox', { name: 'Product page' }).click()
+  await page.getByRole('option', { name: 'Reports', exact: true }).click()
+  await screen.getByRole('combobox', { name: /^Connection\b/ }).click()
+  await page.getByRole('option', { name: 'Staging app', exact: true }).click()
+  await screen.getByRole('textbox', { name: /^Path\b/ }).fill('/dashboard')
+  await screen
+    .getByRole('textbox', { name: 'Element that proves the screen' })
+    .fill('#report-detail')
+  await screen
+    .getByRole('textbox', { name: 'Feature to find (optional)' })
+    .fill('Show the detailed report')
+  await screen.getByRole('spinbutton', { name: 'Action limit' }).fill('3')
+  await screen.getByRole('spinbutton', { name: 'AI credit limit' }).fill('6')
+  await screen.getByRole('button', { name: 'Add screen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Detailed reports · version 1' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(/AI objective: Show the detailed report/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Enable after deployment' })).toBeDisabled()
+  const recipeRows = await db.query<{
+    id: string
+    definition: { navigation: { objective: string; maxSteps: number; creditLimit: number } }
+  }>(`SELECT id, definition FROM capture_recipe WHERE "organizationId"=$1 AND "surfaceId"=$2`, [
+    workspace.id,
+    surface.id,
+  ])
+  expect(recipeRows.rows[0]?.definition.navigation).toEqual({
+    objective: 'Show the detailed report',
+    maxSteps: 3,
+    creditLimit: 6,
+  })
+
   // Signing in needs the provider: a plain failure, and no browser or state.
   const connect = await trpcMutation(page, 'capture.connect', { id: saved?.id })
   expect(connect.status).toBe(503)
@@ -90,6 +136,10 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
     expect(theirs.connections).toHaveLength(0)
     const revoke = await trpcMutation(otherPage, 'capture.revokeConnection', { id: saved?.id })
     expect(revoke.status).toBe(404)
+    const archive = await trpcMutation(otherPage, 'capture.archiveRecipe', {
+      id: recipeRows.rows[0]?.id,
+    })
+    expect(archive.status).toBe(404)
     const kept = await db.query(`SELECT status FROM platform_app_connection WHERE id=$1`, [
       saved?.id,
     ])
