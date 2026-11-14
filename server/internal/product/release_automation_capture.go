@@ -50,7 +50,11 @@ func (c *Configuration) automationCaptureProduct(ctx context.Context, org string
 		return automation.Outputs{}, err
 	}
 	if action.RecipeID != "" {
-		return c.automationAuthenticatedCapture(ctx, org, event, input, action)
+		outputs, err := c.automationAuthenticatedCapture(ctx, org, event, input, action)
+		if err != nil {
+			return automation.Outputs{}, err
+		}
+		return c.linkAutomationCapture(ctx, org, event.ID, outputs)
 	}
 	if c.capture == nil || c.objects == nil {
 		return automation.Outputs{}, ErrCaptureUnavailable
@@ -84,6 +88,18 @@ func (c *Configuration) automationCaptureProduct(ctx context.Context, org string
 	outputs := input
 	outputs.CreditsCharged = 0
 	outputs.CaptureID, outputs.CaptureAssetID, outputs.CaptureProof = receipt.ID, receipt.AssetID, proof
+	return c.linkAutomationCapture(ctx, org, event.ID, outputs)
+}
+
+func (c *Configuration) linkAutomationCapture(ctx context.Context, org, eventID string, outputs automation.Outputs) (automation.Outputs, error) {
+	actor := Actor{OrganizationID: org, Kind: "service", Display: "release-automation", RequestID: eventID}
+	link, err := c.LinkCampaignAsset(ctx, actor, outputs.CampaignID, outputs.CaptureAssetID, LinkCampaignAssetInput{Kind: "product-shot", preserveExisting: true})
+	if err != nil {
+		return automation.Outputs{}, err
+	}
+	if link.AssetStatus != "UPLOADED" {
+		return automation.Outputs{}, ErrCaptureRefused
+	}
 	return outputs, nil
 }
 

@@ -260,6 +260,20 @@ export function WorkflowRunDetail({
               </ButtonLink>
             </Row>
           ) : null}
+          {run.outputs.draftIds?.length ? (
+            <Row
+              description="Editable drafts with the captured product image attached. Review and save changes before publishing."
+              label="Publish drafts"
+            >
+              <div className="flex flex-wrap gap-2">
+                {run.outputs.draftIds.map((id, index) => (
+                  <ButtonLink href={`/publish/${id}`} key={id} size="sm" variant="outline">
+                    Open draft {index + 1}
+                  </ButtonLink>
+                ))}
+              </div>
+            </Row>
+          ) : null}
           {run.outputs.renderedAssetIds?.length && run.outputs.campaignId ? (
             <Row
               description="Rendered from the latest product capture in the brand kit. A reviewer approves a design before it can be scheduled."
