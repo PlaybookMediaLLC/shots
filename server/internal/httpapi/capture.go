@@ -16,6 +16,7 @@ type captureStore interface {
 	CreateCaptureConnection(context.Context, product.Actor, product.CreateCaptureConnectionInput) (*product.CaptureConnectionRecord, error)
 	ListCaptureConnections(context.Context, product.Actor) ([]product.CaptureConnectionRecord, error)
 	StartCaptureConnect(context.Context, product.Actor, string) (*product.CaptureConnectStart, error)
+	RefreshCaptureConnect(context.Context, product.Actor, string) (*product.CaptureConnectStart, error)
 	FinishCaptureConnect(context.Context, product.Actor, string, string) error
 	RevokeCaptureConnection(context.Context, product.Actor, string) error
 	CreateCaptureRecipe(context.Context, product.Actor, product.CreateCaptureRecipeInput) (*product.CaptureRecipeRecord, error)
@@ -39,6 +40,7 @@ func (s *Server) registerCapture(mux *http.ServeMux) {
 	authenticated("GET /v1/capture", captureOverview)
 	authenticated("POST /v1/capture/connections", createCaptureConnection)
 	authenticated("POST /v1/capture/connections/{id}/connect", startCaptureConnect)
+	authenticated("POST /v1/capture/connections/{id}/connect/refresh", refreshCaptureConnect)
 	authenticated("POST /v1/capture/connections/{id}/connect/finish", finishCaptureConnect)
 	authenticated("POST /v1/capture/connections/{id}/revoke", revokeCaptureConnection)
 	authenticated("POST /v1/capture/recipes", createCaptureRecipe)
@@ -123,6 +125,17 @@ func finishCaptureConnect(w http.ResponseWriter, r *http.Request, store captureS
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]bool{"accepted": true})
+}
+
+func refreshCaptureConnect(w http.ResponseWriter, r *http.Request, store captureStore) {
+	start, err := store.RefreshCaptureConnect(r.Context(), workspaceActor(r), r.PathValue("id"))
+	if err != nil {
+		writeCaptureError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	writeJSON(w, http.StatusOK, start)
 }
 
 func revokeCaptureConnection(w http.ResponseWriter, r *http.Request, store captureStore) {

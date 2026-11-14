@@ -57,6 +57,16 @@ export const captureRouter = router({
         'This connection was revoked. Create a new one to sign in again.'
       )
     ),
+  /** Issues a new private viewer link for the same person's open sign-in. */
+  refreshConnect: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(captureConnectStartSchema)
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).refreshCaptureConnect(input.id),
+        'This sign-in is no longer open. Reconnect to start a new sign-in window.'
+      )
+    ),
   finishConnect: organizationProcedure('workspace:update')
     .input(captureConnectFinishSchema)
     .mutation(({ ctx, input }) =>

@@ -31,6 +31,10 @@ const CAPTURE_FAILURES: Record<string, string> = {
   surface_unreachable: 'The page could not be reached.',
   // Signed-in capture, from the browser, the job and the connection.
   needs_auth: 'The session ended, or the app asked to sign in. Reconnect to continue.',
+  sign_in_incomplete:
+    'Sign-in did not finish in the private browser. Reconnect, finish signing in there, then select “I’ve signed in”.',
+  session_restore_failed:
+    'Sign-in worked in the private browser, but a new browser could not restore it. Reconnect; if this repeats, the app may require a different sign-in method.',
   wrong_account: 'The app is signed in as a different account than this connection expects.',
   waiting_for_deployment: 'The app kept reporting another commit, so nothing was captured.',
   deployment_unverified: 'The app did not report its deployed commit, so nothing was captured.',

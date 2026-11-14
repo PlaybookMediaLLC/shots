@@ -10,10 +10,12 @@ import type { CaptureConnectStart } from '@/lib/api/contracts/capture'
 export function SignInPanel({
   busy,
   onFinish,
+  onRefresh,
   start,
 }: {
   busy: boolean
   onFinish: () => void
+  onRefresh: () => void
   start: CaptureConnectStart
 }) {
   return (
@@ -21,6 +23,10 @@ export function SignInPanel({
       <p className="text-muted-foreground">
         Sign in as the demo account in the new window, then come back here. The window expires at{' '}
         {new Date(start.expiresAt).toLocaleTimeString()}.
+      </p>
+      <p className="text-muted-foreground">
+        If the view freezes or the link expires, refresh the window link, then open it again. Your
+        sign-in stays in the same browser. Start over creates a new browser.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline">
@@ -33,6 +39,9 @@ export function SignInPanel({
           >
             Open sign-in window
           </a>
+        </Button>
+        <Button disabled={busy} onClick={onRefresh} size="sm" type="button" variant="outline">
+          Refresh sign-in window
         </Button>
         <Button disabled={busy} onClick={onFinish} size="sm" type="button">
           I&apos;ve signed in

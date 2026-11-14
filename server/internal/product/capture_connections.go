@@ -301,6 +301,53 @@ func lockCaptureConnection(ctx context.Context, tx *ent.Tx, org, id string) (*en
 	return tx.PlatformAppConnection.Query().Where(platformappconnection.ID(id), platformappconnection.OrganizationID(org)).Only(ctx)
 }
 
+// RefreshCaptureConnect reopens the same person's unfinished sign-in without
+// replacing its browser, intent or deadline. The bearer link is never stored.
+func (c *Configuration) RefreshCaptureConnect(ctx context.Context, actor Actor, id string) (*CaptureConnectStart, error) {
+	if err := c.authorizeAutomationAdmin(ctx, actor); err != nil {
+		return nil, err
+	}
+	if !c.CaptureAvailable() {
+		return nil, ErrAuthenticatedCaptureUnavailable
+	}
+	row, err := c.client.PlatformAppConnection.Query().Where(platformappconnection.ID(id), platformappconnection.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if row.ConnectUserID == nil || *row.ConnectUserID != actor.UserID {
+		return nil, publishing.ErrForbidden
+	}
+	if row.Status == platformappconnection.StatusREVOKED || row.ConnectPhase == nil || *row.ConnectPhase != "OPEN" || row.ConnectIntentID == nil || row.ConnectSessionID == nil || row.ConnectExpiresAt == nil || !row.ConnectExpiresAt.After(time.Now()) {
+		return nil, publishing.ErrConflict
+	}
+	link, err := c.captureRunner.LiveView(ctx, *row.ConnectSessionID, min(captureLiveViewStart, time.Until(*row.ConnectExpiresAt)))
+	if err != nil {
+		return nil, captureProviderError(err)
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	locked, err := lockCaptureConnection(ctx, tx, actor.OrganizationID, id)
+	if err != nil {
+		return nil, err
+	}
+	if locked.Status == platformappconnection.StatusREVOKED || locked.ConnectPhase == nil || *locked.ConnectPhase != "OPEN" || locked.ConnectIntentID == nil || *locked.ConnectIntentID != *row.ConnectIntentID || locked.ConnectSessionID == nil || *locked.ConnectSessionID != *row.ConnectSessionID || locked.ConnectExpiresAt == nil || !locked.ConnectExpiresAt.After(time.Now()) {
+		return nil, publishing.ErrConflict
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_connect_view_refreshed", "platform_app_connection", id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &CaptureConnectStart{IntentID: *row.ConnectIntentID, LiveViewURL: link, ExpiresAt: *row.ConnectExpiresAt}, nil
+}
+
 // FinishCaptureConnect records "I signed in" from the person who started this
 // exact sign-in, once. It proves nothing: the worker must restore the state in
 // a fresh browser before the connection counts as ready.
@@ -356,7 +403,7 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	state, err := c.captureRunner.Export(ctx, session, target)
 	_ = c.captureRunner.Close(cleanup, session)
 	if err != nil {
-		return c.failCaptureConnection(cleanup, org, id, intent, err)
+		return c.failCaptureConnection(cleanup, org, id, intent, captureSignInFailure(err, browser.SignInIncomplete))
 	}
 	fresh, err := c.captureRunner.Allocate(ctx, row.Hosts, 3*time.Minute)
 	if err != nil {
@@ -365,7 +412,7 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	err = c.captureRunner.Verify(ctx, fresh, target, state)
 	_ = c.captureRunner.Close(cleanup, fresh)
 	if err != nil {
-		return c.failCaptureConnection(cleanup, org, id, intent, err)
+		return c.failCaptureConnection(cleanup, org, id, intent, captureSignInFailure(err, browser.SessionRestoreFailed))
 	}
 	body, err := state.Marshal()
 	if err != nil {
@@ -411,8 +458,19 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	return tx.Commit()
 }
 
+func captureSignInFailure(err error, stage browser.Code) error {
+	if stage == browser.SignInIncomplete && errors.Is(err, browser.ErrNoPages) {
+		return &browser.Failure{Code: stage}
+	}
+	var failure *browser.Failure
+	if errors.As(err, &failure) && failure.Code == browser.NeedsAuth {
+		return &browser.Failure{Code: stage}
+	}
+	return err
+}
+
 func (c *Configuration) failCaptureConnection(ctx context.Context, org, id, intent string, cause error) error {
-	code := string(browser.NeedsAuth)
+	code := string(browser.ProviderUnavailable)
 	var failure *browser.Failure
 	if errors.As(cause, &failure) {
 		code = string(failure.Code)

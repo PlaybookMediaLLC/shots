@@ -120,6 +120,33 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
     connectSessionId: null,
   })
 
+  // An interrupted handoff remains recoverable after a page reload. Real
+  // provider recovery is covered in Go; this lane deliberately has no provider.
+  await db.query(
+    `UPDATE platform_app_connection SET "connectPhase"='OPEN', "failureCode"='sign_in_incomplete' WHERE id=$1 AND "organizationId"=$2`,
+    [saved?.id, workspace.id]
+  )
+  await app.reload()
+  await expect(page.getByText(/Sign-in did not finish in the private browser/)).toBeVisible()
+  await page.getByRole('button', { name: 'Resume sign-in', exact: true }).click()
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'authenticated capture is not configured' })
+  ).toBeVisible()
+  const unchanged = await db.query(
+    `SELECT "connectPhase", "connectSessionId" FROM platform_app_connection WHERE id=$1`,
+    [saved?.id]
+  )
+  expect(unchanged.rows[0]).toMatchObject({ connectPhase: 'OPEN', connectSessionId: null })
+  await db.query(
+    `UPDATE platform_app_connection SET "connectPhase"=NULL, "failureCode"='session_restore_failed' WHERE id=$1 AND "organizationId"=$2`,
+    [saved?.id, workspace.id]
+  )
+  await app.reload()
+  await expect(
+    page.getByText(/Sign-in worked in the private browser, but a new browser could not restore it/)
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Resume sign-in', exact: true })).toHaveCount(0)
+
   // Another workspace sees nothing, and cannot act on the ID.
   const otherContext = await browser.newContext()
   try {
