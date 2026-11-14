@@ -34,25 +34,33 @@ func UnmarshalState(body []byte) (*State, error) {
 	return state, nil
 }
 
-func (s *State) canonical() string {
+func (s *State) canonical() (string, error) {
 	if s == nil {
-		return ""
+		return "", nil
 	}
 	cookies := make([]string, 0, len(s.Cookies))
 	for _, cookie := range s.Cookies {
-		cookies = append(cookies, cookie.Name+"\x00"+cookie.Domain+"\x00"+cookie.Value)
+		body, err := json.Marshal(cookie)
+		if err != nil {
+			return "", err
+		}
+		cookies = append(cookies, string(body))
 	}
 	sort.Strings(cookies)
-	body, _ := json.Marshal(struct {
+	body, err := json.Marshal(struct {
 		Cookies []string
 		Storage map[string]map[string]string
 	}{cookies, s.LocalStorage})
-	return string(body)
+	return string(body), err
 }
 
-// Same reports whether two states hold the same credentials, so token expiry
-// bookkeeping alone does not write a new revision.
-func (s *State) Same(other *State) bool { return s.canonical() == other.canonical() }
+// Same compares everything restored into the browser, ignoring cookie order.
+// Renewed expiry and scope must survive even when the token value is unchanged.
+func (s *State) Same(other *State) bool {
+	left, leftErr := s.canonical()
+	right, rightErr := other.canonical()
+	return leftErr == nil && rightErr == nil && left == right
+}
 
 // cookieApproved keeps a cookie only if a browser would send it to an approved
 // host: the host itself, a matching pattern, or a parent domain of an approved

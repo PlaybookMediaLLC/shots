@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	_ "image/png"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -23,6 +24,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/proto"
 )
 
 func init() {
@@ -32,6 +34,35 @@ func init() {
 
 func validRecipe() Recipe {
 	return Recipe{SchemaVersion: 1, Viewport: Viewport{Width: 800, Height: 600}, Steps: []Step{{Kind: StepNavigate, Path: "/dashboard"}}, Markers: []string{"[data-testid=ready]"}}
+}
+
+func TestSessionStateDetectsCookieRenewal(t *testing.T) {
+	base := &State{Cookies: []*proto.NetworkCookieParam{{Name: "session", Value: "same-token", Domain: "app.example.com", Path: "/", Expires: 2_000_000_000, Secure: true, HTTPOnly: true}}}
+	for name, change := range map[string]func(*proto.NetworkCookieParam){
+		"expiry":   func(c *proto.NetworkCookieParam) { c.Expires++ },
+		"path":     func(c *proto.NetworkCookieParam) { c.Path = "/app" },
+		"secure":   func(c *proto.NetworkCookieParam) { c.Secure = false },
+		"httpOnly": func(c *proto.NetworkCookieParam) { c.HTTPOnly = false },
+		"sameSite": func(c *proto.NetworkCookieParam) { c.SameSite = proto.NetworkCookieSameSiteStrict },
+	} {
+		t.Run(name, func(t *testing.T) {
+			cookie := *base.Cookies[0]
+			change(&cookie)
+			if base.Same(&State{Cookies: []*proto.NetworkCookieParam{&cookie}}) {
+				t.Fatal("changed cookie would not be saved for the next capture")
+			}
+		})
+	}
+	other := &proto.NetworkCookieParam{Name: "preferences", Value: "dark", Domain: "app.example.com"}
+	first := &State{Cookies: []*proto.NetworkCookieParam{base.Cookies[0], other}}
+	second := &State{Cookies: []*proto.NetworkCookieParam{other, base.Cookies[0]}}
+	if !first.Same(second) {
+		t.Fatal("cookie order alone must not write a new state revision")
+	}
+	invalid := &State{Cookies: []*proto.NetworkCookieParam{{Expires: proto.TimeSinceEpoch(math.NaN())}}}
+	if invalid.Same(invalid) {
+		t.Fatal("unserializable state cannot prove equality")
+	}
 }
 
 // Browser Run reports [::1] for every response through its local proxy, so
@@ -132,6 +163,7 @@ type protectedApp struct {
 	commit  atomic.Value
 	expired atomic.Bool
 	rotate  atomic.Bool
+	renew   atomic.Bool
 }
 
 func (a *protectedApp) hit(key string) {
@@ -182,6 +214,9 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 			if a.rotate.Load() {
 				http.SetCookie(w, &http.Cookie{Name: "session", Value: "valid-2", Path: "/", Secure: true, HttpOnly: true})
+			}
+			if a.renew.Load() {
+				http.SetCookie(w, &http.Cookie{Name: "session", Value: "valid-1", Path: "/", Secure: true, HttpOnly: true, Expires: time.Now().Add(time.Hour).UTC()})
 			}
 			extra := ""
 			switch r.URL.Path {
@@ -360,6 +395,29 @@ func TestRealBrowserFreshSessionCapture(t *testing.T) {
 	// Unchanged credentials write no new revision.
 	if again, err := Run(ctx, browser, RunInput{Target: target, Recipe: validRecipe(), State: rotated.State}); err != nil || again.State != nil {
 		t.Fatalf("state=%+v err=%v", again, err)
+	}
+}
+
+func TestRealBrowserPreservesRenewedCookieExpiry(t *testing.T) {
+	a := newProtectedApp(t)
+	state := signIn(t, a)
+	browser := localBrowser(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	a.renew.Store(true)
+	result, err := Run(ctx, browser, RunInput{Target: a.target(), Recipe: validRecipe(), State: state})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.State == nil || len(result.State.Cookies) != 1 {
+		t.Fatal("the refreshed cookie expiry was discarded")
+	}
+	if result.State.Cookies[0].Value != state.Cookies[0].Value || float64(result.State.Cookies[0].Expires) <= float64(time.Now().Unix()) {
+		t.Fatal("the same token must retain its renewed expiry")
+	}
+	a.renew.Store(false)
+	if err := Verify(ctx, localBrowser(t), a.target(), result.State); err != nil {
+		t.Fatalf("renewed session could not be restored in a fresh browser: %v", err)
 	}
 }
 
