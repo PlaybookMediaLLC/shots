@@ -342,6 +342,7 @@ export {
 } from './publishing'
 export { SECRETS, dropSensitiveScreenshot, ocr } from './sensitive'
 export {
+  closeSharedDatabase,
   createE2EObjectStoreClient,
   db,
   getE2EObjectStoreBucket,
