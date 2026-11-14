@@ -118,8 +118,13 @@ const overview: CaptureOverview = {
 }
 
 test('the overview parses the records the backend returns', () => {
-  const parsed = captureOverviewSchema.parse({ ...overview, jobs: [job] })
-  assert.deepEqual(parsed, { ...overview, jobs: [job] })
+  const jobs = ['test', 'manual', 'agent', 'deployment'].map((kind) => ({ ...job, kind }))
+  const parsed = captureOverviewSchema.parse({ ...overview, jobs })
+  assert.deepEqual(parsed, { ...overview, jobs })
+  assert.equal(
+    captureOverviewSchema.safeParse({ ...overview, jobs: [{ ...job, kind: 'unknown' }] }).success,
+    false
+  )
 })
 
 test('the sign-in link must be https, and a refused link is never repeated', () => {

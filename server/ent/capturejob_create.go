@@ -128,6 +128,20 @@ func (_c *CaptureJobCreate) SetNillableAttempts(v *int) *CaptureJobCreate {
 	return _c
 }
 
+// SetNavigationAttempts sets the "navigation_attempts" field.
+func (_c *CaptureJobCreate) SetNavigationAttempts(v int) *CaptureJobCreate {
+	_c.mutation.SetNavigationAttempts(v)
+	return _c
+}
+
+// SetNillableNavigationAttempts sets the "navigation_attempts" field if the given value is not nil.
+func (_c *CaptureJobCreate) SetNillableNavigationAttempts(v *int) *CaptureJobCreate {
+	if v != nil {
+		_c.SetNavigationAttempts(*v)
+	}
+	return _c
+}
+
 // SetSurfaceID sets the "surface_id" field.
 func (_c *CaptureJobCreate) SetSurfaceID(v string) *CaptureJobCreate {
 	_c.mutation.SetSurfaceID(v)
@@ -395,6 +409,10 @@ func (_c *CaptureJobCreate) defaults() {
 		v := capturejob.DefaultAttempts
 		_c.mutation.SetAttempts(v)
 	}
+	if _, ok := _c.mutation.NavigationAttempts(); !ok {
+		v := capturejob.DefaultNavigationAttempts
+		_c.mutation.SetNavigationAttempts(v)
+	}
 	if _, ok := _c.mutation.ConnectionGeneration(); !ok {
 		v := capturejob.DefaultConnectionGeneration
 		_c.mutation.SetConnectionGeneration(v)
@@ -457,6 +475,9 @@ func (_c *CaptureJobCreate) check() error {
 	}
 	if _, ok := _c.mutation.Attempts(); !ok {
 		return &ValidationError{Name: "attempts", err: errors.New(`ent: missing required field "CaptureJob.attempts"`)}
+	}
+	if _, ok := _c.mutation.NavigationAttempts(); !ok {
+		return &ValidationError{Name: "navigation_attempts", err: errors.New(`ent: missing required field "CaptureJob.navigation_attempts"`)}
 	}
 	if _, ok := _c.mutation.ConnectionGeneration(); !ok {
 		return &ValidationError{Name: "connection_generation", err: errors.New(`ent: missing required field "CaptureJob.connection_generation"`)}
@@ -547,6 +568,10 @@ func (_c *CaptureJobCreate) createSpec() (*CaptureJob, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Attempts(); ok {
 		_spec.SetField(capturejob.FieldAttempts, field.TypeInt, value)
 		_node.Attempts = value
+	}
+	if value, ok := _c.mutation.NavigationAttempts(); ok {
+		_spec.SetField(capturejob.FieldNavigationAttempts, field.TypeInt, value)
+		_node.NavigationAttempts = value
 	}
 	if value, ok := _c.mutation.SurfaceID(); ok {
 		_spec.SetField(capturejob.FieldSurfaceID, field.TypeString, value)

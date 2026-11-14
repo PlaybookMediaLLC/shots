@@ -456,24 +456,28 @@ func init() {
 	capturejobDescAttempts := capturejobFields[10].Descriptor()
 	// capturejob.DefaultAttempts holds the default value on creation for the attempts field.
 	capturejob.DefaultAttempts = capturejobDescAttempts.Default.(int)
+	// capturejobDescNavigationAttempts is the schema descriptor for navigation_attempts field.
+	capturejobDescNavigationAttempts := capturejobFields[11].Descriptor()
+	// capturejob.DefaultNavigationAttempts holds the default value on creation for the navigation_attempts field.
+	capturejob.DefaultNavigationAttempts = capturejobDescNavigationAttempts.Default.(int)
 	// capturejobDescConnectionGeneration is the schema descriptor for connection_generation field.
-	capturejobDescConnectionGeneration := capturejobFields[13].Descriptor()
+	capturejobDescConnectionGeneration := capturejobFields[14].Descriptor()
 	// capturejob.DefaultConnectionGeneration holds the default value on creation for the connection_generation field.
 	capturejob.DefaultConnectionGeneration = capturejobDescConnectionGeneration.Default.(int)
 	// capturejobDescFencingToken is the schema descriptor for fencing_token field.
-	capturejobDescFencingToken := capturejobFields[17].Descriptor()
+	capturejobDescFencingToken := capturejobFields[18].Descriptor()
 	// capturejob.DefaultFencingToken holds the default value on creation for the fencing_token field.
 	capturejob.DefaultFencingToken = capturejobDescFencingToken.Default.(int64)
 	// capturejobDescResumeCount is the schema descriptor for resume_count field.
-	capturejobDescResumeCount := capturejobFields[23].Descriptor()
+	capturejobDescResumeCount := capturejobFields[24].Descriptor()
 	// capturejob.DefaultResumeCount holds the default value on creation for the resume_count field.
 	capturejob.DefaultResumeCount = capturejobDescResumeCount.Default.(int)
 	// capturejobDescCreatedAt is the schema descriptor for created_at field.
-	capturejobDescCreatedAt := capturejobFields[24].Descriptor()
+	capturejobDescCreatedAt := capturejobFields[25].Descriptor()
 	// capturejob.DefaultCreatedAt holds the default value on creation for the created_at field.
 	capturejob.DefaultCreatedAt = capturejobDescCreatedAt.Default.(func() time.Time)
 	// capturejobDescUpdatedAt is the schema descriptor for updated_at field.
-	capturejobDescUpdatedAt := capturejobFields[25].Descriptor()
+	capturejobDescUpdatedAt := capturejobFields[26].Descriptor()
 	// capturejob.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	capturejob.DefaultUpdatedAt = capturejobDescUpdatedAt.Default.(func() time.Time)
 	// capturejob.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

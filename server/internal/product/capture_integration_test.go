@@ -41,17 +41,18 @@ const captureSecret = "dummy-session-secret"
 // scriptedBrowser stands in for the provider. The real runner is proven against
 // Chrome in the browser package; this one scripts what each attempt finds.
 type scriptedBrowser struct {
-	mu        sync.Mutex
-	sessions  map[string]bool
-	allocated [][]string
-	closed    []string
-	links     int
-	exported  error
-	verify    error
-	run       func(browser.RunInput) (*browser.RunResult, error)
-	runs      atomic.Int32
-	seenState []*browser.State
-	during    func()
+	mu          sync.Mutex
+	sessions    map[string]bool
+	allocated   [][]string
+	closed      []string
+	links       int
+	allocateErr error
+	exported    error
+	verify      error
+	run         func(browser.RunInput) (*browser.RunResult, error)
+	runs        atomic.Int32
+	seenState   []*browser.State
+	during      func()
 }
 
 func newScriptedBrowser(t *testing.T) *scriptedBrowser {
@@ -69,6 +70,9 @@ func newScriptedBrowser(t *testing.T) *scriptedBrowser {
 func (s *scriptedBrowser) Allocate(_ context.Context, hosts []string, _ time.Duration) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.allocateErr != nil {
+		return "", s.allocateErr
+	}
 	id := fmt.Sprintf("session-%d", len(s.allocated)+1)
 	s.allocated = append(s.allocated, hosts)
 	s.sessions[id] = true
@@ -175,11 +179,11 @@ func (w *captureWorld) recipe(t *testing.T, connection string, change ...func(*b
 }
 
 // ready connects, tests, and activates, as the normal customer journey does.
-func (w *captureWorld) ready(t *testing.T) (*CaptureConnectionRecord, *CaptureRecipeRecord) {
+func (w *captureWorld) ready(t *testing.T, changes ...func(*browser.Recipe)) (*CaptureConnectionRecord, *CaptureRecipeRecord) {
 	t.Helper()
 	connection := w.connection(t)
 	w.signIn(t, connection.ID)
-	recipe := w.recipe(t, connection.ID)
+	recipe := w.recipe(t, connection.ID, changes...)
 	test, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipe.ID, CaptureJobRequest{Test: true})
 	if err != nil {
 		t.Fatal(err)
@@ -267,7 +271,11 @@ func TestCaptureNavigationPersistsProvenanceAndBillsOnlyExecutedAttempts(t *test
 		if input.NextNavigation == nil {
 			t.Fatal("model was not connected to the durable capture job")
 		}
-		choice, err := input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Headings: []string{"Reports"}, Ready: true})
+		view := browser.NavigationObservation{Path: "/reports", Headings: []string{"Reports"}, Ready: true}
+		for i := range 60 {
+			view.Controls = append(view.Controls, browser.NavigationControl{ID: i, Kind: "link", Label: strings.Repeat("L", 120), Path: "/reports/" + strings.Repeat("p", 190)})
+		}
+		choice, err := input.NextNavigation(w.ctx, view)
 		if err != nil {
 			return nil, err
 		}
@@ -303,6 +311,23 @@ func TestCaptureNavigationPersistsProvenanceAndBillsOnlyExecutedAttempts(t *test
 	if strings.Contains(model.prompt, captureSecret) || strings.Contains(model.prompt, "demo@example.com") {
 		t.Fatal("session or account material reached the model")
 	}
+	if len(model.prompt) > 16_000 {
+		t.Fatal("oversized model prompt")
+	}
+	var prompt struct {
+		Observation browser.NavigationObservation `json:"untrustedObservation"`
+	}
+	if err := json.Unmarshal([]byte(model.prompt), &prompt); err != nil {
+		t.Fatal(err)
+	}
+	if len(prompt.Observation.Controls) == 0 || len(prompt.Observation.Controls) >= 60 {
+		t.Fatal("large menu was not bounded")
+	}
+	for i, control := range prompt.Observation.Controls {
+		if control.ID != i {
+			t.Fatal("control IDs changed")
+		}
+	}
 	w.run(t, job.ID)
 	if model.calls != 1 {
 		t.Fatal("completed capture called the model again")
@@ -324,7 +349,7 @@ func TestCaptureNavigationStopsAtBudgetAndProviderFailures(t *testing.T) {
 		budget     bool
 	}{
 		{name: "budget", expected: browser.NavigationBudget, budget: true},
-		{name: "invalid output", modelError: platformai.ErrSchema, expected: browser.NavigationInvalid},
+		{name: "invalid output", modelError: platformai.ErrSchema, expected: browser.NavigationRetryLimit},
 		{name: "timeout", modelError: context.DeadlineExceeded, expected: browser.NavigationRetryLimit},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -366,6 +391,44 @@ func TestCaptureNavigationStopsAtBudgetAndProviderFailures(t *testing.T) {
 				t.Fatalf("model calls=%d open sessions=%d", model.calls, w.browser.open())
 			}
 		})
+	}
+}
+
+func TestCaptureNavigationRecoversBeforeFirstModelAttempt(t *testing.T) {
+	w := newCaptureWorld(t)
+	connection := w.connection(t)
+	w.signIn(t, connection.ID)
+	model := &captureNavigationModel{}
+	w.repo.WithAutomationModel(model).WithMonthlyMeter(&recordingMonthlyMeter{})
+	recipe := w.recipe(t, connection.ID, func(r *browser.Recipe) {
+		r.Navigation = &browser.Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 2}
+	})
+	run := w.browser.run
+	w.browser.run = func(input browser.RunInput) (*browser.RunResult, error) {
+		if _, err := input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Ready: true}); err != nil {
+			return nil, err
+		}
+		return run(input)
+	}
+	job, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipe.ID, CaptureJobRequest{Test: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.browser.allocateErr = &browser.Failure{Code: browser.ProviderUnavailable}
+	for range 3 {
+		if outcome := w.run(t, job.ID); outcome.Done {
+			t.Fatal("allocation failure stopped recovery")
+		}
+	}
+	if model.calls != 0 || w.db.Client.CaptureJob.GetX(w.ctx, job.ID).NavigationAttempts != 0 {
+		t.Fatal("allocation failure consumed model attempts")
+	}
+	w.browser.allocateErr = nil
+	if outcome := w.run(t, job.ID); !outcome.Done || w.job(t, job.ID).Phase != "SUCCEEDED" {
+		t.Fatal("capture did not recover")
+	}
+	if model.calls != 1 || w.db.Client.CaptureJob.GetX(w.ctx, job.ID).NavigationAttempts != 1 || w.browser.open() != 0 {
+		t.Fatal("recovery lost model attempt accounting or browser cleanup")
 	}
 }
 
@@ -605,12 +668,19 @@ func TestCaptureDeploymentJobIsOneCanonicalResult(t *testing.T) {
 
 func TestCaptureReleaseBeforeDeploymentWaitsAndNeverRecordsOldUI(t *testing.T) {
 	w := newCaptureWorld(t)
-	w.ready(t)
+	model := &captureNavigationModel{}
+	w.repo.WithAutomationModel(model).WithMonthlyMeter(&recordingMonthlyMeter{})
+	w.ready(t, func(r *browser.Recipe) {
+		r.Navigation = &browser.Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 2}
+	})
 	job := w.deployment(t, "slow", "abcdef1234567890")
 	live := false
 	w.browser.run = func(input browser.RunInput) (*browser.RunResult, error) {
 		if !live {
 			return nil, &browser.Failure{Code: browser.WaitingForDeployment}
+		}
+		if _, err := input.NextNavigation(w.ctx, browser.NavigationObservation{Path: "/reports", Ready: true}); err != nil {
+			return nil, err
 		}
 		var shot bytes.Buffer
 		_ = png.Encode(&shot, image.NewRGBA(image.Rect(0, 0, 800, 600)))
@@ -631,9 +701,18 @@ func TestCaptureReleaseBeforeDeploymentWaitsAndNeverRecordsOldUI(t *testing.T) {
 	if row := w.db.Client.PlatformAppConnection.GetX(w.ctx, *job.ConnectionID); row.LeaseJobID != nil || w.browser.open() != 0 {
 		t.Fatalf("lease=%v open=%d", row.LeaseJobID, w.browser.open())
 	}
+	for range 2 {
+		w.run(t, job.ID)
+	}
+	if model.calls != 0 || w.db.Client.CaptureJob.GetX(w.ctx, job.ID).NavigationAttempts != 0 {
+		t.Fatal("deployment waits consumed model attempts")
+	}
 	live = true
 	if outcome := w.run(t, job.ID); !outcome.Done || w.job(t, job.ID).Phase != "SUCCEEDED" {
 		t.Fatalf("after live: %+v", outcome)
+	}
+	if model.calls != 1 {
+		t.Fatalf("calls after deployment=%d", model.calls)
 	}
 	// A recipe with no version proof cannot make a deployment job claim one.
 	if unknown := w.job(t, job.ID); unknown.ExpectedRevision == nil {

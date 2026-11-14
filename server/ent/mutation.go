@@ -23924,6 +23924,8 @@ type CaptureJobMutation struct {
 	idempotency_key          *string
 	attempts                 *int
 	addattempts              *int
+	navigation_attempts      *int
+	addnavigation_attempts   *int
 	surface_id               *string
 	app_connection_id        *string
 	connection_generation    *int
@@ -24476,6 +24478,62 @@ func (m *CaptureJobMutation) AddedAttempts() (r int, exists bool) {
 func (m *CaptureJobMutation) ResetAttempts() {
 	m.attempts = nil
 	m.addattempts = nil
+}
+
+// SetNavigationAttempts sets the "navigation_attempts" field.
+func (m *CaptureJobMutation) SetNavigationAttempts(i int) {
+	m.navigation_attempts = &i
+	m.addnavigation_attempts = nil
+}
+
+// NavigationAttempts returns the value of the "navigation_attempts" field in the mutation.
+func (m *CaptureJobMutation) NavigationAttempts() (r int, exists bool) {
+	v := m.navigation_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNavigationAttempts returns the old "navigation_attempts" field's value of the CaptureJob entity.
+// If the CaptureJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureJobMutation) OldNavigationAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNavigationAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNavigationAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNavigationAttempts: %w", err)
+	}
+	return oldValue.NavigationAttempts, nil
+}
+
+// AddNavigationAttempts adds i to the "navigation_attempts" field.
+func (m *CaptureJobMutation) AddNavigationAttempts(i int) {
+	if m.addnavigation_attempts != nil {
+		*m.addnavigation_attempts += i
+	} else {
+		m.addnavigation_attempts = &i
+	}
+}
+
+// AddedNavigationAttempts returns the value that was added to the "navigation_attempts" field in this mutation.
+func (m *CaptureJobMutation) AddedNavigationAttempts() (r int, exists bool) {
+	v := m.addnavigation_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetNavigationAttempts resets all changes to the "navigation_attempts" field.
+func (m *CaptureJobMutation) ResetNavigationAttempts() {
+	m.navigation_attempts = nil
+	m.addnavigation_attempts = nil
 }
 
 // SetSurfaceID sets the "surface_id" field.
@@ -25242,7 +25300,7 @@ func (m *CaptureJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CaptureJobMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.organization_id != nil {
 		fields = append(fields, capturejob.FieldOrganizationID)
 	}
@@ -25272,6 +25330,9 @@ func (m *CaptureJobMutation) Fields() []string {
 	}
 	if m.attempts != nil {
 		fields = append(fields, capturejob.FieldAttempts)
+	}
+	if m.navigation_attempts != nil {
+		fields = append(fields, capturejob.FieldNavigationAttempts)
 	}
 	if m.surface_id != nil {
 		fields = append(fields, capturejob.FieldSurfaceID)
@@ -25346,6 +25407,8 @@ func (m *CaptureJobMutation) Field(name string) (ent.Value, bool) {
 		return m.IdempotencyKey()
 	case capturejob.FieldAttempts:
 		return m.Attempts()
+	case capturejob.FieldNavigationAttempts:
+		return m.NavigationAttempts()
 	case capturejob.FieldSurfaceID:
 		return m.SurfaceID()
 	case capturejob.FieldAppConnectionID:
@@ -25405,6 +25468,8 @@ func (m *CaptureJobMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldIdempotencyKey(ctx)
 	case capturejob.FieldAttempts:
 		return m.OldAttempts(ctx)
+	case capturejob.FieldNavigationAttempts:
+		return m.OldNavigationAttempts(ctx)
 	case capturejob.FieldSurfaceID:
 		return m.OldSurfaceID(ctx)
 	case capturejob.FieldAppConnectionID:
@@ -25513,6 +25578,13 @@ func (m *CaptureJobMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAttempts(v)
+		return nil
+	case capturejob.FieldNavigationAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNavigationAttempts(v)
 		return nil
 	case capturejob.FieldSurfaceID:
 		v, ok := value.(string)
@@ -25633,6 +25705,9 @@ func (m *CaptureJobMutation) AddedFields() []string {
 	if m.addattempts != nil {
 		fields = append(fields, capturejob.FieldAttempts)
 	}
+	if m.addnavigation_attempts != nil {
+		fields = append(fields, capturejob.FieldNavigationAttempts)
+	}
 	if m.addconnection_generation != nil {
 		fields = append(fields, capturejob.FieldConnectionGeneration)
 	}
@@ -25654,6 +25729,8 @@ func (m *CaptureJobMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRecipeVersion()
 	case capturejob.FieldAttempts:
 		return m.AddedAttempts()
+	case capturejob.FieldNavigationAttempts:
+		return m.AddedNavigationAttempts()
 	case capturejob.FieldConnectionGeneration:
 		return m.AddedConnectionGeneration()
 	case capturejob.FieldFencingToken:
@@ -25682,6 +25759,13 @@ func (m *CaptureJobMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddAttempts(v)
+		return nil
+	case capturejob.FieldNavigationAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddNavigationAttempts(v)
 		return nil
 	case capturejob.FieldConnectionGeneration:
 		v, ok := value.(int)
@@ -25835,6 +25919,9 @@ func (m *CaptureJobMutation) ResetField(name string) error {
 		return nil
 	case capturejob.FieldAttempts:
 		m.ResetAttempts()
+		return nil
+	case capturejob.FieldNavigationAttempts:
+		m.ResetNavigationAttempts()
 		return nil
 	case capturejob.FieldSurfaceID:
 		m.ResetSurfaceID()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -17,13 +18,14 @@ type NavigationControl struct {
 	selector string
 }
 
-// NavigationObservation contains headings and navigation labels only. Input
+// NavigationObservation contains paths, headings and navigation labels. Input
 // values, account elements, masked content and URL queries never reach a model.
 type NavigationObservation struct {
 	Path     string              `json:"path"`
 	Headings []string            `json:"headings"`
 	Controls []NavigationControl `json:"controls"`
 	Ready    bool                `json:"ready"`
+	loading  bool
 }
 
 // NavigationChoice must select an ID from the latest observation, capture a
@@ -65,6 +67,7 @@ const observeNavigation = `(identity, masks, markers) => {
    .filter(e => visible(e) && !excluded(e) && !e.hasAttribute('download') && e.getAttribute('aria-disabled')!=='true' && !e.disabled && e.getAttribute('aria-selected')!=='true')
    .slice(0,60).map(e => ({kind:e.getAttribute('role')==='tab'?'tab':'link',label:text(e),href:e.href || '',selector:selector(e)}));
  return {headings:Array.from(document.querySelectorAll('h1,h2,[role=heading]')).filter(e=>visible(e)&&!excluded(e)).slice(0,12).map(text),controls,
+   loading:Array.from(document.querySelectorAll('[aria-busy=true],[role=progressbar]')).some(visible),
    ready:markers.every(s=>Array.from(document.querySelectorAll(s)).some(visible))};
 }`
 
@@ -99,6 +102,7 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 	var snapshot struct {
 		Headings []string `json:"headings"`
 		Ready    bool     `json:"ready"`
+		Loading  bool     `json:"loading"`
 		Controls []struct {
 			Kind, Label, Href, Selector string
 		} `json:"controls"`
@@ -107,6 +111,8 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 		return view, &Failure{Code: PageFailed}
 	}
 	view.Headings, view.Ready = snapshot.Headings, snapshot.Ready
+	view.loading = snapshot.Loading
+	view.Ready = view.Ready && !view.loading
 	for _, control := range snapshot.Controls {
 		if control.Label == "" || (control.Kind == "tab" && !ValidSelector(control.Selector)) {
 			continue
@@ -122,6 +128,34 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 		view.Controls = append(view.Controls, NavigationControl{ID: len(view.Controls), Kind: control.Kind, Label: control.Label, Path: path, selector: control.Selector})
 	}
 	return view, nil
+}
+
+// Wait for feature evidence or new navigation, not just a selected tab attribute.
+func (s *scope) waitNavigation(ctx context.Context, input RunInput, before NavigationObservation) error {
+	waitCtx, cancel := context.WithTimeout(ctx, defaultStepTimeout)
+	defer cancel()
+	for {
+		view, err := s.observeNavigation(waitCtx, input)
+		if err != nil {
+			return err
+		}
+		changed := (!before.Ready && view.Ready) || !slices.Equal(view.Headings, before.Headings)
+		for _, control := range view.Controls {
+			if !slices.ContainsFunc(before.Controls, func(old NavigationControl) bool {
+				return old.Kind == control.Kind && old.Label == control.Label && old.Path == control.Path
+			}) {
+				changed = true
+			}
+		}
+		if !view.loading && changed {
+			return nil
+		}
+		select {
+		case <-waitCtx.Done():
+			return &Failure{Code: NavigationFailed}
+		case <-time.After(150 * time.Millisecond):
+		}
+	}
 }
 
 func (s *scope) navigateFeature(ctx context.Context, input RunInput) ([]NavigationAction, error) {
@@ -157,8 +191,8 @@ func (s *scope) navigateFeature(ctx context.Context, input RunInput) ([]Navigati
 				return actions, &Failure{Code: NavigationInvalid}
 			}
 			framed, err := s.evalBool(ctx, `(selector) => {
-				const e=document.querySelector(selector);
-				if (!e || !e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) return false;
+				const e=Array.from(document.querySelectorAll(selector)).find(e=>e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}));
+				if (!e) return false;
 				e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});
 				const r=e.getBoundingClientRect();
 				return r.bottom>0 && r.right>0 && r.top<innerHeight && r.left<innerWidth;
@@ -195,6 +229,9 @@ func (s *scope) navigateFeature(ctx context.Context, input RunInput) ([]Navigati
 			return actions, &Failure{Code: NavigationInvalid}
 		}
 		if err != nil {
+			return actions, err
+		}
+		if err := s.waitNavigation(ctx, input, view); err != nil {
 			return actions, err
 		}
 		s.settle(ctx)

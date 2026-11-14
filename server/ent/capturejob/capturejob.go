@@ -34,6 +34,8 @@ const (
 	FieldIdempotencyKey = "idempotencyKey"
 	// FieldAttempts holds the string denoting the attempts field in the database.
 	FieldAttempts = "attempts"
+	// FieldNavigationAttempts holds the string denoting the navigation_attempts field in the database.
+	FieldNavigationAttempts = "navigationAttempts"
 	// FieldSurfaceID holds the string denoting the surface_id field in the database.
 	FieldSurfaceID = "surfaceId"
 	// FieldAppConnectionID holds the string denoting the app_connection_id field in the database.
@@ -81,6 +83,7 @@ var Columns = []string{
 	FieldTriggerRunID,
 	FieldIdempotencyKey,
 	FieldAttempts,
+	FieldNavigationAttempts,
 	FieldSurfaceID,
 	FieldAppConnectionID,
 	FieldConnectionGeneration,
@@ -111,6 +114,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultAttempts holds the default value on creation for the "attempts" field.
 	DefaultAttempts int
+	// DefaultNavigationAttempts holds the default value on creation for the "navigation_attempts" field.
+	DefaultNavigationAttempts int
 	// DefaultConnectionGeneration holds the default value on creation for the "connection_generation" field.
 	DefaultConnectionGeneration int
 	// DefaultFencingToken holds the default value on creation for the "fencing_token" field.
@@ -269,6 +274,11 @@ func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 // ByAttempts orders the results by the attempts field.
 func ByAttempts(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAttempts, opts...).ToFunc()
+}
+
+// ByNavigationAttempts orders the results by the navigation_attempts field.
+func ByNavigationAttempts(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNavigationAttempts, opts...).ToFunc()
 }
 
 // BySurfaceID orders the results by the surface_id field.

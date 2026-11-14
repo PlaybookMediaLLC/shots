@@ -213,6 +213,15 @@ func newProtectedApp(t *testing.T) *protectedApp {
 		case "/session":
 			http.SetCookie(w, &http.Cookie{Name: "session", Value: "valid-1", Path: "/", Secure: true, HttpOnly: true})
 			fmt.Fprint(w, `<script>localStorage.setItem('token','local-secret');location='/dashboard'</script>`)
+		case "/report-data":
+			// Deliberate server latency proves tab selection does not imply loaded content.
+			timer := time.NewTimer(300 * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				fmt.Fprint(w, "ready")
+			case <-r.Context().Done():
+			}
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
 		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports":
@@ -231,7 +240,7 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			case "/features":
 				extra = `<h1>Product overview</h1><nav><a href="/feature-reports">Reports</a><a href="/logout">Sign out</a><a href="/feature-reports?token=private">Private link</a><a href="https://other.example.test/">External</a></nav><h2 data-testid="secret">Hidden private heading</h2><h2>Nested <span data-testid="secret">private heading</span></h2><form><h2>Private form</h2><input value="secret-value"></form>`
 			case "/feature-reports":
-				extra = `<h1>Reports</h1><nav><a href="/features">Overview</a></nav><button id="detail-tab" role="tab" aria-selected="false" onclick="this.setAttribute('aria-selected','true');document.querySelector('#report-detail').hidden=false">Detailed report</button><div id="report-detail" style="margin-top:900px;background:#00ee00;height:80px" hidden><h2>Detailed report</h2><p>Verified feature state</p></div><button role="tab" id="repeat-tab">Unresponsive tab</button>`
+				extra = `<h1>Reports</h1><nav><a href="/features">Overview</a></nav><button id="detail-tab" role="tab" aria-selected="false" onclick="this.setAttribute('aria-selected','true');document.body.setAttribute('aria-busy','true');fetch('/report-data').then(r=>r.text()).then(()=>{document.querySelector('#report-detail').hidden=false;document.body.removeAttribute('aria-busy')})">Detailed report</button><div class="report-detail" hidden>Inactive duplicate marker</div><div class="report-detail" id="report-detail" style="margin-top:900px;background:#00ee00;height:80px" hidden><h2>Detailed report</h2><p>Verified feature state</p></div><button role="tab" id="repeat-tab" onclick="document.querySelector('h1').textContent+=' again'">Looping tab</button>`
 			case "/signed-in-tabs":
 				extra = `<button id="plain">not a tab</button><button id="tab" role="tab" onclick="document.body.insertAdjacentHTML('beforeend','<div id=tabbed></div>')">Reports</button>`
 			case "/assets":
@@ -342,7 +351,7 @@ func TestRealBrowserNavigatesObservedFeature(t *testing.T) {
 	b := localBrowser(t)
 	recipe := validRecipe()
 	recipe.Steps = []Step{{Kind: StepNavigate, Path: "/features"}}
-	recipe.Markers = []string{"#report-detail"}
+	recipe.Markers = []string{".report-detail"}
 	recipe.Masks = []string{"[data-testid=secret]"}
 	recipe.Navigation = &Navigation{Objective: "Show the detailed report", MaxSteps: 3, CreditLimit: 5}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -405,6 +414,19 @@ func TestRealBrowserNavigatesObservedFeature(t *testing.T) {
 		}
 	}
 
+	t.Run("revision precedes model", func(t *testing.T) {
+		before := calls
+		revisionRecipe := recipe
+		revisionRecipe.Version = &VersionCheck{Path: "/api/version"}
+		a.commit.Store("ffffffffffffffff")
+		image, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: revisionRecipe, State: state, ExpectedRevision: "abcdef1234567890", NextNavigation: next})
+		a.commit.Store("abcdef1234567890")
+		failed(t, err, WaitingForDeployment)
+		if image != nil || calls != before {
+			t.Fatal("old deployment ran navigation or returned an image")
+		}
+	})
+
 	for name, test := range map[string]struct {
 		choice NavigationChoice
 		code   Code
@@ -426,7 +448,7 @@ func TestRealBrowserNavigatesObservedFeature(t *testing.T) {
 		recipe.Steps[0].Path = "/feature-reports"
 		_, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: recipe, State: state, NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
 			for _, control := range view.Controls {
-				if control.Label == "Unresponsive tab" {
+				if control.Label == "Looping tab" {
 					return NavigationChoice{Action: "select", ControlID: &control.ID}, nil
 				}
 			}

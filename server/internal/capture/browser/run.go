@@ -491,6 +491,12 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	}
 	result := &RunResult{}
 	if input.Recipe.Navigation != nil {
+		// A path-based revision is available before feature navigation; do not pay to explore old UI.
+		if input.ExpectedRevision != "" && input.Recipe.Version.Path != "" {
+			if _, err := s.proveRevision(ctx, input.Recipe.Version, input.ExpectedRevision); err != nil {
+				return nil, err
+			}
+		}
 		if result.NavigationActions, err = s.navigateFeature(ctx, input); err != nil {
 			return nil, err
 		}

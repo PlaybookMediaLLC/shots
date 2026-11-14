@@ -272,7 +272,7 @@ function RecipeForm({
         </CaptureField>
         {text('path', 'Path', 'On the connected app: /billing.')}
         <CaptureField
-          hint="AI can follow the app's navigation links and tabs to find this feature. Leave empty to capture the path directly. Page headings and navigation labels are sent to the AI provider; the account marker, form values, and configured masks are excluded."
+          hint="AI can follow the app's navigation links and tabs to find this feature. Leave empty to capture the path directly. Page paths, headings and navigation labels are sent to the AI provider; the account marker, form values, and configured masks are excluded."
           label="Feature to find (optional)"
         >
           <Textarea

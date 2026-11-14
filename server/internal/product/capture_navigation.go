@@ -3,10 +3,10 @@ package product
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"math"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
 )
@@ -23,12 +23,14 @@ var captureNavigationSchema = mustAutomationJSON(map[string]any{
 })
 
 // captureNavigator uses the same model, plan check and meter as release copy.
-// It is attempt-local: RunCaptureJob allows at most three paid attempts.
-func (c *Configuration) captureNavigator(org string, navigation *browser.Navigation) browser.NextNavigationAction {
+// Reserve at most three model attempts durably, including interrupted calls.
+func (c *Configuration) captureNavigator(claim *captureClaim, navigation *browser.Navigation) browser.NextNavigationAction {
 	if navigation == nil || c.automationModel == nil || c.meter == nil {
 		return nil
 	}
 	remaining := navigation.CreditLimit
+	started := false
+	org := claim.job.OrganizationID
 	return func(ctx context.Context, observation browser.NavigationObservation) (browser.NavigationChoice, error) {
 		var choice browser.NavigationChoice
 		if remaining <= 0 {
@@ -37,12 +39,36 @@ func (c *Configuration) captureNavigator(org string, navigation *browser.Navigat
 		if err := c.requireCredits(ctx, org, 1); err != nil {
 			return choice, &browser.Failure{Code: browser.NavigationBudget}
 		}
-		prompt, err := json.Marshal(struct {
+		input := struct {
 			Objective   string                        `json:"objective"`
 			Observation browser.NavigationObservation `json:"untrustedObservation"`
-		}{navigation.Objective, observation})
-		if err != nil || len(prompt) > 16_000 {
+		}{navigation.Objective, observation}
+		prompt, err := json.Marshal(input)
+		for err == nil && len(prompt) > 16_000 {
+			// Keep observed IDs unchanged when a large navigation menu is truncated.
+			switch {
+			case len(input.Observation.Controls) > 0:
+				input.Observation.Controls = input.Observation.Controls[:len(input.Observation.Controls)-1]
+			case len(input.Observation.Headings) > 0:
+				input.Observation.Headings = input.Observation.Headings[:len(input.Observation.Headings)-1]
+			default:
+				return choice, &browser.Failure{Code: browser.NavigationInvalid}
+			}
+			prompt, err = json.Marshal(input)
+		}
+		if err != nil {
 			return choice, &browser.Failure{Code: browser.NavigationInvalid}
+		}
+		if !started {
+			reserved, err := c.client.CaptureJob.Update().Where(capturejob.ID(claim.job.ID), capturejob.OrganizationID(org),
+				capturejob.PhaseEQ(capturejob.PhaseRUNNING), capturejob.FencingTokenEQ(claim.token), capturejob.NavigationAttemptsLT(3)).AddNavigationAttempts(1).Save(ctx)
+			if err != nil {
+				return choice, &browser.Failure{Code: browser.NavigationUnavailable}
+			}
+			if reserved != 1 {
+				return choice, &browser.Failure{Code: browser.NavigationRetryLimit}
+			}
+			started = true
 		}
 		usage, callErr := c.automationModel.Structured(ctx, platformai.Request{Role: platformai.RoleFast, System: captureNavigationInstructions,
 			Prompt: string(prompt), Schema: captureNavigationSchema, SchemaName: "capture_navigation", MaxTokens: 1024}, &choice)
@@ -60,9 +86,6 @@ func (c *Configuration) captureNavigator(org string, navigation *browser.Navigat
 			}
 		}
 		if callErr != nil {
-			if errors.Is(callErr, platformai.ErrSchema) {
-				return choice, &browser.Failure{Code: browser.NavigationInvalid}
-			}
 			return choice, &browser.Failure{Code: browser.NavigationUnavailable}
 		}
 		return choice, nil

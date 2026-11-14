@@ -117,7 +117,7 @@ export const captureJobSchema = z.object({
   id: idSchema,
   recipeId: z.string(),
   recipeVersion: z.number().int(),
-  kind: z.enum(['test', 'manual', 'deployment']),
+  kind: z.enum(['test', 'manual', 'agent', 'deployment']),
   phase: z.enum([
     'QUEUED',
     'WAITING_DEPLOYMENT',

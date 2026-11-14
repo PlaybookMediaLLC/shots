@@ -81,7 +81,7 @@ export type CaptureJob = {
   id: string
   recipeId: string
   recipeVersion: number
-  kind: 'test' | 'manual' | 'deployment'
+  kind: 'test' | 'manual' | 'agent' | 'deployment'
   phase:
     | 'QUEUED'
     | 'WAITING_DEPLOYMENT'

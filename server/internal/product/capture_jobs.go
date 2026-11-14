@@ -676,10 +676,7 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if err != nil {
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.RecipeInvalid})
 	}
-	navigate := c.captureNavigator(org, recipe.Navigation)
-	if recipe.Navigation != nil && claim.job.Attempts > 3 {
-		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.NavigationRetryLimit})
-	}
+	navigate := c.captureNavigator(claim, recipe.Navigation)
 	if recipe.Navigation != nil && navigate == nil {
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.NavigationUnavailable})
 	}

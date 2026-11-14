@@ -99,6 +99,11 @@ func Attempts(v int) predicate.CaptureJob {
 	return predicate.CaptureJob(sql.FieldEQ(FieldAttempts, v))
 }
 
+// NavigationAttempts applies equality check predicate on the "navigation_attempts" field. It's identical to NavigationAttemptsEQ.
+func NavigationAttempts(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldEQ(FieldNavigationAttempts, v))
+}
+
 // SurfaceID applies equality check predicate on the "surface_id" field. It's identical to SurfaceIDEQ.
 func SurfaceID(v string) predicate.CaptureJob {
 	return predicate.CaptureJob(sql.FieldEQ(FieldSurfaceID, v))
@@ -657,6 +662,46 @@ func AttemptsLT(v int) predicate.CaptureJob {
 // AttemptsLTE applies the LTE predicate on the "attempts" field.
 func AttemptsLTE(v int) predicate.CaptureJob {
 	return predicate.CaptureJob(sql.FieldLTE(FieldAttempts, v))
+}
+
+// NavigationAttemptsEQ applies the EQ predicate on the "navigation_attempts" field.
+func NavigationAttemptsEQ(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldEQ(FieldNavigationAttempts, v))
+}
+
+// NavigationAttemptsNEQ applies the NEQ predicate on the "navigation_attempts" field.
+func NavigationAttemptsNEQ(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldNEQ(FieldNavigationAttempts, v))
+}
+
+// NavigationAttemptsIn applies the In predicate on the "navigation_attempts" field.
+func NavigationAttemptsIn(vs ...int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldIn(FieldNavigationAttempts, vs...))
+}
+
+// NavigationAttemptsNotIn applies the NotIn predicate on the "navigation_attempts" field.
+func NavigationAttemptsNotIn(vs ...int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldNotIn(FieldNavigationAttempts, vs...))
+}
+
+// NavigationAttemptsGT applies the GT predicate on the "navigation_attempts" field.
+func NavigationAttemptsGT(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldGT(FieldNavigationAttempts, v))
+}
+
+// NavigationAttemptsGTE applies the GTE predicate on the "navigation_attempts" field.
+func NavigationAttemptsGTE(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldGTE(FieldNavigationAttempts, v))
+}
+
+// NavigationAttemptsLT applies the LT predicate on the "navigation_attempts" field.
+func NavigationAttemptsLT(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldLT(FieldNavigationAttempts, v))
+}
+
+// NavigationAttemptsLTE applies the LTE predicate on the "navigation_attempts" field.
+func NavigationAttemptsLTE(v int) predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldLTE(FieldNavigationAttempts, v))
 }
 
 // SurfaceIDEQ applies the EQ predicate on the "surface_id" field.
