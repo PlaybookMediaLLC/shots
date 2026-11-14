@@ -97,6 +97,27 @@ func (_u *CaptureJobUpdate) AddAttempts(v int) *CaptureJobUpdate {
 	return _u
 }
 
+// SetNavigationAttempts sets the "navigation_attempts" field.
+func (_u *CaptureJobUpdate) SetNavigationAttempts(v int) *CaptureJobUpdate {
+	_u.mutation.ResetNavigationAttempts()
+	_u.mutation.SetNavigationAttempts(v)
+	return _u
+}
+
+// SetNillableNavigationAttempts sets the "navigation_attempts" field if the given value is not nil.
+func (_u *CaptureJobUpdate) SetNillableNavigationAttempts(v *int) *CaptureJobUpdate {
+	if v != nil {
+		_u.SetNavigationAttempts(*v)
+	}
+	return _u
+}
+
+// AddNavigationAttempts adds value to the "navigation_attempts" field.
+func (_u *CaptureJobUpdate) AddNavigationAttempts(v int) *CaptureJobUpdate {
+	_u.mutation.AddNavigationAttempts(v)
+	return _u
+}
+
 // SetConnectionGeneration sets the "connection_generation" field.
 func (_u *CaptureJobUpdate) SetConnectionGeneration(v int) *CaptureJobUpdate {
 	_u.mutation.ResetConnectionGeneration()
@@ -335,6 +356,12 @@ func (_u *CaptureJobUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.AddedAttempts(); ok {
 		_spec.AddField(capturejob.FieldAttempts, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.NavigationAttempts(); ok {
+		_spec.SetField(capturejob.FieldNavigationAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedNavigationAttempts(); ok {
+		_spec.AddField(capturejob.FieldNavigationAttempts, field.TypeInt, value)
+	}
 	if _u.mutation.SurfaceIDCleared() {
 		_spec.ClearField(capturejob.FieldSurfaceID, field.TypeString)
 	}
@@ -484,6 +511,27 @@ func (_u *CaptureJobUpdateOne) SetNillableAttempts(v *int) *CaptureJobUpdateOne 
 // AddAttempts adds value to the "attempts" field.
 func (_u *CaptureJobUpdateOne) AddAttempts(v int) *CaptureJobUpdateOne {
 	_u.mutation.AddAttempts(v)
+	return _u
+}
+
+// SetNavigationAttempts sets the "navigation_attempts" field.
+func (_u *CaptureJobUpdateOne) SetNavigationAttempts(v int) *CaptureJobUpdateOne {
+	_u.mutation.ResetNavigationAttempts()
+	_u.mutation.SetNavigationAttempts(v)
+	return _u
+}
+
+// SetNillableNavigationAttempts sets the "navigation_attempts" field if the given value is not nil.
+func (_u *CaptureJobUpdateOne) SetNillableNavigationAttempts(v *int) *CaptureJobUpdateOne {
+	if v != nil {
+		_u.SetNavigationAttempts(*v)
+	}
+	return _u
+}
+
+// AddNavigationAttempts adds value to the "navigation_attempts" field.
+func (_u *CaptureJobUpdateOne) AddNavigationAttempts(v int) *CaptureJobUpdateOne {
+	_u.mutation.AddNavigationAttempts(v)
 	return _u
 }
 
@@ -754,6 +802,12 @@ func (_u *CaptureJobUpdateOne) sqlSave(ctx context.Context) (_node *CaptureJob, 
 	}
 	if value, ok := _u.mutation.AddedAttempts(); ok {
 		_spec.AddField(capturejob.FieldAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.NavigationAttempts(); ok {
+		_spec.SetField(capturejob.FieldNavigationAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedNavigationAttempts(); ok {
+		_spec.AddField(capturejob.FieldNavigationAttempts, field.TypeInt, value)
 	}
 	if _u.mutation.SurfaceIDCleared() {
 		_spec.ClearField(capturejob.FieldSurfaceID, field.TypeString)

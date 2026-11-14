@@ -81,23 +81,31 @@ func TestRecipeAcceptsOnlyTheTypedLanguage(t *testing.T) {
 	if err := validRecipe().Validate(); err != nil {
 		t.Fatal(err)
 	}
+	unicode := validRecipe()
+	unicode.Navigation = &Navigation{Objective: strings.Repeat("é", 1000), MaxSteps: 2, CreditLimit: 2}
+	if err := unicode.Validate(); err != nil {
+		t.Fatalf("valid web objective rejected: %v", err)
+	}
 	for name, change := range map[string]func(*Recipe){
-		"version":        func(r *Recipe) { r.SchemaVersion = 2 },
-		"too wide":       func(r *Recipe) { r.Viewport.Width = 4000 },
-		"no steps":       func(r *Recipe) { r.Steps = nil },
-		"many steps":     func(r *Recipe) { r.Steps = append(r.Steps, make([]Step, MaxSteps)...) },
-		"wait first":     func(r *Recipe) { r.Steps[0] = Step{Kind: StepWaitFor, Selector: "a"} },
-		"script step":    func(r *Recipe) { r.Steps = append(r.Steps, Step{Kind: "EVALUATE", Selector: "a"}) },
-		"other host":     func(r *Recipe) { r.Steps[0].Path = "https://evil.example/x" },
-		"network path":   func(r *Recipe) { r.Steps[0].Path = "//evil.example/x" },
-		"dot segments":   func(r *Recipe) { r.Steps[0].Path = "/a/../b" },
-		"long timeout":   func(r *Recipe) { r.Steps[0].TimeoutMs = MaxStepTimeoutMs + 1 },
-		"no marker":      func(r *Recipe) { r.Markers = nil },
-		"script marker":  func(r *Recipe) { r.Markers = []string{"a{}</style><script>"} },
-		"script mask":    func(r *Recipe) { r.Masks = []string{"a;alert(1)"} },
-		"two proofs":     func(r *Recipe) { r.Version = &VersionCheck{Path: "/v", Selector: "a"} },
-		"empty proof":    func(r *Recipe) { r.Version = &VersionCheck{} },
-		"open post path": func(r *Recipe) { r.AllowedPostPaths = []string{"/graphql?x=1"} },
+		"version":                func(r *Recipe) { r.SchemaVersion = 2 },
+		"too wide":               func(r *Recipe) { r.Viewport.Width = 4000 },
+		"no steps":               func(r *Recipe) { r.Steps = nil },
+		"many steps":             func(r *Recipe) { r.Steps = append(r.Steps, make([]Step, MaxSteps)...) },
+		"wait first":             func(r *Recipe) { r.Steps[0] = Step{Kind: StepWaitFor, Selector: "a"} },
+		"script step":            func(r *Recipe) { r.Steps = append(r.Steps, Step{Kind: "EVALUATE", Selector: "a"}) },
+		"other host":             func(r *Recipe) { r.Steps[0].Path = "https://evil.example/x" },
+		"network path":           func(r *Recipe) { r.Steps[0].Path = "//evil.example/x" },
+		"dot segments":           func(r *Recipe) { r.Steps[0].Path = "/a/../b" },
+		"long timeout":           func(r *Recipe) { r.Steps[0].TimeoutMs = MaxStepTimeoutMs + 1 },
+		"no marker":              func(r *Recipe) { r.Markers = nil },
+		"script marker":          func(r *Recipe) { r.Markers = []string{"a{}</style><script>"} },
+		"script mask":            func(r *Recipe) { r.Masks = []string{"a;alert(1)"} },
+		"two proofs":             func(r *Recipe) { r.Version = &VersionCheck{Path: "/v", Selector: "a"} },
+		"empty proof":            func(r *Recipe) { r.Version = &VersionCheck{} },
+		"open post path":         func(r *Recipe) { r.AllowedPostPaths = []string{"/graphql?x=1"} },
+		"empty objective":        func(r *Recipe) { r.Navigation = &Navigation{MaxSteps: 2, CreditLimit: 2} },
+		"unbounded navigation":   func(r *Recipe) { r.Navigation = &Navigation{Objective: "Reports", MaxSteps: 100, CreditLimit: 2} },
+		"unbounded model budget": func(r *Recipe) { r.Navigation = &Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 100} },
 	} {
 		recipe := validRecipe()
 		recipe.Steps = append([]Step{}, recipe.Steps...)
@@ -205,9 +213,18 @@ func newProtectedApp(t *testing.T) *protectedApp {
 		case "/session":
 			http.SetCookie(w, &http.Cookie{Name: "session", Value: "valid-1", Path: "/", Secure: true, HttpOnly: true})
 			fmt.Fprint(w, `<script>localStorage.setItem('token','local-secret');location='/dashboard'</script>`)
+		case "/report-data":
+			// Deliberate server latency proves tab selection does not imply loaded content.
+			timer := time.NewTimer(300 * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				fmt.Fprint(w, "ready")
+			case <-r.Context().Done():
+			}
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
-		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link":
+		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail":
 			if !signed {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
@@ -220,6 +237,12 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 			extra := ""
 			switch r.URL.Path {
+			case "/feature-shell", "/feature-shell-detail":
+				extra = `<h1>Reports</h1><nav><a href="/feature-shell-detail">Detailed report</a></nav>`
+			case "/features":
+				extra = `<h1>Product overview</h1><nav><a href="/feature-reports">Reports</a><a href="/logout">Sign out</a><a href="/feature-reports?token=private">Private link</a><a href="https://other.example.test/">External</a></nav><h2 data-testid="secret">Hidden private heading</h2><h2>Nested <span data-testid="secret">private heading</span></h2><form><h2>Private form</h2><input value="secret-value"></form>`
+			case "/feature-reports":
+				extra = `<h1>Reports</h1><nav><a href="/features">Overview</a></nav><button id="detail-tab" role="tab" aria-selected="false" onclick="this.setAttribute('aria-selected','true');document.body.setAttribute('aria-busy','true');fetch('/report-data').then(r=>r.text()).then(()=>{document.querySelector('#report-detail').hidden=false;document.body.removeAttribute('aria-busy')})">Detailed report</button><div class="report-detail" hidden>Inactive duplicate marker</div><div class="report-detail" id="report-detail" style="margin-top:900px;background:#00ee00;height:80px" hidden><h2>Detailed report</h2><p>Verified feature state</p></div><button role="tab" id="repeat-tab" onclick="document.querySelector('h1').textContent+=' again'">Looping tab</button>`
 			case "/signed-in-tabs":
 				extra = `<button id="plain">not a tab</button><button id="tab" role="tab" onclick="document.body.insertAdjacentHTML('beforeend','<div id=tabbed></div>')">Reports</button>`
 			case "/assets":
@@ -322,6 +345,143 @@ func failed(t *testing.T, err error, want Code) {
 	if !errors.As(err, &failure) || failure.Code != want {
 		t.Fatalf("err=%v, want %s", err, want)
 	}
+}
+
+func TestRealBrowserNavigatesObservedFeature(t *testing.T) {
+	a := newProtectedApp(t)
+	state := signIn(t, a)
+	b := localBrowser(t)
+	recipe := validRecipe()
+	recipe.Steps = []Step{{Kind: StepNavigate, Path: "/features"}}
+	recipe.Markers = []string{".report-detail"}
+	recipe.Masks = []string{"[data-testid=secret]"}
+	recipe.Navigation = &Navigation{Objective: "Show the detailed report", MaxSteps: 3, CreditLimit: 5}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	calls := 0
+	next := func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+		calls++
+		for _, heading := range view.Headings {
+			if strings.Contains(strings.ToLower(heading), "private") || strings.Contains(heading, "secret-value") || strings.Contains(heading, "acme-demo") {
+				t.Fatal("private content reached the navigation model")
+			}
+		}
+		for _, control := range view.Controls {
+			if strings.Contains(control.Label, "Private") || control.Label == "Sign out" || control.Label == "External" {
+				t.Fatal("unsafe navigation was offered")
+			}
+		}
+		if view.Ready {
+			id := -1
+			return NavigationChoice{Action: "capture", ControlID: &id}, nil
+		}
+		wanted := "Reports"
+		if view.Path == "/feature-reports" {
+			wanted = "Detailed report"
+		}
+		for _, control := range view.Controls {
+			if control.Label == wanted {
+				return NavigationChoice{Action: "select", ControlID: &control.ID}, nil
+			}
+		}
+		t.Fatalf("feature navigation control missing: %q", wanted)
+		return NavigationChoice{}, nil
+	}
+	result, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: recipe, State: state, NextNavigation: next})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 || len(result.NavigationActions) != 3 || result.SourcePath != "/feature-reports" || len(result.Image) == 0 {
+		t.Fatalf("calls=%d actions=%v path=%q image=%d", calls, result.NavigationActions, result.SourcePath, len(result.Image))
+	}
+	picture, _, err := image.Decode(bytes.NewReader(result.Image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	featurePixels := 0
+	for y := picture.Bounds().Min.Y; y < picture.Bounds().Max.Y; y++ {
+		for x := picture.Bounds().Min.X; x < picture.Bounds().Max.X; x++ {
+			r, g, b, _ := picture.At(x, y).RGBA()
+			if r == 0 && g == 0xeeee && b == 0 {
+				featurePixels++
+			}
+		}
+	}
+	if featurePixels < 10_000 {
+		t.Fatalf("target feature is not framed in screenshot: %d pixels", featurePixels)
+	}
+	for _, path := range []string{"GET /logout", "GET /private"} {
+		if a.count(path) != 0 {
+			t.Fatalf("unsafe request: %s", path)
+		}
+	}
+
+	t.Run("revision precedes model", func(t *testing.T) {
+		before := calls
+		revisionRecipe := recipe
+		revisionRecipe.Version = &VersionCheck{Path: "/api/version"}
+		a.commit.Store("ffffffffffffffff")
+		image, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: revisionRecipe, State: state, ExpectedRevision: "abcdef1234567890", NextNavigation: next})
+		a.commit.Store("abcdef1234567890")
+		failed(t, err, WaitingForDeployment)
+		if image != nil || calls != before {
+			t.Fatal("old deployment ran navigation or returned an image")
+		}
+	})
+
+	t.Run("same shell on another route", func(t *testing.T) {
+		routeRecipe := recipe
+		routeRecipe.Steps = []Step{{Kind: StepNavigate, Path: "/feature-shell"}}
+		routeRecipe.Markers = []string{"[data-testid=ready]"}
+		result, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: routeRecipe, State: state, NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			if view.Path == "/feature-shell-detail" {
+				return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+			}
+			for _, control := range view.Controls {
+				if control.Path == "/feature-shell-detail" {
+					return NavigationChoice{Action: "select", ControlID: &control.ID}, nil
+				}
+			}
+			t.Fatal("detail route was not offered")
+			return NavigationChoice{}, nil
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.SourcePath != "/feature-shell-detail" || len(result.Image) == 0 || len(result.NavigationActions) != 2 {
+			t.Fatal("route change did not produce an attributed capture")
+		}
+	})
+
+	for name, test := range map[string]struct {
+		choice NavigationChoice
+		code   Code
+	}{
+		"invented control": {NavigationChoice{Action: "select", ControlID: new(int(999))}, NavigationInvalid},
+		"missing control":  {NavigationChoice{Action: "select"}, NavigationInvalid},
+		"false success":    {NavigationChoice{Action: "capture", ControlID: new(int(-1))}, NavigationInvalid},
+		"script":           {NavigationChoice{Action: "evaluate", ControlID: new(int(0))}, NavigationInvalid},
+	} {
+		t.Run(name, func(t *testing.T) {
+			image, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: recipe, State: state, NextNavigation: func(context.Context, NavigationObservation) (NavigationChoice, error) { return test.choice, nil }})
+			failed(t, err, test.code)
+			if image != nil {
+				t.Fatal("failed navigation returned an image")
+			}
+		})
+	}
+	t.Run("loop", func(t *testing.T) {
+		recipe.Steps[0].Path = "/feature-reports"
+		_, err := Run(ctx, b, RunInput{Target: a.target(), Recipe: recipe, State: state, NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			for _, control := range view.Controls {
+				if control.Label == "Looping tab" {
+					return NavigationChoice{Action: "select", ControlID: &control.ID}, nil
+				}
+			}
+			return NavigationChoice{}, nil
+		}})
+		failed(t, err, NavigationLimit)
+	})
 }
 
 func TestRealBrowserFreshSessionCapture(t *testing.T) {

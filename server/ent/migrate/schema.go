@@ -792,6 +792,7 @@ var (
 		{Name: "triggerRunId", Type: field.TypeString, Nullable: true},
 		{Name: "idempotencyKey", Type: field.TypeString},
 		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "navigationAttempts", Type: field.TypeInt, Default: 0},
 		{Name: "surfaceId", Type: field.TypeString, Nullable: true},
 		{Name: "appConnectionId", Type: field.TypeString, Nullable: true},
 		{Name: "connectionGeneration", Type: field.TypeInt, Default: 0},
@@ -822,7 +823,7 @@ var (
 			{
 				Name:    "capturejob_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[24]},
+				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[25]},
 			},
 		},
 	}

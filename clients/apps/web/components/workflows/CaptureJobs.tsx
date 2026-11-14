@@ -10,6 +10,7 @@ import { CaptureError, useCaptureAction } from './capture-ui'
 import { relativeTime } from './workflow-ui'
 
 const KIND: Record<CaptureJob['kind'], string> = {
+  agent: 'From a workflow',
   deployment: 'After a deployment',
   manual: 'Requested',
   test: 'Test',

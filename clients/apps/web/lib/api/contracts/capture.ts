@@ -81,6 +81,13 @@ export const captureRecipeDefinitionSchema = z.object({
     .object({ path: pathSchema.optional(), selector: selectorSchema.optional() })
     .optional(),
   allowedPostPaths: z.array(pathSchema).max(5).optional(),
+  navigation: z
+    .object({
+      objective: z.string().trim().min(1).max(1000),
+      maxSteps: z.number().int().min(1).max(6),
+      creditLimit: z.number().int().min(1).max(20),
+    })
+    .optional(),
 })
 
 /** A new version of a screen's capture; it runs only as a test until activated. */
@@ -110,7 +117,7 @@ export const captureJobSchema = z.object({
   id: idSchema,
   recipeId: z.string(),
   recipeVersion: z.number().int(),
-  kind: z.enum(['test', 'manual', 'deployment']),
+  kind: z.enum(['test', 'manual', 'agent', 'deployment']),
   phase: z.enum([
     'QUEUED',
     'WAITING_DEPLOYMENT',

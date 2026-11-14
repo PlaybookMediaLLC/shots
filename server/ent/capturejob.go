@@ -37,6 +37,8 @@ type CaptureJob struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// Attempts holds the value of the "attempts" field.
 	Attempts int `json:"attempts,omitempty"`
+	// NavigationAttempts holds the value of the "navigation_attempts" field.
+	NavigationAttempts int `json:"navigation_attempts,omitempty"`
 	// SurfaceID holds the value of the "surface_id" field.
 	SurfaceID *string `json:"surface_id,omitempty"`
 	// AppConnectionID holds the value of the "app_connection_id" field.
@@ -75,7 +77,7 @@ func (*CaptureJob) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case capturejob.FieldRecipeVersion, capturejob.FieldAttempts, capturejob.FieldConnectionGeneration, capturejob.FieldFencingToken, capturejob.FieldResumeCount:
+		case capturejob.FieldRecipeVersion, capturejob.FieldAttempts, capturejob.FieldNavigationAttempts, capturejob.FieldConnectionGeneration, capturejob.FieldFencingToken, capturejob.FieldResumeCount:
 			values[i] = new(sql.NullInt64)
 		case capturejob.FieldID, capturejob.FieldOrganizationID, capturejob.FieldReleaseID, capturejob.FieldRecipeID, capturejob.FieldStatus, capturejob.FieldPhase, capturejob.FieldKind, capturejob.FieldTriggerRunID, capturejob.FieldIdempotencyKey, capturejob.FieldSurfaceID, capturejob.FieldAppConnectionID, capturejob.FieldDeploymentEventID, capturejob.FieldExpectedRevision, capturejob.FieldRecipeHash, capturejob.FieldFailureCode, capturejob.FieldRequestedByUserID, capturejob.FieldSurfaceCaptureID, capturejob.FieldAssetID:
 			values[i] = new(sql.NullString)
@@ -163,6 +165,12 @@ func (_m *CaptureJob) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field attempts", values[i])
 			} else if value.Valid {
 				_m.Attempts = int(value.Int64)
+			}
+		case capturejob.FieldNavigationAttempts:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field navigation_attempts", values[i])
+			} else if value.Valid {
+				_m.NavigationAttempts = int(value.Int64)
 			}
 		case capturejob.FieldSurfaceID:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -333,6 +341,9 @@ func (_m *CaptureJob) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("attempts=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Attempts))
+	builder.WriteString(", ")
+	builder.WriteString("navigation_attempts=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NavigationAttempts))
 	builder.WriteString(", ")
 	if v := _m.SurfaceID; v != nil {
 		builder.WriteString("surface_id=")

@@ -116,6 +116,8 @@ func (CaptureJob) Fields() []ent.Field {
 		field.String("trigger_run_id").StorageKey("triggerRunId").Optional().Nillable().Immutable(),
 		field.String("idempotency_key").StorageKey("idempotencyKey").Immutable(),
 		field.Int("attempts").StorageKey("attempts").Default(0),
+		// Reserved before a model attempt; infrastructure and deployment waits do not spend it.
+		field.Int("navigation_attempts").StorageKey("navigationAttempts").Default(0),
 		field.String("surface_id").StorageKey("surfaceId").Optional().Nillable().Immutable(),
 		field.String("app_connection_id").StorageKey("appConnectionId").Optional().Nillable().Immutable(),
 		field.Int("connection_generation").StorageKey("connectionGeneration").Default(0),
