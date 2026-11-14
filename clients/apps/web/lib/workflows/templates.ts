@@ -254,17 +254,6 @@ export function buildWorkflowTemplate(
     },
   ]
   const after = () => steps.at(-1)?.id ?? 'campaign'
-  if (input.creditLimit > 0) {
-    steps.push({
-      id: 'copy',
-      type: 'action',
-      action: {
-        type: 'generate_copy',
-        input: { nodeId: after(), output: 'campaignId' },
-        creditLimit: input.creditLimit,
-      },
-    })
-  }
   if (input.capture && template.family === 'deployment.succeeded') {
     steps.push({
       id: 'capture',
@@ -274,6 +263,17 @@ export function buildWorkflowTemplate(
         input: { nodeId: after(), output: 'campaignId' },
         surfaceId: input.capture.surfaceId,
         ...(input.capture.versionPath ? { versionPath: input.capture.versionPath } : {}),
+      },
+    })
+  }
+  if (input.creditLimit > 0) {
+    steps.push({
+      id: 'copy',
+      type: 'action',
+      action: {
+        type: 'generate_copy',
+        input: { nodeId: after(), output: 'campaignId' },
+        creditLimit: input.creditLimit,
       },
     })
   }

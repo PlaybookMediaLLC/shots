@@ -190,6 +190,7 @@ func (c *Configuration) SaveReleaseAutomation(ctx context.Context, actor Actor, 
 }
 
 func (c *Configuration) automationResources(ctx context.Context, org string, graph automation.Graph) error {
+	captures := slices.ContainsFunc(graph.Nodes, func(node automation.Node) bool { return node.Action != nil && node.Action.Type == "capture_product" })
 	for _, node := range graph.Nodes {
 		if node.Action != nil && node.Action.Type == "capture_product" {
 			var owned bool
@@ -220,6 +221,12 @@ func (c *Configuration) automationResources(ctx context.Context, org string, gra
 		}
 		if !owned {
 			return publishing.ErrNotFound
+		}
+		if captures {
+			if _, err := c.automationDraftDestinations(ctx, c.client, org, a.DestinationIDs); err != nil {
+				return err
+			}
+			continue
 		}
 		count, err := c.client.ChannelConnection.Query().Where(channelconnection.IDIn(a.DestinationIDs...), channelconnection.OrganizationID(org), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).Count(ctx)
 		if err != nil {
