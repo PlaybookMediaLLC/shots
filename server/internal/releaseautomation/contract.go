@@ -57,6 +57,7 @@ type Outputs struct {
 	ReleaseID       string   `json:"releaseId,omitempty"`
 	CampaignID      string   `json:"campaignId,omitempty"`
 	PostIDs         []string `json:"postIds,omitempty"`
+	DraftIDs        []string `json:"draftIds,omitempty"`
 	CreditsCharged  int      `json:"creditsCharged,omitempty"`
 	// DesignIDs and RenderedAssetIDs are campaign designs and their images.
 	DesignIDs        []string `json:"designIds,omitempty"`

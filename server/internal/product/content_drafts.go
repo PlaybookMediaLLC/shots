@@ -198,7 +198,7 @@ type ContentDraftInput struct {
 	// empty, so request fingerprints from before the field still match.
 	ReleaseID string `json:"releaseId,omitempty"`
 	// campaignID is the campaign an edited visual was published from. It is
-	// unexported on purpose: only CreateCampaignPublishDraft sets it, after
+	// unexported on purpose: only the campaign handoffs set it, after
 	// checking the caller's role on that campaign, so a plain draft create
 	// cannot claim one. campaignPostID is that campaign's post whose copy the
 	// draft took, checked there to belong to it.

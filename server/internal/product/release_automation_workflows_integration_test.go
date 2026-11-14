@@ -17,12 +17,16 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
@@ -899,6 +903,9 @@ func (c *countingCapturer) Capture(ctx context.Context, page string) ([]byte, er
 func newCaptureFixture(t *testing.T, page string, action automation.Action) *captureFixture {
 	t.Helper()
 	f := &captureFixture{automationFixture: newAutomationFixture(t), renderer: &recordingRenderer{}, surface: "surface" + cuid.New()[:12]}
+	if _, err := f.repo.defaultSocialSet(f.ctx, f.org); err != nil {
+		t.Fatal(err)
+	}
 	f.version.Store("")
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -1019,6 +1026,14 @@ func TestAutomationCaptureProductProvesTheDeployment(t *testing.T) {
 	if run := f.db.Client.ReleaseAutomationRun.GetX(f.ctx, runID); run.Outputs.CaptureID != outputs.CaptureID || run.Outputs.CaptureProof != automation.CaptureProofVersion {
 		t.Fatalf("run outputs=%+v", run.Outputs)
 	}
+	link, err := f.repo.GetCampaignAsset(f.ctx, f.owner, outputs.CampaignID, outputs.CaptureAssetID)
+	if err != nil || link.AssetStatus != "UPLOADED" {
+		t.Fatalf("captured original is missing from its campaign: %v", err)
+	}
+	caption := "The team's reviewed screenshot caption"
+	if _, err := f.repo.LinkCampaignAsset(f.ctx, f.owner, outputs.CampaignID, outputs.CaptureAssetID, LinkCampaignAssetInput{Kind: link.Kind, Caption: &caption}); err != nil {
+		t.Fatal(err)
+	}
 	// The proven image supersedes the unproven one.
 	if row := f.db.Client.SurfaceCapture.GetX(f.ctx, unproven); row.SupersededAt == nil || receipt.SupersededAt != nil {
 		t.Fatalf("unproven=%+v proven=%+v", row, receipt)
@@ -1032,6 +1047,9 @@ func TestAutomationCaptureProductProvesTheDeployment(t *testing.T) {
 	retried, err := f.repo.automationCaptureProduct(f.ctx, f.org, event, automation.Outputs{CampaignID: outputs.CampaignID}, action)
 	if err != nil || retried.CaptureID != outputs.CaptureID || f.capturer.calls.Load() != 1 {
 		t.Fatalf("retried=%+v err=%v calls=%d", retried, err, f.capturer.calls.Load())
+	}
+	if after, err := f.repo.GetCampaignAsset(f.ctx, f.owner, outputs.CampaignID, outputs.CaptureAssetID); err != nil || after.ID != link.ID || optionalText(after.Caption) != caption {
+		t.Fatal("capture replay replaced the original link or its edited caption")
 	}
 
 	// A newer image appears before the render: the render still shows this
@@ -1048,6 +1066,285 @@ func TestAutomationCaptureProductProvesTheDeployment(t *testing.T) {
 	}
 	if len(f.renderer.requests) != 1 || f.renderer.requests[0].CaptureAssetID != outputs.CaptureAssetID || rendered.CaptureID != outputs.CaptureID || len(rendered.DesignIDs) != 1 {
 		t.Fatalf("requests=%+v rendered=%+v", f.renderer.requests, rendered)
+	}
+}
+
+func TestAutomationCapturedCampaignCreatesEditableDraft(t *testing.T) {
+	f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+	model, meter := &scriptedCopyModel{}, &recordingMonthlyMeter{}
+	f.repo.WithAutomationModel(model).WithMonthlyMeter(meter)
+	if err := f.repo.AdvertiseReleaseAutomationExecutor(f.ctx, "copy-worker"+f.id, f.repo.AutomationCapabilities()...); err != nil {
+		t.Fatal(err)
+	}
+	set := f.db.Client.ChannelConnection.GetX(f.ctx, f.graph.Nodes[3].Action.DestinationIDs[0]).SocialSetID
+	linkedin := f.db.Client.ChannelConnection.Create().SetID(cuid.New()).SetOrganizationID(f.org).SetPlatform("linkedin").SetExternalAccountID("fixture-linkedin").SetSecretReference("fixture-only").SetCreatedByUserID(f.owner.UserID).SetNillableSocialSetID(set).SaveX(f.ctx)
+	f.graph.Nodes[3].Action.DestinationIDs = append(f.graph.Nodes[3].Action.DestinationIDs, linkedin.ID)
+	f.graph.Nodes = append(f.graph.Nodes, automation.Node{ID: "copy", Type: "action", Action: &automation.Action{Type: "generate_copy", Input: &automation.Reference{NodeID: "capture", Output: "campaignId"}, CreditLimit: 25}})
+	for i := range f.graph.Nodes {
+		if f.graph.Nodes[i].ID == "art" {
+			f.graph.Nodes[i].Action.Input.NodeID = "copy"
+		}
+	}
+	for i := range f.graph.Edges {
+		if f.graph.Edges[i].From == "capture" {
+			f.graph.Edges[i].To = "copy"
+		}
+	}
+	f.graph.Edges = append(f.graph.Edges, automation.Edge{From: "copy", To: "art", Branch: "next"})
+	f.active = f.activate(t)
+	runID := f.deploy(t, 750, "production")
+	var outputs automation.Outputs
+	for _, node := range []string{"capture", "copy", "art", "review"} {
+		var err error
+		outputs, err = f.repo.AutomationNode(f.ctx, f.org, runID, node, nil, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", node, err)
+		}
+	}
+	drafts, err := f.db.Client.ContentDraft.Query().Where(contentdraft.OrganizationID(f.org), contentdraft.CampaignID(outputs.CampaignID)).All(f.ctx)
+	if err != nil || len(drafts) != 2 || len(outputs.DraftIDs) != 2 {
+		t.Fatalf("campaign has no editable image-attached draft: count=%d err=%v", len(drafts), err)
+	}
+	if len(model.prompts) != 1 || !strings.Contains(model.prompts[0], "Persisted product capture record:") || !strings.Contains(model.prompts[0], `"releaseRevisionVerified":false`) {
+		t.Fatal("generated copy did not receive honest capture evidence")
+	}
+	for _, draft := range drafts {
+		post := f.db.Client.CampaignPost.GetX(f.ctx, optionalText(draft.CampaignPostID))
+		if draft.Status != contentdraft.StatusDraft || draft.PrimaryPlatform == nil || *draft.PrimaryPlatform != post.Channel || !slices.Contains(outputs.PostIDs, post.ID) || optionalText(draft.ReleaseID) != outputs.ReleaseID || !slices.Equal(draft.AssetIds, []string{outputs.CaptureAssetID}) || len(draft.ChannelConnectionIds) != 1 || draft.PlainText != post.Copy {
+			t.Fatal("draft lost its platform, copy, screenshot or release/campaign attribution")
+		}
+		body, err := json.Marshal(draft.Body)
+		if err != nil || !strings.Contains(string(body), outputs.CaptureAssetID) {
+			t.Fatal("captured media is not attached to the editable post body")
+		}
+	}
+	draft := drafts[0]
+	title := "Edited by the team"
+	if _, err := f.repo.UpdateContentDraft(f.ctx, f.owner, draft.ID, ContentDraftUpdate{BaseVersion: draft.Version, Title: &title}); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, `UPDATE release_automation_node SET status='running' WHERE "runId"=$1 AND "nodeId"='review'`, runID)
+	if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "review", nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	after := f.db.Client.ContentDraft.Query().Where(contentdraft.OrganizationID(f.org), contentdraft.CampaignID(outputs.CampaignID)).AllX(f.ctx)
+	if len(after) != 2 || f.db.Client.ContentDraft.GetX(f.ctx, draft.ID).Title != title {
+		t.Fatal("review recovery duplicated or overwrote an edited draft")
+	}
+	if count := f.db.Client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(f.org)).CountX(f.ctx); count != 0 {
+		t.Fatal("draft creation scheduled a post")
+	}
+}
+
+func TestAutomationCapturedDraftsRefuseIncompleteOrForeignInputs(t *testing.T) {
+	for _, problem := range []string{"missing post after valid post", "unlinked image", "failed upload", "foreign campaign", "foreign image", "private destination"} {
+		t.Run(problem, func(t *testing.T) {
+			f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+			outputs, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 751, "production"), "capture", nil, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch problem {
+			case "missing post after valid post":
+				outputs.PostIDs = append(outputs.PostIDs, cuid.New())
+			case "unlinked image":
+				f.db.Client.CampaignAsset.Delete().Where(campaignasset.OrganizationID(f.org), campaignasset.CampaignID(outputs.CampaignID)).ExecX(f.ctx)
+			case "failed upload":
+				f.db.Client.Asset.UpdateOneID(outputs.CaptureAssetID).SetStatus(asset.StatusFAILED).ExecX(f.ctx)
+			case "foreign campaign", "foreign image":
+				other := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+				foreign, err := other.repo.AutomationNode(other.ctx, other.org, other.deploy(t, 752, "production"), "capture", nil, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if problem == "foreign campaign" {
+					outputs.CampaignID = foreign.CampaignID
+				} else {
+					outputs.CaptureAssetID = foreign.CaptureAssetID
+				}
+			case "private destination":
+				set, err := f.repo.CreateSocialSet(f.ctx, f.owner, SocialSetInput{Name: "Private", Visibility: "PRIVATE"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.db.Client.ChannelConnection.UpdateOneID(outputs.DestinationIDs[0]).SetSocialSetID(set.ID).ExecX(f.ctx)
+			}
+			actor := Actor{OrganizationID: f.org, Kind: "service", Display: "release-automation"}
+			if _, err := f.repo.automationCampaignDrafts(f.ctx, actor, outputs); err == nil {
+				t.Fatal("unsafe or incomplete campaign became a draft")
+			}
+			if f.db.Client.ContentDraft.Query().Where(contentdraft.OrganizationID(f.org)).CountX(f.ctx) != 0 || f.db.Client.CalendarMutation.Query().Where(calendarmutation.OrganizationID(f.org)).CountX(f.ctx) != 0 {
+				t.Fatal("failed handoff left a partial draft or replay receipt")
+			}
+		})
+	}
+}
+
+func TestAutomationCaptureDestinationsRequireSharedSetsBeforeActivation(t *testing.T) {
+	for _, scenario := range []string{"existing default and orphan", "two legacy X accounts", "private destination"} {
+		t.Run(scenario, func(t *testing.T) {
+			f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+			first := f.graph.Nodes[3].Action.DestinationIDs[0]
+			originalSet := optionalText(f.db.Client.ChannelConnection.GetX(f.ctx, first).SocialSetID)
+			second := f.db.Client.ChannelConnection.Create().SetID(cuid.New()).SetOrganizationID(f.org).SetPlatform("x").SetExternalAccountID("second-x").SetSecretReference("fixture-only").SetCreatedByUserID(f.owner.UserID).SaveX(f.ctx)
+			f.graph.Nodes[3].Action.DestinationIDs = []string{second.ID}
+			if scenario == "two legacy X accounts" {
+				f.db.Client.ChannelConnection.UpdateOneID(first).ClearSocialSetID().ExecX(f.ctx)
+				f.graph.Nodes[3].Action.DestinationIDs = []string{first, second.ID}
+			}
+			if scenario == "private destination" {
+				private, err := f.repo.CreateSocialSet(f.ctx, f.owner, SocialSetInput{Name: "Private", Visibility: "PRIVATE"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.repo.AssignSocialSetAccount(f.ctx, f.owner, private.ID, second.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			draft, err := f.repo.SaveReleaseAutomation(f.ctx, f.owner, SaveAutomationInput{SourceAppID: f.source.ID, Name: "Shared destinations", Priority: 20, Graph: f.graph, Layout: map[string]automation.Position{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.repo.ActivateReleaseAutomation(f.ctx, f.owner, draft.ID, draft.Revision); !errors.Is(err, errAutomationDraftDestination) {
+				t.Fatalf("unsafe destination passed activation: %v", err)
+			}
+			if scenario == "private destination" {
+				return
+			}
+			// Validation does not silently migrate accounts or choose a brand.
+			if f.db.Client.ChannelConnection.GetX(f.ctx, second.ID).SocialSetID != nil {
+				t.Fatal("activation assigned the orphan account")
+			}
+			if scenario == "two legacy X accounts" {
+				if _, err := f.repo.AssignSocialSetAccount(f.ctx, f.owner, originalSet, first); err != nil {
+					t.Fatal(err)
+				}
+			}
+			otherSet, err := f.repo.CreateSocialSet(f.ctx, f.owner, SocialSetInput{Name: "Second brand"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.repo.AssignSocialSetAccount(f.ctx, f.owner, otherSet.ID, second.ID); err != nil {
+				t.Fatal(err)
+			}
+			f.active = f.activate(t)
+			run := f.deploy(t, 755, "production")
+			var outputs automation.Outputs
+			for _, node := range []string{"capture", "art", "review"} {
+				outputs, err = f.repo.AutomationNode(f.ctx, f.org, run, node, nil, 0)
+				if err != nil {
+					t.Fatalf("repaired %s: %v", node, err)
+				}
+			}
+			if len(outputs.DraftIDs) != len(f.graph.Nodes[3].Action.DestinationIDs) {
+				t.Fatal("the repaired destinations did not each receive a draft")
+			}
+		})
+	}
+}
+
+func TestAutomationCaptureRechecksDestinationAssignmentsBeforeSpending(t *testing.T) {
+	f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+	run := f.deploy(t, 756, "production")
+	connection := f.db.Client.ChannelConnection.GetX(f.ctx, f.graph.Nodes[3].Action.DestinationIDs[0])
+	f.db.Client.ChannelConnection.UpdateOneID(connection.ID).ClearSocialSetID().ExecX(f.ctx)
+	if _, err := f.repo.AutomationNode(f.ctx, f.org, run, "capture", nil, 0); !errors.Is(err, errAutomationDraftDestination) || !PermanentAutomationError(err) {
+		t.Fatalf("changed destination was not refused: %v", err)
+	}
+	if f.capturer.calls.Load() != 0 || f.failureCode(t, run, "capture") != "destination_set_required" {
+		t.Fatal("capture spent resources or hid the account assignment failure")
+	}
+	if _, err := f.repo.AssignSocialSetAccount(f.ctx, f.owner, optionalText(connection.SocialSetID), connection.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range []string{"capture", "art", "review"} {
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, run, node, nil, 0); err != nil {
+			t.Fatalf("recovered %s: %v", node, err)
+		}
+	}
+}
+
+func TestAutomationCapturedDraftsSerializeRecoveryWithoutAdoptingManualDrafts(t *testing.T) {
+	f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+	outputs, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 753, "production"), "capture", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manual, err := f.repo.CreateCampaignPublishDraft(f.ctx, f.owner, outputs.CampaignID, CampaignPublishDraftInput{
+		AssetID: outputs.CaptureAssetID, CampaignPostID: outputs.PostIDs[0],
+		Draft: ContentDraftInput{Title: "A separate team draft", PlainText: "Keep my words."},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := Actor{OrganizationID: f.org, Kind: "service", Display: "release-automation"}
+	results := make(chan automation.Outputs, 6)
+	errors := make(chan error, 6)
+	for range 6 {
+		go func() {
+			output, err := f.repo.automationCampaignDrafts(f.ctx, actor, outputs)
+			results <- output
+			errors <- err
+		}()
+	}
+	var draftID string
+	for range 6 {
+		output, err := <-results, <-errors
+		if err != nil || len(output.DraftIDs) != 1 {
+			t.Fatalf("concurrent handoff failed: %v", err)
+		}
+		if draftID == "" {
+			draftID = output.DraftIDs[0]
+		}
+		if draftID != output.DraftIDs[0] || draftID == manual.ID {
+			t.Fatal("recovery duplicated a draft or adopted the team's separate draft")
+		}
+	}
+	if f.db.Client.ContentDraft.Query().Where(contentdraft.OrganizationID(f.org)).CountX(f.ctx) != 2 || f.db.Client.ContentDraft.GetX(f.ctx, manual.ID).PlainText != "Keep my words." {
+		t.Fatal("concurrent recovery changed the team's draft or created duplicates")
+	}
+}
+
+func TestAutomationAuthenticatedCaptureLinksOriginalAndSuppliesSafeEvidence(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, recipe := w.ready(t)
+	job := w.deployment(t, "campaign-handoff", "abcdef1234567890")
+	w.run(t, job.ID)
+	campaign, err := w.repo.CreateCampaign(w.ctx, w.owner, CreateCampaignInput{
+		Name: "Dashboard release", Objective: "Show the dashboard",
+		Angles: []CampaignAngleInput{{Hook: "Dashboard", Title: "Dashboard"}},
+		Posts:  []CampaignPostInput{{Channel: "x", Copy: "Review the dashboard update."}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := &ent.ReleaseSourceEvent{ID: "handoff-event", SourceAppID: w.source.ID, Snapshot: automation.Event{Family: automation.Deployed, ObjectID: "campaign-handoff"}}
+	output, err := w.repo.automationCaptureProduct(w.ctx, w.org, event, automation.Outputs{
+		CampaignID: campaign.ID, PostIDs: []string{campaign.Posts[0].ID}, DestinationIDs: w.graph.Nodes[3].Action.DestinationIDs,
+	}, &automation.Action{RecipeID: recipe.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link, err := w.repo.GetCampaignAsset(w.ctx, w.owner, campaign.ID, output.CaptureAssetID); err != nil || link.AssetStatus != "UPLOADED" {
+		t.Fatal("authenticated capture did not attach its original to the campaign")
+	}
+	media := w.db.Client.Asset.GetX(w.ctx, output.CaptureAssetID)
+	if media.CaptureID == nil {
+		t.Fatal("authenticated capture lost its attempt provenance")
+	}
+	for _, source := range []string{"https://app.example.com/dashboard?token=dummy-secret#private", "https://dummy-user:dummy-secret@app.example.com/dashboard"} {
+		w.db.Client.CaptureAttempt.UpdateOneID(*media.CaptureID).SetSourceURL(source).ExecX(w.ctx)
+		evidence, err := w.repo.automationCaptureEvidence(w.ctx, w.org, output)
+		if err != nil || strings.Contains(evidence, "dummy-") || strings.Contains(evidence, "token") || strings.Contains(evidence, "private") || !strings.Contains(evidence, `"releaseRevisionVerified":true`) {
+			t.Fatalf("capture evidence failed its secret or proof boundary: %v", err)
+		}
+		if strings.Contains(source, "?") && !strings.Contains(evidence, `"path":"/dashboard"`) {
+			t.Fatal("capture evidence lost the observed feature path")
+		}
+	}
+	actor := Actor{OrganizationID: w.org, Kind: "service", Display: "release-automation"}
+	if drafts, err := w.repo.automationCampaignDrafts(w.ctx, actor, output); err != nil || len(drafts.DraftIDs) != 1 {
+		t.Fatalf("authenticated capture did not reach an editable draft: %v", err)
 	}
 }
 

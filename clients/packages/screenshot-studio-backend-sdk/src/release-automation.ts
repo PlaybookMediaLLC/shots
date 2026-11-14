@@ -158,6 +158,7 @@ export type AutomationOutputs = {
   releaseId?: string
   campaignId?: string
   postIds?: string[]
+  draftIds?: string[]
   brandKitId?: string
   brandKitVersion?: number
   destinationIds?: string[]

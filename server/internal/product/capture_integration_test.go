@@ -127,6 +127,9 @@ type captureWorld struct {
 func newCaptureWorld(t *testing.T) *captureWorld {
 	t.Helper()
 	f := newAutomationFixture(t)
+	if _, err := f.repo.defaultSocialSet(f.ctx, f.org); err != nil {
+		t.Fatal(err)
+	}
 	keys, err := sessionstate.NewKeys(bytes.Repeat([]byte{7}, 32))
 	if err != nil {
 		t.Fatal(err)

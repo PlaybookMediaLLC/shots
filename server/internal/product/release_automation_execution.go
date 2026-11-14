@@ -263,9 +263,11 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 			outputs, err = c.automationRenderCodeVisual(ctx, org, id, nodeID, source, event, input, node.Action)
 		case "submit_review":
 			var result *CampaignPostTransition
-			result, err = c.TransitionCampaignPosts(ctx, actor, input.CampaignID, CampaignPostDecision{Decision: "submit", PostIDs: input.PostIDs, IdempotencyKey: key})
+			outputs, err = c.automationCampaignDrafts(ctx, actor, input)
 			if err == nil {
-				outputs = input
+				result, err = c.TransitionCampaignPosts(ctx, actor, input.CampaignID, CampaignPostDecision{Decision: "submit", PostIDs: input.PostIDs, IdempotencyKey: key})
+			}
+			if err == nil {
 				outputs.PostIDs = result.PostIDs
 				// Credits belong to the generation receipt that spent them.
 				outputs.CreditsCharged = 0
@@ -311,6 +313,9 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 	}
 	if len(outputs.DesignIDs) > 0 {
 		run.Outputs.DesignIDs, run.Outputs.RenderedAssetIDs = outputs.DesignIDs, outputs.RenderedAssetIDs
+	}
+	if len(outputs.DraftIDs) > 0 {
+		run.Outputs.DraftIDs = outputs.DraftIDs
 	}
 	if outputs.CanvasID != "" {
 		run.Outputs.CanvasID = outputs.CanvasID
@@ -565,6 +570,8 @@ func automationFailureCode(err error) string {
 		return "capture_pending"
 	case errors.Is(err, ErrCaptureSuperseded):
 		return captureSuperseded
+	case errors.Is(err, errAutomationDraftDestination):
+		return "destination_set_required"
 	case errors.Is(err, ErrInvalidInput), errors.Is(err, publishing.ErrNotFound), ent.IsNotFound(err):
 		return "configuration_invalid"
 	}

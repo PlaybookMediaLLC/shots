@@ -222,6 +222,7 @@ export const automationOutputsSchema = z.object({
   releaseId: z.string().optional(),
   campaignId: z.string().optional(),
   postIds: z.array(z.string()).optional(),
+  draftIds: z.array(z.string()).optional(),
   brandKitId: z.string().optional(),
   brandKitVersion: z.number().int().optional(),
   destinationIds: z.array(z.string()).optional(),

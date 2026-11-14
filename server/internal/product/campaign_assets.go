@@ -32,6 +32,8 @@ type LinkCampaignAssetInput struct {
 	PlanAssetKey *string `json:"planAssetKey"`
 	PlanVersion  *int    `json:"planVersion"`
 	VariantLabel *string `json:"variantLabel"`
+	// Workflow recovery must not replace a person's caption or provenance.
+	preserveExisting bool
 }
 
 type SaveCampaignCopyInput struct {
@@ -123,7 +125,7 @@ func (c *Configuration) LinkCampaignAsset(ctx context.Context, actor Actor, camp
 			SetCampaignID(campaignID).SetAssetID(assetID).SetKind(input.Kind).SetNillableCaption(input.Caption).
 			SetNillablePlanAssetKey(input.PlanAssetKey).SetNillablePlanVersion(input.PlanVersion).
 			SetNillableVariantLabel(input.VariantLabel).Save(ctx)
-	case err == nil:
+	case err == nil && !input.preserveExisting:
 		update := tx.CampaignAsset.UpdateOne(link).SetNillableCaption(input.Caption).
 			SetNillablePlanAssetKey(input.PlanAssetKey).SetNillablePlanVersion(input.PlanVersion).
 			SetNillableVariantLabel(input.VariantLabel)

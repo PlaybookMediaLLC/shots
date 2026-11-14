@@ -76,6 +76,8 @@ export const FAILURE_CODES: Record<string, string> = {
   access_revoked: 'Automation was disabled or GitHub access was revoked.',
   cancelled: 'Cancelled by an administrator or a configuration change.',
   configuration_invalid: 'Required configuration or evidence was unavailable.',
+  destination_set_required:
+    'Assign each workflow account to a shared social set in Publish settings, then retry.',
   insufficient_credits: 'Not enough AI credits for the generation budget.',
   not_entitled: 'The workspace plan does not include this action.',
   prohibited_terms: 'Copy used a term the brand prohibits.',

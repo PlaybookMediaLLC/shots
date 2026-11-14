@@ -6,6 +6,7 @@ import {
   automationActionTypeSchema,
   automationGraphSchema,
   automationFamilySchema,
+  automationOutputsSchema,
   type AutomationOverview,
 } from '../lib/api/contracts/release-automation'
 import {
@@ -164,6 +165,35 @@ test('a capture action may name a signed-in recipe instead of a public page', ()
   assert.deepEqual(automationActionSchema.parse(action), action)
   const tooLong = { type: 'capture_product', recipeId: 'r'.repeat(65) }
   assert.equal(automationActionSchema.safeParse(tooLong).success, false)
+})
+
+test('capture evidence reaches copy generation before editable drafts are reviewed', () => {
+  const { graph } = buildWorkflowTemplate('deployment-marketing', {
+    brandKitId: 'brand-fixture',
+    destinationIds: ['destination-fixture'],
+    branch: 'main',
+    creditLimit: 25,
+    aiRelevance: false,
+    majorMinorOnly: false,
+    renderTemplateIds: ['layout-browser-launch'],
+    canvas: false,
+    capture: { surfaceId: 'surface-fixture' },
+  })
+  assert.deepEqual(automationGraphSchema.parse(graph), graph)
+  const copy = graph.nodes.find((node) => node.id === 'copy')?.action
+  const art = graph.nodes.find((node) => node.id === 'art')?.action
+  assert.ok(copy?.type === 'generate_copy')
+  assert.ok(art?.type === 'render_creatives')
+  assert.deepEqual(copy.input, {
+    nodeId: 'capture',
+    output: 'campaignId',
+  })
+  assert.deepEqual(art.input, {
+    nodeId: 'copy',
+    output: 'campaignId',
+  })
+  const outputs = { campaignId: 'campaign-fixture', draftIds: ['draft-one', 'draft-two'] }
+  assert.deepEqual(automationOutputsSchema.parse(outputs), outputs)
 })
 
 test('the action registry covers every executor action and wires outputs to inputs', () => {
