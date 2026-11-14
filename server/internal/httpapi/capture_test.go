@@ -45,6 +45,9 @@ func (c *captureConfiguration) FinishCaptureConnect(_ context.Context, _ product
 	}
 	return nil
 }
+func (c *captureConfiguration) RefreshCaptureConnect(ctx context.Context, actor product.Actor, id string) (*product.CaptureConnectStart, error) {
+	return c.StartCaptureConnect(ctx, actor, id)
+}
 func (c *captureConfiguration) RevokeCaptureConnection(context.Context, product.Actor, string) error {
 	return nil
 }
@@ -93,6 +96,10 @@ func TestCaptureRoutesAdaptTransportOntoTheDomain(t *testing.T) {
 	connect := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/connect", "")
 	if connect.Code != http.StatusOK || connect.Header().Get("Cache-Control") != "no-store" || connect.Header().Get("Referrer-Policy") != "no-referrer" || !strings.Contains(connect.Body.String(), `"liveViewUrl"`) {
 		t.Fatalf("connect=%d headers=%v", connect.Code, connect.Header())
+	}
+	refresh := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/connect/refresh", "")
+	if refresh.Code != http.StatusOK || refresh.Header().Get("Cache-Control") != "no-store" || refresh.Header().Get("Referrer-Policy") != "no-referrer" || !strings.Contains(refresh.Body.String(), `"intentId":"intent-1"`) {
+		t.Fatalf("refresh=%d headers=%v", refresh.Code, refresh.Header())
 	}
 	if finish := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/connect/finish", `{"intentId":"intent-1"}`); finish.Code != http.StatusAccepted || config.intent != "intent-1" {
 		t.Fatalf("finish=%d", finish.Code)

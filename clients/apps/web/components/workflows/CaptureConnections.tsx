@@ -64,8 +64,17 @@ function ConnectionRow({
   const { busy, error, run } = useCaptureAction()
   const status = CAPTURE_CONNECTION_STATUS[connection.status]
   const finishing = connection.connectPhase === 'FINISHING'
+  const open = connection.connectPhase === 'OPEN' && connection.status !== 'REVOKED'
   const connect = () =>
-    run(async () => setStart(await client.capture.connect.mutate({ id: connection.id })))
+    run(async () => {
+      setStart(await client.capture.connect.mutate({ id: connection.id }))
+      await onChanged()
+    })
+  const refresh = () =>
+    run(async () => {
+      setStart(await client.capture.refreshConnect.mutate({ id: connection.id }))
+      await onChanged()
+    })
   const finish = (intentId: string) =>
     run(async () => {
       await client.capture.finishConnect.mutate({ id: connection.id, intentId })
@@ -92,13 +101,23 @@ function ConnectionRow({
         </div>
         {canManage && connection.status !== 'REVOKED' ? (
           <div className="flex flex-wrap gap-2">
+            {open && !start ? (
+              <Button
+                disabled={busy}
+                onClick={() => void refresh()}
+                type="button"
+                variant="outline"
+              >
+                Resume sign-in
+              </Button>
+            ) : null}
             <Button
               disabled={busy || finishing}
               onClick={() => void connect()}
               type="button"
               variant="outline"
             >
-              {connection.status === 'CONNECTING' && !start ? 'Connect' : 'Reconnect'}
+              {open ? 'Start over' : connection.status === 'CONNECTING' ? 'Connect' : 'Reconnect'}
             </Button>
             <ConfirmDialog
               confirmLabel="Revoke"
@@ -120,13 +139,18 @@ function ConnectionRow({
           </div>
         ) : null}
       </div>
-      {start ? (
-        <SignInPanel busy={busy} onFinish={() => void finish(start.intentId)} start={start} />
+      {start && open ? (
+        <SignInPanel
+          busy={busy}
+          onFinish={() => void finish(start.intentId)}
+          onRefresh={() => void refresh()}
+          start={start}
+        />
       ) : null}
       {finishing ? (
         <p className="text-sm text-muted-foreground" role="status">
-          Checking this sign-in. Saying you signed in is not proof it worked: a worker first
-          restores the session in a fresh browser and checks the account. This updates on its own.
+          Checking your account in the private browser, then checking that a fresh browser can
+          restore the sign-in. This updates on its own.
         </p>
       ) : null}
       {connection.failureCode && !finishing ? (

@@ -25,6 +25,8 @@ type Code string
 
 const (
 	NeedsAuth            Code = "needs_auth"
+	SignInIncomplete     Code = "sign_in_incomplete"
+	SessionRestoreFailed Code = "session_restore_failed"
 	WrongAccount         Code = "wrong_account"
 	WaitingForDeployment Code = "waiting_for_deployment"
 	DeploymentUnverified Code = "deployment_unverified"
@@ -191,17 +193,38 @@ func open(ctx context.Context, browser *rod.Browser, hosts, postPaths []string) 
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
-	page, err := isolated.Page(proto.TargetCreateTarget{URL: "about:blank"})
+	s, err := openPage(ctx, isolated, hosts, postPaths)
+	if err != nil {
+		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser)
+		return nil, err
+	}
+	closePage := s.close
+	s.close = func() {
+		closePage()
+		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser)
+	}
+	return s, nil
+}
+
+// openPage applies the capture policy to a new tab in an existing context.
+func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []string) (*scope, error) {
+	page, err := browser.Context(ctx).Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
-	s := &scope{page: page, context: isolated}
+	ready := false
+	defer func() {
+		if !ready {
+			_ = page.Close()
+		}
+	}()
+	s := &scope{page: page, context: browser}
 	for _, setup := range []func() error{
 		func() error { return proto.NetworkEnable{}.Call(page) },
 		func() error { return proto.NetworkSetBypassServiceWorker{Bypass: true}.Call(page) },
 		func() error { _, err := page.EvalOnNewDocument(lockdown); return err },
 		func() error {
-			return proto.BrowserSetDownloadBehavior{Behavior: proto.BrowserSetDownloadBehaviorBehaviorDeny, BrowserContextID: isolated.BrowserContextID}.Call(browser)
+			return proto.BrowserSetDownloadBehavior{Behavior: proto.BrowserSetDownloadBehaviorBehaviorDeny, BrowserContextID: browser.BrowserContextID}.Call(browser)
 		},
 	} {
 		if err := setup(); err != nil {
@@ -234,8 +257,8 @@ func open(ctx context.Context, browser *rod.Browser, hosts, postPaths []string) 
 	s.close = func() {
 		_ = router.Stop()
 		_ = page.Close()
-		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser)
 	}
+	ready = true
 	return s, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -112,6 +113,11 @@ func exportState(ctx context.Context, context_ *rod.Browser, page *rod.Page, tar
 // ExportConnected reads the state a person's sign-in left in the session's
 // default context, from the tab they signed in with.
 func ExportConnected(ctx context.Context, browser *rod.Browser, target Target) (*State, error) {
+	if err := target.Validate(); err != nil {
+		return nil, &Failure{Code: RecipeInvalid}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	pages, err := browser.Context(ctx).Pages()
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
@@ -126,19 +132,46 @@ func ExportConnected(ctx context.Context, browser *rod.Browser, target Target) (
 			continue
 		}
 		if here, err := url.Parse(info.URL); err == nil && here.Scheme == "https" && HostApproved(here.Hostname(), target.Hosts) {
+			live := &scope{page: page}
+			// Another tab may still show sign-in; inspect the account before exporting.
+			found, err := live.evalBool(ctx, `(selector) => !!document.querySelector(selector)`, target.IdentitySelector)
+			if err != nil {
+				return nil, &Failure{Code: ProviderUnavailable}
+			}
+			if !found {
+				continue
+			}
+			if err := live.checkIdentity(ctx, target, target.ProtectedPath); err != nil {
+				continue
+			}
 			signedIn = page
 			break
 		}
 	}
 	if signedIn == nil {
-		return nil, &Failure{Code: NeedsAuth}
+		// Login may land elsewhere; verify the configured path without moving the person's tab.
+		probe, err := openPage(ctx, browser, target.Hosts, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer probe.close()
+		if err := probe.navigate(ctx, target, target.ProtectedPath, defaultStepTimeout*2); err != nil {
+			return nil, err
+		}
+		if err := probe.checkIdentity(ctx, target, target.ProtectedPath); err != nil {
+			return nil, err
+		}
+		if probe.privateResponse.Load() {
+			return nil, &Failure{Code: OriginRefused}
+		}
+		signedIn = probe.page
 	}
 	state, err := exportState(ctx, browser, signedIn, target)
 	if err != nil {
 		return nil, err
 	}
 	if len(state.Cookies) == 0 && len(state.LocalStorage) == 0 {
-		return nil, &Failure{Code: NeedsAuth}
+		return nil, &Failure{Code: SessionRestoreFailed}
 	}
 	return state, nil
 }

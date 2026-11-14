@@ -224,7 +224,7 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
-		case "/dashboard", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail":
+		case "/dashboard", "/hydrating-account", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail":
 			if !signed {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
@@ -237,6 +237,8 @@ func newProtectedApp(t *testing.T) *protectedApp {
 			}
 			extra := ""
 			switch r.URL.Path {
+			case "/hydrating-account":
+				extra = `<script>fetch('/report-data').then(()=>{document.querySelector('[data-testid=account]').id='hydrated-account'})</script>`
 			case "/feature-shell", "/feature-shell-detail":
 				extra = `<h1>Reports</h1><nav><a href="/feature-shell-detail">Detailed report</a></nav>`
 			case "/features":
@@ -344,6 +346,103 @@ func failed(t *testing.T, err error, want Code) {
 	var failure *Failure
 	if !errors.As(err, &failure) || failure.Code != want {
 		t.Fatalf("err=%v, want %s", err, want)
+	}
+}
+
+func TestExportConnectedChecksTheLiveAccountBeforeSaving(t *testing.T) {
+	a := newProtectedApp(t)
+	b := localBrowser(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	target := a.target()
+	if err := OpenLogin(ctx, b, target); err != nil {
+		t.Fatal(err)
+	}
+	pages, err := b.Pages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := pages.First().Context(ctx)
+	if err := page.WaitLoad(); err != nil {
+		t.Fatal(err)
+	}
+	// A cookie's presence does not establish a completed sign-in.
+	if err := b.SetCookies([]*proto.NetworkCookieParam{{Name: "preauth", Value: "pending", Domain: "app.example.test"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ExportConnected(ctx, b, target); err == nil {
+		t.Fatal("login page was exported as signed in")
+	} else {
+		failed(t, err, NeedsAuth)
+	}
+	if err := page.Navigate(target.Origin + "/session"); err != nil {
+		t.Fatal(err)
+	}
+	live := &scope{page: page}
+	if err := live.waitFor(ctx, target.IdentitySelector, 10*time.Second, target.ProtectedPath, NeedsAuth); err != nil {
+		t.Fatal(err)
+	}
+	wrong := target
+	wrong.ExpectedAccount = "another-account"
+	if _, err := ExportConnected(ctx, b, wrong); err == nil {
+		t.Fatal("wrong live account was exported")
+	} else {
+		failed(t, err, WrongAccount)
+	}
+	// The account marker belongs to the configured path, not every app page.
+	if err := page.Navigate(target.Origin + "/landing"); err != nil {
+		t.Fatal(err)
+	}
+	if err := page.WaitLoad(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{target.ProtectedPath, "/hydrating-account", "/assets"} {
+		probeTarget := target
+		probeTarget.ProtectedPath = path
+		if path == "/hydrating-account" {
+			probeTarget.IdentitySelector = "#hydrated-account"
+		}
+		state, err := ExportConnected(ctx, b, probeTarget)
+		if err != nil || len(state.Cookies) == 0 || len(state.LocalStorage) == 0 {
+			t.Fatalf("protected path %s not verified from landing page: %v", path, err)
+		}
+		info, err := page.Info()
+		if err != nil || info.URL != target.Origin+"/landing" {
+			t.Fatalf("original tab moved: %v", err)
+		}
+		after, err := b.Pages()
+		if err != nil || len(after) != len(pages) {
+			t.Fatalf("verification tab was not closed: %v", err)
+		}
+	}
+	if a.count("POST /mutate") != 0 || a.count("POST /graphql") != 0 || a.count("other.example.test") != 0 || a.count("websocket") != 0 {
+		t.Fatal("live verification escaped capture policy")
+	}
+	// Keep an old sign-in tab open while another application tab has the account.
+	if err := page.Navigate(target.Origin + "/login"); err != nil {
+		t.Fatal(err)
+	}
+	second, err := b.Page(proto.TargetCreateTarget{URL: target.Origin + target.ProtectedPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Context(ctx).WaitLoad(); err != nil {
+		t.Fatal(err)
+	}
+	state, err := ExportConnected(ctx, b, target)
+	if err != nil || len(state.Cookies) == 0 || len(state.LocalStorage) == 0 {
+		t.Fatalf("signed-in tab not exported: %v", err)
+	}
+	if err := (proto.StorageClearCookies{}).Call(b); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := second.Eval(`() => localStorage.clear()`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ExportConnected(ctx, b, target); err == nil {
+		t.Fatal("unportable state accepted")
+	} else {
+		failed(t, err, SessionRestoreFailed)
 	}
 }
 

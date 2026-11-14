@@ -41,18 +41,21 @@ const captureSecret = "dummy-session-secret"
 // scriptedBrowser stands in for the provider. The real runner is proven against
 // Chrome in the browser package; this one scripts what each attempt finds.
 type scriptedBrowser struct {
-	mu          sync.Mutex
-	sessions    map[string]bool
-	allocated   [][]string
-	closed      []string
-	links       int
-	allocateErr error
-	exported    error
-	verify      error
-	run         func(browser.RunInput) (*browser.RunResult, error)
-	runs        atomic.Int32
-	seenState   []*browser.State
-	during      func()
+	mu           sync.Mutex
+	sessions     map[string]bool
+	allocated    [][]string
+	closed       []string
+	links        int
+	viewSessions []string
+	viewWindows  []time.Duration
+	duringView   func()
+	allocateErr  error
+	exported     error
+	verify       error
+	run          func(browser.RunInput) (*browser.RunResult, error)
+	runs         atomic.Int32
+	seenState    []*browser.State
+	during       func()
 }
 
 func newScriptedBrowser(t *testing.T) *scriptedBrowser {
@@ -78,10 +81,15 @@ func (s *scriptedBrowser) Allocate(_ context.Context, hosts []string, _ time.Dur
 	s.sessions[id] = true
 	return id, nil
 }
-func (s *scriptedBrowser) LiveView(context.Context, string, time.Duration) (string, error) {
+func (s *scriptedBrowser) LiveView(_ context.Context, session string, window time.Duration) (string, error) {
+	if s.duringView != nil {
+		s.duringView()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.links++
+	s.viewSessions = append(s.viewSessions, session)
+	s.viewWindows = append(s.viewWindows, window)
 	return fmt.Sprintf("https://live.example/view?jwt=dummy-live-view-%d", s.links), nil
 }
 func (s *scriptedBrowser) Close(_ context.Context, id string) error {
@@ -498,6 +506,105 @@ func TestCaptureConnectJourneyProvesAFreshSession(t *testing.T) {
 	}
 }
 
+func TestCaptureSignInFailuresIdentifyTheStage(t *testing.T) {
+	for name, tc := range map[string]struct {
+		export error
+		verify error
+		code   browser.Code
+	}{
+		"incomplete live sign-in": {export: &browser.Failure{Code: browser.NeedsAuth}, code: browser.SignInIncomplete},
+		"closed live tabs":        {export: browser.ErrNoPages, code: browser.SignInIncomplete},
+		"wrong live account":      {export: &browser.Failure{Code: browser.WrongAccount}, code: browser.WrongAccount},
+		"fresh restoration":       {verify: &browser.Failure{Code: browser.NeedsAuth}, code: browser.SessionRestoreFailed},
+		"unportable live state":   {export: &browser.Failure{Code: browser.SessionRestoreFailed}, code: browser.SessionRestoreFailed},
+		"unknown infrastructure":  {export: errors.New("private provider detail"), code: browser.ProviderUnavailable},
+		"fresh page failure":      {verify: &browser.Failure{Code: browser.PageFailed}, code: browser.PageFailed},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newCaptureWorld(t)
+			connection := w.connection(t)
+			w.browser.exported, w.browser.verify = tc.export, tc.verify
+			w.signIn(t, connection.ID)
+			row := w.db.Client.PlatformAppConnection.GetX(w.ctx, connection.ID)
+			if row.Status != platformappconnection.StatusNEEDS_AUTH || row.FailureCode == nil || *row.FailureCode != string(tc.code) || row.StateCiphertext != nil || row.ConnectSessionID != nil || w.browser.open() != 0 {
+				t.Fatalf("status=%s code=%v state=%t session=%v open=%d", row.Status, row.FailureCode, row.StateCiphertext != nil, row.ConnectSessionID, w.browser.open())
+			}
+		})
+	}
+}
+
+func TestCaptureRefreshKeepsTheSameSignInAndDeadline(t *testing.T) {
+	w := newCaptureWorld(t)
+	connection := w.connection(t)
+	start, err := w.repo.StartCaptureConnect(w.ctx, w.owner, connection.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.db.Client.PlatformAppConnection.UpdateOneID(connection.ID).SetConnectExpiresAt(time.Now().Add(time.Minute)).ExecX(w.ctx)
+	before := w.db.Client.PlatformAppConnection.GetX(w.ctx, connection.ID)
+	refresh, err := w.repo.RefreshCaptureConnect(w.ctx, w.owner, connection.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := w.db.Client.PlatformAppConnection.GetX(w.ctx, connection.ID)
+	if refresh.IntentID != start.IntentID || refresh.LiveViewURL == start.LiveViewURL || !refresh.ExpiresAt.Equal(*before.ConnectExpiresAt) || !after.ConnectExpiresAt.Equal(*before.ConnectExpiresAt) || *after.ConnectSessionID != *before.ConnectSessionID || len(w.browser.allocated) != 1 || w.browser.open() != 1 {
+		t.Fatal("refresh replaced or extended the sign-in")
+	}
+	if w.browser.viewSessions[1] != *before.ConnectSessionID || w.browser.viewWindows[1] > time.Minute || w.browser.viewWindows[1] <= 0 {
+		t.Fatalf("viewer did not use the existing session and remaining deadline: %v", w.browser.viewWindows)
+	}
+	audits := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.capture_connect_view_refreshed")).AllX(w.ctx)
+	if len(audits) != 1 {
+		t.Fatalf("refresh audit count=%d", len(audits))
+	}
+	w.addMember(t, "other-admin", "admin")
+	if link, err := w.repo.RefreshCaptureConnect(w.ctx, w.actor("other-admin"), connection.ID); !errors.Is(err, publishing.ErrForbidden) || link != nil {
+		t.Fatalf("another admin got viewer=%t err=%v", link != nil, err)
+	}
+	if err := w.repo.FinishCaptureConnect(w.ctx, w.owner, connection.ID, refresh.IntentID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.RefreshCaptureConnect(w.ctx, w.owner, connection.ID); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("finishing refresh=%v", err)
+	}
+}
+
+func TestCaptureRefreshRefusesExpiredOrReplacedSignIn(t *testing.T) {
+	for _, stage := range []string{"before", "during", "replaced", "revoked"} {
+		t.Run(stage, func(t *testing.T) {
+			w := newCaptureWorld(t)
+			connection := w.connection(t)
+			if _, err := w.repo.StartCaptureConnect(w.ctx, w.owner, connection.ID); err != nil {
+				t.Fatal(err)
+			}
+			change := func() {
+				u := w.db.Client.PlatformAppConnection.UpdateOneID(connection.ID)
+				switch stage {
+				case "replaced":
+					u.SetConnectIntentID("replacement")
+				case "revoked":
+					u.SetStatus(platformappconnection.StatusREVOKED)
+				default:
+					u.SetConnectExpiresAt(time.Now().Add(-time.Minute))
+				}
+				u.ExecX(w.ctx)
+			}
+			if stage == "before" {
+				change()
+			} else {
+				w.browser.duringView = change
+			}
+			link, err := w.repo.RefreshCaptureConnect(w.ctx, w.owner, connection.ID)
+			if !errors.Is(err, publishing.ErrConflict) || link != nil {
+				t.Fatalf("stale refresh returned link=%t err=%v", link != nil, err)
+			}
+			if stage == "before" && w.browser.links != 1 {
+				t.Fatal("expired sign-in contacted provider")
+			}
+		})
+	}
+}
+
 func (w *captureWorld) connection2(t *testing.T) *CaptureConnectionRecord {
 	t.Helper()
 	record, err := w.repo.CreateCaptureConnection(w.ctx, w.owner, CreateCaptureConnectionInput{Name: "Second", Environment: "staging", Origin: "https://app.example.com",
@@ -555,6 +662,10 @@ func TestCaptureOtherTenantsAreDenied(t *testing.T) {
 	other.repo.WithAuthenticatedCapture(w.browser, w.keys)
 	stranger := other.owner
 	checks := map[string]func() error{
+		"refresh": func() error {
+			_, err := other.repo.RefreshCaptureConnect(other.ctx, stranger, connection.ID)
+			return err
+		},
 		"start":  func() error { _, err := other.repo.StartCaptureConnect(other.ctx, stranger, connection.ID); return err },
 		"finish": func() error { return other.repo.FinishCaptureConnect(other.ctx, stranger, connection.ID, "x") },
 		"revoke": func() error { return other.repo.RevokeCaptureConnection(other.ctx, stranger, connection.ID) },
@@ -603,12 +714,18 @@ func TestCaptureOtherTenantsAreDenied(t *testing.T) {
 	if _, err := f.repo.StartCaptureConnect(f.ctx, reader, connection.ID); !errors.Is(err, publishing.ErrForbidden) {
 		t.Errorf("member started a sign-in: %v", err)
 	}
+	if _, err := f.repo.RefreshCaptureConnect(f.ctx, reader, connection.ID); !errors.Is(err, publishing.ErrForbidden) {
+		t.Errorf("member refreshed a sign-in: %v", err)
+	}
 	if err := f.repo.RevokeCaptureConnection(f.ctx, reader, connection.ID); !errors.Is(err, publishing.ErrForbidden) {
 		t.Errorf("member revoked: %v", err)
 	}
 	// An API key cannot start a human handoff.
 	if _, err := f.repo.StartCaptureConnect(f.ctx, Actor{OrganizationID: f.org, Kind: "api_key"}, connection.ID); !errors.Is(err, publishing.ErrForbidden) {
 		t.Errorf("api key started a sign-in: %v", err)
+	}
+	if _, err := f.repo.RefreshCaptureConnect(f.ctx, Actor{OrganizationID: f.org, Kind: "api_key"}, connection.ID); !errors.Is(err, publishing.ErrForbidden) {
+		t.Errorf("api key refreshed a sign-in: %v", err)
 	}
 }
 

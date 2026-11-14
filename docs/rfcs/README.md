@@ -41,6 +41,13 @@ for earlier designs, not instructions to rebuild superseded architecture.
 
 ## Build order and exit gates
 
+**Scoped authorization (2026-11-14):** The [managed AI capture and sign-in recovery
+addendum](authenticated-capture-runtime-and-recovery.md) authorizes completing
+Verifier capture-to-draft validation and correcting sign-in diagnostics and
+same-session live-view recovery under RFC 007. It evaluates managed AI agents
+first; provider adoption and self-hosted browser infrastructure remain subject
+to their explicit evidence gates.
+
 Each milestone produces usable customer value. Begin assisted pilots now;
 advance automation based on the observed bottlenecks and acceptance evidence,
 not completion of every historical RFC. Existing access control, approval,
