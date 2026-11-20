@@ -520,6 +520,17 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 224px), 1fr));
   gap: 32px 24px;
 }
+/* Wide enough for five, the starters and recent work share one five-column grid, so every
+   tile on Home has the same size, as in a document hub. */
+.home-recent {
+  container-type: inline-size;
+}
+@container (min-width: 720px) {
+  .home-starters,
+  .home-cards {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
 /* Recent work sits below the starters across a hairline, as in a document hub. */
 .home-divider {
   margin-top: 44px;
