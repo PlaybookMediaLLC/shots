@@ -61,6 +61,17 @@ test(
     await expect(page.getByText('Restored “One headline”')).toBeVisible({ timeout: 30_000 })
     await expect(texts(page)).toHaveCount(1)
     expect(await revision()).toBeGreaterThan(beforeRestore)
+
+    // A rename from the editor reaches the sidebar's Recents before its 30-second cache goes stale.
+    await page.getByRole('button', { name: 'Expand navigation' }).click()
+    const recents = page.getByRole('region', { name: 'Recents' })
+    await expect(recents.getByRole('link', { exact: true, name: 'Launch hero' })).toBeVisible()
+    await projectMenu(page, 'Launch hero', 'Rename…')
+    await page.getByLabel('Project name').fill('Launch hero final')
+    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    await expect(
+      recents.getByRole('link', { exact: true, name: 'Launch hero final' })
+    ).toBeVisible()
   }
 )
 

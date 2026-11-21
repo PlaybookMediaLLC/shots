@@ -252,6 +252,16 @@ test('A: a manual product announcement survives reload and exports what was comp
   const bytes = await readFile(file)
   expect(await sharp(bytes).metadata()).toMatchObject({ format: 'png', width: 1080, height: 1350 })
   await notBlank(bytes)
+
+  // A rename from the header reaches the sidebar's Recents before its 30-second cache goes stale.
+  await page.getByRole('button', { name: 'Expand navigation' }).click()
+  const recents = page.getByRole('region', { name: 'Recents' })
+  await expect(recents.getByRole('link', { exact: true, name: 'Untitled canvas' })).toBeVisible()
+  await page.getByTitle('Rename canvas', { exact: true }).click()
+  const rename = page.getByRole('dialog', { name: 'Rename canvas' })
+  await rename.getByLabel('Name').fill('Launch board')
+  await rename.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(recents.getByRole('link', { exact: true, name: 'Launch board' })).toBeVisible()
 })
 
 test('B: a multi-artboard campaign adapts formats, persists and exports a ZIP', async ({
