@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.55.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.54.0...v2.55.0) (2026-11-24)
+
+
+### Features
+
+* **capture:** unify capture-to-campaign pipeline and harden AI capture ([daa0f25](https://github.com/PlaybookMediaLLC/shots/commit/daa0f25eb5640f3dca74000001fe8019c32873cf))
+* **capture:** unify capture-to-campaign pipeline and harden AI capture ([47c6f5b](https://github.com/PlaybookMediaLLC/shots/commit/47c6f5b6857014d469eff0bc7410edc0ca4c5579))
+
+
+### Bug Fixes
+
+* **product:** keep render-only automation review compatible when assets or sets are not draft-ready ([ee5452f](https://github.com/PlaybookMediaLLC/shots/commit/ee5452f412cafb353e3daaade2575eb43f051358))
+
 ## [2.54.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.53.1...v2.54.0) (2026-11-21)
 
 
