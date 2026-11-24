@@ -13,6 +13,7 @@ import {
   test,
   trpcMutation,
   trpcQuery,
+  waitForHydration,
 } from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
@@ -171,6 +172,20 @@ async function assertRolePermissions(
   await expect(starters.getByRole('button', { name: /Write a post/ })).toHaveCount(canEdit ? 1 : 0)
   await expect(starters.getByText('Ask a workspace owner or admin for more access.')).toHaveCount(
     isAdmin ? 0 : 1
+  )
+  await page.goto('/home?view=release')
+  await waitForHydration(page)
+  await expect(page.getByRole('link', { name: 'Prepare a release', exact: true })).toHaveCount(
+    canCreateRelease || isAdmin ? 1 : 0
+  )
+  await expect(page.getByRole('link', { name: 'Browse releases', exact: true })).toHaveCount(
+    canCreateRelease || isAdmin ? 0 : 1
+  )
+  const releaseStarters = page.getByRole('region', {
+    name: 'Start with a release, or create something on its own',
+  })
+  await expect(releaseStarters.getByRole('button', { name: /Write a post/ })).toHaveCount(
+    canEdit ? 1 : 0
   )
 }
 

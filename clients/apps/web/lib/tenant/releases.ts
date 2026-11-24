@@ -28,8 +28,8 @@ export async function createRelease(context: TenantContext, input: CreateRelease
   return backendSDK(context).createRelease(input)
 }
 
-export async function listReleases(context: TenantContext, take: number) {
-  return withDates((await backendSDK(context).listReleases(take)).releases)
+export async function listReleases(context: TenantContext, take: number, search?: string) {
+  return withDates((await backendSDK(context).listReleases(take, search)).releases)
 }
 
 export async function getRelease(context: TenantContext, releaseId: string) {

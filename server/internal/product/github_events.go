@@ -75,6 +75,10 @@ var ErrNotEligible = errors.New("tenant resource is no longer eligible for dispa
 // an event it does not own. Each handler is safe to run again after a crash.
 func (c *Configuration) HandleOutboxEvent(ctx context.Context, eventID, organizationID, eventType, aggregateID string) (bool, error) {
 	switch eventType {
+	case EventKitPrepare:
+		return true, c.processKitPreparation(ctx, organizationID, aggregateID)
+	case EventKitExport:
+		return true, c.processKitExport(ctx, organizationID, aggregateID)
 	case EventGitHubObservation:
 		return true, c.processGitHubObservation(ctx, organizationID, aggregateID)
 	case EventReleaseAutomationDispatch:
@@ -251,7 +255,28 @@ func (c *Configuration) releaseScreenshots(ctx context.Context, eventID, organiz
 	if len(assets) == 0 {
 		return nil
 	}
-	return row.Update().SetScreenshotAssetIds(assets).Exec(ctx)
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.PlatformExec(ctx, `SELECT id FROM release WHERE "organizationId"=$1 AND id=$2 FOR UPDATE`, organizationID, releaseID); err != nil {
+		return err
+	}
+	current, err := tx.Release.Query().Where(release.ID(releaseID), release.OrganizationID(organizationID), release.StatusNEQ(release.StatusCANCELLED)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return ErrNotEligible
+	}
+	if err != nil || len(current.ScreenshotAssetIds) > 0 {
+		return err
+	}
+	if err = current.Update().SetScreenshotAssetIds(assets).Exec(ctx); err != nil {
+		return err
+	}
+	if err = invalidateReleaseQualification(ctx, tx, actor, releaseID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func payloadInt(value any) (int64, bool) {

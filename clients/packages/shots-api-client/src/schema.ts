@@ -92,6 +92,278 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/releases/{id}/evidence/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change evidence access or retention
+         * @description Go checks action-specific authority: assigned approvers clear audiences; editors withdraw or erase retained text. Image deletion uses the existing asset endpoint.
+         */
+        post: operations["changeEvidenceAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List release evidence
+         * @description Read bounded retained snapshots. Unavailable and erased sources return metadata; machine reads omit private excerpts.
+         */
+        get: operations["listReleaseEvidence"];
+        put?: never;
+        /**
+         * Retain evidence for a release
+         * @description Save bounded text, an accountable attestation, an owned image, or a retained provider snapshot.
+         */
+        post: operations["createReleaseEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/claims/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import historical claims for review
+         * @description Preserve historical spec approvals and create unverified stable claim mappings. Source labels remain scoped to their original spec.
+         */
+        post: operations["importReleaseSpecClaims"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/evidence/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an existing evidence snapshot
+         * @description Bind an exact workspace snapshot to a release without copying its bytes.
+         */
+        post: operations["linkReleaseEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List release claims
+         * @description Read current claim versions, exact decisions, permitted supporting excerpts and reasons that require review.
+         */
+        get: operations["listReleaseClaims"];
+        put?: never;
+        /**
+         * Save a stable release claim
+         * @description Append exact claim text and qualifiers as an unresolved version. Unrelated claims retain their decisions.
+         */
+        post: operations["saveReleaseClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/claims/{claimId}/support": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace a claim support set
+         * @description Pin exact evidence versions and byte or pixel selectors, retaining contradictory passages or explicit exclusions.
+         */
+        post: operations["setClaimSupports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/claims/{claimId}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a human factual decision
+         * @description Require the assigned human reviewer, exact current claim and support hashes, live evidence and a rationale.
+         */
+        post: operations["verifyReleaseClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read release kit readiness
+         * @description Read a kit revision, human review history and deterministic current blockers. Machine responses omit native content and private lineage.
+         */
+        get: operations["getReleaseKit"];
+        put?: never;
+        /**
+         * Assemble or replace a release kit
+         * @description Assemble or replace a release kit. The Go domain checks the aggregate revision, exact dependencies and current authority.
+         */
+        post: operations["createReleaseKitRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kits/{revisionId}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a human kit review
+         * @description Record a human kit review. The Go domain checks the aggregate revision, exact dependencies and current authority.
+         */
+        post: operations["decideReleaseKit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kits/{revisionId}/artifacts/{artifactId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview a release kit artifact privately
+         * @description A private watermarked preview grants no export or distribution authority.
+         */
+        get: operations["getKitArtifactPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kit-exports/{exportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an approved kit export
+         * @description Read persisted export metadata. A download URL requires a new live readiness and authority check; downloaded files cannot be recalled.
+         */
+        get: operations["getKitExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kits/{revisionId}/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare immutable kit outputs
+         * @description Prepare immutable kit outputs. The Go domain checks the aggregate revision, exact dependencies and current authority.
+         */
+        post: operations["prepareReleaseKit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/kits/{revisionId}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request an approved ZIP export
+         * @description Request an approved ZIP export. The Go domain checks the aggregate revision, exact dependencies and current authority.
+         */
+        post: operations["requestKitExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/github/sources/{sourceId}/production": {
         parameters: {
             query?: never;
@@ -668,6 +940,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/releases/{id}/qualification/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save release facts for review
+         * @description Append a factual revision using an expected revision and required idempotency key. Incomplete facts remain unqualified.
+         */
+        post: operations["createQualificationRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a human release qualification decision
+         * @description Record a decision by the assigned reviewer with live workspace authority, or REOPEN a withdrawn release as a new unqualified facts revision with unknown rollout. Reopening preserves the saved facts and does not grant edit permission. API keys and service principals cannot decide or reopen.
+         */
+        post: operations["decideReleaseQualification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read release qualification
+         * @description Read human qualification separately from campaign status, including facts that need repair.
+         */
+        get: operations["getReleaseQualification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification/revisions/{revisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a saved qualification version
+         * @description Read immutable release facts and their recorded human decision, including when qualification is disabled.
+         */
+        get: operations["getQualificationRevision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification/lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read release merge and split history
+         * @description Read the human merge and split history for this release, preserving original release and source identities.
+         */
+        get: operations["getReleaseLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge unqualified release candidates
+         * @description Merge active, never-qualified releases using expected revisions and the complete explicit source selection. Preserve old URLs, facts, work and receipts; require facts review afterward. No generation or delivery is dispatched.
+         */
+        post: operations["mergeRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/{id}/qualification/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split sources into unqualified release candidates
+         * @description Move disjoint, explicit source groups from an active, never-qualified release into new releases with human briefs. Keep existing work and historical evidence on their original release. Every result requires facts review; no generation or delivery is dispatched.
+         */
+        post: operations["splitRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/source-apps": {
         parameters: {
             query?: never;
@@ -682,6 +1094,66 @@ export interface paths {
          * @description Registers a release-intake source in the API key workspace and returns its webhook URL. Without a `secretReference`, the response also carries the webhook secret, shown only this once. Requires the `source:write` scope.
          */
         post: operations["createSourceApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/release-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List release source evidence
+         * @description Read at most 50 retained source objects per page. A source observation is evidence, not a human qualification decision. Retained history remains readable when the source is disconnected.
+         */
+        get: operations["listReleaseSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/release-sources/{id}/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read release source history
+         * @description Read at most 50 observations of one source object. Sequence orders receipt history, while provider timestamps express known source order.
+         */
+        get: operations["getReleaseSourceHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/release-sources/selections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select sources for a release
+         * @description Select up to 200 exact observations for one existing release or atomically create a release with a human-written brief. Requires workspace readiness opt-in, expected source sequences, expected release revision and an idempotency key. Existing associations are reused explicitly; different releases are never merged by this command. Selection does not qualify, generate or publish content.
+         */
+        post: operations["selectReleaseSources"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2036,6 +2508,409 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChangeEvidenceAccessRequest: {
+            expectedRevision: string;
+            evidenceVersionId: string;
+            expectedSourceSequence: string;
+            /** @enum {string} */
+            action: "CLEAR_FOR_AUDIENCE" | "REVOKE_CLEARANCE" | "WITHDRAW" | "TOMBSTONE";
+            audienceIds: string[];
+            reason: string;
+        };
+        ReadinessMutation: {
+            created: boolean;
+            revision: string;
+            id: string;
+            ids: string[];
+        };
+        CreateReleaseEvidenceRequest: {
+            expectedRevision: string;
+            /** @default null */
+            sourceId: string | null;
+            /** @default null */
+            expectedSourceSequence: string | null;
+            /** @enum {string} */
+            kind: "TEXT" | "ATTESTATION" | "ASSET" | "RELEASE_SOURCE";
+            /** @enum {string} */
+            origin: "HUMAN" | "PROVIDER" | "AI";
+            /** @default  */
+            text: string;
+            /** @default null */
+            sourceUrl: string | null;
+            observedAt: string | null;
+            purpose: string;
+            /** @default  */
+            attestationScope: string;
+            /** @default  */
+            limitations: string;
+            /** @default false */
+            confirmAttestation: boolean;
+            /** @default null */
+            assetId: string | null;
+            /** @default null */
+            redactionAssetId: string | null;
+            /** @default null */
+            sourceBindingId: string | null;
+            /** @default null */
+            observationId: string | null;
+        };
+        ImportReleaseSpecClaimsRequest: {
+            expectedRevision: string;
+            /** @default null */
+            specId: string | null;
+        };
+        LinkReleaseEvidenceRequest: {
+            expectedRevision: string;
+            evidenceVersionId: string;
+            expectedSourceSequence: string;
+            purpose: string;
+        };
+        ListReleaseClaimsPage: {
+            importProgress: {
+                cursor: string;
+                imported: number;
+                skipped: number;
+                invalid: number;
+                done: boolean;
+                invalidSpecIds: string[];
+            };
+            items: {
+                id: string;
+                versionId: string;
+                version: string;
+                specId: string | null;
+                text: string;
+                qualifiers: {
+                    audience: string;
+                    availability: string;
+                    eligibility: string;
+                    limitations: string;
+                };
+                /** @enum {string} */
+                origin: "HUMAN" | "PROVIDER" | "AI";
+                sha256: string;
+                supportSetId: string | null;
+                supportSha256: string | null;
+                supports: {
+                    evidenceVersionId: string;
+                    evidenceSha256: string;
+                    sourceId: string;
+                    sourceSequence: string;
+                    /** @enum {string} */
+                    relation: "SUPPORTS" | "CONTRADICTS" | "CONTEXT";
+                    selector: {
+                        /** @enum {string} */
+                        kind: "TEXT_SPAN" | "IMAGE_REGION";
+                        contextSha256: string;
+                        startByte?: number;
+                        endByte?: number;
+                        quoteSha256?: string;
+                        x?: number;
+                        y?: number;
+                        width?: number;
+                        height?: number;
+                        redactionId?: string;
+                    };
+                    exclusionReason: string;
+                }[];
+                evidence: {
+                    id: string;
+                    sourceId: string;
+                    version: string;
+                    sourceSequence: string;
+                    /** @enum {string} */
+                    kind: "TEXT" | "ATTESTATION" | "ASSET" | "RELEASE_SOURCE";
+                    /** @enum {string} */
+                    format: "TEXT" | "IMAGE";
+                    /** @enum {string} */
+                    origin: "HUMAN" | "PROVIDER" | "AI";
+                    /** @enum {string} */
+                    accessClass: "PRIVATE_SOURCE" | "INTERNAL_MATERIAL" | "CUSTOMER_CLEARED";
+                    available: boolean;
+                    current: boolean;
+                    sha256: string;
+                    normalizationVersion: string;
+                    providerRevision: string;
+                    text: string | null;
+                    sourceUrl: string | null;
+                    assetId: string | null;
+                    width: number;
+                    height: number;
+                    redactionAssetId: string | null;
+                    /** Format: date-time */
+                    observedAt: string;
+                    /** Format: date-time */
+                    createdAt: string;
+                    confirmedByUserId: string | null;
+                    confirmedAt: string | null;
+                    attestationScope: string | null;
+                    limitations: string | null;
+                    tombstonedAt: string | null;
+                }[];
+                decision: {
+                    id: string;
+                    /** @enum {string} */
+                    decision: "SUPPORTED" | "CONTRADICTED" | "UNRESOLVED" | "WITHDRAWN";
+                    humanUserId: string;
+                    reason: string;
+                    /** Format: date-time */
+                    createdAt: string;
+                } | null;
+                /** @enum {string} */
+                state: "SUPPORTED" | "CONTRADICTED" | "UNRESOLVED" | "WITHDRAWN";
+                blockers: string[];
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+            nextCursor: string | null;
+        };
+        ListReleaseEvidencePage: {
+            items: {
+                id: string;
+                sourceId: string;
+                version: string;
+                sourceSequence: string;
+                /** @enum {string} */
+                kind: "TEXT" | "ATTESTATION" | "ASSET" | "RELEASE_SOURCE";
+                /** @enum {string} */
+                format: "TEXT" | "IMAGE";
+                /** @enum {string} */
+                origin: "HUMAN" | "PROVIDER" | "AI";
+                /** @enum {string} */
+                accessClass: "PRIVATE_SOURCE" | "INTERNAL_MATERIAL" | "CUSTOMER_CLEARED";
+                available: boolean;
+                current: boolean;
+                sha256: string;
+                normalizationVersion: string;
+                providerRevision: string;
+                text: string | null;
+                sourceUrl: string | null;
+                assetId: string | null;
+                width: number;
+                height: number;
+                redactionAssetId: string | null;
+                /** Format: date-time */
+                observedAt: string;
+                /** Format: date-time */
+                createdAt: string;
+                confirmedByUserId: string | null;
+                confirmedAt: string | null;
+                attestationScope: string | null;
+                limitations: string | null;
+                tombstonedAt: string | null;
+            }[];
+            nextCursor: string | null;
+        };
+        SaveReleaseClaimRequest: {
+            expectedRevision: string;
+            /** @default null */
+            claimId: string | null;
+            /** @default null */
+            expectedClaimVersionId: string | null;
+            text: string;
+            qualifiers: {
+                audience: string;
+                availability: string;
+                eligibility: string;
+                limitations: string;
+            };
+            /** @enum {string} */
+            origin: "HUMAN" | "AI";
+        };
+        SetClaimSupportsRequest: {
+            expectedRevision: string;
+            claimVersionId: string;
+            supports: {
+                evidenceVersionId: string;
+                expectedSourceSequence: string;
+                /** @enum {string} */
+                relation: "SUPPORTS" | "CONTRADICTS" | "CONTEXT";
+                selector: {
+                    /** @enum {string} */
+                    kind: "TEXT_SPAN" | "IMAGE_REGION";
+                    contextSha256: string;
+                    startByte?: number;
+                    endByte?: number;
+                    quoteSha256?: string;
+                    x?: number;
+                    y?: number;
+                    width?: number;
+                    height?: number;
+                    redactionId?: string;
+                };
+                /** @default  */
+                exclusionReason: string;
+            }[];
+        };
+        VerifyReleaseClaimRequest: {
+            expectedRevision: string;
+            claimVersionId: string;
+            claimSha256: string;
+            supportSetId: string;
+            supportSha256: string;
+            /** @enum {string} */
+            decision: "SUPPORTED" | "CONTRADICTED" | "UNRESOLVED" | "WITHDRAWN";
+            reason: string;
+        };
+        CreateReleaseKitRevisionRequest: {
+            expectedRevision: string;
+            expectedKitRevisionId: string | null;
+            qualificationRevisionId: string;
+            approverUserId: string;
+            artifacts: ({
+                existingArtifactId: string;
+            } | {
+                /** @default null */
+                existingArtifactId: null;
+                /** @enum {string} */
+                kind: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                audienceId: string;
+                /** @enum {string} */
+                classification: "INTERNAL_MATERIAL" | "CUSTOMER_CLEARED";
+                /** @enum {string} */
+                sourceKind: "TEMPLATE" | "DRAFT" | "ASSET" | "CREATIVE";
+                /** @default  */
+                sourceId: string;
+                /** @default  */
+                expectedNativeRevision: string;
+                /** @default  */
+                outputId: string;
+                claims: {
+                    nodeId: string;
+                    claimVersionId: string;
+                }[];
+            })[];
+        };
+        DecideReleaseKitRequest: {
+            expectedRevision: string;
+            manifestSha256: string;
+            dependencyToken: string;
+            /** @enum {string} */
+            reviewType: "CONTENT_COVERAGE" | "FINAL_APPROVAL";
+            /** @enum {string} */
+            decision: "APPROVE" | "REJECT" | "WITHDRAW";
+            reason: string;
+            assertionsConfirmed: boolean;
+            screenshotsConfirmed: boolean;
+            audienceConfirmed: boolean;
+        };
+        KitPreview: {
+            /** @enum {string} */
+            kind: "image" | "text";
+            content: string;
+            /** @constant */
+            watermark: "PREVIEW — NOT APPROVED FOR DISTRIBUTION";
+        };
+        KitExport: {
+            id: string;
+            /** @enum {string} */
+            state: "BUILDING" | "READY" | "FAILED";
+            sha256: string | null;
+            failureCode: string;
+            fileIndex: {
+                /** @constant */
+                schemaVersion: 1;
+                releaseId: string;
+                kitRevisionId: string;
+                audienceIds: string[];
+                files: {
+                    name: string;
+                    sha256: string;
+                    byteLength: number;
+                }[];
+            };
+            downloadUrl: string | null;
+        };
+        ReleaseKit: {
+            id: string;
+            kitId: string;
+            history: {
+                id: string;
+                version: string;
+                state: string;
+            }[];
+            exportIds: string[];
+            version: string;
+            /** @enum {string} */
+            state: "DRAFT" | "BUILDING" | "REVIEWABLE" | "APPROVED" | "REJECTED" | "SUPERSEDED" | "WITHDRAWN" | "FAILED";
+            approverUserId: string;
+            qualificationRevisionId: string;
+            failureCode: string;
+            artifacts: {
+                id: string;
+                /** @enum {string} */
+                kind: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                audienceId: string;
+                /** @enum {string} */
+                classification: "INTERNAL_MATERIAL" | "CUSTOMER_CLEARED";
+                /** @enum {string} */
+                sourceKind: "TEMPLATE" | "DRAFT" | "ASSET" | "CREATIVE";
+                sourceId: string;
+                sourceRevision: string;
+                snapshotSha256: string;
+                outputSha256: string | null;
+                claims: {
+                    nodeId: string;
+                    claimId: string;
+                    claimVersionId: string;
+                    supportSetId: string;
+                    verificationId: string;
+                }[];
+                prepared: boolean;
+                document: unknown[] | {
+                    [key: string]: unknown;
+                } | null;
+                markdown: string | null;
+            }[];
+            omissions: {
+                audienceId: string;
+                /** @enum {string} */
+                material: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                ownerId: string;
+                reason: string;
+            }[];
+            decisions: {
+                id: string;
+                /** @enum {string} */
+                reviewType: "CONTENT_COVERAGE" | "FINAL_APPROVAL";
+                /** @enum {string} */
+                decision: "APPROVE" | "REJECT" | "WITHDRAW";
+                humanUserId: string;
+                reason: string;
+                manifestSha256: string;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+            readiness: {
+                canApprove: boolean;
+                canExportApproved: boolean;
+                canRequestHandoff: boolean;
+                manifestHash: string | null;
+                aggregateRevision: string;
+                dependencyToken: string;
+                policyVersion: number;
+                blockers: {
+                    /** @enum {string} */
+                    code: "QUALIFICATION_REQUIRED" | "AVAILABILITY_UNCONFIRMED" | "CLAIM_UNVERIFIED" | "EVIDENCE_UNAVAILABLE" | "SOURCE_CHANGED" | "MATERIAL_MISSING" | "COVERAGE_UNREVIEWED" | "SCREENSHOT_UNREVIEWED" | "AUDIENCE_LEAK" | "OUTPUT_INCOMPLETE" | "APPROVAL_REQUIRED" | "APPROVER_REVOKED" | "REVISION_SUPERSEDED";
+                    objectId: string;
+                    audienceId: string | null;
+                    ownerId: string | null;
+                    repairAction: string;
+                }[];
+            };
+        };
+        PrepareReleaseKitRequest: {
+            expectedRevision: string;
+            snapshots: {
+                artifactRevisionId: string;
+                snapshotSha256: string;
+            }[];
+        };
+        RequestKitExportRequest: {
+            expectedRevision: string;
+            manifestSha256: string;
+            audienceIds: string[];
+        };
         CalendarResult: {
             drafts: {
                 assetIds: string[];
@@ -2600,6 +3475,285 @@ export interface components {
             sourceUrls?: string[];
             title: string;
         };
+        CreateQualificationRequest: {
+            expectedRevision: string;
+            facts: {
+                ownerUserId: string | null;
+                factReviewerUserId: string | null;
+                rationale: string | null;
+                /** @enum {string} */
+                rollout: "UNKNOWN" | "PLANNED" | "LIMITED" | "GENERAL" | "WITHDRAWN";
+                availability: string | null;
+                exclusions: string | null;
+                eligibility: string | null;
+                plannedAvailability: string | null;
+                readyAt: string | null;
+                humanBrief: string | null;
+                humanBriefAuthorUserId: string | null;
+                sourceUrls: string[];
+                sourceAssetIds: string[];
+                requirements: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "SALES" | "CUSTOMER_SUCCESS" | "CUSTOMER" | "OTHER";
+                    label: string | null;
+                    materials: ("FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT")[];
+                    omissions: {
+                        /** @enum {string} */
+                        material: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                        reason: string;
+                    }[];
+                }[];
+            };
+            reason?: string | null;
+        };
+        QualificationCommandResult: {
+            created: boolean;
+            revision: string;
+            qualificationRevisionId: string;
+            decisionId: string | null;
+        };
+        DecideQualificationRequest: {
+            expectedRevision: string;
+            qualificationRevisionId: string;
+            /** @enum {string} */
+            decision: "QUALIFIED" | "NO_COMMUNICATION" | "DEFERRED" | "WITHDRAWN" | "REOPEN";
+            reason: string;
+            revisitAt?: string | null;
+        };
+        ReleaseQualification: {
+            releaseId: string;
+            canonicalReleaseId: string;
+            /** @enum {string} */
+            canonicalState: "ACTIVE" | "MERGED" | "WITHDRAWN";
+            revision: string;
+            firstQualifiedAt: string | null;
+            enabled: boolean;
+            needsReview: boolean;
+            /** @enum {string} */
+            state: "NEEDS_FACTS" | "QUALIFIED" | "NO_COMMUNICATION" | "DEFERRED" | "WITHDRAWN";
+            current: {
+                id: string;
+                version: string;
+                parentRevisionId: string | null;
+                facts: {
+                    ownerUserId: string | null;
+                    factReviewerUserId: string | null;
+                    rationale: string | null;
+                    /** @enum {string} */
+                    rollout: "UNKNOWN" | "PLANNED" | "LIMITED" | "GENERAL" | "WITHDRAWN";
+                    availability: string | null;
+                    exclusions: string | null;
+                    eligibility: string | null;
+                    plannedAvailability: string | null;
+                    readyAt: string | null;
+                    humanBrief: string | null;
+                    humanBriefAuthorUserId: string | null;
+                    sourceUrls: string[];
+                    sourceAssetIds: string[];
+                    requirements: {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "SALES" | "CUSTOMER_SUCCESS" | "CUSTOMER" | "OTHER";
+                        label: string | null;
+                        materials: ("FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT")[];
+                        omissions: {
+                            /** @enum {string} */
+                            material: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                            reason: string;
+                        }[];
+                    }[];
+                };
+                /** @enum {string} */
+                authorKind: "session" | "api_key";
+                authorId: string;
+                /** Format: date-time */
+                createdAt: string;
+                sourceAssets: {
+                    id: string;
+                    fileName: string;
+                    mediaType: string;
+                }[];
+                sources: {
+                    sourceAppId: string;
+                    provider: string;
+                    /** @enum {string} */
+                    kind: "PULL_REQUEST" | "DEPLOYMENT";
+                    repositoryId: string;
+                    providerObjectId: string;
+                    bindingId: string;
+                    observation: {
+                        id: string;
+                        sequence: string;
+                        providerEventId: string | null;
+                        sourceUpdatedAt: string | null;
+                        /** Format: date-time */
+                        occurredAt: string;
+                        /** Format: date-time */
+                        receivedAt: string;
+                        /** @enum {string} */
+                        origin: "LIVE" | "HISTORICAL";
+                        snapshot: {
+                            title: string;
+                            notes: string;
+                            url: string | null;
+                            repositoryName: string | null;
+                            commit: string | null;
+                            environment: string | null;
+                            providerState: string | null;
+                        };
+                    };
+                }[];
+                decision: {
+                    id: string;
+                    /** @enum {string} */
+                    decision: "QUALIFIED" | "NO_COMMUNICATION" | "DEFERRED" | "WITHDRAWN";
+                    humanUserId: string;
+                    reason: string;
+                    revisitAt: string | null;
+                    /** Format: date-time */
+                    createdAt: string;
+                } | null;
+            } | null;
+            missingFacts: {
+                field: string;
+                /** @enum {string} */
+                reason: "OWNER_REQUIRED" | "REVIEWER_REQUIRED" | "SOURCE_REQUIRED" | "AUDIENCE_REQUIRED" | "MATERIAL_REQUIRED" | "ROLLOUT_UNKNOWN" | "ROLLOUT_WITHDRAWN" | "AVAILABILITY_REQUIRED" | "EXCLUSIONS_REQUIRED" | "ELIGIBILITY_REQUIRED" | "PLANNED_AVAILABILITY_REQUIRED" | "READY_TIME_REQUIRED";
+                objectId: string | null;
+                ownerUserId: string | null;
+                /** @constant */
+                repairAction: "REVISE_FACTS";
+            }[];
+        };
+        QualificationRevision: {
+            id: string;
+            version: string;
+            parentRevisionId: string | null;
+            facts: {
+                ownerUserId: string | null;
+                factReviewerUserId: string | null;
+                rationale: string | null;
+                /** @enum {string} */
+                rollout: "UNKNOWN" | "PLANNED" | "LIMITED" | "GENERAL" | "WITHDRAWN";
+                availability: string | null;
+                exclusions: string | null;
+                eligibility: string | null;
+                plannedAvailability: string | null;
+                readyAt: string | null;
+                humanBrief: string | null;
+                humanBriefAuthorUserId: string | null;
+                sourceUrls: string[];
+                sourceAssetIds: string[];
+                requirements: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "SALES" | "CUSTOMER_SUCCESS" | "CUSTOMER" | "OTHER";
+                    label: string | null;
+                    materials: ("FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT")[];
+                    omissions: {
+                        /** @enum {string} */
+                        material: "FACT_SHEET" | "SALES_NOTES" | "CS_NOTES" | "ANNOUNCEMENT" | "FAQ" | "SCREENSHOT";
+                        reason: string;
+                    }[];
+                }[];
+            };
+            /** @enum {string} */
+            authorKind: "session" | "api_key";
+            authorId: string;
+            /** Format: date-time */
+            createdAt: string;
+            sourceAssets: {
+                id: string;
+                fileName: string;
+                mediaType: string;
+            }[];
+            sources: {
+                sourceAppId: string;
+                provider: string;
+                /** @enum {string} */
+                kind: "PULL_REQUEST" | "DEPLOYMENT";
+                repositoryId: string;
+                providerObjectId: string;
+                bindingId: string;
+                observation: {
+                    id: string;
+                    sequence: string;
+                    providerEventId: string | null;
+                    sourceUpdatedAt: string | null;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    receivedAt: string;
+                    /** @enum {string} */
+                    origin: "LIVE" | "HISTORICAL";
+                    snapshot: {
+                        title: string;
+                        notes: string;
+                        url: string | null;
+                        repositoryName: string | null;
+                        commit: string | null;
+                        environment: string | null;
+                        providerState: string | null;
+                    };
+                };
+            }[];
+            decision: {
+                id: string;
+                /** @enum {string} */
+                decision: "QUALIFIED" | "NO_COMMUNICATION" | "DEFERRED" | "WITHDRAWN";
+                humanUserId: string;
+                reason: string;
+                revisitAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+            } | null;
+        };
+        ReleaseLineageHistory: {
+            items: {
+                id: string;
+                /** @enum {string} */
+                operation: "MERGE" | "SPLIT";
+                sourceReleaseId: string;
+                destinationReleaseId: string;
+                sourceRevision: string;
+                destinationRevision: string;
+                reason: string;
+                humanUserId: string;
+                /** Format: date-time */
+                createdAt: string;
+                bindingIds: string[];
+            }[];
+            nextCursor: string | null;
+        };
+        MergeReleaseRequest: {
+            expectedRevision: string;
+            sources: {
+                releaseId: string;
+                expectedRevision: string;
+            }[];
+            bindingIds: string[];
+            reason: string;
+        };
+        ReleaseLineageResult: {
+            created: boolean;
+            releaseId: string;
+            releases: {
+                releaseId: string;
+                revision: string;
+            }[];
+            lineageIds: string[];
+        };
+        SplitReleaseRequest: {
+            expectedRevision: string;
+            groups: {
+                bindingIds: string[];
+                newRelease: {
+                    title: string;
+                    benefitStatement: string;
+                };
+            }[];
+            reason: string;
+        };
         SourceAppCreateRequest: {
             allowedHosts: string[];
             branch?: string;
@@ -2612,6 +3766,165 @@ export interface components {
             provider: string;
             secretReference?: string;
             skipPrereleases?: boolean;
+        };
+        ReleaseSourcePage: {
+            items: {
+                id: string;
+                sourceAppId: string;
+                sourceName: string;
+                provider: string;
+                /** @enum {string} */
+                kind: "PULL_REQUEST" | "DEPLOYMENT";
+                repositoryId: string;
+                providerObjectId: string;
+                canonicalReleaseId: string | null;
+                sequence: string;
+                available: boolean;
+                needsResolution: boolean;
+                selectionNeedsReview: boolean;
+                current: {
+                    id: string;
+                    sequence: string;
+                    providerEventId: string | null;
+                    sourceUpdatedAt: string | null;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    receivedAt: string;
+                    /** @enum {string} */
+                    origin: "LIVE" | "HISTORICAL";
+                    snapshot: {
+                        title: string;
+                        notes: string;
+                        url: string | null;
+                        repositoryName: string | null;
+                        commit: string | null;
+                        environment: string | null;
+                        providerState: string | null;
+                    };
+                } | null;
+                selected: {
+                    id: string;
+                    sequence: string;
+                    providerEventId: string | null;
+                    sourceUpdatedAt: string | null;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    receivedAt: string;
+                    /** @enum {string} */
+                    origin: "LIVE" | "HISTORICAL";
+                    snapshot: {
+                        title: string;
+                        notes: string;
+                        url: string | null;
+                        repositoryName: string | null;
+                        commit: string | null;
+                        environment: string | null;
+                        providerState: string | null;
+                    };
+                } | null;
+            }[];
+            nextCursor: string | null;
+        };
+        ReleaseSourceHistory: {
+            source: {
+                id: string;
+                sourceAppId: string;
+                sourceName: string;
+                provider: string;
+                /** @enum {string} */
+                kind: "PULL_REQUEST" | "DEPLOYMENT";
+                repositoryId: string;
+                providerObjectId: string;
+                canonicalReleaseId: string | null;
+                sequence: string;
+                available: boolean;
+                needsResolution: boolean;
+                selectionNeedsReview: boolean;
+                current: {
+                    id: string;
+                    sequence: string;
+                    providerEventId: string | null;
+                    sourceUpdatedAt: string | null;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    receivedAt: string;
+                    /** @enum {string} */
+                    origin: "LIVE" | "HISTORICAL";
+                    snapshot: {
+                        title: string;
+                        notes: string;
+                        url: string | null;
+                        repositoryName: string | null;
+                        commit: string | null;
+                        environment: string | null;
+                        providerState: string | null;
+                    };
+                } | null;
+                selected: {
+                    id: string;
+                    sequence: string;
+                    providerEventId: string | null;
+                    sourceUpdatedAt: string | null;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    receivedAt: string;
+                    /** @enum {string} */
+                    origin: "LIVE" | "HISTORICAL";
+                    snapshot: {
+                        title: string;
+                        notes: string;
+                        url: string | null;
+                        repositoryName: string | null;
+                        commit: string | null;
+                        environment: string | null;
+                        providerState: string | null;
+                    };
+                } | null;
+            };
+            items: {
+                id: string;
+                sequence: string;
+                providerEventId: string | null;
+                sourceUpdatedAt: string | null;
+                /** Format: date-time */
+                occurredAt: string;
+                /** Format: date-time */
+                receivedAt: string;
+                /** @enum {string} */
+                origin: "LIVE" | "HISTORICAL";
+                snapshot: {
+                    title: string;
+                    notes: string;
+                    url: string | null;
+                    repositoryName: string | null;
+                    commit: string | null;
+                    environment: string | null;
+                    providerState: string | null;
+                };
+            }[];
+            nextCursor: string | null;
+        };
+        SelectReleaseSourcesRequest: {
+            releaseId: string | null;
+            newRelease: {
+                title: string;
+                benefitStatement: string;
+            } | null;
+            expectedRevision: string;
+            sources: {
+                bindingId: string;
+                observationId: string;
+                expectedSequence: string;
+            }[];
+        };
+        ReleaseSourceSelection: {
+            created: boolean;
+            releaseId: string;
+            revision: string;
         };
         SourceAppUpdateRequest: {
             branch?: string | null;
@@ -4993,6 +6306,39 @@ export interface components {
             message: string;
             /** @description HTTP status code, repeated in the body. */
             status: number;
+            /** @description Release qualification or source selection conflict and repair details. */
+            details?: {
+                /** @enum {string} */
+                reason: "KIT_NOT_READY" | "SOURCE_CHANGED";
+                currentRevision: string;
+                blockers: {
+                    /** @enum {string} */
+                    code: "QUALIFICATION_REQUIRED" | "AVAILABILITY_UNCONFIRMED" | "CLAIM_UNVERIFIED" | "EVIDENCE_UNAVAILABLE" | "SOURCE_CHANGED" | "MATERIAL_MISSING" | "COVERAGE_UNREVIEWED" | "SCREENSHOT_UNREVIEWED" | "AUDIENCE_LEAK" | "OUTPUT_INCOMPLETE" | "APPROVAL_REQUIRED" | "APPROVER_REVOKED" | "REVISION_SUPERSEDED";
+                    objectId: string;
+                    audienceId: string | null;
+                    ownerId: string | null;
+                    repairAction: string;
+                }[];
+            } | {
+                /** @enum {string} */
+                reason: "MISSING_FACTS" | "READINESS_DISABLED" | "COMMAND_KEY_REUSED" | "CANONICAL_RELEASE_CHANGED" | "RELEASE_INACTIVE" | "QUALIFICATION_UNAVAILABLE" | "REVISION_CONFLICT" | "SOURCE_CHANGED" | "SOURCE_SELECTION_CHANGED" | "RELEASE_ALREADY_QUALIFIED" | "RELEASE_HAS_REVIEWED_WORK" | "CLAIM_LIMIT" | "CLAIM_CHANGED" | "CONTRADICTION_NOT_REVIEWED" | "CLAIM_QUALIFIERS_MISSING" | "EVIDENCE_UNAVAILABLE" | "AI_EVIDENCE_UNCONFIRMED" | "ATTESTATION_UNCONFIRMED" | "SUPPORT_MISSING" | "EVIDENCE_ALREADY_ATTACHED" | "QUALIFICATION_REQUIRED" | "DELETE_SOURCE_ASSET_FIRST" | "NATIVE_REVISION_CONFLICT" | "OUTPUT_INCOMPLETE" | "CLAIM_UNVERIFIED";
+                currentRevision: string;
+                blockers: {
+                    field: string;
+                    /** @enum {string} */
+                    reason: "OWNER_REQUIRED" | "REVIEWER_REQUIRED" | "SOURCE_REQUIRED" | "AUDIENCE_REQUIRED" | "MATERIAL_REQUIRED" | "ROLLOUT_UNKNOWN" | "ROLLOUT_WITHDRAWN" | "AVAILABILITY_REQUIRED" | "EXCLUSIONS_REQUIRED" | "ELIGIBILITY_REQUIRED" | "PLANNED_AVAILABILITY_REQUIRED" | "READY_TIME_REQUIRED";
+                    objectId: string | null;
+                    ownerUserId: string | null;
+                    /** @constant */
+                    repairAction: "REVISE_FACTS";
+                }[];
+                canonicalReleaseId?: string;
+            } | {
+                /** @enum {string} */
+                reason: "SOURCE_CHANGED" | "SOURCE_UNAVAILABLE" | "SOURCE_ALREADY_ASSOCIATED" | "SOURCE_ASSOCIATION_CONFLICT" | "SOURCE_ASSOCIATION_LIMIT" | "SOURCE_LIMIT";
+                bindingId: string | null;
+                releaseId: string | null;
+            };
         };
         WorkspaceEntitlementError: {
             /**
@@ -5016,6 +6362,39 @@ export interface components {
             message: string;
             /** @description HTTP status code, repeated in the body. */
             status: number;
+            /** @description Release qualification or source selection conflict and repair details. */
+            details?: {
+                /** @enum {string} */
+                reason: "KIT_NOT_READY" | "SOURCE_CHANGED";
+                currentRevision: string;
+                blockers: {
+                    /** @enum {string} */
+                    code: "QUALIFICATION_REQUIRED" | "AVAILABILITY_UNCONFIRMED" | "CLAIM_UNVERIFIED" | "EVIDENCE_UNAVAILABLE" | "SOURCE_CHANGED" | "MATERIAL_MISSING" | "COVERAGE_UNREVIEWED" | "SCREENSHOT_UNREVIEWED" | "AUDIENCE_LEAK" | "OUTPUT_INCOMPLETE" | "APPROVAL_REQUIRED" | "APPROVER_REVOKED" | "REVISION_SUPERSEDED";
+                    objectId: string;
+                    audienceId: string | null;
+                    ownerId: string | null;
+                    repairAction: string;
+                }[];
+            } | {
+                /** @enum {string} */
+                reason: "MISSING_FACTS" | "READINESS_DISABLED" | "COMMAND_KEY_REUSED" | "CANONICAL_RELEASE_CHANGED" | "RELEASE_INACTIVE" | "QUALIFICATION_UNAVAILABLE" | "REVISION_CONFLICT" | "SOURCE_CHANGED" | "SOURCE_SELECTION_CHANGED" | "RELEASE_ALREADY_QUALIFIED" | "RELEASE_HAS_REVIEWED_WORK" | "CLAIM_LIMIT" | "CLAIM_CHANGED" | "CONTRADICTION_NOT_REVIEWED" | "CLAIM_QUALIFIERS_MISSING" | "EVIDENCE_UNAVAILABLE" | "AI_EVIDENCE_UNCONFIRMED" | "ATTESTATION_UNCONFIRMED" | "SUPPORT_MISSING" | "EVIDENCE_ALREADY_ATTACHED" | "QUALIFICATION_REQUIRED" | "DELETE_SOURCE_ASSET_FIRST" | "NATIVE_REVISION_CONFLICT" | "OUTPUT_INCOMPLETE" | "CLAIM_UNVERIFIED";
+                currentRevision: string;
+                blockers: {
+                    field: string;
+                    /** @enum {string} */
+                    reason: "OWNER_REQUIRED" | "REVIEWER_REQUIRED" | "SOURCE_REQUIRED" | "AUDIENCE_REQUIRED" | "MATERIAL_REQUIRED" | "ROLLOUT_UNKNOWN" | "ROLLOUT_WITHDRAWN" | "AVAILABILITY_REQUIRED" | "EXCLUSIONS_REQUIRED" | "ELIGIBILITY_REQUIRED" | "PLANNED_AVAILABILITY_REQUIRED" | "READY_TIME_REQUIRED";
+                    objectId: string | null;
+                    ownerUserId: string | null;
+                    /** @constant */
+                    repairAction: "REVISE_FACTS";
+                }[];
+                canonicalReleaseId?: string;
+            } | {
+                /** @enum {string} */
+                reason: "SOURCE_CHANGED" | "SOURCE_UNAVAILABLE" | "SOURCE_ALREADY_ASSOCIATED" | "SOURCE_ASSOCIATION_CONFLICT" | "SOURCE_ASSOCIATION_LIMIT" | "SOURCE_LIMIT";
+                bindingId: string | null;
+                releaseId: string | null;
+            };
             /** @enum {string} */
             currentPlan: "free" | "pro" | "business" | "enterprise";
             /** @enum {string} */
@@ -5045,6 +6424,39 @@ export interface components {
             message: string;
             /** @description HTTP status code, repeated in the body. */
             status: number;
+            /** @description Release qualification or source selection conflict and repair details. */
+            details?: {
+                /** @enum {string} */
+                reason: "KIT_NOT_READY" | "SOURCE_CHANGED";
+                currentRevision: string;
+                blockers: {
+                    /** @enum {string} */
+                    code: "QUALIFICATION_REQUIRED" | "AVAILABILITY_UNCONFIRMED" | "CLAIM_UNVERIFIED" | "EVIDENCE_UNAVAILABLE" | "SOURCE_CHANGED" | "MATERIAL_MISSING" | "COVERAGE_UNREVIEWED" | "SCREENSHOT_UNREVIEWED" | "AUDIENCE_LEAK" | "OUTPUT_INCOMPLETE" | "APPROVAL_REQUIRED" | "APPROVER_REVOKED" | "REVISION_SUPERSEDED";
+                    objectId: string;
+                    audienceId: string | null;
+                    ownerId: string | null;
+                    repairAction: string;
+                }[];
+            } | {
+                /** @enum {string} */
+                reason: "MISSING_FACTS" | "READINESS_DISABLED" | "COMMAND_KEY_REUSED" | "CANONICAL_RELEASE_CHANGED" | "RELEASE_INACTIVE" | "QUALIFICATION_UNAVAILABLE" | "REVISION_CONFLICT" | "SOURCE_CHANGED" | "SOURCE_SELECTION_CHANGED" | "RELEASE_ALREADY_QUALIFIED" | "RELEASE_HAS_REVIEWED_WORK" | "CLAIM_LIMIT" | "CLAIM_CHANGED" | "CONTRADICTION_NOT_REVIEWED" | "CLAIM_QUALIFIERS_MISSING" | "EVIDENCE_UNAVAILABLE" | "AI_EVIDENCE_UNCONFIRMED" | "ATTESTATION_UNCONFIRMED" | "SUPPORT_MISSING" | "EVIDENCE_ALREADY_ATTACHED" | "QUALIFICATION_REQUIRED" | "DELETE_SOURCE_ASSET_FIRST" | "NATIVE_REVISION_CONFLICT" | "OUTPUT_INCOMPLETE" | "CLAIM_UNVERIFIED";
+                currentRevision: string;
+                blockers: {
+                    field: string;
+                    /** @enum {string} */
+                    reason: "OWNER_REQUIRED" | "REVIEWER_REQUIRED" | "SOURCE_REQUIRED" | "AUDIENCE_REQUIRED" | "MATERIAL_REQUIRED" | "ROLLOUT_UNKNOWN" | "ROLLOUT_WITHDRAWN" | "AVAILABILITY_REQUIRED" | "EXCLUSIONS_REQUIRED" | "ELIGIBILITY_REQUIRED" | "PLANNED_AVAILABILITY_REQUIRED" | "READY_TIME_REQUIRED";
+                    objectId: string | null;
+                    ownerUserId: string | null;
+                    /** @constant */
+                    repairAction: "REVISE_FACTS";
+                }[];
+                canonicalReleaseId?: string;
+            } | {
+                /** @enum {string} */
+                reason: "SOURCE_CHANGED" | "SOURCE_UNAVAILABLE" | "SOURCE_ALREADY_ASSOCIATED" | "SOURCE_ASSOCIATION_CONFLICT" | "SOURCE_ASSOCIATION_LIMIT" | "SOURCE_LIMIT";
+                bindingId: string | null;
+                releaseId: string | null;
+            };
             limit: number;
             /** @enum {string} */
             quota: "api:write:minute" | "storage:bytes" | "ai:credits:monthly" | "posts:monthly" | "emails:monthly" | "jobs:concurrent";
@@ -5460,6 +6872,1169 @@ export interface operations {
             };
             /** @description The upstream host refused the request. */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    changeEvidenceAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEvidenceAccessRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listReleaseEvidence: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded current records. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListReleaseEvidencePage"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Release not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createReleaseEvidence: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReleaseEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    importReleaseSpecClaims: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportReleaseSpecClaimsRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    linkReleaseEvidence: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkReleaseEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listReleaseClaims: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded current records. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListReleaseClaimsPage"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Release not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    saveReleaseClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveReleaseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setClaimSupports: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetClaimSupportsRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    verifyReleaseClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                claimId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyReleaseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Immutable revision or decision recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Invalid input. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or evidence changed; reload before deciding. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReleaseKit: {
+        parameters: {
+            query?: {
+                revisionId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kit revision and current readiness. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseKit"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Kit not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createReleaseKitRevision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReleaseKitRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Request recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Current readiness or revision blocks this action. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decideReleaseKit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideReleaseKitRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Request recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Current readiness or revision blocks this action. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getKitArtifactPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                revisionId: string;
+                artifactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Watermarked preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KitPreview"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Current human membership required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getKitExport: {
+        parameters: {
+            query?: {
+                download?: "true" | "false";
+            };
+            header?: never;
+            path: {
+                id: string;
+                exportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export metadata and an optional short-lived URL. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KitExport"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No current authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Readiness changed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    prepareReleaseKit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareReleaseKitRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Request recorded. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Current readiness or revision blocks this action. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    requestKitExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestKitExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description Request recorded. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessMutation"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human authority required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Current readiness or revision blocks this action. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8314,6 +10889,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -8457,6 +11033,511 @@ export interface operations {
             };
         };
     };
+    createQualificationRevision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQualificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualificationCommandResult"];
+                };
+            };
+            /** @description New facts revision. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualificationCommandResult"];
+                };
+            };
+            /** @description Invalid facts or missing command key. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stale revision or reused command key. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decideReleaseQualification: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideQualificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Original decision on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualificationCommandResult"];
+                };
+            };
+            /** @description Human decision recorded or withdrawn release reopened for facts review. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualificationCommandResult"];
+                };
+            };
+            /** @description Invalid decision or missing command key. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Facts changed, required facts are missing, or the revision already has a decision. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReleaseQualification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current qualification and missing facts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseQualification"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Release not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getQualificationRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved facts and decision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualificationRevision"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision not found for this release in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReleaseLineage: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A bounded history page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineageHistory"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Release not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    mergeRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeReleaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Original grouping result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineageResult"];
+                };
+            };
+            /** @description Releases merged and history recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineageResult"];
+                };
+            };
+            /** @description Invalid participants, selection or command key. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human session, current permission or source access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision or source selection changed, release moved, or reviewed work prevents grouping. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    splitRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitReleaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Original grouping result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineageResult"];
+                };
+            };
+            /** @description Releases created and history recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineageResult"];
+                };
+            };
+            /** @description Invalid groups, briefs or command key. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Human session, current permission or source access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Revision changed, release moved, or reviewed work prevents grouping. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createSourceApp: {
         parameters: {
             query?: never;
@@ -8522,6 +11603,223 @@ export interface operations {
             };
             /** @description The API key lacks the required workspace scope. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listReleaseSources: {
+        parameters: {
+            query?: {
+                releaseId?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source objects with selected and current observations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSourcePage"];
+                };
+            };
+            /** @description Invalid release or page cursor. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReleaseSourceHistory: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Source history and next page cursor. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSourceHistory"];
+                };
+            };
+            /** @description Invalid source or page cursor. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Source not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    selectReleaseSources: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectReleaseSourcesRequest"];
+            };
+        };
+        responses: {
+            /** @description Original result on retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSourceSelection"];
+                };
+            };
+            /** @description Source selection command recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseSourceSelection"];
+                };
+            };
+            /** @description Invalid selection, duplicate source, too many sources or missing command key. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing permission, plan, readiness opt-in or source access. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A referenced source, observation or release is not in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Source or release changed, conflicting existing association, reused key, or aggregate source limit. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13355,6 +16653,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         settings: {
+                            releaseReadinessEnabled?: boolean;
                             createdAt?: string;
                             defaultPublishTime: string;
                             description: string | null;

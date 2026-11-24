@@ -127,6 +127,8 @@ func (WorkspaceSettings) Fields() []ent.Field {
 		field.String("default_publish_time").StorageKey("defaultPublishTime").Default("09:00"),
 		// The workspace AI agent kill switch (docs/rfcs/027-ai-sdk-marketing-tools.md).
 		field.Bool("ai_agent_enabled").StorageKey("aiAgentEnabled").Default(true),
+		// Manual release qualification is enabled explicitly for a workspace.
+		field.Bool("release_readiness_enabled").StorageKey("releaseReadinessEnabled").Default(false),
 		// Experiments an owner or admin turned off for everyone (RFC 024).
 		field.JSON("disabled_experiments", []string{}).StorageKey("disabledExperiments").Default([]string{}),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),

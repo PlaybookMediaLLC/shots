@@ -224,7 +224,9 @@ func TestFrontendPromotedChecksConcurrentDeliveryAndReceipts(t *testing.T) {
 	service := notifications.New(w.db.SQL, w.db.Client)
 	var n int
 	deadline := time.Now().Add(15 * time.Second)
+	rounds := 0
 	for {
+		rounds++
 		if err := service.Process(w.ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +237,11 @@ func TestFrontendPromotedChecksConcurrentDeliveryAndReceipts(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("in-app receipts %d", n)
+			var pending, targetFanned, deliveries int
+			if err := w.db.SQL.QueryRowContext(w.ctx, `SELECT (SELECT count(*) FROM outbox_event WHERE notification_version=1 AND NOT notification_fanned),(SELECT count(*) FROM outbox_event WHERE "organizationId"=$1 AND type='activity.frontend.checks_passed' AND notification_fanned),(SELECT count(*) FROM platform_notification_delivery WHERE "organizationId"=$1 AND kind='frontend.checks_passed')`, w.org).Scan(&pending, &targetFanned, &deliveries); err != nil {
+				t.Fatal(err)
+			}
+			t.Fatalf("in-app receipts %d; worker rounds=%d global pending=%d target fanned=%d target deliveries=%d", n, rounds, pending, targetFanned, deliveries)
 		}
 	}
 	if err := service.Process(w.ctx); err != nil {

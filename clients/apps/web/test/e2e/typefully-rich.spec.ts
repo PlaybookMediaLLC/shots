@@ -24,9 +24,8 @@ test(
       'An article with structure'
     )
     const editor = draftEditor(page)
-    await editor.click()
-    await settleSelection(page)
-    await page.keyboard.press('ControlOrMeta+End')
+    // The empty editor also contains a non-editable account header; place the caret in its paragraph.
+    await editor.locator('[data-slate-node="element"]:not([data-slate-void])').last().click()
     await settleSelection(page)
     await page.keyboard.press('ControlOrMeta+b')
     await settleSelection(page)

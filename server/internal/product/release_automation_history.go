@@ -33,6 +33,9 @@ func (c *Configuration) recordHistoricalPR(ctx context.Context, source *ent.Sour
 	base := firstNonEmpty(pr.Base.Ref, repository.DefaultBranch)
 	event := automation.Event{Family: automation.Merged, SemanticKey: "pr:" + repo + ":" + number, RepositoryID: repo, RepositoryName: repository.FullName, ObjectID: number, Number: pr.Number, OccurredAt: *pr.MergedAt, Origin: "historical", Title: releasenotes.Clean(pr.Title, 160), Notes: releasenotes.Clean(pr.Body, MaxChangeBodyRunes), URL: pr.HTMLURL, DefaultBranch: repository.DefaultBranch,
 		Fields: map[string]automation.Value{"repository.id": automation.StringValue(repo), "repository.name": automation.StringValue(repository.FullName), "event.family": automation.StringValue(string(automation.Merged)), "event.action": automation.StringValue("closed"), "pr.number": automation.StringValue(number), "pr.title": automation.StringValue(releasenotes.Clean(pr.Title, 160)), "pr.base": automation.StringValue(base), "pr.author": automation.StringValue(pr.User.Login), "pr.bot": automation.BoolValue(pr.User.Type == "Bot"), "pr.labels": automation.StringValue(labels...), "pr.files": {State: "pending"}}}
+	if pr.UpdatedAt != nil && !pr.UpdatedAt.IsZero() {
+		event.SourceUpdatedAt = pr.UpdatedAt
+	}
 	return c.recordHistoricalEvent(ctx, source, event)
 }
 

@@ -1,3 +1,4 @@
+import * as releaseKits from '../lib/api/contracts/release-kits'
 import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -40,6 +41,9 @@ import * as notifications from '@/lib/api/contracts/notifications'
 import * as onboardingRuns from '@/lib/api/contracts/onboarding-runs'
 import * as outboundWebhooks from '@/lib/api/contracts/outbound-webhooks'
 import * as releases from '@/lib/api/contracts/releases'
+import * as releaseReadiness from '@/lib/api/contracts/release-readiness'
+import * as releaseSources from '@/lib/api/contracts/release-sources'
+import * as releaseEvidence from '@/lib/api/contracts/release-evidence'
 import * as scheduledPosts from '@/lib/api/contracts/scheduled-posts'
 import * as senja from '@/lib/api/contracts/senja'
 import * as settingsPlatform from '@/lib/api/contracts/settings-platform'
@@ -106,6 +110,10 @@ const contracts = new Map<string, RouteContract>(
     outboundWebhooks,
     notifications,
     releases,
+    releaseReadiness,
+    releaseSources,
+    releaseEvidence,
+    releaseKits,
     scheduledPosts,
     senja,
     settingsPlatform,
@@ -386,4 +394,18 @@ test('the committed OpenAPI snapshot is the document /openapi.json serves', () =
     'utf8'
   )
   assert.equal(committed, `${JSON.stringify(openApiSpec, null, 2)}\n`, 'run npm run api:generate')
+})
+
+test('factual decisions and audience clearance are session-only contracts', () => {
+  for (const contract of [
+    releaseEvidence.verifyReleaseClaimContract,
+    releaseEvidence.changeEvidenceAccessContract,
+    releaseEvidence.importReleaseSpecClaimsContract,
+  ]) {
+    assert.equal('apiKeyScope' in contract.access, false, contract.name)
+    const paths: Record<string, Record<string, Record<string, unknown>>> = openApiSpec.paths
+    const operation = paths[contract.path]?.post
+    assert.ok(operation)
+    assert.equal(JSON.stringify(operation.security).includes('workspaceApiKey'), false)
+  }
 })

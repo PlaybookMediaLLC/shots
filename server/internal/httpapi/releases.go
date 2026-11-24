@@ -21,7 +21,7 @@ func (s *Server) listReleases(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid release limit")
 		return
 	}
-	items, err := s.configuration.ListReleases(r.Context(), workspaceActor(r), limit)
+	items, err := s.configuration.ListReleases(r.Context(), workspaceActor(r), limit, r.URL.Query().Get("search"))
 	if err != nil {
 		writeStoreError(w, err)
 		return

@@ -130,9 +130,14 @@ test(
     await page.mouse.move(handle!.x - 78, handle!.y + 80, { steps: 5 })
     await page.mouse.up()
     await expect(resize).toHaveAttribute('aria-valuenow', String(initialWidth + 144))
-    await page
-      .getByRole('img', { name: 'Drag post 1', exact: true })
-      .dragTo(page.locator('[data-post-number="3"]'))
+    const destination = page.locator('[data-post-number="3"]')
+    await page.getByRole('img', { name: 'Drag post 1', exact: true }).hover()
+    await page.mouse.down()
+    // Two moves deliver native dragover; wait for the drop cue before releasing.
+    await destination.hover()
+    await destination.hover()
+    await expect(destination).toHaveClass(/bg-accent/)
+    await page.mouse.up()
     await expect(draftEditor(page)).toContainText(/Second[\s\S]*Third[\s\S]*First/)
     await expectSaved(page)
     await app.reload()

@@ -3,6 +3,7 @@ import test from 'node:test'
 import { enforceCitations, findCitationIssues } from '@/lib/launch/citations'
 import {
   claimsMeanTheSame,
+  claimRefSection,
   isRegisteredCaptureUrl,
   listSpecClaims,
   releaseSpecSchema,
@@ -40,6 +41,31 @@ test('claim refs resolve to the claims they name', () => {
   assert.equal(resolveClaimRef(spec, 'messaging.pillars.0')?.section, 'messaging')
   assert.equal(resolveClaimRef(spec, 'capabilities.5'), null)
   assert.ok(listSpecClaims(spec).some((claim) => claim.ref === 'messaging.positioning'))
+})
+
+test('stable claim references survive reorder and never bind to an edited version', () => {
+  const spec = sampleSpec()
+  spec.capabilities[0] = {
+    ...spec.capabilities[0]!,
+    claimId: 'claim-one',
+    claimVersionId: 'version-one',
+  }
+  spec.capabilities[1] = {
+    ...spec.capabilities[1]!,
+    claimId: 'claim-two',
+    claimVersionId: 'version-two',
+  }
+  const parsed = releaseSpecSchema.parse(spec)
+  const ref = 'claim:claim-one:version-one'
+  const reordered = { ...parsed, capabilities: [...parsed.capabilities].reverse() }
+  assert.equal(resolveClaimRef(reordered, ref)?.text, resolveClaimRef(parsed, ref)?.text)
+  assert.equal(resolveClaimRef(reordered, ref)?.ref, 'capabilities.1')
+  assert.equal(claimRefSection(ref, reordered), 'capabilities')
+  assert.equal(claimRefSection(ref), null)
+  assert.equal(claimsMeanTheSame([ref], parsed, reordered), true)
+  reordered.capabilities[1] = { ...reordered.capabilities[1]!, claimVersionId: 'changed-version' }
+  assert.equal(resolveClaimRef(reordered, ref), null)
+  assert.equal(claimsMeanTheSame([ref], parsed, reordered), false)
 })
 
 test('citation checks catch sources the model was not given', () => {
@@ -145,4 +171,16 @@ test('claims from an earlier spec version count only while they still say the sa
   assert.equal(claimsMeanTheSame(['messaging.pillars.0', 'capabilities.0'], v1, v2), false)
   // A ref the later version no longer has does not carry over.
   assert.equal(claimsMeanTheSame(['problem.9'], v1, v2), false)
+})
+
+test('versioned evidence citations remain syntactic and must be supplied', () => {
+  const spec = sampleSpec()
+  spec.summary.sources = ['evidence:retained-version']
+  assert.equal(releaseSpecSchema.safeParse(spec).success, true)
+  assert.ok(
+    findCitationIssues(spec, new Set(['S1', 'S2'])).some((issue) =>
+      issue.includes('evidence:retained-version')
+    )
+  )
+  assert.deepEqual(findCitationIssues(spec, new Set(['S1', 'S2', 'evidence:retained-version'])), [])
 })

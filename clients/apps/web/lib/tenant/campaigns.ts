@@ -30,8 +30,11 @@ export class CampaignError extends Error {
   }
 }
 
-export async function listCampaigns(context: TenantContext) {
-  return withDates((await backendSDK(context).listCampaigns()).campaigns)
+export async function listCampaigns(
+  context: TenantContext,
+  filter?: Parameters<ReturnType<typeof backendSDK>['listCampaigns']>[0]
+) {
+  return withDates((await backendSDK(context).listCampaigns(filter)).campaigns)
 }
 
 export async function getCampaign(context: TenantContext, campaignId: string) {

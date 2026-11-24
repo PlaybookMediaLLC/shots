@@ -173,12 +173,62 @@ func campaignPostItem(post *ent.CampaignPost) CampaignPostItem {
 		SpecVersion: post.SpecVersion, Status: string(post.Status), Title: post.Title, UpdatedAt: post.UpdatedAt}
 }
 
-func (c *Configuration) ListCampaigns(ctx context.Context, actor Actor) ([]CampaignItem, error) {
+// CampaignListFilter bounds new discovery surfaces without changing legacy full-list callers.
+type CampaignListFilter struct {
+	IdempotencyKey string
+	ReleaseID      string
+	Cursor         string
+	Limit          int
+	Search         string
+	Sort           string
+}
+
+func (c *Configuration) ListCampaigns(ctx context.Context, actor Actor, filters ...CampaignListFilter) ([]CampaignItem, error) {
 	if err := c.AuthorizeRead(ctx, actor); err != nil {
 		return nil, err
 	}
-	rows, err := c.client.Campaign.Query().Where(campaign.OrganizationID(actor.OrganizationID)).
-		Order(ent.Desc(campaign.FieldCreatedAt), ent.Desc(campaign.FieldID)).All(ctx)
+	query := c.client.Campaign.Query().Where(campaign.OrganizationID(actor.OrganizationID))
+	order := campaign.FieldCreatedAt
+	if len(filters) > 0 {
+		filter := filters[0]
+		if filter.Limit < 1 || filter.Limit > 100 {
+			return nil, invalid("Choose between 1 and 100 campaigns per page.")
+		}
+		if len(filter.IdempotencyKey) > 128 || utf8.RuneCountInString(filter.Search) > 200 || strings.ContainsRune(filter.Search, 0) ||
+			(filter.Sort != "" && filter.Sort != "updated") {
+			return nil, ErrInvalidInput
+		}
+		if filter.Sort == "updated" {
+			order = campaign.FieldUpdatedAt
+		}
+		if search := strings.TrimSpace(filter.Search); search != "" {
+			query.Where(campaign.NameContainsFold(search))
+		}
+		if filter.IdempotencyKey != "" {
+			query.Where(campaign.IdempotencyKey(filter.IdempotencyKey))
+		}
+		if filter.ReleaseID != "" {
+			query.Where(campaign.ReleaseID(filter.ReleaseID))
+		}
+		if filter.Cursor != "" {
+			cursor, err := query.Clone().Where(campaign.ID(filter.Cursor)).Only(ctx)
+			if ent.IsNotFound(err) {
+				return nil, publishing.ErrNotFound
+			}
+			if err != nil {
+				return nil, err
+			}
+			if filter.Sort == "updated" {
+				query.Where(campaign.Or(campaign.UpdatedAtLT(cursor.UpdatedAt),
+					campaign.And(campaign.UpdatedAtEQ(cursor.UpdatedAt), campaign.IDLT(cursor.ID))))
+			} else {
+				query.Where(campaign.Or(campaign.CreatedAtLT(cursor.CreatedAt),
+					campaign.And(campaign.CreatedAtEQ(cursor.CreatedAt), campaign.IDLT(cursor.ID))))
+			}
+		}
+		query.Limit(filter.Limit)
+	}
+	rows, err := query.Order(ent.Desc(order), ent.Desc(campaign.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -380,12 +430,25 @@ func (c *Configuration) CreateCampaign(ctx context.Context, actor Actor, input C
 	defer tx.Rollback()
 	var linkedRelease *ent.Release
 	if input.ReleaseID != nil {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+		if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, *input.ReleaseID); err != nil {
+			return nil, err
+		}
+		// Lock before reading so source edits and archival cannot race this snapshot.
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM release WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, *input.ReleaseID, actor.OrganizationID); err != nil {
+			return nil, err
+		}
 		linkedRelease, err = tx.Release.Query().Where(release.ID(*input.ReleaseID), release.OrganizationID(actor.OrganizationID)).Only(ctx)
 		if ent.IsNotFound(err) {
 			return nil, publishing.ErrNotFound
 		}
 		if err != nil {
 			return nil, err
+		}
+		if linkedRelease.Status == release.StatusARCHIVED || linkedRelease.Status == release.StatusCANCELLED {
+			return nil, conflict("Restore this archived or cancelled release before creating a campaign.")
 		}
 	}
 	surfaceID := input.ProductSurfaceID

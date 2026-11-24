@@ -142,7 +142,18 @@ test(
     expect(rerun.pagesSkipped).toBe(rerun.pagesDiscovered)
 
     await page.getByRole('button', { name: 'Looks right' }).click()
-    await expect(page.getByText('Creating your first 7 posts')).toBeVisible()
+    await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/campaigns\/[^/]+\/spec$/)
+    const campaignId = new URL(page.url()).pathname.split('/')[2]!
+    await expect(page.getByRole('button', { name: 'Draft spec', exact: true })).toBeVisible()
+    expect(
+      await db.row('SELECT status FROM campaign WHERE id = $1 AND "organizationId" = $2', [
+        campaignId,
+        organizationId,
+      ])
+    ).toEqual({ status: 'DRAFT' })
+    expect(
+      await db.rows('SELECT id FROM campaign_post WHERE "campaignId" = $1', [campaignId])
+    ).toEqual([])
 
     // After onboarding, a card in the corner of the app reports how far enrichment got.
     await app.open('/settings')

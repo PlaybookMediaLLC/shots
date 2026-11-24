@@ -5,6 +5,7 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import { useTRPC } from '@/lib/trpc/react'
 import { connectedSources } from '@/lib/workflows/actions'
@@ -27,11 +28,16 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
   )
   const hosts = useQuery(trpc.frontendDeployments.sources.queryOptions())
   const capture = useQuery(trpc.capture.overview.queryOptions(undefined, { enabled: canManage }))
-  const failure = overview.error ?? runs.error ?? hosts.error
+  const failure = overview.error
   if (!overview.data) {
     return failure ? (
       <Alert variant="destructive">
-        <AlertDescription>{getErrorMessage(failure)}</AlertDescription>
+        <AlertDescription>
+          {getErrorMessage(failure)}
+          <Button size="sm" variant="outline" onClick={() => void overview.refetch()}>
+            Retry overview
+          </Button>
+        </AlertDescription>
       </Alert>
     ) : (
       <div aria-label="Loading Automate" className="grid gap-3" role="status">
@@ -47,7 +53,11 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
   const counts = overview.data.runCounts ?? {}
   const totalRuns = Object.values(counts).reduce((total, count) => total + count, 0)
   const attention = counts.needs_attention ?? 0
-  const pages = [
+  const legacyRuns = Object.values(overview.data.legacyRunCounts ?? {}).reduce(
+    (total, count) => total + count,
+    0
+  )
+  const pages: { href: string; label: string; status: string; retry?: () => void }[] = [
     {
       href: '/workflows',
       label: 'Workflows',
@@ -61,27 +71,52 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
       status: watched ? `${plural(watched, 'repository', 'repositories')} watched` : 'None watched',
     },
     {
-      href: attention ? '/workflows/runs?status=needs_attention' : '/workflows/runs',
-      label: 'Runs',
+      href: attention
+        ? '/workflows/runs?mode=automation&status=needs_attention'
+        : '/workflows/runs?mode=automation',
+      label: 'Workflow runs',
       status: totalRuns
         ? `${plural(totalRuns, 'run')}${attention ? `, ${attention} needing attention` : ''}`
         : 'None yet',
     },
     {
+      href: '/workflows/runs?mode=legacy',
+      label: 'Release inbox runs',
+      status: legacyRuns ? plural(legacyRuns, 'run') : 'None yet',
+    },
+    {
       href: '/workflows/deployments',
       label: 'Deployments',
-      status: hosts.data?.sources.length
-        ? `${plural(hosts.data.sources.length, 'host')} connected`
-        : 'No hosts connected',
+      status: hosts.isPending
+        ? 'Loading hosts…'
+        : hosts.error
+          ? 'Hosts could not load'
+          : hosts.data?.sources.length
+            ? `${plural(hosts.data.sources.length, 'host')} connected`
+            : 'No hosts connected',
+      retry: hosts.error
+        ? () => {
+            void hosts.refetch()
+          }
+        : undefined,
     },
     ...(canManage
       ? [
           {
             href: '/workflows/connections',
             label: 'Signed-in capture',
-            status: !capture.data?.available
-              ? 'Not set up'
-              : `${plural(capture.data.connections.length, 'sign-in')} connected`,
+            status: capture.isPending
+              ? 'Loading capture status…'
+              : capture.error
+                ? 'Capture status could not load'
+                : !capture.data?.available
+                  ? 'Not set up'
+                  : `${plural(capture.data.connections.length, 'sign-in')} connected`,
+            retry: capture.error
+              ? () => {
+                  void capture.refetch()
+                }
+              : undefined,
           },
         ]
       : []),
@@ -91,7 +126,12 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
     <div className="flex flex-col gap-8">
       {failure ? (
         <Alert variant="destructive">
-          <AlertDescription>{getErrorMessage(failure)}</AlertDescription>
+          <AlertDescription>
+            {getErrorMessage(failure)}
+            <Button size="sm" variant="outline" onClick={() => void overview.refetch()}>
+              Retry overview
+            </Button>
+          </AlertDescription>
         </Alert>
       ) : null}
       {canManage ? <WorkflowSetup overview={overview.data} /> : null}
@@ -99,6 +139,11 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
         <Group>
           {pages.map((page) => (
             <Row description={page.status} key={page.label} label={page.label} layout="inline">
+              {page.retry ? (
+                <Button size="sm" variant="outline" onClick={page.retry}>
+                  Retry<span className="sr-only"> {page.label}</span>
+                </Button>
+              ) : null}
               <ButtonLink href={page.href} size="sm" variant="outline">
                 Open<span className="sr-only"> {page.label}</span>
               </ButtonLink>
@@ -106,15 +151,27 @@ export function AutomateOverview({ canManage }: { canManage: boolean }) {
           ))}
         </Group>
       </Section>
-      {recent.length ? (
+      {recent.length || runs.isPending || runs.error ? (
         <Section
           actions={
-            <ButtonLink href="/workflows/runs" size="sm" variant="outline">
-              All runs
+            <ButtonLink href="/workflows/runs?mode=automation" size="sm" variant="outline">
+              All workflow runs
             </ButtonLink>
           }
-          title="Latest runs"
+          title="Latest workflow runs"
         >
+          {runs.error ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Latest workflow runs could not load.
+                <Button size="sm" variant="outline" onClick={() => void runs.refetch()}>
+                  Retry runs
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : runs.isPending ? (
+            <p role="status">Loading workflow runs…</p>
+          ) : null}
           <Group>
             {recent.map((item) => (
               <Row

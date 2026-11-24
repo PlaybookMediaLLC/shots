@@ -7,7 +7,9 @@ import { createRelease, listReleases } from '@/lib/tenant/releases'
 /** The workspace's most recent releases. */
 export const GET = route(listReleasesContract, {
   auth: tenantAccess(listReleasesContract.access),
-  handler: async ({ access, query }) => ({ releases: await listReleases(access, query.limit) }),
+  handler: async ({ access, query }) => ({
+    releases: await listReleases(access, query.limit, query.search),
+  }),
 })
 
 /** Create a release. Replaying an `Idempotency-Key` returns the original with 200. */

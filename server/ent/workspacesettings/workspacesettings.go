@@ -23,6 +23,8 @@ const (
 	FieldDefaultPublishTime = "defaultPublishTime"
 	// FieldAiAgentEnabled holds the string denoting the ai_agent_enabled field in the database.
 	FieldAiAgentEnabled = "aiAgentEnabled"
+	// FieldReleaseReadinessEnabled holds the string denoting the release_readiness_enabled field in the database.
+	FieldReleaseReadinessEnabled = "releaseReadinessEnabled"
 	// FieldDisabledExperiments holds the string denoting the disabled_experiments field in the database.
 	FieldDisabledExperiments = "disabledExperiments"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -41,6 +43,7 @@ var Columns = []string{
 	FieldTimeZone,
 	FieldDefaultPublishTime,
 	FieldAiAgentEnabled,
+	FieldReleaseReadinessEnabled,
 	FieldDisabledExperiments,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -65,6 +68,8 @@ var (
 	DefaultDefaultPublishTime string
 	// DefaultAiAgentEnabled holds the default value on creation for the "ai_agent_enabled" field.
 	DefaultAiAgentEnabled bool
+	// DefaultReleaseReadinessEnabled holds the default value on creation for the "release_readiness_enabled" field.
+	DefaultReleaseReadinessEnabled bool
 	// DefaultDisabledExperiments holds the default value on creation for the "disabled_experiments" field.
 	DefaultDisabledExperiments []string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -106,6 +111,11 @@ func ByDefaultPublishTime(opts ...sql.OrderTermOption) OrderOption {
 // ByAiAgentEnabled orders the results by the ai_agent_enabled field.
 func ByAiAgentEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAiAgentEnabled, opts...).ToFunc()
+}
+
+// ByReleaseReadinessEnabled orders the results by the release_readiness_enabled field.
+func ByReleaseReadinessEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReleaseReadinessEnabled, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

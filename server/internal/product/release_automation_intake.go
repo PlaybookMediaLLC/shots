@@ -68,6 +68,12 @@ func (c *Configuration) AcceptGitHubEvent(ctx context.Context, input AcceptGitHu
 	if err != nil && evidence == nil {
 		return nil, ErrInvalidInput
 	}
+	if event == nil && err == nil {
+		installation, event, err = automation.NormalizeGitHubSource(input.EventName, input.Body)
+		if err != nil {
+			return nil, ErrInvalidInput
+		}
+	}
 	if evidence != nil {
 		installation = evidence.InstallationID
 		if event == nil {
@@ -119,10 +125,17 @@ func (c *Configuration) acceptGitHubEvent(ctx context.Context, delivery string, 
 		if err != nil {
 			return nil, err
 		}
+		if err := automationSourceAccess(ctx, tx.Client(), source); err != nil {
+			return nil, err
+		}
+		if err := retainGitHubReleaseSource(ctx, tx, source, delivery, event); err != nil {
+			return nil, err
+		}
+		if event.ObservationOnly {
+			result.Handled++
+			continue
+		}
 		if evidence != nil {
-			if err := automationSourceAccess(ctx, tx.Client(), source); err != nil {
-				return nil, err
-			}
 			legacy, duplicate, err := recordGitHubObservation(ctx, tx, source, delivery, origin, *evidence)
 			if err != nil {
 				return nil, err
@@ -140,9 +153,6 @@ func (c *Configuration) acceptGitHubEvent(ctx context.Context, delivery string, 
 		// source has no behavior for them, so nothing is recorded.
 		if !source.ReleaseAutomation && automation.FamilyVersion(event.Family) > 1 {
 			continue
-		}
-		if err := automationSourceAccess(ctx, tx.Client(), source); err != nil {
-			return nil, err
 		}
 		prior, err := tx.ReleaseSourceEvent.Query().Where(releasesourceevent.OrganizationID(source.OrganizationID), releasesourceevent.SourceAppID(source.ID), releasesourceevent.SemanticKey(event.SemanticKey)).Exist(ctx)
 		if err != nil {

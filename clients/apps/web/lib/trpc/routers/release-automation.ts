@@ -115,7 +115,9 @@ export const releaseAutomationRouter = router({
     .query(({ ctx, input }) => backendSDK(ctx.access).listReleaseAutomationHistory(input)),
   recentRuns: organizationProcedure('workspace:read')
     .output(z.object({ items: z.array(automationRunSummarySchema).max(6) }))
-    .query(({ ctx }) => backendSDK(ctx.access).listReleaseAutomationRunSummaries({}, 6)),
+    .query(({ ctx }) =>
+      backendSDK(ctx.access).listReleaseAutomationRunSummaries({ mode: 'automation' }, 6)
+    ),
   runSummaries: organizationProcedure('workspace:read')
     .input(automationHistoryFilterSchema.optional())
     .output(z.object({ items: z.array(automationRunSummarySchema) }))

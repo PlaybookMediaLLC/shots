@@ -1,5 +1,77 @@
 import { apiRequest, db, draftEditor, expect, expectSaved, test, postMenu } from './framework'
 
+test('an unresolved edit conflict prevents navigation until the writer resolves it', async ({
+  app,
+  page,
+  workspace,
+}) => {
+  const created = await apiRequest(page, '/api/v1/content-drafts', {
+    method: 'POST',
+    body: { title: 'Original title' },
+  })
+  expect(created.status).toBe(201)
+  const draft = created.body as { id: string; version: number }
+  await app.open(`/publish/${draft.id}`)
+  const title = page.getByRole('textbox', { name: 'Draft title', exact: true })
+  await expect(title).toHaveValue('Original title')
+
+  // Hold a real local save while another authorized request commits a newer title.
+  let releaseSave!: () => void
+  let saveStarted!: () => void
+  const held = new Promise<void>((resolve) => {
+    releaseSave = resolve
+  })
+  const started = new Promise<void>((resolve) => {
+    saveStarted = resolve
+  })
+  await page.route(`**/api/v1/content-drafts/${draft.id}`, async (route) => {
+    if (
+      route.request().method() === 'PATCH' &&
+      route.request().postDataJSON()?.title === 'My local title'
+    ) {
+      saveStarted()
+      await held
+    }
+    await route.continue()
+  })
+  await title.fill('My local title')
+  await started
+  try {
+    const remote = await apiRequest(page, `/api/v1/content-drafts/${draft.id}`, {
+      method: 'PATCH',
+      body: { baseVersion: draft.version, title: 'Remote title' },
+    })
+    expect(remote.status, JSON.stringify(remote.body)).toBe(200)
+  } finally {
+    releaseSave()
+  }
+  const conflict = page.getByTestId('save-conflict')
+  await expect(conflict).toBeVisible()
+  await expect(page.getByTestId('save-state')).toHaveText('Resolve conflict')
+  await expect(title).toHaveValue('Remote title')
+
+  // A real browser unload request is cancelled, leaving the recovery controls available.
+  const warned = page.waitForEvent('dialog')
+  // A cancelled reload never reaches the load event Playwright's reload waits for.
+  const navigating = page.evaluate(() => window.location.reload())
+  const dialog = await warned
+  expect(dialog.type()).toBe('beforeunload')
+  await dialog.dismiss()
+  await navigating
+  await expect(conflict).toBeVisible()
+  await expect(page.getByTestId('save-state')).toHaveText('Resolve conflict')
+  await conflict.getByRole('button', { name: 'Discard my edit', exact: true }).click()
+  await expectSaved(page)
+  await app.reload()
+  await expect(title).toHaveValue('Remote title')
+  expect(
+    await db.row('SELECT title FROM content_draft WHERE id = $1 AND "organizationId" = $2', [
+      draft.id,
+      workspace.id,
+    ])
+  ).toEqual({ title: 'Remote title' })
+})
+
 // @quarantine until fixed: on the production build one early-typed title character is lost.
 test(
   'early typing, reordered post controls, selected comments, and failed saves preserve text',

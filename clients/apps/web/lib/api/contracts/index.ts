@@ -1,3 +1,5 @@
+import * as releaseKitContracts from '@/lib/api/contracts/release-kits'
+import * as releaseEvidenceContracts from '@/lib/api/contracts/release-evidence'
 import {
   getGitHubProductionContract,
   saveGitHubProductionContract,
@@ -94,6 +96,20 @@ import {
 } from '@/lib/api/contracts/onboarding-runs'
 import { createReleaseContract, listReleasesContract } from '@/lib/api/contracts/releases'
 import {
+  createQualificationContract,
+  decideQualificationContract,
+  getReleaseQualificationContract,
+  getQualificationRevisionContract,
+  getReleaseLineageContract,
+  mergeReleaseContract,
+  splitReleaseContract,
+} from '@/lib/api/contracts/release-readiness'
+import {
+  listReleaseSourcesContract,
+  getReleaseSourceHistoryContract,
+  selectReleaseSourcesContract,
+} from '@/lib/api/contracts/release-sources'
+import {
   cancelScheduledPostContract,
   createScheduledPostContract,
   listScheduledPostsContract,
@@ -150,6 +166,8 @@ import {
 
 /** Every contract in the public OpenAPI spec, in the order the spec lists them. */
 export const documentedContracts = [
+  ...Object.values(releaseEvidenceContracts),
+  ...Object.values(releaseKitContracts),
   getGitHubProductionContract,
   saveGitHubProductionContract,
   previewGitHubProductionContract,
@@ -187,7 +205,17 @@ export const documentedContracts = [
   completeBlueskyConnectionContract,
   listReleasesContract,
   createReleaseContract,
+  createQualificationContract,
+  decideQualificationContract,
+  getReleaseQualificationContract,
+  getQualificationRevisionContract,
+  getReleaseLineageContract,
+  mergeReleaseContract,
+  splitReleaseContract,
   createSourceAppContract,
+  listReleaseSourcesContract,
+  getReleaseSourceHistoryContract,
+  selectReleaseSourcesContract,
   updateSourceAppContract,
   getLinkPreviewContract,
   createAssetUploadUrlContract,

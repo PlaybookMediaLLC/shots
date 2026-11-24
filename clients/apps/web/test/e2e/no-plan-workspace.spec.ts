@@ -21,6 +21,9 @@ test.describe('a workspace without a plan', () => {
       if (new URL(request.url()).pathname.startsWith('/api/v1/content-drafts'))
         draftReads.push(request.url())
     })
+    await app.open('/home?view=release')
+    await app.expectPath('/upgrade')
+    await expect(page.getByRole('link', { name: 'Prepare a release', exact: true })).toHaveCount(0)
     await app.open('/upgrade')
     const navigation = page.getByRole('navigation', { exact: true, name: 'Workspace' })
     // Home and Publish check content drafts, like the areas already marked Pro.

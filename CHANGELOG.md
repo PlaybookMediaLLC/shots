@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.54.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.53.1...v2.54.0) (2026-11-21)
+
+
+### Features
+
+* **readiness:** prepare and approve immutable release kits ([e232c69](https://github.com/PlaybookMediaLLC/shots/commit/e232c69787935eedff2836172218190e34585f0e))
+* **readiness:** qualify releases and approve evidence-backed kits ([ea2c018](https://github.com/PlaybookMediaLLC/shots/commit/ea2c01848bba91b6cf62f3ef237db1e8a58f0bae))
+* **readiness:** qualify releases and verify retained claim evidence ([fa47ece](https://github.com/PlaybookMediaLLC/shots/commit/fa47ecea9fcc20b5ea016ddca575d9c0793155ed))
+
+
+### Bug Fixes
+
+* **readiness:** close clearance and kit preparation review gaps ([63c97c1](https://github.com/PlaybookMediaLLC/shots/commit/63c97c102d805e461da79dc27743df4c701e3c83))
+
 ## [2.53.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.53.0...v2.53.1) (2026-11-20)
 
 

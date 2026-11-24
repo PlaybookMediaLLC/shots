@@ -247,6 +247,7 @@ function Navigation({
         {navGroup(AREAS_GROUP)}
         {collapsed ? null : (
           <SidebarRecents
+            campaignsEnabled={campaignsEnabled}
             draftsEnabled={draftsEnabled}
             onNavigate={onNavigate}
             paidPlan={paidPlan}

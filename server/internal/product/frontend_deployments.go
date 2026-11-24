@@ -325,6 +325,13 @@ func (c *Configuration) frontendObservationTx(ctx context.Context, org, id strin
 		return err
 	}
 	defer tx.Rollback()
+	source, err := lockAutomationSource(ctx, tx, org, id)
+	if err != nil {
+		return err
+	}
+	if source.Status != sourceapp.StatusACTIVE {
+		return publishing.ErrNotFound
+	}
 	_, err = tx.FrontendSource.Update().Where(frontendsource.ID(id), frontendsource.OrganizationID(org)).AddRevision(0).Save(ctx)
 	if err != nil {
 		return err
@@ -333,10 +340,7 @@ func (c *Configuration) frontendObservationTx(ctx context.Context, org, id strin
 	if err != nil {
 		return err
 	}
-	src, err := tx.SourceApp.Query().Where(sourceapp.ID(id), sourceapp.OrganizationID(org), sourceapp.StatusEQ(sourceapp.StatusACTIVE)).Only(ctx)
-	if err != nil {
-		return err
-	}
+	src := source
 	if err := c.authorizeRoles(ctx, Actor{OrganizationID: org, Kind: "service"}); err != nil {
 		return err
 	}
@@ -383,19 +387,22 @@ func (c *Configuration) frontendObservationTx(ctx context.Context, org, id strin
 		}
 		return d
 	}
-	seen, err := tx.FrontendObservation.Query().Where(frontendobservation.SourceID(id), frontendobservation.OrganizationID(org), frontendobservation.EventKey(o.Key)).Exist(ctx)
-	if err != nil {
-		return err
-	}
-	if seen {
-		return nil
-	}
 	now := time.Now().UTC()
 	eventTime := o.OccurredAt
 	if o.ActivationObservedAt != nil {
 		eventTime = *o.ActivationObservedAt
 	}
 	historical = historical || !s.Enabled || !eventTime.After(s.EffectiveAt) || eventTime.After(now.Add(5*time.Minute))
+	if err := retainFrontendReleaseSource(ctx, tx, source, o, historical); err != nil {
+		return err
+	}
+	seen, err := tx.FrontendObservation.Query().Where(frontendobservation.SourceID(id), frontendobservation.OrganizationID(org), frontendobservation.EventKey(o.Key)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if seen {
+		return tx.Commit()
+	}
 	incomingHistorical := historical
 	// A successful staging/preview activation does not supersede production,
 	// including when production is still waiting on its required checks.

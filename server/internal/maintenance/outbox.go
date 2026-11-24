@@ -140,7 +140,7 @@ func productEvent(kind string) bool {
 	switch kind {
 	case "source_change.collected", "release.ingested", "source_app.connected", "deployment.succeeded",
 		"campaign_posts.submitted", "campaign_posts.decided", "release_automation.dispatch", "release_automation.cancel", "github.observation",
-		"capture_job.dispatch", "capture_connection.finish":
+		"capture_job.dispatch", "capture_connection.finish", "release_readiness.kit_prepare_requested", "release_readiness.export_requested":
 		return true
 	}
 	return false

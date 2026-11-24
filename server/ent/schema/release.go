@@ -41,6 +41,7 @@ func (Release) Fields() []ent.Field {
 
 func (Release) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("organization_id", "id").Unique(),
 		index.Fields("organization_id", "status", "updated_at"),
 		index.Fields("organization_id", "created_at"),
 		index.Fields("organization_id", "product_surface_id"),

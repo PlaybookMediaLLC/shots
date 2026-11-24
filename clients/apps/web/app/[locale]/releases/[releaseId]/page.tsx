@@ -4,7 +4,10 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { z } from 'zod'
+import { Suspense } from 'react'
+import { ReleaseQualificationSection } from '@/components/releases/ReleaseQualificationSection'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
+import { CampaignStatusPill } from '@/components/campaigns/CampaignStatusPill'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Group, Page, Pill, type PillTone, Row, Section } from '@/components/platform-ui'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
@@ -15,6 +18,7 @@ import { accessAllows } from '@/lib/auth/permissions'
 import { getActiveBrand } from '@/lib/launch/store'
 import { editorHref } from '@/lib/platform/editor-handoff'
 import { getRelease } from '@/lib/tenant/releases'
+import { listCampaigns } from '@/lib/tenant/campaigns'
 
 export const metadata: Metadata = { title: 'Release' }
 
@@ -38,11 +42,19 @@ function sourceParts(url: string): { host: string; rest: string } {
 /** Read-only source evidence, including releases that have no campaign yet. */
 export default async function ReleasePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; releaseId: string }>
+  searchParams: Promise<{ campaignCursor?: string }>
 }) {
-  const [{ locale, releaseId }, requestHeaders] = await Promise.all([params, headers()])
+  const [{ locale, releaseId }, { campaignCursor }, requestHeaders] = await Promise.all([
+    params,
+    searchParams,
+    headers(),
+  ])
   if (!z.uuid().safeParse(releaseId).success) notFound()
+  if (campaignCursor !== undefined && !z.string().cuid().safeParse(campaignCursor).success)
+    notFound()
   const access = await requirePaidPageAccess(requestHeaders, locale, `/releases/${releaseId}`)
   if (!access.organization || !accessAllows(access, 'artifact:read')) notFound()
   const tenant = sessionTenant(access, access.organization.id, requestHeaders)
@@ -50,12 +62,18 @@ export default async function ReleasePage({
   // and its post starts from the release summary (PrepareScreenshotPost).
   // A kit that cannot be read leaves the links working, and the page says so.
   // Read beside the release rather than after it, which saves a round trip.
-  const [release, activeBrand] = await Promise.all([
+  const [release, activeBrand, related] = await Promise.all([
     getRelease(tenant, releaseId),
     getActiveBrand(tenant).then(
       ({ kitId }) => ({ kitId }),
       () => null
     ),
+    access.campaignWorkflowEnabled
+      ? listCampaigns(tenant, { releaseId, cursor: campaignCursor, limit: 11 }).then(
+          (campaigns) => ({ campaigns, error: false }),
+          () => ({ campaigns: [], error: true })
+        )
+      : Promise.resolve({ campaigns: [], error: false }),
   ])
   if (!release) notFound()
   const screenshots = release.screenshotAssetIds ?? []
@@ -64,6 +82,11 @@ export default async function ReleasePage({
     editorHref({ assetId, brandKitId: brand?.kitId ?? undefined }, { releaseId: release.id })
   const status = STATUS[release.status]
   const sources = release.sourceUrls.filter((url) => /^https?:\/\//i.test(url))
+  const inactive = release.status === 'ARCHIVED' || release.status === 'CANCELLED'
+  const merged = Boolean(release.canonicalReleaseId && release.canonicalReleaseId !== release.id)
+  const canCreate =
+    access.campaignWorkflowEnabled && accessAllows(access, 'release:create') && !inactive && !merged
+  const campaignPage = related.campaigns.slice(0, 10)
 
   return (
     <PlatformShell
@@ -89,22 +112,112 @@ export default async function ReleasePage({
           </span>
         }
         actions={
-          <div className="flex flex-wrap gap-2">
-            {access.campaignWorkflowEnabled && accessAllows(access, 'release:create') ? (
-              <ButtonLink href={`/campaigns/new?release=${encodeURIComponent(release.id)}`} size="sm">
-                Start campaign
+          <>
+            {canCreate ? (
+              <ButtonLink href={`/campaigns/new?releaseId=${release.id}`} size="sm">
+                Create campaign from this release
               </ButtonLink>
             ) : null}
             <ButtonLink href="/workflows" size="sm" variant="outline">
               Workflows
             </ButtonLink>
-          </div>
+          </>
         }
       >
+        {merged ? (
+          <Section title="This release was merged">
+            <p>
+              Its saved facts and existing campaigns remain here. Continue new work on the current
+              release.
+            </p>
+            <ButtonLink href={`/releases/${release.canonicalReleaseId}`}>
+              Open current release
+            </ButtonLink>
+          </Section>
+        ) : null}
+        <Suspense fallback={<p role="status">Loading release facts…</p>}>
+          <ReleaseQualificationSection
+            tenant={tenant}
+            releaseId={release.id}
+            userId={access.session.user.id}
+            sourceUrls={release.sourceUrls}
+            canEdit={accessAllows(access, 'release:create')}
+            canDecide={accessAllows(access, 'release:approve')}
+            canReadMembers={accessAllows(access, 'member:read')}
+            inactive={inactive}
+          />
+        </Suspense>
+        <Section title="Campaigns" description="Continue work created from this release.">
+          {!access.campaignWorkflowEnabled ? (
+            <p>Campaigns are not enabled for this workspace.</p>
+          ) : (
+            <>
+              {merged ? (
+                <p>Existing campaigns keep their original release history.</p>
+              ) : inactive ? (
+                <p role="status">
+                  This release is {status.label.toLowerCase()}. Existing campaigns remain available;
+                  restore the release before creating another.
+                </p>
+              ) : !canCreate ? (
+                <p>
+                  Your role can view campaigns. Ask a workspace admin for creator access to start
+                  one.
+                </p>
+              ) : null}
+              {related.error ? (
+                <p role="alert">
+                  Campaigns could not load.{' '}
+                  <Link className="underline" href={`/releases/${release.id}`}>
+                    Try again from the newest campaigns
+                  </Link>
+                  .
+                </p>
+              ) : campaignPage.length ? (
+                <Group>
+                  {campaignPage.map((campaign) => (
+                    <Row key={campaign.id}>
+                      <Link
+                        className="text-ui-lg underline underline-offset-4"
+                        href={`/campaigns/${campaign.id}`}
+                      >
+                        {campaign.name}
+                      </Link>
+                      <CampaignStatusPill status={campaign.status} />
+                    </Row>
+                  ))}
+                </Group>
+              ) : (
+                <p>
+                  {campaignCursor ? 'No older campaigns.' : 'No campaigns for this release yet.'}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-3">
+                {campaignCursor ? (
+                  <ButtonLink variant="outline" href={`/releases/${release.id}`}>
+                    Newest campaigns
+                  </ButtonLink>
+                ) : null}
+                {related.campaigns.length > 10 ? (
+                  <ButtonLink
+                    variant="outline"
+                    href={`/releases/${release.id}?campaignCursor=${campaignPage[9].id}`}
+                  >
+                    Older campaigns
+                  </ButtonLink>
+                ) : null}
+              </div>
+            </>
+          )}
+        </Section>
         {screenshots.length ? (
           <Section
             title="Screenshots"
-            description="Open one in the editor with your brand kit applied, then post it to X and LinkedIn with captions written from this release."
+            description={
+              merged
+                ? 'View the original screenshots. Start new work from the current release linked above.'
+                : 'Open one in the editor with your brand kit applied, then post it to X and LinkedIn with captions written from this release.'
+            }
             actions={
               <Link
                 className="text-ui text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -114,7 +227,7 @@ export default async function ReleasePage({
               </Link>
             }
           >
-            {brand ? null : (
+            {brand || merged ? null : (
               <p className="text-ui text-muted-foreground" role="status">
                 The brand kit could not be read, so screenshots open without it. Apply it from Brand
                 in the editor.
@@ -125,8 +238,14 @@ export default async function ReleasePage({
                 <li key={assetId}>
                   <Link
                     className="group block overflow-hidden rounded-[14.4px] border border-border bg-[var(--platform-group,var(--card))] transition-colors hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
-                    data-testid="release-open-editor"
-                    href={editScreenshot(assetId)}
+                    data-testid={merged ? 'release-view-original' : 'release-open-editor'}
+                    href={
+                      merged
+                        ? `/api/v1/assets/${encodeURIComponent(assetId)}/content`
+                        : editScreenshot(assetId)
+                    }
+                    target={merged ? '_blank' : undefined}
+                    rel={merged ? 'noopener noreferrer' : undefined}
                   >
                     <span className="relative block aspect-[16/10] overflow-hidden bg-[radial-gradient(circle_at_center,#1a1a1a,#0c0c0c)]">
                       {/* The link's text names it, so the picture adds no words. */}
@@ -141,7 +260,7 @@ export default async function ReleasePage({
                         {screenshots.length === 1 ? 'Screenshot' : `Screenshot ${index + 1}`}
                       </span>
                       <span className="inline-flex items-center gap-1 text-ui text-muted-foreground transition-colors group-hover:text-foreground">
-                        Open in the editor
+                        {merged ? 'View original (opens in a new tab)' : 'Open in the editor'}
                         <ArrowUpRightIcon aria-hidden="true" className="size-3.5" />
                       </span>
                     </span>

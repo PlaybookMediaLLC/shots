@@ -229,6 +229,7 @@ const WRITE_PLUGINS: unknown[] = [
 
 /** What the save state reads as. */
 const SAVE_LABELS: Record<SaveState, string> = {
+  conflict: 'Resolve conflict',
   error: 'Not saved',
   offline: 'Offline: will save when back',
   saved: 'Saved',
@@ -1514,7 +1515,7 @@ export function WriteComposer({
             <span
               className={cn(
                 'min-w-[8ch] shrink-0 text-xs',
-                saveState === 'error' || saveState === 'offline'
+                saveState === 'error' || saveState === 'offline' || saveState === 'conflict'
                   ? 'text-amber-700 dark:text-amber-300'
                   : 'text-muted-foreground'
               )}

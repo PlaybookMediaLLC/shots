@@ -18,6 +18,7 @@ import { campaignPublishDraftSchema } from '@/lib/tenant/campaign-publish-draft'
 import {
   campaignApprovalSchema,
   campaignCreateSchema,
+  campaignListQuerySchema,
   campaignPostScheduleSchema,
   campaignPostUpdateSchema,
   campaignTransitionSchema,
@@ -33,10 +34,12 @@ import { organizationProcedure } from '../procedures'
 const campaignIdSchema = z.object({ campaignId: z.string().cuid() })
 
 export const campaignRouter = router({
-  list: organizationProcedure('artifact:read').query(async ({ ctx }) => {
-    const campaigns = await listCampaigns(ctx.access)
-    return { campaigns }
-  }),
+  list: organizationProcedure('artifact:read')
+    .input(campaignListQuerySchema.optional())
+    .query(async ({ ctx, input }) => {
+      const campaigns = await listCampaigns(ctx.access, input)
+      return { campaigns }
+    }),
   get: organizationProcedure('artifact:read')
     .input(campaignIdSchema)
     .query(async ({ ctx, input }) => {

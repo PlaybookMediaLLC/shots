@@ -21,7 +21,7 @@ export const releaseRouter = router({
   list: tenantProcedure({ apiKeyScope: 'artifact:read', permission: 'artifact:read' })
     .input(releaseListQuerySchema.optional())
     .query(async ({ ctx, input }) => {
-      const releases = await listReleases(ctx.tenant, input?.limit ?? 50)
+      const releases = await listReleases(ctx.tenant, input?.limit ?? 50, input?.search)
       return { releases }
     }),
   get: tenantProcedure({ apiKeyScope: 'artifact:read', permission: 'artifact:read' })

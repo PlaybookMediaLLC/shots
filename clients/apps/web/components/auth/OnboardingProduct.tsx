@@ -1,8 +1,5 @@
 'use client'
 
-import { CheckIcon as Check } from '@phosphor-icons/react/dist/ssr/Check'
-import { SpinnerGapIcon as Loader2 } from '@phosphor-icons/react/dist/ssr/SpinnerGap'
-import Link from 'next/link'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,39 +7,23 @@ import { OnboardingReview } from '@/components/onboarding/OnboardingReview'
 import { IdealCustomerProfileForm } from '@/components/workspace/WorkspaceIdealCustomerProfile'
 import { ProductProfileForm } from '@/components/workspace/WorkspaceProductProfile'
 import { trackOnboarding } from '@/lib/onboarding/funnel'
-import { ONBOARDING_POST_COUNT } from '@/lib/onboarding/plan-target'
 import type { StoredIdealCustomerProfile } from '@/lib/tenant/ideal-customer-profile'
 import type { StoredOnboardingRun } from '@/lib/tenant/onboarding-runs'
 import type { StoredProductProfile } from '@/lib/tenant/product-profile'
 import { useTRPCClient } from '@/lib/trpc/react'
-import { cn } from '@/lib/utils'
 import { getAuthErrorMessage } from './error-message'
 import { authInputClassName, FormAlert, SubmitButton } from './fields'
 import { Label } from '@/components/ui/label'
-
-const POLL_MS = 2_000
-
-/** The first campaign's stages, shown while they run; the first is the site read. */
-const LAUNCH_STEPS = [
-  'Reading your site',
-  'Writing the brief',
-  `Planning ${ONBOARDING_POST_COUNT} posts`,
-  'Producing visuals and copy',
-]
-/** The campaign page to open when a stage stops: spec, plan, then assets. */
-const STEP_PAGES = ['spec', 'spec', 'plan', 'assets']
 
 type Stage =
   | { kind: 'url'; manual: boolean; problem: string | null }
   | { kind: 'reading'; startedAt: number }
   | { extracted: boolean; kind: 'review'; run: StoredOnboardingRun }
   | { kind: 'manual' }
-  | { campaignId: string | null; error: string | null; kind: 'launching'; step: number }
+  | { error: string | null; kind: 'launching' }
 
 /** The pages the first campaign cites: the run's best few, as the old read used. */
 const CAMPAIGN_PAGES = 4
-
-type LaunchRun = { error: string | null; id: string; resultId: string | null; status: string }
 
 function Heading({ children, lead }: { children: string; lead: string }) {
   return (
@@ -66,8 +47,8 @@ function Elapsed({ startedAt }: { startedAt: number }) {
  * Onboarding's product step: paste the product's URL, review the drafts the
  * onboarding agent read from the site while a background run deepens them
  * (or describe it by hand), and confirm. Confirming creates the first
- * campaign and runs spec, plan, and produce on it, then opens its copy for
- * approval. Without the onboarding agent, onboarding is the manual form.
+ * campaign and opens its spec page. Generating and approving each version
+ * remain explicit actions on the campaign. Without the onboarding agent, onboarding is the manual form.
  */
 export function OnboardingProduct({
   agentEnabled,
@@ -135,16 +116,6 @@ export function OnboardingProduct({
     }
   }
 
-  async function waitFor({ run }: { run: LaunchRun }): Promise<LaunchRun> {
-    let current = run
-    while (current.status === 'RUNNING') {
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
-      current = (await trpcClient.launch.run.query({ runId: current.id })).run
-    }
-    if (current.status === 'FAILED') throw new Error(current.error ?? 'The step failed.')
-    return current
-  }
-
   async function launch(saved: StoredProductProfile): Promise<void> {
     setProfile(saved)
     trackOnboarding('onboarding_profile_confirmed', {
@@ -154,42 +125,22 @@ export function OnboardingProduct({
       window.location.assign('/')
       return
     }
-    let campaignId: string | null = null
-    let step = 1
-    const advance = (next: number) => {
-      step = next
-      setStage({ campaignId, error: null, kind: 'launching', step })
-    }
-    advance(1)
+    setStage({ error: null, kind: 'launching' })
+    const startedAt = Date.now()
     try {
       const started = await trpcClient.onboarding.startCampaign.mutate({ pages })
-      campaignId = started.campaignId
-      const spec = await waitFor(await trpcClient.launch.spec.generate.mutate({ campaignId }))
-      // Approving is a reviewer's call; without the permission, the reviewers take it from here.
-      if (!started.canApprove || !spec.resultId) {
-        window.location.assign(`/campaigns/${campaignId}/spec`)
-        return
-      }
-      await trpcClient.launch.spec.approve.mutate({ specId: spec.resultId })
-      advance(2)
-      const plan = await waitFor(
-        await trpcClient.launch.plan.generate.mutate({
-          campaignId,
-          timelineItems: ONBOARDING_POST_COUNT,
-        })
+      trackOnboarding(
+        started.created ? 'onboarding_campaign_created' : 'onboarding_campaign_resumed',
+        {
+          duration_ms: Date.now() - startedAt,
+        }
       )
-      if (!plan.resultId) throw new Error('The plan was not saved.')
-      await trpcClient.launch.plan.approve.mutate({ planId: plan.resultId })
-      advance(3)
-      await waitFor(await trpcClient.launch.produce.mutate({ campaignId }))
-      trackOnboarding('onboarding_campaign_ready', { posts: ONBOARDING_POST_COUNT })
-      window.location.assign(`/campaigns/${campaignId}/copy`)
+      window.location.assign(`/campaigns/${started.campaignId}/spec`)
     } catch (error) {
+      trackOnboarding('onboarding_campaign_failed', { duration_ms: Date.now() - startedAt })
       setStage({
-        campaignId,
-        error: getAuthErrorMessage(error, 'A step failed.'),
+        error: getAuthErrorMessage(error, 'Your campaign could not be opened.'),
         kind: 'launching',
-        step,
       })
     }
   }
@@ -197,56 +148,23 @@ export function OnboardingProduct({
   if (stage.kind === 'launching') {
     return (
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-6 py-12">
-        <Heading lead="This takes a few minutes. Keep this tab open.">
-          {`Creating your first ${ONBOARDING_POST_COUNT} posts`}
+        <Heading lead="Your product profile is saved. Review the campaign brief before generating and approving any material.">
+          Opening your first campaign
         </Heading>
-        <ol aria-live="polite" className="flex flex-col gap-4">
-          {LAUNCH_STEPS.map((label, index) => {
-            const done = index < stage.step
-            const active = index === stage.step && !stage.error
-            return (
-              <li className="flex items-center gap-3 text-sm" key={label}>
-                <span
-                  aria-hidden
-                  className={cn(
-                    'grid size-6 place-items-center rounded-full',
-                    done ? 'bg-white text-black' : 'border border-white/[0.12] text-neutral-500'
-                  )}
-                >
-                  {done ? (
-                    <Check className="size-3.5" />
-                  ) : active ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : null}
-                </span>
-                <span className={done || active ? 'text-white' : 'text-neutral-500'}>
-                  {label}
-                  <span className="sr-only">{done ? ' (done)' : active ? ' (working)' : ''}</span>
-                </span>
-              </li>
-            )
-          })}
-        </ol>
         {stage.error ? (
           <div className="flex flex-col gap-3">
             <FormAlert>{stage.error}</FormAlert>
-            {stage.campaignId ? (
-              <Button asChild className="w-fit rounded-lg" variant="outline">
-                <Link href={`/campaigns/${stage.campaignId}/${STEP_PAGES[stage.step]}`}>
-                  Open the campaign
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                className="w-fit rounded-lg"
-                onClick={() => setStage({ kind: 'manual' })}
-                variant="outline"
-              >
-                Back to your product
-              </Button>
-            )}
+            <Button
+              className="w-fit rounded-lg"
+              onClick={() => setStage({ kind: 'manual' })}
+              variant="outline"
+            >
+              Back to your product
+            </Button>
           </div>
-        ) : null}
+        ) : (
+          <p role="status">Opening campaign…</p>
+        )}
       </div>
     )
   }
@@ -301,7 +219,9 @@ export function OnboardingProduct({
           />
         </section>
         {agentEnabled ? (
-          <Button variant="custom" size={null}
+          <Button
+            variant="custom"
+            size={null}
             className="w-fit text-sm text-neutral-400 underline underline-offset-4 hover:text-white"
             onClick={() => setStage({ kind: 'url', manual: false, problem: null })}
             type="button"
@@ -335,7 +255,10 @@ export function OnboardingProduct({
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-ui-lg font-medium text-neutral-300" htmlFor="product-site-sentence">
+          <Label
+            className="text-ui-lg font-medium text-neutral-300"
+            htmlFor="product-site-sentence"
+          >
             In one sentence, what does it do? <span className="text-neutral-500">(optional)</span>
           </Label>
           <Input
@@ -358,7 +281,9 @@ export function OnboardingProduct({
           Read my site
         </SubmitButton>
         {stage.kind === 'url' && !stage.manual ? (
-          <Button variant="custom" size={null}
+          <Button
+            variant="custom"
+            size={null}
             className="w-fit text-sm text-neutral-400 underline underline-offset-4 hover:text-white"
             onClick={() => {
               trackOnboarding('onboarding_product_started', { path: 'manual' })

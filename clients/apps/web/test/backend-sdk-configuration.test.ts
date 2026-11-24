@@ -3,7 +3,303 @@ import { test } from 'node:test'
 import {
   BackendSDKError,
   ScreenshotStudioBackendSDK,
+  createQualificationSchema,
+  decideQualificationSchema,
+  readinessRevisionSchema,
+  selectReleaseSourcesSchema,
+  mergeReleaseSchema,
+  splitReleaseSchema,
 } from '../../../packages/screenshot-studio-backend-sdk/src'
+
+test('source selection validates exact observations and preserves paging, authority and receipts', async () => {
+  const input = selectReleaseSourcesSchema.parse({
+    releaseId: null,
+    newRelease: { title: 'Human release', benefitStatement: 'Useful change' },
+    expectedRevision: '0',
+    sources: [
+      {
+        bindingId: 'binding-1',
+        observationId: 'observation-1',
+        expectedSequence: '9007199254740993',
+      },
+    ],
+  })
+  for (const invalid of [
+    { ...input, releaseId: 'release-1' },
+    { ...input, newRelease: null },
+    { ...input, expectedRevision: '1' },
+    { ...input, organizationId: 'foreign' },
+    { ...input, sources: [...input.sources, ...input.sources] },
+    { ...input, sources: [{ ...input.sources[0], expectedSequence: 1 }] },
+    { ...input, sources: [{ ...input.sources[0], expectedSequence: '0' }] },
+    {
+      ...input,
+      sources: Array.from({ length: 201 }, (_, i) => ({
+        ...input.sources[0],
+        bindingId: `binding-${i}`,
+      })),
+    },
+  ])
+    assert.equal(selectReleaseSourcesSchema.safeParse(invalid).success, false)
+  const observation = {
+    id: 'observation-1',
+    sequence: '9007199254740993',
+    providerEventId: 'delivery-1',
+    sourceUpdatedAt: null,
+    occurredAt: '2026-11-20T00:00:00Z',
+    receivedAt: '2026-11-20T00:01:00Z',
+    origin: 'LIVE',
+    snapshot: {
+      title: 'Provider facts',
+      notes: '',
+      url: null,
+      repositoryName: 'acme/app',
+      commit: null,
+      environment: null,
+      providerState: 'merged',
+    },
+  }
+  const source = {
+    id: 'binding-1',
+    sourceAppId: 'source-1',
+    sourceName: 'App',
+    provider: 'github',
+    kind: 'PULL_REQUEST',
+    repositoryId: '1001',
+    providerObjectId: '51',
+    canonicalReleaseId: null,
+    sequence: observation.sequence,
+    available: true,
+    needsResolution: true,
+    selectionNeedsReview: true,
+    current: observation,
+    selected: null,
+  }
+  const calls: { url: URL; headers: Headers; body: unknown }[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.example',
+    'service-secret',
+    { organizationId: 'org-1', requestId: 'request-1', sessionId: 'session-1', userId: 'user-1' },
+    async (url, init) => {
+      calls.push({
+        url: new URL(String(url)),
+        headers: new Headers(init?.headers),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      })
+      if (String(url).includes('/selections'))
+        return Response.json({
+          created: true,
+          releaseId: 'release-1',
+          revision: '9007199254740994',
+        })
+      if (String(url).includes('/observations'))
+        return Response.json({ source, items: [observation], nextCursor: '9007199254740993' })
+      return Response.json({ items: [source], nextCursor: 'binding-1' })
+    }
+  )
+  const page = await sdk.listReleaseSources({ releaseId: 'release-1', cursor: 'binding-2' })
+  assert.equal(page.items[0].current?.sourceUpdatedAt, null)
+  assert.equal(calls[0].url.searchParams.get('releaseId'), 'release-1')
+  assert.equal(calls[0].url.searchParams.get('cursor'), 'binding-2')
+  const history = await sdk.getReleaseSourceHistory('binding-1', '9007199254740994')
+  assert.equal(history.items[0].sequence, '9007199254740993')
+  assert.equal(calls[1].url.searchParams.get('cursor'), '9007199254740994')
+  const result = await sdk.selectReleaseSources('choose-once', input)
+  assert.equal(result.releaseId, 'release-1')
+  assert.equal(result.revision, '9007199254740994')
+  assert.deepEqual(calls[2].body, input)
+  assert.equal(calls[2].headers.get('idempotency-key'), 'choose-once')
+  for (const call of calls) assert.equal(call.headers.get('x-organization-id'), 'org-1')
+})
+
+test('qualification commands preserve scope, command key and decimal revisions', async () => {
+  const calls: { path: string; headers: Headers; body: unknown }[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.example',
+    'service-secret',
+    { organizationId: 'org-1', requestId: 'req-1', sessionId: 'session-1', userId: 'user-1' },
+    async (url, init) => {
+      calls.push({
+        path: new URL(String(url)).pathname,
+        headers: new Headers(init?.headers),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      })
+      if (new URL(String(url)).pathname.endsWith('/revisions/history-1')) {
+        return Response.json({
+          id: 'history-1',
+          version: '1',
+          parentRevisionId: null,
+          facts: input.facts,
+          authorKind: 'session',
+          authorId: 'user-1',
+          createdAt: '2026-11-20T00:00:00Z',
+          sourceAssets: [],
+          sources: [],
+          decision: null,
+        })
+      }
+      return Response.json({
+        created: true,
+        revision: '9007199254740994',
+        qualificationRevisionId: 'revision-1',
+        decisionId: null,
+      })
+    }
+  )
+  const input = createQualificationSchema.parse({
+    expectedRevision: '9007199254740993',
+    facts: {
+      ownerUserId: 'user-1',
+      factReviewerUserId: 'user-1',
+      rationale: null,
+      rollout: 'UNKNOWN',
+      availability: null,
+      exclusions: null,
+      eligibility: null,
+      plannedAvailability: null,
+      readyAt: null,
+      humanBrief: null,
+      humanBriefAuthorUserId: null,
+      sourceUrls: [],
+      sourceAssetIds: [],
+      requirements: [],
+    },
+  })
+  for (const [facts, message] of [
+    [{ ...input.facts, humanBrief: 'Confirmed by the release owner.' }, 'Name the person'],
+    [
+      {
+        ...input.facts,
+        requirements: [
+          { id: 'audience-1', kind: 'OTHER', label: null, materials: [], omissions: [] },
+        ],
+      },
+      'Give each Other audience a name',
+    ],
+    [
+      { ...input.facts, sourceUrls: ['https://example.test/facts', 'https://example.test/facts'] },
+      'Use each source link once',
+    ],
+    [{ ...input.facts, sourceAssetIds: ['asset-1', 'asset-1'] }, 'Use each source file once'],
+    [
+      {
+        ...input.facts,
+        requirements: [
+          { id: 'audience-1', kind: 'SALES', label: null, materials: [], omissions: [] },
+          { id: 'audience-1', kind: 'CUSTOMER', label: null, materials: [], omissions: [] },
+        ],
+      },
+      'Use a distinct ID for each audience',
+    ],
+    [
+      {
+        ...input.facts,
+        requirements: [
+          {
+            id: 'audience-1',
+            kind: 'SALES',
+            label: null,
+            materials: ['FAQ', 'FAQ'],
+            omissions: [],
+          },
+        ],
+      },
+      'Choose each material once',
+    ],
+    [
+      {
+        ...input.facts,
+        requirements: [
+          {
+            id: 'audience-1',
+            kind: 'SALES',
+            label: null,
+            materials: ['FAQ'],
+            omissions: [{ material: 'FAQ', reason: 'Already covered.' }],
+          },
+        ],
+      },
+      'Choose each material once',
+    ],
+    [
+      {
+        ...input.facts,
+        requirements: [
+          {
+            id: 'audience-1',
+            kind: 'SALES',
+            label: null,
+            materials: [],
+            omissions: [
+              { material: 'FAQ', reason: 'Already covered.' },
+              { material: 'FAQ', reason: 'Repeated.' },
+            ],
+          },
+        ],
+      },
+      'Choose each material once',
+    ],
+  ] as const) {
+    const invalid = createQualificationSchema.safeParse({ ...input, facts })
+    assert.equal(invalid.success, false)
+    if (!invalid.success) assert.ok(invalid.error.issues[0].message.startsWith(message))
+  }
+  assert.equal(
+    (await sdk.createQualificationRevision('release-1', 'same-command', input)).revision,
+    '9007199254740994'
+  )
+  await sdk.decideReleaseQualification('release-1', 'decision-command', {
+    expectedRevision: '9007199254740994',
+    qualificationRevisionId: 'revision-1',
+    decision: 'DEFERRED',
+    reason: 'Awaiting facts.',
+  })
+  assert.deepEqual(
+    calls.map((call) => call.path),
+    [
+      '/v1/releases/release-1/qualification/revisions',
+      '/v1/releases/release-1/qualification/decisions',
+    ]
+  )
+  assert.deepEqual(calls[0].body, input)
+  for (const decision of ['QUALIFIED', 'NO_COMMUNICATION', 'WITHDRAWN', 'REOPEN'] as const) {
+    assert.equal(
+      decideQualificationSchema.safeParse({
+        expectedRevision: '1',
+        qualificationRevisionId: 'revision-1',
+        decision,
+        reason: 'Reviewed',
+        revisitAt: '2027-01-01T00:00:00Z',
+      }).success,
+      false
+    )
+  }
+  assert.equal(
+    decideQualificationSchema.safeParse({
+      expectedRevision: '1',
+      qualificationRevisionId: 'revision-1',
+      decision: 'REOPEN',
+      reason: 'Review the rollout again.',
+    }).success,
+    true
+  )
+  assert.equal(calls[0].headers.get('idempotency-key'), 'same-command')
+  assert.equal(calls[1].headers.get('x-organization-id'), 'org-1')
+  assert.equal(calls[1].headers.get('x-session-id'), 'session-1')
+  for (const value of ['-1', '01', '9223372036854775808', '1.2'])
+    assert.equal(readinessRevisionSchema.safeParse(value).success, false, value)
+  await assert.rejects(sdk.createQualificationRevision('release-1', '', input))
+  assert.equal(calls.length, 2, 'invalid command keys must fail before transport')
+  assert.equal(
+    createQualificationSchema.safeParse({ ...input, humanUserId: 'another-person' }).success,
+    false
+  )
+  const historical = await sdk.getQualificationRevision('release-1', 'history-1')
+  assert.equal(historical.id, 'history-1')
+  assert.deepEqual(historical.sourceAssets, [])
+  assert.equal(calls.at(-1)?.path, '/v1/releases/release-1/qualification/revisions/history-1')
+  assert.equal(calls.at(-1)?.headers.get('x-organization-id'), 'org-1')
+})
 
 test('configuration SDK sends scoped requests to the backend', async () => {
   const requests: { path: string; body?: unknown; headers: Headers; method?: string }[] = []
@@ -289,6 +585,44 @@ test('generated asset SDK sends bytes and metadata without JSON encoding', async
   assert.deepEqual(JSON.parse(String(requests[1].body)), { amount: 2, quota: 'generation:monthly' })
 })
 
+test('campaign discovery preserves bounds, cursor, release and recovery identity', async () => {
+  const requests: URL[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.example',
+    'service-secret',
+    { organizationId: 'org-1', requestId: 'req-1', sessionId: 'session-1', userId: 'user-1' },
+    async (input, init) => {
+      requests.push(new URL(String(input)))
+      assert.equal(new Headers(init?.headers).get('x-organization-id'), 'org-1')
+      return Response.json({ campaigns: [] })
+    }
+  )
+  await sdk.listCampaigns()
+  await sdk.listCampaigns({ limit: 11, releaseId: 'release-1', cursor: 'campaign-2' })
+  await sdk.listCampaigns({ limit: 1, idempotencyKey: 'onboarding:first-campaign:v1' })
+  await sdk.listCampaigns({ limit: 4, search: 'Launch + Q&A', sort: 'updated' })
+  await sdk.listReleases(4, 'Launch + Q&A')
+  assert.equal(requests[0].search, '')
+  assert.deepEqual(Object.fromEntries(requests[1].searchParams), {
+    limit: '11',
+    releaseId: 'release-1',
+    cursor: 'campaign-2',
+  })
+  assert.deepEqual(Object.fromEntries(requests[2].searchParams), {
+    limit: '1',
+    idempotencyKey: 'onboarding:first-campaign:v1',
+  })
+  assert.deepEqual(Object.fromEntries(requests[3].searchParams), {
+    limit: '4',
+    search: 'Launch + Q&A',
+    sort: 'updated',
+  })
+  assert.deepEqual(Object.fromEntries(requests[4].searchParams), {
+    limit: '4',
+    search: 'Launch + Q&A',
+  })
+})
+
 test('campaign, design, creative, and entitlement SDK calls hit their backend routes', async () => {
   const requests: { body?: unknown; method?: string; path: string }[] = []
   const sdk = new ScreenshotStudioBackendSDK(
@@ -332,4 +666,117 @@ test('campaign, design, creative, and entitlement SDK calls hit their backend ro
   assert.deepEqual(requests[1].body, { status: 'READY_FOR_REVIEW' })
   assert.deepEqual(requests[5].body, { document: { pages: [] } })
   assert.deepEqual(requests[6].body, { assetId: 'asset-1', renderKey: null })
+})
+
+test('release grouping validates disjoint bounded selections and preserves command receipts', async () => {
+  const merge = mergeReleaseSchema.parse({
+    expectedRevision: '9007199254740992',
+    sources: [{ releaseId: 'release-old', expectedRevision: '1' }],
+    bindingIds: ['binding-1'],
+    reason: 'Shared rollout',
+  })
+  const split = splitReleaseSchema.parse({
+    expectedRevision: '9007199254740992',
+    groups: [
+      {
+        bindingIds: ['binding-1'],
+        newRelease: { title: 'Separate rollout', benefitStatement: 'Useful outcome' },
+      },
+    ],
+    reason: 'Independent rollout',
+  })
+  for (const invalid of [
+    { ...merge, expectedRevision: 1 },
+    { ...merge, expectedRevision: '01' },
+    { ...merge, sources: [] },
+    { ...merge, sources: [...merge.sources, ...merge.sources] },
+    {
+      ...merge,
+      sources: Array.from({ length: 20 }, (_, i) => ({
+        releaseId: `release-${i}`,
+        expectedRevision: '1',
+      })),
+    },
+    { ...merge, bindingIds: ['binding-1', 'binding-1'] },
+    { ...merge, bindingIds: Array.from({ length: 201 }, (_, i) => `binding-${i}`) },
+    { ...merge, reason: ' ' },
+    { ...merge, reason: 'bad\0reason' },
+    { ...merge, humanUserId: 'forged' },
+  ])
+    assert.equal(mergeReleaseSchema.safeParse(invalid).success, false)
+  for (const invalid of [
+    { ...split, groups: [] },
+    { ...split, groups: [...split.groups, ...split.groups] },
+    { ...split, groups: [{ ...split.groups[0], bindingIds: [] }] },
+    {
+      ...split,
+      groups: [
+        {
+          ...split.groups[0],
+          newRelease: { ...split.groups[0].newRelease, ownerUserId: 'forged' },
+        },
+      ],
+    },
+    {
+      ...split,
+      groups: Array.from({ length: 21 }, (_, i) => ({
+        ...split.groups[0],
+        bindingIds: [`binding-${i}`],
+      })),
+    },
+  ])
+    assert.equal(splitReleaseSchema.safeParse(invalid).success, false)
+  const calls: { url: URL; headers: Headers; body: unknown }[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.example',
+    'service-secret',
+    { organizationId: 'org-1', requestId: 'request-1', sessionId: 'session-1', userId: 'user-1' },
+    async (url, init) => {
+      calls.push({
+        url: new URL(String(url)),
+        headers: new Headers(init?.headers),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      })
+      return Response.json(
+        String(url).includes('/lineage')
+          ? { items: [], nextCursor: null }
+          : {
+              created: false,
+              releaseId: 'release-1',
+              releases: [
+                { releaseId: 'release-1', revision: '9007199254740993' },
+                { releaseId: 'release-new', revision: '1' },
+              ],
+              lineageIds: ['lineage-1'],
+            }
+      )
+    }
+  )
+  const merged = await sdk.mergeRelease('release-1', 'same-merge', merge)
+  const separated = await sdk.splitRelease('release-1', 'same-split', split)
+  await sdk.getReleaseLineage('release-1', 'history-1')
+  assert.equal(merged.created, false)
+  assert.equal(merged.releases[0].revision, '9007199254740993')
+  assert.deepEqual(separated.lineageIds, ['lineage-1'])
+  assert.deepEqual(
+    calls.slice(0, 2).map((call) => call.body),
+    [merge, split]
+  )
+  assert.deepEqual(
+    calls.slice(0, 2).map((call) => call.headers.get('idempotency-key')),
+    ['same-merge', 'same-split']
+  )
+  assert.deepEqual(
+    calls.map((call) => call.url.pathname),
+    [
+      '/v1/releases/release-1/qualification/merge',
+      '/v1/releases/release-1/qualification/split',
+      '/v1/releases/release-1/qualification/lineage',
+    ]
+  )
+  assert.equal(calls[2].url.searchParams.get('cursor'), 'history-1')
+  for (const call of calls) {
+    assert.equal(call.headers.get('x-organization-id'), 'org-1')
+    assert.equal(call.headers.get('x-session-id'), 'session-1')
+  }
 })

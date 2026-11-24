@@ -290,14 +290,21 @@ export function ShellSearch({
   const searching = term.length >= 2
   // An empty box offers the work the person was last on, as Home does.
   const recent = useQuery({
-    ...recentWorkQuery(client, workspaceId ?? '', draftsEnabled, paidPlan),
+    ...recentWorkQuery(client, workspaceId ?? '', draftsEnabled, paidPlan, campaignsEnabled),
     enabled: open && searchesWork && Boolean(workspaceId) && !query.trim(),
   })
   const found = useQuery({
-    enabled: open && searchesWork && searching,
-    queryKey: ['shell-search', workspaceId, term, draftsEnabled, paidPlan],
+    enabled: open && searchesWork && searching && Boolean(workspaceId),
+    queryKey: ['shell-search', workspaceId, term, draftsEnabled, paidPlan, campaignsEnabled],
     queryFn: ({ signal }) =>
-      loadWork(client, { draftsEnabled, limit: 4, paidPlan, search: term, signal }),
+      loadWork(client, {
+        campaignsEnabled,
+        draftsEnabled,
+        limit: 4,
+        paidPlan,
+        search: term,
+        signal,
+      }),
   })
   const work = !query.trim() ? recent : searching ? found : null
   const workItems = (work?.data?.items ?? []).slice(0, 6)
@@ -306,6 +313,7 @@ export function ShellSearch({
   const kinds = new Intl.ListFormat('en', { type: 'conjunction' }).format([
     ...(draftsEnabled ? ['posts'] : []),
     ...(paidPlan ? ['screenshots', 'canvases'] : []),
+    ...(paidPlan && campaignsEnabled ? ['releases', 'campaigns'] : []),
   ])
   const link = 'min-h-11 justify-between rounded-lg font-normal'
   const newPost = useNewPost(() => setOpen(false))
@@ -335,6 +343,7 @@ export function ShellSearch({
               : 'Go to… try screenshot or billing'
           }
           type="search"
+          maxLength={200}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

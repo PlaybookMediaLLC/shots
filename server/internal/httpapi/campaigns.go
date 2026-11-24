@@ -10,7 +10,19 @@ import (
 )
 
 func (s *Server) listCampaigns(w http.ResponseWriter, r *http.Request) {
-	items, err := s.configuration.ListCampaigns(r.Context(), workspaceActor(r))
+	var filters []product.CampaignListFilter
+	query := r.URL.Query()
+	if query.Has("limit") || query.Has("cursor") || query.Has("releaseId") || query.Has("idempotencyKey") || query.Has("search") || query.Has("sort") {
+		limit, err := strconv.Atoi(query.Get("limit"))
+		if err != nil || limit < 1 || limit > 100 || len(query.Get("idempotencyKey")) > 128 ||
+			(query.Get("cursor") != "" && !resourceIDPattern.MatchString(query.Get("cursor"))) ||
+			(query.Get("releaseId") != "" && !resourceIDPattern.MatchString(query.Get("releaseId"))) {
+			writeError(w, http.StatusBadRequest, "invalid campaign query")
+			return
+		}
+		filters = append(filters, product.CampaignListFilter{Limit: limit, Cursor: query.Get("cursor"), ReleaseID: query.Get("releaseId"), IdempotencyKey: query.Get("idempotencyKey"), Search: query.Get("search"), Sort: query.Get("sort")})
+	}
+	items, err := s.configuration.ListCampaigns(r.Context(), workspaceActor(r), filters...)
 	if err != nil {
 		writeStoreError(w, err)
 		return

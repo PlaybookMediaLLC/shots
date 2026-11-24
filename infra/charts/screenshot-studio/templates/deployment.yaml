@@ -155,6 +155,12 @@ spec:
                   name: {{ . }}
                   key: STORE_PUBLISHING_ENCRYPTION_KEY
                   optional: true
+            - name: PLATFORM_WORKFLOW_RENDER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: PLATFORM_WORKFLOW_RENDER_KEY
+                  optional: true
             {{- end }}
           {{- with .Values.startupProbe }}
           startupProbe:

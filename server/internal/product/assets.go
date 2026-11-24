@@ -16,6 +16,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
 	"github.com/lucsky/cuid"
 )
 
@@ -33,6 +34,7 @@ func isVideoPoster(objectKey string) bool {
 }
 
 type AssetListItem struct {
+	SHA256         *string   `json:"sha256"`
 	FileName       string    `json:"fileName"`
 	PosterAssetID  string    `json:"posterAssetId,omitempty"`
 	Classification string    `json:"classification"`
@@ -176,7 +178,7 @@ func (c *Configuration) ListAssets(ctx context.Context, actor Actor, options Ass
 		}
 	}
 	for _, row := range rows {
-		item := AssetListItem{PosterAssetID: posters[row.ID], ID: row.ID, Bytes: row.Bytes, CreatedAt: row.CreatedAt, Height: row.Height, MediaType: row.MediaType, Width: row.Width, FileName: path.Base(row.ObjectKey)}
+		item := AssetListItem{SHA256: row.Sha256, PosterAssetID: posters[row.ID], ID: row.ID, Bytes: row.Bytes, CreatedAt: row.CreatedAt, Height: row.Height, MediaType: row.MediaType, Width: row.Width, FileName: path.Base(row.ObjectKey)}
 		parts := strings.Split(row.ObjectKey, "/")
 		if len(parts) >= 3 {
 			item.Classification = parts[2]
@@ -233,6 +235,11 @@ func (c *Configuration) DeleteAsset(ctx context.Context, actor Actor, assetID st
 		return "", err
 	}
 	defer tx.Rollback()
+	if found, err := workspaceplan.LockWorkspace(ctx, tx, actor.OrganizationID); err != nil {
+		return "", err
+	} else if !found {
+		return AssetMissing, nil
+	}
 	current, err := tx.Asset.Query().Where(asset.ID(owned.ID), asset.OrganizationID(actor.OrganizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return AssetMissing, nil
@@ -279,6 +286,9 @@ func (c *Configuration) DeleteAsset(ctx context.Context, actor Actor, assetID st
 	if needed {
 		return AssetInUse, nil
 	}
+	if err := tombstoneAssetEvidence(ctx, tx, actor.OrganizationID, current.ID); err != nil {
+		return "", err
+	}
 	changed, err := tx.Asset.Update().Where(asset.ID(current.ID), asset.OrganizationID(actor.OrganizationID),
 		asset.StatusEQ(asset.StatusUPLOADED)).SetStatus(asset.StatusDELETED).Save(ctx)
 	if err != nil {
@@ -306,6 +316,9 @@ func (c *Configuration) DeleteAsset(ctx context.Context, actor Actor, assetID st
 		return "", err
 	}
 	for _, poster := range posters {
+		if err := tombstoneAssetEvidence(ctx, tx, actor.OrganizationID, poster.ID); err != nil {
+			return "", err
+		}
 		if err := tx.Asset.UpdateOneID(poster.ID).SetStatus(asset.StatusDELETED).Exec(ctx); err != nil {
 			return "", err
 		}

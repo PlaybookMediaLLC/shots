@@ -103,7 +103,7 @@ func TestToolsMirrorTheirOpenAPIOperations(t *testing.T) {
 		}
 	}
 	// Approving stays human-only (RFC 019).
-	for _, absent := range []string{"decideCampaignApproval", "transitionCampaign", "scheduleContentDraft", "reviewContentDraft"} {
+	for _, absent := range []string{"decideCampaignApproval", "transitionCampaign", "scheduleContentDraft", "reviewContentDraft", "verifyReleaseClaim", "changeEvidenceAccess", "importReleaseSpecClaims"} {
 		if slices.Contains(names, absent) {
 			t.Fatalf("%s must not be an agent tool", absent)
 		}

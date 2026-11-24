@@ -57,6 +57,11 @@ func (c *Configuration) CreateCampaignPublishDraft(ctx context.Context, actor Ac
 		return nil, err
 	}
 	defer tx.Rollback()
+	if input.Draft.ReleaseID != "" {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	// Locks the campaign for this transaction, so an archive cannot land
 	// between the checks below and the draft.
 	if err := mutableCampaign(ctx, tx, actor, campaignID); err != nil {

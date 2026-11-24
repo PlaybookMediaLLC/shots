@@ -40,6 +40,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimpathbinding"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupportset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimverification"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
@@ -59,6 +63,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/enrichmentrecord"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceclearance"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidencesource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendactivation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendsource"
@@ -71,6 +78,13 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/idealcustomerprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/integrationconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/invitation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitexport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitmember"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitreviewdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitsourcepin"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrunstep"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
@@ -121,6 +135,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/projectversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/readinesscommandreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 
 	entreleaseautomation "github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomation"
@@ -128,8 +143,21 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaimversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasedocument"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseevidence"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasekit"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaselineage"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaselineagebinding"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalification"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationasset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationsource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasereadiness"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourcebinding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasespec"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/screenshotcache"
@@ -250,6 +278,10 @@ func checkColumn(t, c string) error {
 			capturejob.Table:                      capturejob.ValidColumn,
 			capturerecipe.Table:                   capturerecipe.ValidColumn,
 			channelconnection.Table:               channelconnection.ValidColumn,
+			claimpathbinding.Table:                claimpathbinding.ValidColumn,
+			claimsupport.Table:                    claimsupport.ValidColumn,
+			claimsupportset.Table:                 claimsupportset.ValidColumn,
+			claimverification.Table:               claimverification.ValidColumn,
 			communicationattempt.Table:            communicationattempt.ValidColumn,
 			communicationrecipient.Table:          communicationrecipient.ValidColumn,
 			contentangle.Table:                    contentangle.ValidColumn,
@@ -269,6 +301,9 @@ func checkColumn(t, c string) error {
 			deploymentevent.Table:                 deploymentevent.ValidColumn,
 			design.Table:                          design.ValidColumn,
 			enrichmentrecord.Table:                enrichmentrecord.ValidColumn,
+			evidenceclearance.Table:               evidenceclearance.ValidColumn,
+			evidencesource.Table:                  evidencesource.ValidColumn,
+			evidenceversion.Table:                 evidenceversion.ValidColumn,
 			frontendactivation.Table:              frontendactivation.ValidColumn,
 			frontendobservation.Table:             frontendobservation.ValidColumn,
 			frontendsource.Table:                  frontendsource.ValidColumn,
@@ -281,6 +316,13 @@ func checkColumn(t, c string) error {
 			idealcustomerprofile.Table:            idealcustomerprofile.ValidColumn,
 			integrationconnection.Table:           integrationconnection.ValidColumn,
 			invitation.Table:                      invitation.ValidColumn,
+			kitartifactclaim.Table:                kitartifactclaim.ValidColumn,
+			kitartifactrevision.Table:             kitartifactrevision.ValidColumn,
+			kitexport.Table:                       kitexport.ValidColumn,
+			kitmember.Table:                       kitmember.ValidColumn,
+			kitreviewdecision.Table:               kitreviewdecision.ValidColumn,
+			kitrevision.Table:                     kitrevision.ValidColumn,
+			kitsourcepin.Table:                    kitsourcepin.ValidColumn,
 			launchrun.Table:                       launchrun.ValidColumn,
 			launchrunstep.Table:                   launchrunstep.ValidColumn,
 			member.Table:                          member.ValidColumn,
@@ -331,14 +373,28 @@ func checkColumn(t, c string) error {
 			project.Table:                         project.ValidColumn,
 			projectversion.Table:                  projectversion.ValidColumn,
 			publicationattempt.Table:              publicationattempt.ValidColumn,
+			readinesscommandreceipt.Table:         readinesscommandreceipt.ValidColumn,
 			release.Table:                         release.ValidColumn,
 			entreleaseautomation.Table:            entreleaseautomation.ValidColumn,
 			releaseautomationexecutor.Table:       releaseautomationexecutor.ValidColumn,
 			releaseautomationnode.Table:           releaseautomationnode.ValidColumn,
 			releaseautomationrun.Table:            releaseautomationrun.ValidColumn,
 			releaseautomationversion.Table:        releaseautomationversion.ValidColumn,
+			releaseclaim.Table:                    releaseclaim.ValidColumn,
+			releaseclaimversion.Table:             releaseclaimversion.ValidColumn,
 			releasedocument.Table:                 releasedocument.ValidColumn,
+			releaseevidence.Table:                 releaseevidence.ValidColumn,
+			releasekit.Table:                      releasekit.ValidColumn,
+			releaselineage.Table:                  releaselineage.ValidColumn,
+			releaselineagebinding.Table:           releaselineagebinding.ValidColumn,
+			releasequalification.Table:            releasequalification.ValidColumn,
+			releasequalificationasset.Table:       releasequalificationasset.ValidColumn,
+			releasequalificationdecision.Table:    releasequalificationdecision.ValidColumn,
+			releasequalificationsource.Table:      releasequalificationsource.ValidColumn,
+			releasereadiness.Table:                releasereadiness.ValidColumn,
+			releasesourcebinding.Table:            releasesourcebinding.ValidColumn,
 			releasesourceevent.Table:              releasesourceevent.ValidColumn,
+			releasesourceobservation.Table:        releasesourceobservation.ValidColumn,
 			releasespec.Table:                     releasespec.ValidColumn,
 			scheduledpost.Table:                   scheduledpost.ValidColumn,
 			screenshotcache.Table:                 screenshotcache.ValidColumn,

@@ -5,7 +5,7 @@ import { organizationAccess } from '@/lib/api/route-auth'
 import { getAuthBaseUrl } from '@/lib/auth/environment'
 import { completeCheckout } from '@/lib/billing/stripe'
 import { checkoutReturnSchema, pathAfterCheckout } from '@/lib/billing/stripe-events'
-import { ONBOARDING_PRODUCT_PATH, pathAfterPlan } from '@/lib/onboarding/next-step'
+import { pathAfterPlan } from '@/lib/onboarding/next-step'
 
 /**
  * Stripe's success URL. Applies the plan the buyer just paid for, then sends
@@ -24,11 +24,10 @@ export const GET = route(completeCheckoutContract, {
     if (outcome === checkoutReturnSchema.enum.mismatch) {
       return errorResponse(403, 'This checkout does not belong to the active workspace.')
     }
-    const next = await pathAfterCheckout(outcome, query.returnTo, async () =>
-      (await pathAfterPlan(access)) !== '/'
-        ? `${ONBOARDING_PRODUCT_PATH}?checkout=success`
-        : '/?checkout=success'
-    )
+    const next = await pathAfterCheckout(outcome, query.returnTo, async () => {
+      const path = await pathAfterPlan(access)
+      return `${path}${path.includes('?') ? '&' : '?'}checkout=success`
+    })
     return NextResponse.redirect(new URL(next, getAuthBaseUrl()), 303)
   },
 })

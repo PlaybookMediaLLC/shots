@@ -32,7 +32,8 @@
     "./@platejs/mention/react": "./src/exports/platejs-mention-react.ts",
     "./@platejs/selection/react": "./src/exports/platejs-selection-react.ts",
     "./@platejs/suggestion": "./src/exports/platejs-suggestion.ts",
-    "./@platejs/suggestion/react": "./src/exports/platejs-suggestion-react.ts"
+    "./@platejs/suggestion/react": "./src/exports/platejs-suggestion-react.ts",
+    "./markdown-kit": "./src/plugins/markdown-kit.tsx"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

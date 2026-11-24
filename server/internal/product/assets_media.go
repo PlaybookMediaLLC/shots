@@ -19,6 +19,8 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitexport"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
@@ -383,7 +385,17 @@ func storageUsed(ctx context.Context, client *ent.Client, organizationID string)
 		asset.StatusNEQ(asset.StatusDELETED)).Aggregate(func(s *entsql.Selector) string {
 		return fmt.Sprintf("COALESCE(SUM(%s), 0)", s.C(asset.FieldBytes))
 	}).Int(ctx)
-	return int64(used), err
+	if err != nil {
+		return 0, err
+	}
+	artifacts, err := client.KitArtifactRevision.Query().Where(kitartifactrevision.OrganizationID(organizationID)).Aggregate(func(s *entsql.Selector) string {
+		return fmt.Sprintf("COALESCE(SUM(%s), 0)", s.C(kitartifactrevision.FieldOutputBytes))
+	}).Int(ctx)
+	if err != nil {
+		return 0, err
+	}
+	exports, err := client.KitExport.Query().Where(kitexport.OrganizationID(organizationID)).Aggregate(func(s *entsql.Selector) string { return fmt.Sprintf("COALESCE(SUM(%s), 0)", s.C(kitexport.FieldBytes)) }).Int(ctx)
+	return int64(used) + int64(artifacts) + int64(exports), err
 }
 
 // reserveStorage counts the workspace's bytes and admits this many more under

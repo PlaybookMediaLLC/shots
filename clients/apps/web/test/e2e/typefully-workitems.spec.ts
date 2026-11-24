@@ -247,7 +247,9 @@ test(
     const first = page.getByTestId('draft-row').filter({ hasText: 'Batch first' })
     const second = page.getByTestId('draft-row').filter({ hasText: 'Batch second' })
     await first.getByRole('link').click({ modifiers: ['Shift'] })
+    await expect(page.getByRole('toolbar', { name: 'Selected drafts' })).toContainText('1 selected')
     await second.getByRole('link').click()
+    await expect(page.getByRole('toolbar', { name: 'Selected drafts' })).toContainText('2 selected')
     await page
       .getByRole('toolbar', { name: 'Selected drafts' })
       .getByRole('button', { name: 'Schedule', exact: true })

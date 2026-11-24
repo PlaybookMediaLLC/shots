@@ -75,6 +75,32 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("POST /v1/releases", s.authenticateProduct(http.HandlerFunc(s.createRelease)))
 	mux.Handle("GET /v1/releases/{id}", s.authenticateProduct(http.HandlerFunc(s.getRelease)))
 	mux.Handle("PATCH /v1/releases/{id}", s.authenticateProduct(http.HandlerFunc(s.updateRelease)))
+	mux.Handle("GET /v1/releases/{id}/kits/{revisionId}/artifacts/{artifactId}/preview", s.authenticateProduct(http.HandlerFunc(s.getKitArtifactPreview)))
+	mux.Handle("GET /v1/releases/{id}/kits", s.authenticateProduct(http.HandlerFunc(s.getReleaseKit)))
+	mux.Handle("POST /v1/releases/{id}/kits", s.authenticateProduct(http.HandlerFunc(s.createReleaseKitRevision)))
+	mux.Handle("POST /v1/releases/{id}/kits/{revisionId}/prepare", s.authenticateProduct(http.HandlerFunc(s.prepareReleaseKit)))
+	mux.Handle("POST /v1/releases/{id}/kits/{revisionId}/decisions", s.authenticateProduct(http.HandlerFunc(s.decideReleaseKit)))
+	mux.Handle("POST /v1/releases/{id}/kits/{revisionId}/exports", s.authenticateProduct(http.HandlerFunc(s.requestKitExport)))
+	mux.Handle("GET /v1/releases/{id}/kit-exports/{exportId}", s.authenticateProduct(http.HandlerFunc(s.getKitExport)))
+	mux.Handle("GET /v1/releases/{id}/qualification", s.authenticateProduct(http.HandlerFunc(s.getReleaseQualification)))
+	mux.Handle("GET /v1/releases/{id}/qualification/revisions/{revisionId}", s.authenticateProduct(http.HandlerFunc(s.getQualificationRevision)))
+	mux.Handle("POST /v1/releases/{id}/evidence", s.authenticateProduct(http.HandlerFunc(s.createReleaseEvidence)))
+	mux.Handle("POST /v1/releases/{id}/evidence/links", s.authenticateProduct(http.HandlerFunc(s.linkReleaseEvidence)))
+	mux.Handle("POST /v1/releases/{id}/evidence/access", s.authenticateProduct(http.HandlerFunc(s.changeEvidenceAccess)))
+	mux.Handle("POST /v1/releases/{id}/claims", s.authenticateProduct(http.HandlerFunc(s.saveReleaseClaim)))
+	mux.Handle("POST /v1/releases/{id}/claims/{claimId}/support", s.authenticateProduct(http.HandlerFunc(s.setClaimSupports)))
+	mux.Handle("POST /v1/releases/{id}/claims/{claimId}/decisions", s.authenticateProduct(http.HandlerFunc(s.verifyReleaseClaim)))
+	mux.Handle("POST /v1/releases/{id}/claims/imports", s.authenticateProduct(http.HandlerFunc(s.importReleaseSpecClaims)))
+	mux.Handle("GET /v1/releases/{id}/claims", s.authenticateProduct(http.HandlerFunc(s.listReleaseClaims)))
+	mux.Handle("GET /v1/releases/{id}/evidence", s.authenticateProduct(http.HandlerFunc(s.listReleaseEvidence)))
+	mux.Handle("POST /v1/releases/{id}/qualification/revisions", s.authenticateProduct(http.HandlerFunc(s.createReleaseQualification)))
+	mux.Handle("POST /v1/releases/{id}/qualification/decisions", s.authenticateProduct(http.HandlerFunc(s.decideReleaseQualification)))
+	mux.Handle("GET /v1/releases/{id}/qualification/lineage", s.authenticateProduct(http.HandlerFunc(s.getReleaseLineage)))
+	mux.Handle("POST /v1/releases/{id}/qualification/merge", s.authenticateProduct(http.HandlerFunc(s.mergeRelease)))
+	mux.Handle("POST /v1/releases/{id}/qualification/split", s.authenticateProduct(http.HandlerFunc(s.splitRelease)))
+	mux.Handle("GET /v1/release-sources", s.authenticateProduct(http.HandlerFunc(s.listReleaseSources)))
+	mux.Handle("GET /v1/release-sources/{id}/observations", s.authenticateProduct(http.HandlerFunc(s.getReleaseSourceHistory)))
+	mux.Handle("POST /v1/release-sources/selections", s.authenticateProduct(http.HandlerFunc(s.selectReleaseSources)))
 	mux.Handle("GET /v1/campaigns", s.authenticateProduct(http.HandlerFunc(s.listCampaigns)))
 	mux.Handle("POST /v1/campaigns", s.authenticateProduct(http.HandlerFunc(s.createCampaign)))
 	mux.Handle("GET /v1/campaigns/{id}", s.authenticateProduct(http.HandlerFunc(s.getCampaign)))
@@ -101,6 +127,7 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("POST /v1/assets/{id}/upload-parts", s.authenticateProduct(http.HandlerFunc(s.signAssetUploadParts)))
 	mux.Handle("GET /v1/assets/{id}/download-url", s.authenticateProduct(http.HandlerFunc(s.signAssetDownload)))
 	mux.Handle("GET /v1/assets/{id}/bytes", s.authenticateProduct(http.HandlerFunc(s.readAsset)))
+	mux.Handle("POST /v1/internal/releases/{id}/kit-exports/{exportId}/download", s.authenticateService(http.HandlerFunc(s.readKitExportDownload)))
 	mux.Handle("POST /v1/internal/assets/{id}/download", s.authenticateService(http.HandlerFunc(s.readAssetDownload)))
 	mux.Handle("DELETE /v1/assets/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteAsset)))
 	mux.Handle("GET /v1/audit-logs", s.authenticateProduct(http.HandlerFunc(s.listAuditLogs)))
@@ -535,11 +562,14 @@ func workspaceResponse(workspace *product.Workspace) map[string]any {
 
 func workspaceMutationResponse(workspace *product.Workspace) map[string]any {
 	organization := map[string]any{"id": workspace.ID, "logo": workspace.Logo, "name": workspace.Name, "slug": workspace.Slug}
+	settings := workspaceSettingsResponse(workspace.WorkspaceSettings)
 	response := map[string]any{
 		"organization": organization,
-		"settings":     workspaceSettingsResponse(workspace.WorkspaceSettings),
+		"settings":     settings,
 	}
 	if workspace.CreationMember != nil {
+		// Older creation clients validate this shape strictly; read new settings after creation.
+		delete(settings, "releaseReadinessEnabled")
 		var metadata json.RawMessage
 		if workspace.Metadata != nil {
 			metadata = json.RawMessage(*workspace.Metadata)
@@ -550,7 +580,7 @@ func workspaceMutationResponse(workspace *product.Workspace) map[string]any {
 	return response
 }
 
-func workspaceSettingsResponse(settings *ent.WorkspaceSettings) any {
+func workspaceSettingsResponse(settings *ent.WorkspaceSettings) map[string]any {
 	if settings == nil {
 		return nil
 	}
@@ -558,7 +588,8 @@ func workspaceSettingsResponse(settings *ent.WorkspaceSettings) any {
 		"organizationId": settings.ID, "description": settings.Description,
 		"locale": settings.Locale, "timeZone": settings.TimeZone,
 		"defaultPublishTime": settings.DefaultPublishTime, "aiAgentEnabled": settings.AiAgentEnabled,
-		"createdAt": settings.CreatedAt, "updatedAt": settings.UpdatedAt,
+		"releaseReadinessEnabled": settings.ReleaseReadinessEnabled,
+		"createdAt":               settings.CreatedAt, "updatedAt": settings.UpdatedAt,
 	}
 }
 

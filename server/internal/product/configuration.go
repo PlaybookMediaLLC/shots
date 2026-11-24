@@ -464,7 +464,7 @@ func (c *Configuration) UpdateSourceApp(ctx context.Context, actor Actor, source
 		return nil, err
 	}
 	defer tx.Rollback()
-	current, err := tx.SourceApp.Query().Where(sourceapp.ID(sourceAppID), sourceapp.OrganizationID(actor.OrganizationID)).Only(ctx)
+	current, err := lockAutomationSource(ctx, tx, actor.OrganizationID, sourceAppID)
 	if ent.IsNotFound(err) {
 		return nil, publishing.ErrNotFound
 	}

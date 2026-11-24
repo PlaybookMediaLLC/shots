@@ -210,7 +210,8 @@ export async function proposeCampaignRevision(
       return from !== undefined && claimsMeanTheSame(refsOf(post), from, spec.content)
     }
     const dependents = posts.filter(
-      (post) => agrees(post) && refsOf(post).some((ref) => claimRefSection(ref) === section)
+      (post) =>
+        agrees(post) && refsOf(post).some((ref) => claimRefSection(ref, spec.content) === section)
     )
     const dependentIds = new Set(dependents.map((post) => post.id))
     const guardFor = (content: ReleaseSpecContent) =>

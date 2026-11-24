@@ -253,6 +253,9 @@ spec:
     - name: grpc
       port: 7233
       targetPort: grpc
+    - name: ui
+      port: 8233
+      targetPort: ui
   selector:
     app.kubernetes.io/component: temporal
     {{- include "screenshot-studio.selectorLabels" . | nindent 4 }}
@@ -280,6 +283,8 @@ spec:
           ports:
             - name: grpc
               containerPort: 7233
+            - name: ui
+              containerPort: 8233
           readinessProbe:
             tcpSocket:
               port: grpc
@@ -346,4 +351,30 @@ spec:
             httpGet:
               path: /readyz
               port: http
+        - name: worker
+          image: {{ .Values.local.backend.image | quote }}
+          command: ["/publishing-orchestrator"]
+          ports:
+            - name: worker
+              containerPort: 8081
+          envFrom:
+            - secretRef:
+                name: {{ $secretName }}
+          env:
+            - name: PORT
+              value: "8081"
+            - name: TEMPORAL_ADDRESS
+              value: {{ printf "%s-temporal:7233" $fullName | quote }}
+            - name: RUN_MAINTENANCE
+              value: "true"
+            - name: RESEND_API_KEY
+              value: "re_e2e_no_delivery"
+            - name: AUTH_EMAIL_FROM
+              value: "Shots E2E <noreply@localhost.test>"
+            - name: PLATFORM_WORKFLOW_RENDER_URL
+              value: {{ printf "http://%s:%v" $fullName .Values.service.port | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: worker
 {{- end }}

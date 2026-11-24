@@ -28,6 +28,8 @@ type WorkspaceSettings struct {
 	DefaultPublishTime string `json:"default_publish_time,omitempty"`
 	// AiAgentEnabled holds the value of the "ai_agent_enabled" field.
 	AiAgentEnabled bool `json:"ai_agent_enabled,omitempty"`
+	// ReleaseReadinessEnabled holds the value of the "release_readiness_enabled" field.
+	ReleaseReadinessEnabled bool `json:"release_readiness_enabled,omitempty"`
 	// DisabledExperiments holds the value of the "disabled_experiments" field.
 	DisabledExperiments []string `json:"disabled_experiments,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -44,7 +46,7 @@ func (*WorkspaceSettings) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workspacesettings.FieldDisabledExperiments:
 			values[i] = new([]byte)
-		case workspacesettings.FieldAiAgentEnabled:
+		case workspacesettings.FieldAiAgentEnabled, workspacesettings.FieldReleaseReadinessEnabled:
 			values[i] = new(sql.NullBool)
 		case workspacesettings.FieldID, workspacesettings.FieldDescription, workspacesettings.FieldLocale, workspacesettings.FieldTimeZone, workspacesettings.FieldDefaultPublishTime:
 			values[i] = new(sql.NullString)
@@ -101,6 +103,12 @@ func (_m *WorkspaceSettings) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field ai_agent_enabled", values[i])
 			} else if value.Valid {
 				_m.AiAgentEnabled = value.Bool
+			}
+		case workspacesettings.FieldReleaseReadinessEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field release_readiness_enabled", values[i])
+			} else if value.Valid {
+				_m.ReleaseReadinessEnabled = value.Bool
 			}
 		case workspacesettings.FieldDisabledExperiments:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -174,6 +182,9 @@ func (_m *WorkspaceSettings) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("ai_agent_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AiAgentEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("release_readiness_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseReadinessEnabled))
 	builder.WriteString(", ")
 	builder.WriteString("disabled_experiments=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DisabledExperiments))

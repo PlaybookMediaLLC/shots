@@ -7,7 +7,30 @@ import {
   workspaceCreationInputSchema,
   workspaceCreationMetadataSchema,
   workspaceCreationLogoSchema,
+  workspaceCreationResultSchema,
 } from '../../../packages/screenshot-studio-backend-sdk/src/workspace-creation'
+
+test('workspace creation accepts the readiness setting across backend rollout versions', () => {
+  const settings = {
+    organizationId: 'org-1',
+    description: null,
+    locale: 'en',
+    timeZone: 'UTC',
+    defaultPublishTime: '09:00',
+    aiAgentEnabled: false,
+    createdAt: '2026-11-20T00:00:00Z',
+    updatedAt: '2026-11-20T00:00:00Z',
+  }
+  const schema = workspaceCreationResultSchema.shape.settings
+  assert.equal(schema.safeParse(settings).success, true)
+  for (const releaseReadinessEnabled of [true, false]) {
+    assert.equal(
+      schema.parse({ ...settings, releaseReadinessEnabled }).releaseReadinessEnabled,
+      releaseReadinessEnabled
+    )
+  }
+  assert.equal(schema.safeParse({ ...settings, releaseReadinessEnabled: 'true' }).success, false)
+})
 
 test('creation preserves retry identity and optional active-workspace preservation', () => {
   const input = {

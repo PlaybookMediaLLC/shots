@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 const generalDraftSchema = z.object({
   aiAgentEnabled: z.boolean(),
+  releaseReadinessEnabled: z.boolean().default(false),
   defaultPublishTime: z.string(),
   description: z.string(),
   locale: z.string(),
@@ -41,6 +42,7 @@ type WorkspaceGeneralSettingsProps = {
     slug: string
     workspaceSettings?: {
       aiAgentEnabled: boolean
+      releaseReadinessEnabled?: boolean
       defaultPublishTime: string
       description: string | null
       locale: string
@@ -62,6 +64,7 @@ export function WorkspaceGeneralSettings({
 
   const [saved, setSaved] = useState({
     aiAgentEnabled: organization.workspaceSettings?.aiAgentEnabled ?? true,
+    releaseReadinessEnabled: organization.workspaceSettings?.releaseReadinessEnabled ?? false,
     defaultPublishTime: organization.workspaceSettings?.defaultPublishTime ?? '09:00',
     description: organization.workspaceSettings?.description ?? '',
     locale: organization.workspaceSettings?.locale ?? 'en',
@@ -203,7 +206,13 @@ export function WorkspaceGeneralSettings({
                 placeholder="https://example.com/logo.svg"
                 type="url"
               />
-              <p id="workspace-logo-error" className="min-h-4 text-xs text-destructive" role={logoError ? 'alert' : undefined}>{logoError}</p>
+              <p
+                id="workspace-logo-error"
+                className="min-h-4 text-xs text-destructive"
+                role={logoError ? 'alert' : undefined}
+              >
+                {logoError}
+              </p>
             </div>
           </Row>
           <Row
@@ -264,6 +273,22 @@ export function WorkspaceGeneralSettings({
           </Group>
         </Section>
 
+        <Section title="Release qualification">
+          <Group>
+            <Row
+              description="Let release owners record facts and ask a reviewer to qualify them. Turning this off preserves previous decisions."
+              label={label('workspace-release-readiness', 'Enable manual release qualification')}
+            >
+              <Checkbox
+                checked={values.releaseReadinessEnabled}
+                onCheckedChange={(checked) => update({ releaseReadinessEnabled: checked === true })}
+                disabled={!canManage}
+                id="workspace-release-readiness"
+                name="releaseReadinessEnabled"
+              />
+            </Row>
+          </Group>
+        </Section>
         <Section title="AI">
           <Group>
             <Row

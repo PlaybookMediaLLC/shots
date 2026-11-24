@@ -9,12 +9,16 @@ export const ONBOARDING_PRODUCT_PATH = '/onboarding/product'
 
 /**
  * Where a workspace goes once it has a plan: the product step until it has a
- * product profile, then the app. A failed read sends it to the app, so a
- * backend hiccup never strands someone who just paid.
+ * product profile, then the app. A failed read opens Home with a visible
+ * recovery message instead of treating an existing profile as missing.
  */
 export async function pathAfterPlan(context: TenantContext): Promise<string> {
-  const profile = await getProductProfile(context).catch(() => null)
-  return profile ? '/' : ONBOARDING_PRODUCT_PATH
+  try {
+    const profile = await getProductProfile(context)
+    return profile ? '/' : ONBOARDING_PRODUCT_PATH
+  } catch {
+    return '/home?setup=unavailable'
+  }
 }
 
 type PageAccess = NonNullable<Awaited<ReturnType<typeof getPageAccess>>>

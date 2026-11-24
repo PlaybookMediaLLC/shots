@@ -163,6 +163,9 @@ type Event struct {
 	DefaultBranch  string                   `json:"defaultBranch,omitempty"`
 	Fields         map[string]Value         `json:"fields"`
 	Production     *ProductionQualification `json:"production,omitempty"`
+	// Intake-only ordering evidence; source observations retain it separately from workflow snapshots.
+	SourceUpdatedAt *time.Time `json:"-"`
+	ObservationOnly bool       `json:"-"`
 }
 
 // ProductionQualification records a workspace decision, separate from GitHub's

@@ -84,7 +84,9 @@ jobs:
           # Content draft co-editing: browsers reach the collab server directly.
           kubectl --namespace screenshot-studio port-forward service/screenshot-studio-collab 1234:1234 &
           collab_port_forward_pid=$!
-          trap 'kill $port_forward_pid $postgres_port_forward_pid $rustfs_port_forward_pid $collab_port_forward_pid' EXIT
+          kubectl --namespace screenshot-studio port-forward service/screenshot-studio-temporal 8233:8233 &
+          temporal_port_forward_pid=$!
+          trap 'kill $port_forward_pid $postgres_port_forward_pid $rustfs_port_forward_pid $collab_port_forward_pid $temporal_port_forward_pid' EXIT
           source .local/dev.env
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error http://localhost:3000/api/health; then

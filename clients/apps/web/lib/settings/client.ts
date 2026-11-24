@@ -1,9 +1,20 @@
 'use client'
 
 import { z } from 'zod'
+import {
+  qualificationErrorDetailsSchema,
+  kitReadinessErrorDetailsSchema,
+  sourceSelectionErrorDetailsSchema,
+} from 'screenshot-studio-backend-sdk'
 import { debugLog, redactPath } from '@/lib/debug-log'
 import { isPlanRefusal, PLAN_REFUSAL_MESSAGE } from '@/lib/api/platform-errors'
 import { workspaceScopeHeaders, type WorkspaceRequestScope } from '@/lib/auth/request-scope'
+
+const releaseErrorDetailsSchema = z.union([
+  kitReadinessErrorDetailsSchema,
+  qualificationErrorDetailsSchema,
+  sourceSelectionErrorDetailsSchema,
+])
 
 /** A settings request the server refused, with its status and error code. */
 export class SettingsRequestError extends Error {
@@ -13,7 +24,12 @@ export class SettingsRequestError extends Error {
   readonly code: string | null
 
   /** A refusal with its message, status and code. */
-  constructor(message: string, status: number, code: string | null) {
+  constructor(
+    message: string,
+    status: number,
+    code: string | null,
+    readonly details?: z.infer<typeof releaseErrorDetailsSchema>
+  ) {
     super(message)
     this.name = 'SettingsRequestError'
     this.status = status
@@ -25,6 +41,7 @@ const failureSchema = z.object({
   code: z.string().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
+  details: releaseErrorDetailsSchema.optional(),
 })
 
 /**
@@ -39,6 +56,7 @@ export async function settingsRequest<Schema extends z.ZodType>(
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
     scope?: WorkspaceRequestScope
     signal?: AbortSignal
+    commandKey?: string
   } = {}
 ): Promise<z.output<Schema>> {
   const method = options.method ?? 'GET'
@@ -50,6 +68,7 @@ export async function settingsRequest<Schema extends z.ZodType>(
     headers: {
       ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
       ...(options.scope ? workspaceScopeHeaders(options.scope) : {}),
+      ...(options.commandKey ? { 'Idempotency-Key': options.commandKey } : {}),
     },
     method,
     signal: options.signal,
@@ -64,7 +83,8 @@ export async function settingsRequest<Schema extends z.ZodType>(
     throw new SettingsRequestError(
       failure.data?.message ?? failure.data?.error ?? 'The request could not be completed.',
       response.status,
-      failure.data?.code ?? null
+      failure.data?.code ?? null,
+      failure.data?.details
     )
   }
   return schema.parse(payload)

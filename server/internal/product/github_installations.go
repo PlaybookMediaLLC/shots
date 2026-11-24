@@ -292,6 +292,10 @@ func (c *Configuration) UnlinkGitHubInstallation(ctx context.Context, actor Acto
 		return err
 	}
 	defer tx.Rollback()
+	// Serialize with workspace-authorized source selection before changing its connection.
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+		return err
+	}
 	if _, err := tx.WorkspaceGitHubInstallation.Delete().Where(workspacegithubinstallation.ID(linkID),
 		workspacegithubinstallation.OrganizationID(actor.OrganizationID)).Exec(ctx); err != nil {
 		return err
@@ -391,6 +395,16 @@ func (c *Configuration) SetGitHubInstallationStatus(ctx context.Context, install
 	if row.Status == githubinstallation.StatusDELETED && status != GitHubInstallationDeleted {
 		// A removal is final: a late suspension cannot change it.
 		return 0, nil
+	}
+	organizations, err := tx.SourceApp.Query().Where(sourceapp.GithubInstallationID(row.ID)).Select(sourceapp.FieldOrganizationID).Strings(ctx)
+	if err != nil {
+		return 0, err
+	}
+	// Revocation must precede source locks and audit FKs in the same authority order as selection.
+	for _, org := range sortedUnique(organizations) {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, org); err != nil {
+			return 0, err
+		}
 	}
 	if _, err := row.Update().SetStatus(githubinstallation.Status(status)).Save(ctx); err != nil {
 		return 0, err

@@ -2,8 +2,8 @@ import { draftEditor, expect, expectSaved, openNewDraft, settleSelection, test }
 
 /**
  * The post editor brief's acceptance tests: a short, platform-aware slash
- * menu that never leaves junk, one look with the app (Inter, 32px controls,
- * Phosphor icons), a paste split that is previewed first, narrow screens,
+ * menu that never leaves junk, one look with the app (Inter, 2rem controls,
+ * rounded corners and Phosphor icons), a paste split that is previewed first, narrow screens,
  * and popovers that never move the page.
  */
 
@@ -85,12 +85,17 @@ test(
     await openNewDraft(page)
     const editor = draftEditor(page)
     await expect(editor).toHaveCSS('font-family', /Inter/)
-    await expect(editor).toHaveCSS('font-size', '16px')
+    const rem = await page.evaluate(() =>
+      parseFloat(getComputedStyle(document.documentElement).fontSize)
+    )
+    await expect(editor).toHaveCSS('font-size', `${rem}px`)
     const tools = page.getByRole('toolbar', { name: 'Draft tools' }).getByRole('button')
     expect(await tools.count()).toBeGreaterThanOrEqual(4)
     for (const button of await tools.all()) {
-      await expect(button).toHaveCSS('height', '32px')
-      await expect(button).toHaveCSS('border-top-left-radius', '6px')
+      await expect
+        .poll(() => button.evaluate((node) => parseFloat(getComputedStyle(node).height)))
+        .toBeCloseTo(2 * rem, 1)
+      await expect(button).toHaveCSS('border-top-left-radius', `${0.5 * rem - 2}px`)
       await expect(button).toHaveAttribute('aria-label', /.+/)
     }
     await tools.first().hover()

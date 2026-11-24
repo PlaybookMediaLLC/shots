@@ -1,4 +1,13 @@
-import { apiRequest, db, draftEditor, expect, expectSaved, type Page, test } from './framework'
+import {
+  apiRequest,
+  db,
+  draftEditor,
+  expect,
+  expectSaved,
+  type Page,
+  startPostByTyping,
+  test,
+} from './framework'
 
 /**
  * Publishing a run of written posts in one sitting. A writer who has drafted
@@ -146,16 +155,11 @@ test(
 test(
   'Schedule and next queues the post and opens the next draft on the same accounts',
   { tag: '@journey' },
-  async ({ page, startWorkspace }) => {
+  async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'bluesky'] })
     await weeklySlots(page)
-    await page.goto('/publish')
-
-    await page.getByTestId('new-draft').first().click()
-    await page.keyboard.type('The first post of the run.')
-    await page.waitForURL(/\/publish\/[a-z0-9]+/)
-    await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
-    const first = new URL(page.url()).pathname.split('/').pop() ?? ''
+    await app.open('/publish')
+    const first = await startPostByTyping(page, 'The first post of the run.')
 
     // Only X: the next draft must open on that choice, not on the brand's defaults.
     await page.getByRole('switch', { name: 'Publish to Bluesky', exact: true }).click()

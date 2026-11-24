@@ -10,6 +10,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendactivation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
@@ -149,15 +150,30 @@ func (c *Configuration) ingestSourceRelease(ctx context.Context, actor Actor, in
 		return nil, err
 	}
 	defer tx.Rollback()
-	source, err := lockAutomationSource(ctx, tx, actor.OrganizationID, input.SourceAppID)
-	if ent.IsNotFound(err) {
-		return nil, publishing.ErrNotFound
+	var frontend *ent.FrontendActivation
+	sourceIDs := []string{input.SourceAppID}
+	if input.automationAssociation != nil && strings.HasPrefix(input.EventID, "frontend:") {
+		frontend, err = tx.FrontendActivation.Query().Where(frontendactivation.OrganizationID(actor.OrganizationID), frontendactivation.ID(strings.TrimPrefix(input.EventID, "frontend:"))).Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sourceIDs = append(sourceIDs, frontend.SourceID)
 	}
-	if err != nil {
-		return nil, err
-	}
-	if source.Status != sourceapp.StatusACTIVE {
-		return nil, publishing.ErrNotFound
+	var source *ent.SourceApp
+	for _, id := range sortedUnique(sourceIDs) {
+		locked, err := lockAutomationSource(ctx, tx, actor.OrganizationID, id)
+		if ent.IsNotFound(err) {
+			return nil, publishing.ErrNotFound
+		}
+		if err != nil {
+			return nil, err
+		}
+		if locked.Status != sourceapp.StatusACTIVE {
+			return nil, publishing.ErrNotFound
+		}
+		if id == input.SourceAppID {
+			source = locked
+		}
 	}
 	if source.ReleaseAutomation && input.automationAssociation == nil {
 		return nil, conflict("This source uses release automation; legacy release intake is disabled.")
@@ -174,10 +190,23 @@ func (c *Configuration) ingestSourceRelease(ctx context.Context, actor Actor, in
 	if existing != nil {
 		return &SourceReleaseIngest{Created: false, ReleaseID: existing.AggregateID}, nil
 	}
-	id := uuid.NewString()
-	features, err := releaseFeatures(ctx, tx, source, input, id)
+	id, err := selectedSourceRelease(ctx, tx, actor.OrganizationID, input, frontend)
 	if err != nil {
 		return nil, err
+	}
+	reused := id != ""
+	if !reused {
+		id = uuid.NewString()
+		features, err := releaseFeatures(ctx, tx, source, input, id)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = tx.Release.Create().SetID(id).SetOrganizationID(actor.OrganizationID).SetTitle(input.Title).
+			SetBenefitStatement(input.BenefitStatement).SetNillableAudience(input.Audience).
+			SetNillableDescription(input.Description).SetSourceUrls(input.SourceURLs).
+			SetNillableNotes(input.Notes).SetFeatures(features).Save(ctx); err != nil {
+			return nil, err
+		}
 	}
 	payload := map[string]any{"releaseId": id, "sourceAppId": input.SourceAppID, "actorUserId": actor.UserID}
 	if evidence := input.automationAssociation; evidence != nil {
@@ -198,12 +227,6 @@ func (c *Configuration) ingestSourceRelease(ctx context.Context, actor Actor, in
 	if err != nil {
 		return nil, err
 	}
-	if _, err = tx.Release.Create().SetID(id).SetOrganizationID(actor.OrganizationID).SetTitle(input.Title).
-		SetBenefitStatement(input.BenefitStatement).SetNillableAudience(input.Audience).
-		SetNillableDescription(input.Description).SetSourceUrls(input.SourceURLs).
-		SetNillableNotes(input.Notes).SetFeatures(features).Save(ctx); err != nil {
-		return nil, err
-	}
 	// The release takes every change merged since the source's last release.
 	attach := tx.SourceChange.Update().Where(sourcechange.OrganizationID(actor.OrganizationID),
 		sourcechange.SourceAppID(source.ID), sourcechange.ReleaseIDIsNil())
@@ -213,8 +236,14 @@ func (c *Configuration) ingestSourceRelease(ctx context.Context, actor Actor, in
 	if evidence := input.automationAssociation; evidence != nil {
 		attach.Where(sourcechange.NumberIn(evidence.Numbers...), sourcechange.MergedAtLTE(evidence.Cutoff))
 	}
-	if _, err = attach.SetReleaseID(id).Save(ctx); err != nil {
+	attached, err := attach.SetReleaseID(id).Save(ctx)
+	if err != nil {
 		return nil, err
+	}
+	if reused && attached > 0 {
+		if err := invalidateReleaseQualification(ctx, tx, actor, id); err != nil {
+			return nil, err
+		}
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.release_ingested", "release", id); err != nil {
 		return nil, err

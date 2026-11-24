@@ -77,6 +77,7 @@ test(
     const linkField = dialog.getByRole('textbox', { name: /^Review link for / }).first()
     await expect(linkField).toBeVisible({ timeout: 60_000 })
     const link = await linkField.inputValue()
+    expect(new URL(link).origin).toBe(new URL(page.url()).origin)
 
     const reviewer = await browser.newContext()
     const reviewPage = await reviewer.newPage()
@@ -108,6 +109,7 @@ test(
     await page.getByRole('button', { name: 'Project', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Share for review…' }).click()
     await expect(dialog.getByText('Headline is too long on small phones')).toBeVisible()
+    await expect(linkField).toHaveValue(link)
     await expect(dialog.getByRole('button', { name: `Slide 2 · ${slideName}` })).toBeVisible()
     await dialog.getByRole('checkbox', { name: 'Resolved' }).check()
     await dialog.getByRole('button', { name: 'Revoke…' }).click()

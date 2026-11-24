@@ -251,14 +251,15 @@ func (n *NullableString) UnmarshalJSON(data []byte) error {
 
 type UpdateWorkspaceInput struct {
 	// AIAgentEnabled is the AI kill switch; changing it is audited.
-	AIAgentEnabled     *bool          `json:"aiAgentEnabled"`
-	DefaultPublishTime *string        `json:"defaultPublishTime"`
-	Description        NullableString `json:"description"`
-	Locale             *string        `json:"locale"`
-	Logo               NullableString `json:"logo"`
-	Name               string         `json:"name"`
-	Slug               string         `json:"slug"`
-	TimeZone           *string        `json:"timeZone"`
+	AIAgentEnabled          *bool          `json:"aiAgentEnabled"`
+	ReleaseReadinessEnabled *bool          `json:"releaseReadinessEnabled"`
+	DefaultPublishTime      *string        `json:"defaultPublishTime"`
+	Description             NullableString `json:"description"`
+	Locale                  *string        `json:"locale"`
+	Logo                    NullableString `json:"logo"`
+	Name                    string         `json:"name"`
+	Slug                    string         `json:"slug"`
+	TimeZone                *string        `json:"timeZone"`
 }
 
 func (c *Configuration) UpdateWorkspace(ctx context.Context, actor Actor, input UpdateWorkspaceInput) (*Workspace, error) {
@@ -272,6 +273,11 @@ func (c *Configuration) UpdateWorkspace(ctx context.Context, actor Actor, input 
 		return nil, err
 	}
 	defer tx.Rollback()
+	if input.ReleaseReadinessEnabled != nil {
+		if err := workspaceAdministrator(ctx, tx, actor, "workspace:update"); err != nil {
+			return nil, err
+		}
+	}
 	org, err := tx.Organization.Query().Where(organization.ID(actor.OrganizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, publishing.ErrNotFound
@@ -305,6 +311,10 @@ func (c *Configuration) UpdateWorkspace(ctx context.Context, actor Actor, input 
 		}
 	}
 	settingsUpdate := tx.WorkspaceSettings.UpdateOneID(org.ID)
+	readinessChanged := input.ReleaseReadinessEnabled != nil && *input.ReleaseReadinessEnabled != settings.ReleaseReadinessEnabled
+	if input.ReleaseReadinessEnabled != nil {
+		settingsUpdate.SetReleaseReadinessEnabled(*input.ReleaseReadinessEnabled)
+	}
 	aiAgentChanged := input.AIAgentEnabled != nil && *input.AIAgentEnabled != settings.AiAgentEnabled
 	if input.AIAgentEnabled != nil {
 		settingsUpdate.SetAiAgentEnabled(*input.AIAgentEnabled)
@@ -338,6 +348,12 @@ func (c *Configuration) UpdateWorkspace(ctx context.Context, actor Actor, input 
 			action = "product.workspace_ai_agent_enabled"
 		}
 		if err := appendConfigurationAudit(ctx, tx, actor, action, "organization", org.ID); err != nil {
+			return nil, err
+		}
+	}
+	if readinessChanged {
+		if err := appendConfigurationAudit(ctx, tx, actor, "product.workspace_release_readiness_changed", "organization", org.ID,
+			map[string]any{"enabled": *input.ReleaseReadinessEnabled}); err != nil {
 			return nil, err
 		}
 	}

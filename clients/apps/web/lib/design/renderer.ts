@@ -3,6 +3,8 @@ import 'server-only'
 import { type Browser, chromium } from 'playwright-core'
 import { GOOGLE_FONT_ORIGINS } from '@/lib/typography/google-fonts'
 import { createRenderToken } from './render-token'
+import type { DesignDocument } from './document'
+import { RENDER_FRAME_PATH, type RenderResponse } from '@/lib/render/protocol'
 
 /**
  * Headless renderer for design documents.
@@ -80,6 +82,8 @@ export type RenderedDesign = {
 
 export type DesignRenderer = {
   close: () => Promise<void>
+  /** Render an immutable document with owned media already resolved to pinned bytes. */
+  renderSnapshot: (document: DesignDocument) => Promise<RenderedDesign>
   render: (
     designId: string,
     organizationId: string,
@@ -139,7 +143,7 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
   const baseUrl = new URL(getRenderBaseUrl())
 
   /** A fresh page that may load only the app itself and Google Fonts. */
-  async function openPage(viewport = { height: 1400, width: 2200 }) {
+  async function openPage(viewport = { height: 1400, width: 2200 }, externalFonts = true) {
     // A remote session ends after its idle keep_alive; reconnect if it did.
     if (!browser.isConnected()) browser = await openBrowser()
     const context = await browser.newContext({ deviceScaleFactor: 1, viewport })
@@ -151,7 +155,7 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
       return url.protocol === 'data:' ||
         url.protocol === 'blob:' ||
         url.origin === baseUrl.origin ||
-        (GOOGLE_FONT_ORIGINS as readonly string[]).includes(url.origin)
+        (externalFonts && (GOOGLE_FONT_ORIGINS as readonly string[]).includes(url.origin))
         ? route.continue()
         : route.abort()
     })
@@ -160,6 +164,78 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
 
   return {
     close: () => browser.close(),
+    renderSnapshot: async (document) => {
+      const { context, page } = await openPage(undefined, false)
+      try {
+        await page.addInitScript(() => {
+          window.addEventListener('message', (event: MessageEvent<RenderResponse>) => {
+            if (
+              event.source === window &&
+              event.origin === location.origin &&
+              event.data.type === 'ready'
+            )
+              window.document.documentElement.dataset.renderReady = 'true'
+          })
+        })
+        const response = await page.goto(new URL(RENDER_FRAME_PATH, baseUrl).toString(), {
+          timeout: RENDER_TIMEOUT_MS,
+        })
+        if (!response?.ok()) throw new Error('Snapshot render page is unavailable.')
+        await page.waitForFunction(
+          () => window.document.documentElement.dataset.renderReady === 'true',
+          undefined,
+          { timeout: RENDER_TIMEOUT_MS }
+        )
+        const result = await page.evaluate(
+          ({ serializedDocument, timeout }) =>
+            new Promise<ExportResult>((resolve, reject) => {
+              const id = crypto.randomUUID()
+              const timer = setTimeout(() => {
+                window.removeEventListener('message', listener.receive)
+                reject(new Error('Snapshot rendering timed out.'))
+              }, timeout)
+              const listener = {
+                receive(event: MessageEvent<RenderResponse>) {
+                  if (
+                    event.source !== window ||
+                    event.origin !== location.origin ||
+                    !('id' in event.data) ||
+                    event.data.id !== id
+                  )
+                    return
+                  if (event.data.type !== 'error' && event.data.type !== 'result') return
+                  clearTimeout(timer)
+                  window.removeEventListener('message', listener.receive)
+                  if (event.data.type === 'error') {
+                    reject(new Error(event.data.message))
+                    return
+                  }
+                  const { blob, width, height } = event.data
+                  const reader = new FileReader()
+                  reader.onerror = () => reject(new Error('Snapshot bytes could not be read.'))
+                  reader.onload = () =>
+                    resolve({ base64: String(reader.result).split(',')[1], width, height })
+                  reader.readAsDataURL(blob)
+                },
+              }
+              window.addEventListener('message', listener.receive)
+              window.postMessage(
+                {
+                  type: 'render',
+                  id,
+                  document: JSON.parse(serializedDocument),
+                  output: { format: 'png', scale: 1, strict: true },
+                },
+                location.origin
+              )
+            }),
+          { serializedDocument: JSON.stringify(document), timeout: RENDER_TIMEOUT_MS }
+        )
+        return toRenderedDesign(result, { format: 'png' })
+      } finally {
+        await context.close()
+      }
+    },
     printCanvas: async (canvasId, organizationId, artboardIds) => {
       const { context, page } = await openPage()
       try {
@@ -195,7 +271,9 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
         await page.waitForFunction(() => window.__codeReady === true, undefined, {
           timeout: RENDER_TIMEOUT_MS,
         })
-        return toRenderedDesign(await page.evaluate(() => window.__exportCode!()), { format: 'png' })
+        return toRenderedDesign(await page.evaluate(() => window.__exportCode!()), {
+          format: 'png',
+        })
       } finally {
         await context.close()
       }

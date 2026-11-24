@@ -1,0 +1,26 @@
+[
+  {
+    "raw": "{\"z\":[],\"a\":{\"c\":null,\"b\":true}}",
+    "canonical": "{\"a\":{\"b\":true,\"c\":null},\"z\":[]}",
+    "domain": "shots.claim.v1",
+    "sha256": "6fc36340119f97976b704e2980107c96cad6794a522bbe687372ea537f5252e3"
+  },
+  {
+    "raw": "{\"n\":-0,\"max\":9007199254740991}",
+    "canonical": "{\"max\":9007199254740991,\"n\":0}",
+    "domain": "shots.claim.v1",
+    "sha256": "cb8ea4a8e34176c4214ca8da7566e5db7d79ab7a123283de239d06636d217b75"
+  },
+  {
+    "raw": "{\"\\ufffd\":1,\"\\ud83d\\ude00\":2,\"a\":3}",
+    "canonical": "{\"a\":3,\"😀\":2,\"�\":1}",
+    "domain": "shots.claim.v1",
+    "sha256": "94563e44bd9a87fc72be87c439a49e2f72fe3d344db3a9a8948772864e2cdcee"
+  },
+  {
+    "raw": "{\"audience\":\"café 日本語\",\"claims\":[\"b\",\"a\"],\"revision\":\"9007199254740999\"}",
+    "canonical": "{\"audience\":\"café 日本語\",\"claims\":[\"b\",\"a\"],\"revision\":\"9007199254740999\"}",
+    "domain": "shots.claim.v1",
+    "sha256": "7d89b27d823a98e1a5e6d2f610ea17ebb6b00aed2c7a33c84ba11704443b1223"
+  }
+]

@@ -32,7 +32,7 @@ import {
   useEditorVersion,
   useReadOnly,
 } from '@shots/platejs-editor/platejs/react'
-import { KEYS, type Value } from '@shots/platejs-editor/platejs'
+import { type Value } from '@shots/platejs-editor/platejs'
 import type { z } from 'zod'
 import type { socialMentionSchema } from '@/lib/api/contracts/social-mentions'
 import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
@@ -55,16 +55,7 @@ export const PostHeaderContext = React.createContext<(number: number) => React.R
   () => null
 )
 
-/** The draft for a document export: each post break after the first becomes a horizontal rule. */
-export function threadAsRules(value: Value): Value {
-  return value.flatMap((node, index) =>
-    node.type !== POST_BREAK
-      ? [node]
-      : index === 0
-        ? []
-        : [{ children: [{ text: '' }], type: KEYS.hr }]
-  )
-}
+export { threadAsRules } from '@/lib/content-drafts/export'
 
 /** Each post's [start, end) indexes, the break included at start. */
 export function postRanges(children: Value): [number, number][] {

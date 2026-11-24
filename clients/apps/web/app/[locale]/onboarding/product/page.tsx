@@ -42,9 +42,9 @@ export default async function OnboardingProductPage({ params }: OnboardingProduc
     redirect(getLocalizedPath(locale, '/'))
   }
   const [profile, icp, run] = await Promise.all([
-    getProductProfile(tenant).catch(() => null),
-    getIdealCustomerProfile(tenant).catch(() => null),
-    access.onboardingAgentEnabled ? getLatestOnboardingRun(tenant).catch(() => null) : null,
+    getProductProfile(tenant),
+    getIdealCustomerProfile(tenant),
+    access.onboardingAgentEnabled ? getLatestOnboardingRun(tenant) : null,
   ])
   return (
     <OnboardingShell

@@ -71,6 +71,10 @@ func (c *Configuration) authorizeAutomationAdmin(ctx context.Context, actor Acto
 // lockAutomationSource serializes activation, draft edits, and event admission
 // on the existing source row. No remote calls occur while this lock is held.
 func lockAutomationSource(ctx context.Context, tx *ent.Tx, org, id string) (*ent.SourceApp, error) {
+	// Foreign-key writes need this lock too; take it before the source to match human commands.
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, org); err != nil {
+		return nil, err
+	}
 	n, err := tx.SourceApp.Update().Where(sourceapp.ID(id), sourceapp.OrganizationID(org)).SetUpdatedAt(time.Now()).Save(ctx)
 	if err != nil {
 		return nil, err

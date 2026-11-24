@@ -113,7 +113,7 @@ func (Asset) Edges() []ent.Edge {
 	return []ent.Edge{edge.From("variants", CreativeVariant.Type).Ref("source_asset")}
 }
 func (Asset) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("object_key").Unique(), index.Fields("organization_id", "created_at"), index.Fields("parent_asset_id")}
+	return []ent.Index{index.Fields("object_key").Unique(), index.Fields("organization_id", "id").Unique(), index.Fields("organization_id", "created_at"), index.Fields("parent_asset_id")}
 }
 
 // WorkspaceDeletion is a read-only projection used to block publications during deletion.

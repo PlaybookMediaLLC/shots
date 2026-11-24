@@ -89,7 +89,7 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                       title: toolLabel(STORE_SCREENSHOTS.href),
                       description: 'Prepare store listings across devices, sizes and languages.',
                       href: STORE_SCREENSHOTS.href,
-                      scope: 'App Store studio · On this browser',
+                      scope: 'App Store studio · Browser and workspace projects',
                       pages: [
                         { kind: 'phone', ratio: '9:16' },
                         { kind: 'phone', ratio: '9:16' },

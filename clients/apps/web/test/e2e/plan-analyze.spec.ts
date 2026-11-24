@@ -93,7 +93,9 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.getByTestId('available-slot').first().click()
     await expect(page.getByRole('dialog').getByTestId('schedule-zone')).toContainText('New York')
     await expect(page.getByLabel('Time', { exact: true })).toHaveValue('9:15 AM')
+    await expect(page.getByRole('combobox', { name: 'Composer social account' })).toBeFocused()
     await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
     await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByTestId('available-slot').first()).toBeVisible()
     await expect(page.getByTestId('available-slot').first().locator('..')).toHaveCSS(

@@ -89,6 +89,11 @@ func AiAgentEnabled(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiAgentEnabled, v))
 }
 
+// ReleaseReadinessEnabled applies equality check predicate on the "release_readiness_enabled" field. It's identical to ReleaseReadinessEnabledEQ.
+func ReleaseReadinessEnabled(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldReleaseReadinessEnabled, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldCreatedAt, v))
@@ -377,6 +382,16 @@ func AiAgentEnabledEQ(v bool) predicate.WorkspaceSettings {
 // AiAgentEnabledNEQ applies the NEQ predicate on the "ai_agent_enabled" field.
 func AiAgentEnabledNEQ(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldAiAgentEnabled, v))
+}
+
+// ReleaseReadinessEnabledEQ applies the EQ predicate on the "release_readiness_enabled" field.
+func ReleaseReadinessEnabledEQ(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldReleaseReadinessEnabled, v))
+}
+
+// ReleaseReadinessEnabledNEQ applies the NEQ predicate on the "release_readiness_enabled" field.
+func ReleaseReadinessEnabledNEQ(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldReleaseReadinessEnabled, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

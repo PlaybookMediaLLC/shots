@@ -294,6 +294,14 @@ export const releaseUpdateSchema = z
 
 export const releaseListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  search: z.string().trim().max(200).optional(),
+})
+
+/** Bounded campaign discovery; omitted input retains the existing collection behavior. */
+export const campaignListQuerySchema = z.object({
+  limit: z.number().int().min(1).max(100),
+  search: z.string().trim().max(200).optional(),
+  sort: z.literal('updated').optional(),
 })
 
 /** Source providers whose webhooks have their own conventions; any other slug is generic. */

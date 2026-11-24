@@ -23,6 +23,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasefacts"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
@@ -249,11 +250,38 @@ type ConfigurationStore interface {
 	StoreGeneratedAsset(context.Context, product.Actor, product.GeneratedAssetInput) (*product.GeneratedAssetRecord, error)
 	ConsumeWorkspaceQuota(context.Context, product.Actor, string, int) (int, error)
 	CreateScheduledPost(context.Context, product.Actor, publishing.CreateScheduledPostInput) (publishing.CreateScheduledPostResult, error)
-	ListReleases(context.Context, product.Actor, int) ([]product.ReleaseListItem, error)
+	ListReleases(context.Context, product.Actor, int, ...string) ([]product.ReleaseListItem, error)
 	GetRelease(context.Context, product.Actor, string) (*product.ReleaseDetail, error)
+	CreateReleaseEvidence(context.Context, product.Actor, string, string, product.CreateReleaseEvidenceInput) (*product.ReadinessMutation, error)
+	LinkReleaseEvidence(context.Context, product.Actor, string, string, product.LinkReleaseEvidenceInput) (*product.ReadinessMutation, error)
+	ChangeEvidenceAccess(context.Context, product.Actor, string, string, product.ChangeEvidenceAccessInput) (*product.ReadinessMutation, error)
+	SaveReleaseClaim(context.Context, product.Actor, string, string, product.SaveReleaseClaimInput) (*product.ReadinessMutation, error)
+	SetClaimSupports(context.Context, product.Actor, string, string, string, product.SetClaimSupportsInput) (*product.ReadinessMutation, error)
+	VerifyReleaseClaim(context.Context, product.Actor, string, string, string, product.VerifyReleaseClaimInput) (*product.ReadinessMutation, error)
+	ImportReleaseSpecClaims(context.Context, product.Actor, string, string, product.ImportReleaseSpecInput) (*product.ReadinessMutation, error)
+	ListReleaseEvidence(context.Context, product.Actor, string, string) (*product.ReleaseEvidencePage, error)
+	ListReleaseClaims(context.Context, product.Actor, string, string) (*product.ReleaseClaimsPage, error)
+	CreateReleaseKitRevision(context.Context, product.Actor, string, string, product.CreateReleaseKitInput) (*product.ReadinessMutation, error)
+	PrepareReleaseKit(context.Context, product.Actor, string, string, string, product.PrepareReleaseKitInput) (*product.ReadinessMutation, error)
+	DecideReleaseKit(context.Context, product.Actor, string, string, string, product.DecideReleaseKitInput) (*product.ReadinessMutation, error)
+	RequestKitExport(context.Context, product.Actor, string, string, string, product.RequestKitExportInput) (*product.ReadinessMutation, error)
+	GetReleaseKit(context.Context, product.Actor, string, string) (*product.ReleaseKitDetail, error)
+	ReadKitExportDownload(context.Context, string, string, string, string) ([]byte, error)
+	GetKitArtifactPreview(context.Context, product.Actor, string, string, string) (*product.KitArtifactPreview, error)
+	GetKitExport(context.Context, product.Actor, string, string, bool) (*product.KitExportRecord, error)
+	GetReleaseQualification(context.Context, product.Actor, string) (*product.ReleaseQualificationDetail, error)
+	GetQualificationRevision(context.Context, product.Actor, string, string) (*product.QualificationRevision, error)
+	CreateQualificationRevision(context.Context, product.Actor, string, string, product.CreateQualificationInput) (*releasefacts.Result, error)
+	DecideQualification(context.Context, product.Actor, string, string, product.DecideQualificationInput) (*releasefacts.Result, error)
+	ListReleaseSources(context.Context, product.Actor, string, string) (*product.ReleaseSourcePage, error)
+	GetReleaseSourceHistory(context.Context, product.Actor, string, string) (*product.ReleaseSourceHistory, error)
+	SelectReleaseSources(context.Context, product.Actor, string, product.SelectReleaseSourcesInput) (*product.ReleaseSourceSelection, error)
+	GetReleaseLineage(context.Context, product.Actor, string, string) (*product.ReleaseLineageHistory, error)
+	MergeRelease(context.Context, product.Actor, string, string, product.MergeReleaseInput) (*product.ReleaseLineageResult, error)
+	SplitRelease(context.Context, product.Actor, string, string, product.SplitReleaseInput) (*product.ReleaseLineageResult, error)
 	CreateRelease(context.Context, product.Actor, product.CreateReleaseInput) (*product.ReleaseCreation, error)
 	UpdateRelease(context.Context, product.Actor, string, product.UpdateReleaseInput) (*product.ReleaseDetail, error)
-	ListCampaigns(context.Context, product.Actor) ([]product.CampaignItem, error)
+	ListCampaigns(context.Context, product.Actor, ...product.CampaignListFilter) ([]product.CampaignItem, error)
 	ListPendingApprovals(context.Context, product.Actor, int, string) (*product.ApprovalPage, error)
 	DescribeAgentClient(context.Context, product.Actor, product.AgentAuthorizationRequest) (*product.AgentConsent, error)
 	ApproveAgentAccess(context.Context, product.Actor, product.AgentAuthorizationRequest) (*product.AgentAuthorizationCode, error)
@@ -844,7 +872,26 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	var prohibited *product.ProhibitedTermsError
 	var atLimit *product.PlanLimitError
 	var provider *socialapi.Error
+	var qualification *product.QualificationError
+	var kitReadiness *product.KitReadinessError
+	var sourceSelection *product.SourceSelectionError
 	switch {
+	case errors.As(err, &kitReadiness):
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "conflict", "error": err.Error(), "message": err.Error(), "status": http.StatusConflict, "details": kitReadiness})
+	case errors.As(err, &sourceSelection):
+		status, code := http.StatusConflict, "conflict"
+		if errors.Is(err, publishing.ErrForbidden) {
+			status, code = http.StatusForbidden, "forbidden"
+		}
+		writeJSON(w, status, map[string]any{"code": code, "error": err.Error(), "message": err.Error(), "status": status, "details": sourceSelection})
+	case errors.As(err, &qualification):
+		status, code := http.StatusConflict, "conflict"
+		if errors.Is(err, publishing.ErrForbidden) {
+			status, code = http.StatusForbidden, "forbidden"
+		} else if errors.Is(err, product.ErrStorageUnavailable) {
+			status, code = http.StatusServiceUnavailable, "upstream_unavailable"
+		}
+		writeJSON(w, status, map[string]any{"code": code, "error": err.Error(), "message": err.Error(), "status": status, "details": qualification})
 	case errors.As(err, &prohibited):
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"code": "brand_prohibited_terms", "error": err.Error(), "matches": prohibited.Matches,

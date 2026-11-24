@@ -643,6 +643,8 @@ func href(kind, id string, row map[string]any) string {
 		return ""
 	case "campaign":
 		return "/campaigns/" + id + "/copy"
+	case "release":
+		return "/releases/" + id
 	case "frontend_source":
 		return "/workflows/deployments?source=" + url.QueryEscape(id)
 	case "frontend_activation":

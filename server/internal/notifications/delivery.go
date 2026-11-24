@@ -324,6 +324,13 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 			wanted[id] = true
 		}
 	}
+	// Qualification handoffs belong to the named owner and reviewer, not campaign authors.
+	if d.Audience == "qualification_participants" {
+		wanted = map[string]bool{}
+		for _, id := range stringsFrom(e.payload["recipientUserIds"]) {
+			wanted[id] = true
+		}
+	}
 	actor := textValue(e.payload, "actorUserId")
 	if d.MandatoryFailure && actor != "" {
 		wanted[actor] = true

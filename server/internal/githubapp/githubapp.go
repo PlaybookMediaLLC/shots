@@ -64,6 +64,7 @@ type PullRequest struct {
 	BodyHTML     string     `json:"body_html"`
 	HTMLURL      string     `json:"html_url"`
 	MergedAt     *time.Time `json:"merged_at"`
+	UpdatedAt    *time.Time `json:"updated_at"`
 	Base         struct {
 		Ref string `json:"ref"`
 	} `json:"base"`

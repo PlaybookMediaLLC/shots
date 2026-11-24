@@ -34,6 +34,8 @@ var Catalogue = catalogue([]Definition{
 	{ID: "frontend.needs_attention", Label: "Production deployment needs attention", Group: "deployments", Audience: "workspace"},
 	{ID: "frontend.rollback", Label: "Production rollback reported; inspect activation evidence", Group: "deployments", Audience: "workspace"},
 	{ID: "release.created", Label: "Release created", Group: "releases", Audience: "creators", Restricted: false, EmailDefault: false},
+	{ID: "release.qualification_changed", Label: "Release facts updated", Group: "releases", Audience: "qualification_participants", Restricted: true, EmailDefault: false},
+	{ID: "release.readiness_changed", Label: "Release readiness updated", Group: "releases", Audience: "qualification_participants", Restricted: true, EmailDefault: false},
 	{ID: "release.ingested", Label: "Release received", Group: "releases", Audience: "creators", Restricted: false, EmailDefault: false},
 	{ID: "source_change.collected", Label: "Repository changes received", Group: "releases", Audience: "creators", Restricted: false, EmailDefault: false},
 	{ID: "source_app.connected", Label: "Repository connected", Group: "integrations", Audience: "admins", Restricted: false, EmailDefault: false},
@@ -121,6 +123,8 @@ func Emit(ctx context.Context, tx *ent.Tx, org, kind, resourceType, resourceID, 
 
 func catalogue(definitions []Definition) []Definition {
 	sources := map[string]string{
+		"release.qualification_changed": "CreateQualificationRevision / DecideQualification / invalidateReleaseQualification",
+		"release.readiness_changed":     "materialCommand",
 		"frontend.connection_attention": "saveFrontendPollState", "frontend.succeeded": "emitFrontendDecision", "frontend.checks_passed": "emitFrontendDecision", "frontend.failed": "emitFrontendDecision", "frontend.needs_attention": "emitFrontendDecision", "frontend.rollback": "emitFrontendDecision",
 		"release.created": "CreateRelease", "release.ingested": "IngestSourceRelease", "source_change.collected": "CollectSourceChange", "source_app.connected": "CreateSourceApp", "deployment.succeeded": "IngestDeployment",
 		"capture.completed": "recordCapture", "capture.failed": "captureDeployment / failCapture", "capture.needs_auth": "parkCaptureJob", "asset.uploaded": "CompleteAssetUpload", "asset.generated": "StoreGeneratedAsset",

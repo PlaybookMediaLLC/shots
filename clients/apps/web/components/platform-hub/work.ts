@@ -31,7 +31,7 @@ export type WorkItem = {
   id: string
   href: string
   title: string
-  type: 'Screenshot' | 'Canvas' | 'Post'
+  type: 'Screenshot' | 'Canvas' | 'Post' | 'Release' | 'Campaign'
   scope: string
   updatedAt: Date
   /** A visual's first design, drawn as its thumbnail. */
@@ -51,12 +51,14 @@ export type WorkItem = {
 export async function loadWork(
   client: ReturnType<typeof useTRPCClient>,
   {
+    campaignsEnabled = false,
     draftsEnabled,
     limit,
     paidPlan,
     search,
     signal,
   }: {
+    campaignsEnabled?: boolean
     draftsEnabled: boolean
     limit: number
     paidPlan: boolean
@@ -117,6 +119,34 @@ export async function loadWork(
   const results = await Promise.allSettled([
     ...(paidPlan ? visuals() : []),
     draftsEnabled ? posts() : Promise.resolve([]),
+    ...(paidPlan && campaignsEnabled
+      ? [
+          client.release.list
+            .query({ limit, search }, { signal })
+            .then(({ releases }): WorkItem[] =>
+              releases.map((item) => ({
+                id: item.id,
+                href: `/releases/${item.id}`,
+                title: item.title,
+                type: 'Release',
+                scope: 'Workspace',
+                updatedAt: new Date(item.updatedAt),
+              }))
+            ),
+          client.campaign.list
+            .query({ limit, search, sort: 'updated' }, { signal })
+            .then(({ campaigns }): WorkItem[] =>
+              campaigns.map((item) => ({
+                id: item.id,
+                href: `/campaigns/${item.id}`,
+                title: item.name,
+                type: 'Campaign',
+                scope: 'Workspace',
+                updatedAt: new Date(item.updatedAt),
+              }))
+            ),
+        ]
+      : []),
   ])
   return {
     partial: results.some((result) => result.status === 'rejected'),
@@ -134,14 +164,19 @@ export function recentWorkQuery(
   client: ReturnType<typeof useTRPCClient>,
   organizationId: string,
   draftsEnabled: boolean,
-  paidPlan: boolean
+  paidPlan: boolean,
+  campaignsEnabled = false
 ) {
   return {
-    queryKey: [...RECENT_WORK_KEY, organizationId, draftsEnabled, paidPlan],
+    queryKey: [...RECENT_WORK_KEY, organizationId, draftsEnabled, paidPlan, campaignsEnabled],
     staleTime: 30_000,
-    queryFn: async ({ signal }: { signal: AbortSignal }) => {
-      const work = await loadWork(client, { draftsEnabled, limit: 5, paidPlan, signal })
-      return { ...work, items: work.items.slice(0, 8) }
-    },
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      loadWork(client, {
+        campaignsEnabled,
+        draftsEnabled,
+        limit: 5,
+        paidPlan,
+        signal,
+      }),
   }
 }

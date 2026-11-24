@@ -34,6 +34,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimpathbinding"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupportset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimverification"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
@@ -53,6 +57,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/enrichmentrecord"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceclearance"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidencesource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendactivation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendsource"
@@ -65,6 +72,13 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/idealcustomerprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/integrationconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/invitation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitexport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitmember"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitreviewdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitsourcepin"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrunstep"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
@@ -104,14 +118,27 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/projectversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/readinesscommandreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	entreleaseautomation "github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationexecutor"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaimversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasedocument"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseevidence"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasekit"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaselineage"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalification"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationasset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationsource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasereadiness"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourcebinding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasespec"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
@@ -526,6 +553,40 @@ func init() {
 	channelconnection.DefaultUpdatedAt = channelconnectionDescUpdatedAt.Default.(func() time.Time)
 	// channelconnection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	channelconnection.UpdateDefaultUpdatedAt = channelconnectionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	claimpathbindingFields := schema.ClaimPathBinding{}.Fields()
+	_ = claimpathbindingFields
+	// claimpathbindingDescCreatedAt is the schema descriptor for created_at field.
+	claimpathbindingDescCreatedAt := claimpathbindingFields[7].Descriptor()
+	// claimpathbinding.DefaultCreatedAt holds the default value on creation for the created_at field.
+	claimpathbinding.DefaultCreatedAt = claimpathbindingDescCreatedAt.Default.(func() time.Time)
+	claimsupportFields := schema.ClaimSupport{}.Fields()
+	_ = claimsupportFields
+	// claimsupportDescExclusionReason is the schema descriptor for exclusion_reason field.
+	claimsupportDescExclusionReason := claimsupportFields[10].Descriptor()
+	// claimsupport.DefaultExclusionReason holds the default value on creation for the exclusion_reason field.
+	claimsupport.DefaultExclusionReason = claimsupportDescExclusionReason.Default.(string)
+	// claimsupportDescCreatedAt is the schema descriptor for created_at field.
+	claimsupportDescCreatedAt := claimsupportFields[11].Descriptor()
+	// claimsupport.DefaultCreatedAt holds the default value on creation for the created_at field.
+	claimsupport.DefaultCreatedAt = claimsupportDescCreatedAt.Default.(func() time.Time)
+	claimsupportsetFields := schema.ClaimSupportSet{}.Fields()
+	_ = claimsupportsetFields
+	// claimsupportsetDescVersion is the schema descriptor for version field.
+	claimsupportsetDescVersion := claimsupportsetFields[5].Descriptor()
+	// claimsupportset.DefaultVersion holds the default value on creation for the version field.
+	claimsupportset.DefaultVersion = claimsupportsetDescVersion.Default.(int64)
+	// claimsupportset.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	claimsupportset.VersionValidator = claimsupportsetDescVersion.Validators[0].(func(int64) error)
+	// claimsupportsetDescCreatedAt is the schema descriptor for created_at field.
+	claimsupportsetDescCreatedAt := claimsupportsetFields[9].Descriptor()
+	// claimsupportset.DefaultCreatedAt holds the default value on creation for the created_at field.
+	claimsupportset.DefaultCreatedAt = claimsupportsetDescCreatedAt.Default.(func() time.Time)
+	claimverificationFields := schema.ClaimVerification{}.Fields()
+	_ = claimverificationFields
+	// claimverificationDescCreatedAt is the schema descriptor for created_at field.
+	claimverificationDescCreatedAt := claimverificationFields[13].Descriptor()
+	// claimverification.DefaultCreatedAt holds the default value on creation for the created_at field.
+	claimverification.DefaultCreatedAt = claimverificationDescCreatedAt.Default.(func() time.Time)
 	communicationattemptFields := schema.CommunicationAttempt{}.Fields()
 	_ = communicationattemptFields
 	// communicationattemptDescStartedAt is the schema descriptor for started_at field.
@@ -814,6 +875,66 @@ func init() {
 	enrichmentrecord.DefaultUpdatedAt = enrichmentrecordDescUpdatedAt.Default.(func() time.Time)
 	// enrichmentrecord.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	enrichmentrecord.UpdateDefaultUpdatedAt = enrichmentrecordDescUpdatedAt.UpdateDefault.(func() time.Time)
+	evidenceclearanceFields := schema.EvidenceClearance{}.Fields()
+	_ = evidenceclearanceFields
+	// evidenceclearanceDescCreatedAt is the schema descriptor for created_at field.
+	evidenceclearanceDescCreatedAt := evidenceclearanceFields[7].Descriptor()
+	// evidenceclearance.DefaultCreatedAt holds the default value on creation for the created_at field.
+	evidenceclearance.DefaultCreatedAt = evidenceclearanceDescCreatedAt.Default.(func() time.Time)
+	evidencesourceFields := schema.EvidenceSource{}.Fields()
+	_ = evidencesourceFields
+	// evidencesourceDescChangeSequence is the schema descriptor for change_sequence field.
+	evidencesourceDescChangeSequence := evidencesourceFields[6].Descriptor()
+	// evidencesource.DefaultChangeSequence holds the default value on creation for the change_sequence field.
+	evidencesource.DefaultChangeSequence = evidencesourceDescChangeSequence.Default.(int64)
+	// evidencesource.ChangeSequenceValidator is a validator for the "change_sequence" field. It is called by the builders before save.
+	evidencesource.ChangeSequenceValidator = evidencesourceDescChangeSequence.Validators[0].(func(int64) error)
+	// evidencesourceDescCreatedAt is the schema descriptor for created_at field.
+	evidencesourceDescCreatedAt := evidencesourceFields[11].Descriptor()
+	// evidencesource.DefaultCreatedAt holds the default value on creation for the created_at field.
+	evidencesource.DefaultCreatedAt = evidencesourceDescCreatedAt.Default.(func() time.Time)
+	evidenceversionFields := schema.EvidenceVersion{}.Fields()
+	_ = evidenceversionFields
+	// evidenceversionDescVersion is the schema descriptor for version field.
+	evidenceversionDescVersion := evidenceversionFields[3].Descriptor()
+	// evidenceversion.DefaultVersion holds the default value on creation for the version field.
+	evidenceversion.DefaultVersion = evidenceversionDescVersion.Default.(int64)
+	// evidenceversion.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	evidenceversion.VersionValidator = evidenceversionDescVersion.Validators[0].(func(int64) error)
+	// evidenceversionDescProviderRevision is the schema descriptor for provider_revision field.
+	evidenceversionDescProviderRevision := evidenceversionFields[12].Descriptor()
+	// evidenceversion.DefaultProviderRevision holds the default value on creation for the provider_revision field.
+	evidenceversion.DefaultProviderRevision = evidenceversionDescProviderRevision.Default.(string)
+	// evidenceversionDescByteLength is the schema descriptor for byte_length field.
+	evidenceversionDescByteLength := evidenceversionFields[13].Descriptor()
+	// evidenceversion.DefaultByteLength holds the default value on creation for the byte_length field.
+	evidenceversion.DefaultByteLength = evidenceversionDescByteLength.Default.(int64)
+	// evidenceversion.ByteLengthValidator is a validator for the "byte_length" field. It is called by the builders before save.
+	evidenceversion.ByteLengthValidator = evidenceversionDescByteLength.Validators[0].(func(int64) error)
+	// evidenceversionDescImageWidth is the schema descriptor for image_width field.
+	evidenceversionDescImageWidth := evidenceversionFields[14].Descriptor()
+	// evidenceversion.DefaultImageWidth holds the default value on creation for the image_width field.
+	evidenceversion.DefaultImageWidth = evidenceversionDescImageWidth.Default.(int)
+	// evidenceversion.ImageWidthValidator is a validator for the "image_width" field. It is called by the builders before save.
+	evidenceversion.ImageWidthValidator = evidenceversionDescImageWidth.Validators[0].(func(int) error)
+	// evidenceversionDescImageHeight is the schema descriptor for image_height field.
+	evidenceversionDescImageHeight := evidenceversionFields[15].Descriptor()
+	// evidenceversion.DefaultImageHeight holds the default value on creation for the image_height field.
+	evidenceversion.DefaultImageHeight = evidenceversionDescImageHeight.Default.(int)
+	// evidenceversion.ImageHeightValidator is a validator for the "image_height" field. It is called by the builders before save.
+	evidenceversion.ImageHeightValidator = evidenceversionDescImageHeight.Validators[0].(func(int) error)
+	// evidenceversionDescAttestationScope is the schema descriptor for attestation_scope field.
+	evidenceversionDescAttestationScope := evidenceversionFields[21].Descriptor()
+	// evidenceversion.DefaultAttestationScope holds the default value on creation for the attestation_scope field.
+	evidenceversion.DefaultAttestationScope = evidenceversionDescAttestationScope.Default.(string)
+	// evidenceversionDescLimitations is the schema descriptor for limitations field.
+	evidenceversionDescLimitations := evidenceversionFields[22].Descriptor()
+	// evidenceversion.DefaultLimitations holds the default value on creation for the limitations field.
+	evidenceversion.DefaultLimitations = evidenceversionDescLimitations.Default.(string)
+	// evidenceversionDescCreatedAt is the schema descriptor for created_at field.
+	evidenceversionDescCreatedAt := evidenceversionFields[24].Descriptor()
+	// evidenceversion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	evidenceversion.DefaultCreatedAt = evidenceversionDescCreatedAt.Default.(func() time.Time)
 	frontendactivationFields := schema.FrontendActivation{}.Fields()
 	_ = frontendactivationFields
 	// frontendactivationDescCommitSha is the schema descriptor for commit_sha field.
@@ -1040,6 +1161,118 @@ func init() {
 	invitationDescCreatedAt := invitationFields[6].Descriptor()
 	// invitation.DefaultCreatedAt holds the default value on creation for the created_at field.
 	invitation.DefaultCreatedAt = invitationDescCreatedAt.Default.(func() time.Time)
+	kitartifactclaimFields := schema.KitArtifactClaim{}.Fields()
+	_ = kitartifactclaimFields
+	// kitartifactclaimDescCreatedAt is the schema descriptor for created_at field.
+	kitartifactclaimDescCreatedAt := kitartifactclaimFields[9].Descriptor()
+	// kitartifactclaim.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitartifactclaim.DefaultCreatedAt = kitartifactclaimDescCreatedAt.Default.(func() time.Time)
+	kitartifactrevisionFields := schema.KitArtifactRevision{}.Fields()
+	_ = kitartifactrevisionFields
+	// kitartifactrevisionDescOutputBytes is the schema descriptor for output_bytes field.
+	kitartifactrevisionDescOutputBytes := kitartifactrevisionFields[12].Descriptor()
+	// kitartifactrevision.DefaultOutputBytes holds the default value on creation for the output_bytes field.
+	kitartifactrevision.DefaultOutputBytes = kitartifactrevisionDescOutputBytes.Default.(int64)
+	// kitartifactrevision.OutputBytesValidator is a validator for the "output_bytes" field. It is called by the builders before save.
+	kitartifactrevision.OutputBytesValidator = kitartifactrevisionDescOutputBytes.Validators[0].(func(int64) error)
+	// kitartifactrevisionDescMediaType is the schema descriptor for media_type field.
+	kitartifactrevisionDescMediaType := kitartifactrevisionFields[13].Descriptor()
+	// kitartifactrevision.DefaultMediaType holds the default value on creation for the media_type field.
+	kitartifactrevision.DefaultMediaType = kitartifactrevisionDescMediaType.Default.(string)
+	// kitartifactrevisionDescRendererVersion is the schema descriptor for renderer_version field.
+	kitartifactrevisionDescRendererVersion := kitartifactrevisionFields[14].Descriptor()
+	// kitartifactrevision.DefaultRendererVersion holds the default value on creation for the renderer_version field.
+	kitartifactrevision.DefaultRendererVersion = kitartifactrevisionDescRendererVersion.Default.(string)
+	// kitartifactrevisionDescCreatedAt is the schema descriptor for created_at field.
+	kitartifactrevisionDescCreatedAt := kitartifactrevisionFields[16].Descriptor()
+	// kitartifactrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitartifactrevision.DefaultCreatedAt = kitartifactrevisionDescCreatedAt.Default.(func() time.Time)
+	kitexportFields := schema.KitExport{}.Fields()
+	_ = kitexportFields
+	// kitexportDescExportVersion is the schema descriptor for export_version field.
+	kitexportDescExportVersion := kitexportFields[6].Descriptor()
+	// kitexport.DefaultExportVersion holds the default value on creation for the export_version field.
+	kitexport.DefaultExportVersion = kitexportDescExportVersion.Default.(int)
+	// kitexport.ExportVersionValidator is a validator for the "export_version" field. It is called by the builders before save.
+	kitexport.ExportVersionValidator = kitexportDescExportVersion.Validators[0].(func(int) error)
+	// kitexportDescBytes is the schema descriptor for bytes field.
+	kitexportDescBytes := kitexportFields[11].Descriptor()
+	// kitexport.DefaultBytes holds the default value on creation for the bytes field.
+	kitexport.DefaultBytes = kitexportDescBytes.Default.(int64)
+	// kitexport.BytesValidator is a validator for the "bytes" field. It is called by the builders before save.
+	kitexport.BytesValidator = kitexportDescBytes.Validators[0].(func(int64) error)
+	// kitexportDescFailureCode is the schema descriptor for failure_code field.
+	kitexportDescFailureCode := kitexportFields[13].Descriptor()
+	// kitexport.DefaultFailureCode holds the default value on creation for the failure_code field.
+	kitexport.DefaultFailureCode = kitexportDescFailureCode.Default.(string)
+	// kitexportDescCreatedAt is the schema descriptor for created_at field.
+	kitexportDescCreatedAt := kitexportFields[14].Descriptor()
+	// kitexport.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitexport.DefaultCreatedAt = kitexportDescCreatedAt.Default.(func() time.Time)
+	kitmemberFields := schema.KitMember{}.Fields()
+	_ = kitmemberFields
+	// kitmemberDescDisplayOrder is the schema descriptor for display_order field.
+	kitmemberDescDisplayOrder := kitmemberFields[7].Descriptor()
+	// kitmember.DisplayOrderValidator is a validator for the "display_order" field. It is called by the builders before save.
+	kitmember.DisplayOrderValidator = kitmemberDescDisplayOrder.Validators[0].(func(int) error)
+	// kitmemberDescCreatedAt is the schema descriptor for created_at field.
+	kitmemberDescCreatedAt := kitmemberFields[8].Descriptor()
+	// kitmember.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitmember.DefaultCreatedAt = kitmemberDescCreatedAt.Default.(func() time.Time)
+	kitreviewdecisionFields := schema.KitReviewDecision{}.Fields()
+	_ = kitreviewdecisionFields
+	// kitreviewdecisionDescPolicyVersion is the schema descriptor for policy_version field.
+	kitreviewdecisionDescPolicyVersion := kitreviewdecisionFields[8].Descriptor()
+	// kitreviewdecision.PolicyVersionValidator is a validator for the "policy_version" field. It is called by the builders before save.
+	kitreviewdecision.PolicyVersionValidator = kitreviewdecisionDescPolicyVersion.Validators[0].(func(int) error)
+	// kitreviewdecisionDescAssertionsConfirmed is the schema descriptor for assertions_confirmed field.
+	kitreviewdecisionDescAssertionsConfirmed := kitreviewdecisionFields[12].Descriptor()
+	// kitreviewdecision.DefaultAssertionsConfirmed holds the default value on creation for the assertions_confirmed field.
+	kitreviewdecision.DefaultAssertionsConfirmed = kitreviewdecisionDescAssertionsConfirmed.Default.(bool)
+	// kitreviewdecisionDescScreenshotsConfirmed is the schema descriptor for screenshots_confirmed field.
+	kitreviewdecisionDescScreenshotsConfirmed := kitreviewdecisionFields[13].Descriptor()
+	// kitreviewdecision.DefaultScreenshotsConfirmed holds the default value on creation for the screenshots_confirmed field.
+	kitreviewdecision.DefaultScreenshotsConfirmed = kitreviewdecisionDescScreenshotsConfirmed.Default.(bool)
+	// kitreviewdecisionDescAudienceConfirmed is the schema descriptor for audience_confirmed field.
+	kitreviewdecisionDescAudienceConfirmed := kitreviewdecisionFields[14].Descriptor()
+	// kitreviewdecision.DefaultAudienceConfirmed holds the default value on creation for the audience_confirmed field.
+	kitreviewdecision.DefaultAudienceConfirmed = kitreviewdecisionDescAudienceConfirmed.Default.(bool)
+	// kitreviewdecisionDescCreatedAt is the schema descriptor for created_at field.
+	kitreviewdecisionDescCreatedAt := kitreviewdecisionFields[15].Descriptor()
+	// kitreviewdecision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitreviewdecision.DefaultCreatedAt = kitreviewdecisionDescCreatedAt.Default.(func() time.Time)
+	kitrevisionFields := schema.KitRevision{}.Fields()
+	_ = kitrevisionFields
+	// kitrevisionDescVersion is the schema descriptor for version field.
+	kitrevisionDescVersion := kitrevisionFields[4].Descriptor()
+	// kitrevision.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	kitrevision.VersionValidator = kitrevisionDescVersion.Validators[0].(func(int64) error)
+	// kitrevisionDescManifestSha256 is the schema descriptor for manifest_sha256 field.
+	kitrevisionDescManifestSha256 := kitrevisionFields[10].Descriptor()
+	// kitrevision.DefaultManifestSha256 holds the default value on creation for the manifest_sha256 field.
+	kitrevision.DefaultManifestSha256 = kitrevisionDescManifestSha256.Default.(string)
+	// kitrevisionDescManifestCanonical is the schema descriptor for manifest_canonical field.
+	kitrevisionDescManifestCanonical := kitrevisionFields[11].Descriptor()
+	// kitrevision.DefaultManifestCanonical holds the default value on creation for the manifest_canonical field.
+	kitrevision.DefaultManifestCanonical = kitrevisionDescManifestCanonical.Default.(string)
+	// kitrevisionDescFailureCode is the schema descriptor for failure_code field.
+	kitrevisionDescFailureCode := kitrevisionFields[13].Descriptor()
+	// kitrevision.DefaultFailureCode holds the default value on creation for the failure_code field.
+	kitrevision.DefaultFailureCode = kitrevisionDescFailureCode.Default.(string)
+	// kitrevisionDescCreatedAt is the schema descriptor for created_at field.
+	kitrevisionDescCreatedAt := kitrevisionFields[15].Descriptor()
+	// kitrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitrevision.DefaultCreatedAt = kitrevisionDescCreatedAt.Default.(func() time.Time)
+	kitsourcepinFields := schema.KitSourcePin{}.Fields()
+	_ = kitsourcepinFields
+	// kitsourcepinDescAcknowledgedSequence is the schema descriptor for acknowledged_sequence field.
+	kitsourcepinDescAcknowledgedSequence := kitsourcepinFields[5].Descriptor()
+	// kitsourcepin.AcknowledgedSequenceValidator is a validator for the "acknowledged_sequence" field. It is called by the builders before save.
+	kitsourcepin.AcknowledgedSequenceValidator = kitsourcepinDescAcknowledgedSequence.Validators[0].(func(int64) error)
+	// kitsourcepinDescCreatedAt is the schema descriptor for created_at field.
+	kitsourcepinDescCreatedAt := kitsourcepinFields[7].Descriptor()
+	// kitsourcepin.DefaultCreatedAt holds the default value on creation for the created_at field.
+	kitsourcepin.DefaultCreatedAt = kitsourcepinDescCreatedAt.Default.(func() time.Time)
 	launchrunFields := schema.LaunchRun{}.Fields()
 	_ = launchrunFields
 	// launchrunDescStartedAt is the schema descriptor for started_at field.
@@ -1722,6 +1955,34 @@ func init() {
 	publicationattemptDescStartedAt := publicationattemptFields[4].Descriptor()
 	// publicationattempt.DefaultStartedAt holds the default value on creation for the started_at field.
 	publicationattempt.DefaultStartedAt = publicationattemptDescStartedAt.Default.(func() time.Time)
+	readinesscommandreceiptFields := schema.ReadinessCommandReceipt{}.Fields()
+	_ = readinesscommandreceiptFields
+	// readinesscommandreceiptDescCommandKey is the schema descriptor for command_key field.
+	readinesscommandreceiptDescCommandKey := readinesscommandreceiptFields[6].Descriptor()
+	// readinesscommandreceipt.CommandKeyValidator is a validator for the "command_key" field. It is called by the builders before save.
+	readinesscommandreceipt.CommandKeyValidator = func() func(string) error {
+		validators := readinesscommandreceiptDescCommandKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(command_key string) error {
+			for _, fn := range fns {
+				if err := fn(command_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// readinesscommandreceiptDescRequestSha256 is the schema descriptor for request_sha256 field.
+	readinesscommandreceiptDescRequestSha256 := readinesscommandreceiptFields[7].Descriptor()
+	// readinesscommandreceipt.RequestSha256Validator is a validator for the "request_sha256" field. It is called by the builders before save.
+	readinesscommandreceipt.RequestSha256Validator = readinesscommandreceiptDescRequestSha256.Validators[0].(func(string) error)
+	// readinesscommandreceiptDescCreatedAt is the schema descriptor for created_at field.
+	readinesscommandreceiptDescCreatedAt := readinesscommandreceiptFields[9].Descriptor()
+	// readinesscommandreceipt.DefaultCreatedAt holds the default value on creation for the created_at field.
+	readinesscommandreceipt.DefaultCreatedAt = readinesscommandreceiptDescCreatedAt.Default.(func() time.Time)
 	releaseFields := schema.Release{}.Fields()
 	_ = releaseFields
 	// releaseDescSourceUrls is the schema descriptor for source_urls field.
@@ -1864,6 +2125,24 @@ func init() {
 	releaseautomationversionDescCreatedAt := releaseautomationversionFields[7].Descriptor()
 	// releaseautomationversion.DefaultCreatedAt holds the default value on creation for the created_at field.
 	releaseautomationversion.DefaultCreatedAt = releaseautomationversionDescCreatedAt.Default.(func() time.Time)
+	releaseclaimFields := schema.ReleaseClaim{}.Fields()
+	_ = releaseclaimFields
+	// releaseclaimDescCreatedAt is the schema descriptor for created_at field.
+	releaseclaimDescCreatedAt := releaseclaimFields[6].Descriptor()
+	// releaseclaim.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releaseclaim.DefaultCreatedAt = releaseclaimDescCreatedAt.Default.(func() time.Time)
+	releaseclaimversionFields := schema.ReleaseClaimVersion{}.Fields()
+	_ = releaseclaimversionFields
+	// releaseclaimversionDescVersion is the schema descriptor for version field.
+	releaseclaimversionDescVersion := releaseclaimversionFields[4].Descriptor()
+	// releaseclaimversion.DefaultVersion holds the default value on creation for the version field.
+	releaseclaimversion.DefaultVersion = releaseclaimversionDescVersion.Default.(int64)
+	// releaseclaimversion.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	releaseclaimversion.VersionValidator = releaseclaimversionDescVersion.Validators[0].(func(int64) error)
+	// releaseclaimversionDescCreatedAt is the schema descriptor for created_at field.
+	releaseclaimversionDescCreatedAt := releaseclaimversionFields[11].Descriptor()
+	// releaseclaimversion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releaseclaimversion.DefaultCreatedAt = releaseclaimversionDescCreatedAt.Default.(func() time.Time)
 	releasedocumentFields := schema.ReleaseDocument{}.Fields()
 	_ = releasedocumentFields
 	// releasedocumentDescCreatedAt is the schema descriptor for created_at field.
@@ -1876,6 +2155,188 @@ func init() {
 	releasedocument.DefaultUpdatedAt = releasedocumentDescUpdatedAt.Default.(func() time.Time)
 	// releasedocument.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	releasedocument.UpdateDefaultUpdatedAt = releasedocumentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	releaseevidenceFields := schema.ReleaseEvidence{}.Fields()
+	_ = releaseevidenceFields
+	// releaseevidenceDescCreatedAt is the schema descriptor for created_at field.
+	releaseevidenceDescCreatedAt := releaseevidenceFields[6].Descriptor()
+	// releaseevidence.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releaseevidence.DefaultCreatedAt = releaseevidenceDescCreatedAt.Default.(func() time.Time)
+	releasekitFields := schema.ReleaseKit{}.Fields()
+	_ = releasekitFields
+	// releasekitDescLastVersion is the schema descriptor for last_version field.
+	releasekitDescLastVersion := releasekitFields[5].Descriptor()
+	// releasekit.DefaultLastVersion holds the default value on creation for the last_version field.
+	releasekit.DefaultLastVersion = releasekitDescLastVersion.Default.(int64)
+	// releasekit.LastVersionValidator is a validator for the "last_version" field. It is called by the builders before save.
+	releasekit.LastVersionValidator = releasekitDescLastVersion.Validators[0].(func(int64) error)
+	// releasekitDescCreatedAt is the schema descriptor for created_at field.
+	releasekitDescCreatedAt := releasekitFields[6].Descriptor()
+	// releasekit.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasekit.DefaultCreatedAt = releasekitDescCreatedAt.Default.(func() time.Time)
+	releaselineageFields := schema.ReleaseLineage{}.Fields()
+	_ = releaselineageFields
+	// releaselineageDescSourceRevision is the schema descriptor for source_revision field.
+	releaselineageDescSourceRevision := releaselineageFields[5].Descriptor()
+	// releaselineage.SourceRevisionValidator is a validator for the "source_revision" field. It is called by the builders before save.
+	releaselineage.SourceRevisionValidator = releaselineageDescSourceRevision.Validators[0].(func(int64) error)
+	// releaselineageDescDestinationRevision is the schema descriptor for destination_revision field.
+	releaselineageDescDestinationRevision := releaselineageFields[6].Descriptor()
+	// releaselineage.DestinationRevisionValidator is a validator for the "destination_revision" field. It is called by the builders before save.
+	releaselineage.DestinationRevisionValidator = releaselineageDescDestinationRevision.Validators[0].(func(int64) error)
+	// releaselineageDescReason is the schema descriptor for reason field.
+	releaselineageDescReason := releaselineageFields[7].Descriptor()
+	// releaselineage.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
+	releaselineage.ReasonValidator = func() func(string) error {
+		validators := releaselineageDescReason.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(reason string) error {
+			for _, fn := range fns {
+				if err := fn(reason); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// releaselineageDescCreatedAt is the schema descriptor for created_at field.
+	releaselineageDescCreatedAt := releaselineageFields[10].Descriptor()
+	// releaselineage.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releaselineage.DefaultCreatedAt = releaselineageDescCreatedAt.Default.(func() time.Time)
+	releasequalificationFields := schema.ReleaseQualification{}.Fields()
+	_ = releasequalificationFields
+	// releasequalificationDescVersion is the schema descriptor for version field.
+	releasequalificationDescVersion := releasequalificationFields[3].Descriptor()
+	// releasequalification.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	releasequalification.VersionValidator = releasequalificationDescVersion.Validators[0].(func(int64) error)
+	// releasequalificationDescAggregateRevision is the schema descriptor for aggregate_revision field.
+	releasequalificationDescAggregateRevision := releasequalificationFields[4].Descriptor()
+	// releasequalification.AggregateRevisionValidator is a validator for the "aggregate_revision" field. It is called by the builders before save.
+	releasequalification.AggregateRevisionValidator = releasequalificationDescAggregateRevision.Validators[0].(func(int64) error)
+	// releasequalificationDescSchemaVersion is the schema descriptor for schema_version field.
+	releasequalificationDescSchemaVersion := releasequalificationFields[18].Descriptor()
+	// releasequalification.DefaultSchemaVersion holds the default value on creation for the schema_version field.
+	releasequalification.DefaultSchemaVersion = releasequalificationDescSchemaVersion.Default.(int)
+	// releasequalificationDescCreatedAt is the schema descriptor for created_at field.
+	releasequalificationDescCreatedAt := releasequalificationFields[22].Descriptor()
+	// releasequalification.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasequalification.DefaultCreatedAt = releasequalificationDescCreatedAt.Default.(func() time.Time)
+	releasequalificationassetFields := schema.ReleaseQualificationAsset{}.Fields()
+	_ = releasequalificationassetFields
+	// releasequalificationassetDescCreatedAt is the schema descriptor for created_at field.
+	releasequalificationassetDescCreatedAt := releasequalificationassetFields[5].Descriptor()
+	// releasequalificationasset.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasequalificationasset.DefaultCreatedAt = releasequalificationassetDescCreatedAt.Default.(func() time.Time)
+	releasequalificationdecisionFields := schema.ReleaseQualificationDecision{}.Fields()
+	_ = releasequalificationdecisionFields
+	// releasequalificationdecisionDescCreatedAt is the schema descriptor for created_at field.
+	releasequalificationdecisionDescCreatedAt := releasequalificationdecisionFields[9].Descriptor()
+	// releasequalificationdecision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasequalificationdecision.DefaultCreatedAt = releasequalificationdecisionDescCreatedAt.Default.(func() time.Time)
+	releasequalificationsourceFields := schema.ReleaseQualificationSource{}.Fields()
+	_ = releasequalificationsourceFields
+	// releasequalificationsourceDescCreatedAt is the schema descriptor for created_at field.
+	releasequalificationsourceDescCreatedAt := releasequalificationsourceFields[6].Descriptor()
+	// releasequalificationsource.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasequalificationsource.DefaultCreatedAt = releasequalificationsourceDescCreatedAt.Default.(func() time.Time)
+	releasereadinessFields := schema.ReleaseReadiness{}.Fields()
+	_ = releasereadinessFields
+	// releasereadinessDescHeadRevision is the schema descriptor for head_revision field.
+	releasereadinessDescHeadRevision := releasereadinessFields[3].Descriptor()
+	// releasereadiness.DefaultHeadRevision holds the default value on creation for the head_revision field.
+	releasereadiness.DefaultHeadRevision = releasereadinessDescHeadRevision.Default.(int64)
+	// releasereadiness.HeadRevisionValidator is a validator for the "head_revision" field. It is called by the builders before save.
+	releasereadiness.HeadRevisionValidator = releasereadinessDescHeadRevision.Validators[0].(func(int64) error)
+	// releasereadinessDescNeedsReview is the schema descriptor for needs_review field.
+	releasereadinessDescNeedsReview := releasereadinessFields[8].Descriptor()
+	// releasereadiness.DefaultNeedsReview holds the default value on creation for the needs_review field.
+	releasereadiness.DefaultNeedsReview = releasereadinessDescNeedsReview.Default.(bool)
+	// releasereadinessDescCreatedAt is the schema descriptor for created_at field.
+	releasereadinessDescCreatedAt := releasereadinessFields[10].Descriptor()
+	// releasereadiness.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasereadiness.DefaultCreatedAt = releasereadinessDescCreatedAt.Default.(func() time.Time)
+	// releasereadinessDescUpdatedAt is the schema descriptor for updated_at field.
+	releasereadinessDescUpdatedAt := releasereadinessFields[11].Descriptor()
+	// releasereadiness.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	releasereadiness.DefaultUpdatedAt = releasereadinessDescUpdatedAt.Default.(func() time.Time)
+	// releasereadiness.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	releasereadiness.UpdateDefaultUpdatedAt = releasereadinessDescUpdatedAt.UpdateDefault.(func() time.Time)
+	releasesourcebindingFields := schema.ReleaseSourceBinding{}.Fields()
+	_ = releasesourcebindingFields
+	// releasesourcebindingDescProvider is the schema descriptor for provider field.
+	releasesourcebindingDescProvider := releasesourcebindingFields[3].Descriptor()
+	// releasesourcebinding.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	releasesourcebinding.ProviderValidator = func() func(string) error {
+		validators := releasesourcebindingDescProvider.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(provider string) error {
+			for _, fn := range fns {
+				if err := fn(provider); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// releasesourcebindingDescRepositoryID is the schema descriptor for repository_id field.
+	releasesourcebindingDescRepositoryID := releasesourcebindingFields[5].Descriptor()
+	// releasesourcebinding.RepositoryIDValidator is a validator for the "repository_id" field. It is called by the builders before save.
+	releasesourcebinding.RepositoryIDValidator = releasesourcebindingDescRepositoryID.Validators[0].(func(string) error)
+	// releasesourcebindingDescProviderObjectID is the schema descriptor for provider_object_id field.
+	releasesourcebindingDescProviderObjectID := releasesourcebindingFields[6].Descriptor()
+	// releasesourcebinding.ProviderObjectIDValidator is a validator for the "provider_object_id" field. It is called by the builders before save.
+	releasesourcebinding.ProviderObjectIDValidator = func() func(string) error {
+		validators := releasesourcebindingDescProviderObjectID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(provider_object_id string) error {
+			for _, fn := range fns {
+				if err := fn(provider_object_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// releasesourcebindingDescLastEventSequence is the schema descriptor for last_event_sequence field.
+	releasesourcebindingDescLastEventSequence := releasesourcebindingFields[8].Descriptor()
+	// releasesourcebinding.DefaultLastEventSequence holds the default value on creation for the last_event_sequence field.
+	releasesourcebinding.DefaultLastEventSequence = releasesourcebindingDescLastEventSequence.Default.(int64)
+	// releasesourcebinding.LastEventSequenceValidator is a validator for the "last_event_sequence" field. It is called by the builders before save.
+	releasesourcebinding.LastEventSequenceValidator = releasesourcebindingDescLastEventSequence.Validators[0].(func(int64) error)
+	// releasesourcebindingDescChangeSequence is the schema descriptor for change_sequence field.
+	releasesourcebindingDescChangeSequence := releasesourcebindingFields[9].Descriptor()
+	// releasesourcebinding.DefaultChangeSequence holds the default value on creation for the change_sequence field.
+	releasesourcebinding.DefaultChangeSequence = releasesourcebindingDescChangeSequence.Default.(int64)
+	// releasesourcebinding.ChangeSequenceValidator is a validator for the "change_sequence" field. It is called by the builders before save.
+	releasesourcebinding.ChangeSequenceValidator = releasesourcebindingDescChangeSequence.Validators[0].(func(int64) error)
+	// releasesourcebindingDescSelectedChangeSequence is the schema descriptor for selected_change_sequence field.
+	releasesourcebindingDescSelectedChangeSequence := releasesourcebindingFields[12].Descriptor()
+	// releasesourcebinding.DefaultSelectedChangeSequence holds the default value on creation for the selected_change_sequence field.
+	releasesourcebinding.DefaultSelectedChangeSequence = releasesourcebindingDescSelectedChangeSequence.Default.(int64)
+	// releasesourcebinding.SelectedChangeSequenceValidator is a validator for the "selected_change_sequence" field. It is called by the builders before save.
+	releasesourcebinding.SelectedChangeSequenceValidator = releasesourcebindingDescSelectedChangeSequence.Validators[0].(func(int64) error)
+	// releasesourcebindingDescNeedsResolution is the schema descriptor for needs_resolution field.
+	releasesourcebindingDescNeedsResolution := releasesourcebindingFields[13].Descriptor()
+	// releasesourcebinding.DefaultNeedsResolution holds the default value on creation for the needs_resolution field.
+	releasesourcebinding.DefaultNeedsResolution = releasesourcebindingDescNeedsResolution.Default.(bool)
+	// releasesourcebindingDescCreatedAt is the schema descriptor for created_at field.
+	releasesourcebindingDescCreatedAt := releasesourcebindingFields[14].Descriptor()
+	// releasesourcebinding.DefaultCreatedAt holds the default value on creation for the created_at field.
+	releasesourcebinding.DefaultCreatedAt = releasesourcebindingDescCreatedAt.Default.(func() time.Time)
+	// releasesourcebindingDescUpdatedAt is the schema descriptor for updated_at field.
+	releasesourcebindingDescUpdatedAt := releasesourcebindingFields[15].Descriptor()
+	// releasesourcebinding.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	releasesourcebinding.DefaultUpdatedAt = releasesourcebindingDescUpdatedAt.Default.(func() time.Time)
+	// releasesourcebinding.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	releasesourcebinding.UpdateDefaultUpdatedAt = releasesourcebindingDescUpdatedAt.UpdateDefault.(func() time.Time)
 	releasesourceeventFields := schema.ReleaseSourceEvent{}.Fields()
 	_ = releasesourceeventFields
 	// releasesourceeventDescCollectUnmatched is the schema descriptor for collect_unmatched field.
@@ -1898,6 +2359,46 @@ func init() {
 	releasesourceeventDescReceivedAt := releasesourceeventFields[13].Descriptor()
 	// releasesourceevent.DefaultReceivedAt holds the default value on creation for the received_at field.
 	releasesourceevent.DefaultReceivedAt = releasesourceeventDescReceivedAt.Default.(func() time.Time)
+	releasesourceobservationFields := schema.ReleaseSourceObservation{}.Fields()
+	_ = releasesourceobservationFields
+	// releasesourceobservationDescEventKey is the schema descriptor for event_key field.
+	releasesourceobservationDescEventKey := releasesourceobservationFields[4].Descriptor()
+	// releasesourceobservation.EventKeyValidator is a validator for the "event_key" field. It is called by the builders before save.
+	releasesourceobservation.EventKeyValidator = func() func(string) error {
+		validators := releasesourceobservationDescEventKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(event_key string) error {
+			for _, fn := range fns {
+				if err := fn(event_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// releasesourceobservationDescProviderEventID is the schema descriptor for provider_event_id field.
+	releasesourceobservationDescProviderEventID := releasesourceobservationFields[5].Descriptor()
+	// releasesourceobservation.ProviderEventIDValidator is a validator for the "provider_event_id" field. It is called by the builders before save.
+	releasesourceobservation.ProviderEventIDValidator = releasesourceobservationDescProviderEventID.Validators[0].(func(string) error)
+	// releasesourceobservationDescSequence is the schema descriptor for sequence field.
+	releasesourceobservationDescSequence := releasesourceobservationFields[6].Descriptor()
+	// releasesourceobservation.SequenceValidator is a validator for the "sequence" field. It is called by the builders before save.
+	releasesourceobservation.SequenceValidator = releasesourceobservationDescSequence.Validators[0].(func(int64) error)
+	// releasesourceobservationDescBodySha256 is the schema descriptor for body_sha256 field.
+	releasesourceobservationDescBodySha256 := releasesourceobservationFields[7].Descriptor()
+	// releasesourceobservation.BodySha256Validator is a validator for the "body_sha256" field. It is called by the builders before save.
+	releasesourceobservation.BodySha256Validator = releasesourceobservationDescBodySha256.Validators[0].(func(string) error)
+	// releasesourceobservationDescSchemaVersion is the schema descriptor for schema_version field.
+	releasesourceobservationDescSchemaVersion := releasesourceobservationFields[11].Descriptor()
+	// releasesourceobservation.DefaultSchemaVersion holds the default value on creation for the schema_version field.
+	releasesourceobservation.DefaultSchemaVersion = releasesourceobservationDescSchemaVersion.Default.(int)
+	// releasesourceobservationDescReceivedAt is the schema descriptor for received_at field.
+	releasesourceobservationDescReceivedAt := releasesourceobservationFields[13].Descriptor()
+	// releasesourceobservation.DefaultReceivedAt holds the default value on creation for the received_at field.
+	releasesourceobservation.DefaultReceivedAt = releasesourceobservationDescReceivedAt.Default.(func() time.Time)
 	releasespecFields := schema.ReleaseSpec{}.Fields()
 	_ = releasespecFields
 	// releasespecDescSources is the schema descriptor for sources field.
@@ -2422,16 +2923,20 @@ func init() {
 	workspacesettingsDescAiAgentEnabled := workspacesettingsFields[5].Descriptor()
 	// workspacesettings.DefaultAiAgentEnabled holds the default value on creation for the ai_agent_enabled field.
 	workspacesettings.DefaultAiAgentEnabled = workspacesettingsDescAiAgentEnabled.Default.(bool)
+	// workspacesettingsDescReleaseReadinessEnabled is the schema descriptor for release_readiness_enabled field.
+	workspacesettingsDescReleaseReadinessEnabled := workspacesettingsFields[6].Descriptor()
+	// workspacesettings.DefaultReleaseReadinessEnabled holds the default value on creation for the release_readiness_enabled field.
+	workspacesettings.DefaultReleaseReadinessEnabled = workspacesettingsDescReleaseReadinessEnabled.Default.(bool)
 	// workspacesettingsDescDisabledExperiments is the schema descriptor for disabled_experiments field.
-	workspacesettingsDescDisabledExperiments := workspacesettingsFields[6].Descriptor()
+	workspacesettingsDescDisabledExperiments := workspacesettingsFields[7].Descriptor()
 	// workspacesettings.DefaultDisabledExperiments holds the default value on creation for the disabled_experiments field.
 	workspacesettings.DefaultDisabledExperiments = workspacesettingsDescDisabledExperiments.Default.([]string)
 	// workspacesettingsDescCreatedAt is the schema descriptor for created_at field.
-	workspacesettingsDescCreatedAt := workspacesettingsFields[7].Descriptor()
+	workspacesettingsDescCreatedAt := workspacesettingsFields[8].Descriptor()
 	// workspacesettings.DefaultCreatedAt holds the default value on creation for the created_at field.
 	workspacesettings.DefaultCreatedAt = workspacesettingsDescCreatedAt.Default.(func() time.Time)
 	// workspacesettingsDescUpdatedAt is the schema descriptor for updated_at field.
-	workspacesettingsDescUpdatedAt := workspacesettingsFields[8].Descriptor()
+	workspacesettingsDescUpdatedAt := workspacesettingsFields[9].Descriptor()
 	// workspacesettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	workspacesettings.DefaultUpdatedAt = workspacesettingsDescUpdatedAt.Default.(func() time.Time)
 	// workspacesettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

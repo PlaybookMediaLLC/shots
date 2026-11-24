@@ -1,3 +1,7 @@
+import { kitArtifactPreviewSchema, createReleaseKitSchema, prepareReleaseKitSchema, decideReleaseKitSchema, requestKitExportSchema, releaseKitSchema, kitExportSchema, type CreateReleaseKitInput, type PrepareReleaseKitInput, type DecideReleaseKitInput, type RequestKitExportInput } from './release-kits.ts'
+export * from './release-kits.ts'
+import { readinessMutationSchema, releaseEvidencePageSchema, releaseClaimsPageSchema, type CreateReleaseEvidenceInput, createReleaseEvidenceSchema, type LinkReleaseEvidenceInput, linkReleaseEvidenceSchema, type ChangeEvidenceAccessInput, changeEvidenceAccessSchema, type SaveReleaseClaimInput, saveReleaseClaimSchema, type SetClaimSupportsInput, setClaimSupportsSchema, type VerifyReleaseClaimInput, verifyReleaseClaimSchema, type ImportReleaseSpecClaimsInput, importReleaseSpecClaimsSchema } from './release-evidence.ts'
+export * from './release-evidence.ts'
 import type {
   YouTubeOptions,
   TikTokOptions,
@@ -24,6 +28,8 @@ export type {
   FacebookOptions,
 } from './video-publishing.ts'
 import { z } from 'zod'
+import { mergeReleaseSchema, splitReleaseSchema, releaseLineageHistorySchema, releaseLineageResultSchema, type MergeReleaseInput, type SplitReleaseInput, createQualificationSchema, decideQualificationSchema, qualificationResultSchema, qualificationRevisionSchema, readinessCommandKeySchema, releaseQualificationSchema, releaseSourcePageSchema, releaseSourceHistorySchema, releaseSourceSelectionSchema, selectReleaseSourcesSchema, type CreateQualificationInput, type DecideQualificationInput, type SelectReleaseSourcesInput } from './release-readiness.ts'
+export * from './release-readiness.ts'
 import {
   founderHubProfileSchema,
   founderHubAuthorizationSchema,
@@ -678,6 +684,8 @@ export type WorkspaceSettings = {
   defaultPublishTime: string
   /** The workspace AI agent kill switch; on unless an owner or admin turned it off. */
   aiAgentEnabled: boolean
+  /** Missing on older backends; treat as disabled during an additive rollout. */
+  releaseReadinessEnabled?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -732,6 +740,8 @@ export type BackendAsset = {
 }
 
 export type BackendAssetListItem = {
+  /** Retained upload digest; absent on older backends. */
+  sha256?: string | null
   fileName?: string
   /** A stored opening frame of a video, shown instead of downloading it. */
   posterAssetId?: string
@@ -784,6 +794,7 @@ export type BackendReleaseListItem = BackendReleaseSummary & {
 }
 
 export type BackendReleaseDetail = BackendReleaseListItem & {
+	canonicalReleaseId?: string
   audience: string | null
   description: string | null
   notes?: string | null
@@ -2284,6 +2295,8 @@ export type ListedWorkspace = {
 export type UpdateWorkspaceInput = {
   /** Turns AI agent runs on or off. Owner or admin only; audited. */
   aiAgentEnabled?: boolean
+  /** Enables manual release facts and qualification. Owner/admin only. */
+  releaseReadinessEnabled?: boolean
   defaultPublishTime?: string
   description?: string | null
   locale?: string
@@ -3072,12 +3085,169 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
-  async listReleases(limit: number) {
-    return this.request<{ releases: BackendReleaseListItem[] }>(`v1/releases?limit=${limit}`)
+  async listReleases(limit: number, search?: string) {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (search) query.set('search', search)
+    return this.request<{ releases: BackendReleaseListItem[] }>(`v1/releases?${query}`)
   }
 
   async getRelease(id: string) {
     return this.request<BackendReleaseDetail>(`v1/releases/${encodeURIComponent(id)}`)
+  }
+
+  async createReleaseEvidence(id: string, key: string, input: CreateReleaseEvidenceInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/evidence`, {
+      body: createReleaseEvidenceSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async linkReleaseEvidence(id: string, key: string, input: LinkReleaseEvidenceInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/evidence/links`, {
+      body: linkReleaseEvidenceSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async changeEvidenceAccess(id: string, key: string, input: ChangeEvidenceAccessInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/evidence/access`, {
+      body: changeEvidenceAccessSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async saveReleaseClaim(id: string, key: string, input: SaveReleaseClaimInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/claims`, {
+      body: saveReleaseClaimSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async setClaimSupports(id: string, claimId: string, key: string, input: SetClaimSupportsInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/claims/${encodeURIComponent(claimId)}/support`, {
+      body: setClaimSupportsSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async verifyReleaseClaim(id: string, claimId: string, key: string, input: VerifyReleaseClaimInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/claims/${encodeURIComponent(claimId)}/decisions`, {
+      body: verifyReleaseClaimSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async importReleaseSpecClaims(id: string, key: string, input: ImportReleaseSpecClaimsInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/claims/imports`, {
+      body: importReleaseSpecClaimsSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST',
+    }))
+  }
+
+  async listReleaseEvidence(id: string, cursor?: string) {
+    const params = new URLSearchParams()
+    if (cursor) params.set('cursor', cursor)
+    return releaseEvidencePageSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/evidence?${params}`))
+  }
+
+  async listReleaseClaims(id: string, cursor?: string) {
+    const params = new URLSearchParams()
+    if (cursor) params.set('cursor', cursor)
+    return releaseClaimsPageSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/claims?${params}`))
+  }
+
+  async createReleaseKitRevision(id: string, key: string, input: CreateReleaseKitInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits`, { body: createReleaseKitSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST' }))
+  }
+
+  async prepareReleaseKit(id: string, revisionId: string, key: string, input: PrepareReleaseKitInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits/${encodeURIComponent(revisionId)}/prepare`, { body: prepareReleaseKitSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST' }))
+  }
+
+  async decideReleaseKit(id: string, revisionId: string, key: string, input: DecideReleaseKitInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits/${encodeURIComponent(revisionId)}/decisions`, { body: decideReleaseKitSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST' }))
+  }
+
+  async requestKitExport(id: string, revisionId: string, key: string, input: RequestKitExportInput) {
+    return readinessMutationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits/${encodeURIComponent(revisionId)}/exports`, { body: requestKitExportSchema.parse(input), headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) }, method: 'POST' }))
+  }
+
+  /** Private pinned output for a watermarked preview, with current session authority. */
+  async readKitExportDownload(id: string, exportId: string, token: string) {
+    return this.request<Response>(`v1/internal/releases/${encodeURIComponent(id)}/kit-exports/${encodeURIComponent(exportId)}/download`, { body: { token }, method: 'POST', responseType: 'response' })
+  }
+
+  /** Private bytes for a watermarked kit preview. */
+  async getKitArtifactPreview(id: string, revisionId: string, artifactId: string) {
+    return kitArtifactPreviewSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits/${encodeURIComponent(revisionId)}/artifacts/${encodeURIComponent(artifactId)}/preview`))
+  }
+  async getReleaseKit(id: string, revisionId?: string) {
+    const query = new URLSearchParams()
+    if (revisionId) query.set('revisionId', revisionId)
+    return releaseKitSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kits?${query}`))
+  }
+  async getKitExport(id: string, exportId: string, download = false) {
+    return kitExportSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/kit-exports/${encodeURIComponent(exportId)}?download=${download}`))
+  }
+
+  async getReleaseQualification(id: string) {
+    return releaseQualificationSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification`))
+  }
+
+  async listReleaseSources(query: { releaseId?: string; cursor?: string } = {}) {
+    const params = new URLSearchParams()
+    if (query.releaseId) params.set('releaseId', query.releaseId)
+    if (query.cursor) params.set('cursor', query.cursor)
+    return releaseSourcePageSchema.parse(await this.request<unknown>(`v1/release-sources?${params}`))
+  }
+
+  async getReleaseSourceHistory(id: string, cursor?: string) {
+    const params = new URLSearchParams()
+    if (cursor) params.set('cursor', cursor)
+    return releaseSourceHistorySchema.parse(await this.request<unknown>(`v1/release-sources/${encodeURIComponent(id)}/observations?${params}`))
+  }
+
+  async selectReleaseSources(key: string, input: SelectReleaseSourcesInput) {
+    return releaseSourceSelectionSchema.parse(await this.request<unknown>('v1/release-sources/selections', {
+      body: selectReleaseSourcesSchema.parse(input),
+      headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) },
+      method: 'POST',
+    }))
+  }
+
+  async getQualificationRevision(id: string, revisionId: string) {
+    return qualificationRevisionSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/revisions/${encodeURIComponent(revisionId)}`))
+  }
+
+  async createQualificationRevision(id: string, key: string, input: CreateQualificationInput) {
+    return qualificationResultSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/revisions`, {
+      body: createQualificationSchema.parse(input),
+      headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) },
+      method: 'POST',
+    }))
+  }
+
+  async decideReleaseQualification(id: string, key: string, input: DecideQualificationInput) {
+    return qualificationResultSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/decisions`, {
+      body: decideQualificationSchema.parse(input),
+      headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) },
+      method: 'POST',
+    }))
+  }
+
+  async getReleaseLineage(id: string, cursor?: string) {
+    const params = new URLSearchParams()
+    if (cursor) params.set('cursor', cursor)
+    return releaseLineageHistorySchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/lineage?${params}`))
+  }
+
+  async mergeRelease(id: string, key: string, input: MergeReleaseInput) {
+    return releaseLineageResultSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/merge`, {
+      body: mergeReleaseSchema.parse(input),
+      headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) },
+      method: 'POST',
+    }))
+  }
+
+  async splitRelease(id: string, key: string, input: SplitReleaseInput) {
+    return releaseLineageResultSchema.parse(await this.request<unknown>(`v1/releases/${encodeURIComponent(id)}/qualification/split`, {
+      body: splitReleaseSchema.parse(input),
+      headers: { 'Idempotency-Key': readinessCommandKeySchema.parse(key) },
+      method: 'POST',
+    }))
   }
 
   async createRelease(input: BackendCreateReleaseInput) {
@@ -3094,8 +3264,19 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
-  async listCampaigns() {
-    return this.request<{ campaigns: BackendCampaignListItem[] }>('v1/campaigns')
+  async listCampaigns(filter?: { cursor?: string; idempotencyKey?: string; limit: number; releaseId?: string; search?: string; sort?: 'updated' }) {
+    const query = new URLSearchParams()
+    if (filter) {
+      query.set('limit', String(filter.limit))
+      if (filter.cursor) query.set('cursor', filter.cursor)
+      if (filter.releaseId) query.set('releaseId', filter.releaseId)
+      if (filter.idempotencyKey) query.set('idempotencyKey', filter.idempotencyKey)
+      if (filter.search) query.set('search', filter.search)
+      if (filter.sort) query.set('sort', filter.sort)
+    }
+    return this.request<{ campaigns: BackendCampaignListItem[] }>(
+      `v1/campaigns${query.size ? `?${query}` : ''}`
+    )
   }
 
   async getCampaign(id: string) {

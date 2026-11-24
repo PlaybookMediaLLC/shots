@@ -62,6 +62,7 @@ next-env.d.ts
 !/clients/apps/web/scripts/indexnow.ts
 !/clients/apps/web/scripts/bind-social-tenant.ts
 !/clients/apps/web/scripts/openapi.ts
+!/clients/apps/web/scripts/pilot-report.ts
 !/clients/apps/web/scripts/public-images.py
 !/clients/apps/web/scripts/stripe-price-cutover.ts
 

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { platformHref } from '@/lib/platform/navigation'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ArrowForwardIcon as ArrowRight, AddIcon as Plus } from '@/components/platform-shell/icons'
 import { CategoryIcon as Shapes } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
@@ -43,6 +44,8 @@ export default async function HomePage({
   const requestHeaders = await headers()
   const access = await requirePaidPageAccess(requestHeaders, locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
+  // The task study uses this explicit view before changing the default Home.
+  const releaseView = query.view === 'release' && paid && access.campaignWorkflowEnabled
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
   const can = (permission: Permission) => accessAllows(access, permission)
   const starters = [
@@ -70,9 +73,11 @@ export default async function HomePage({
     ...(access.campaignWorkflowEnabled
       ? [
           {
-            title: 'Plan a campaign',
+            title: releaseView ? 'Prepare a release' : 'Plan a campaign',
             art: 'campaign' as StarterKind,
-            description: 'Organize your next product launch.',
+            description: releaseView
+              ? 'Describe what changed, then review the campaign brief.'
+              : 'Organize your next product launch.',
             href: gated('/campaigns/new'),
             pro: !paid,
             allowed: can('release:create'),
@@ -98,7 +103,10 @@ export default async function HomePage({
     allowed: boolean
   }[]
   // Starters the role cannot use are left out, and the page says why.
-  const available = starters.filter((starter) => starter.allowed)
+  const relevant = releaseView ? starters.filter((starter) => starter.art !== 'automate') : starters
+  const available = relevant.filter((starter) => starter.allowed)
+  if (releaseView)
+    available.sort((a, b) => Number(b.art === 'campaign') - Number(a.art === 'campaign'))
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}
@@ -106,10 +114,19 @@ export default async function HomePage({
     >
       <Page
         title="Home"
+        description={
+          releaseView
+            ? 'Prepare communication for a product change, review it, and return to the same saved work.'
+            : undefined
+        }
         actions={
           <>
             <SearchField />
-            {paid ? (
+            {releaseView ? (
+              <ButtonLink href={can('release:create') ? '/campaigns/new' : '/campaigns/releases'}>
+                {can('release:create') ? 'Prepare a release' : 'Browse releases'}
+              </ButtonLink>
+            ) : paid ? (
               <ButtonLink
                 href="/create"
                 className="home-create h-9 gap-1.5 rounded-full px-4 text-[0.8125rem]"
@@ -124,16 +141,49 @@ export default async function HomePage({
           </>
         }
       >
+        {query.setup === 'unavailable' ? (
+          <Alert>
+            <AlertTitle>Workspace setup could not be checked</AlertTitle>
+            <AlertDescription>
+              Your saved settings have not been changed. You can keep working or check again.
+              <ButtonLink href="/onboarding/plan" size="sm" variant="outline">
+                Check setup again
+              </ButtonLink>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {releaseView ? (
+          <>
+            <p className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              <SidebarLink href="/campaigns/releases" className="underline underline-offset-4">
+                Find an existing release
+              </SidebarLink>
+              <SidebarLink href="/campaigns" className="underline underline-offset-4">
+                Resume a campaign
+              </SidebarLink>
+              <SidebarLink
+                href="/home"
+                className="text-muted-foreground underline underline-offset-4"
+              >
+                Show all starters
+              </SidebarLink>
+            </p>
+            <NeedsAttention />
+          </>
+        ) : null}
         <RecentWork
+          campaignsEnabled={access.campaignWorkflowEnabled}
           organizationId={access.organization!.id}
           draftsEnabled={contentDraftsEnabled()}
           paidPlan={paid}
           intro={
             <section aria-labelledby="home-start" className="home-start">
               <h2 className="home-eyebrow" id="home-start">
-                Start something new
+                {releaseView
+                  ? 'Start with a release, or create something on its own'
+                  : 'Start something new'}
               </h2>
-              {available.length < starters.length ? (
+              {available.length < relevant.length ? (
                 <p className="mb-3 text-sm text-muted-foreground">
                   Your {roleLabels[normalizeOrganizationRole(access.role)]} role can view this
                   workspace&apos;s work{available.length ? ' and start what is listed here' : ''}.
@@ -188,7 +238,7 @@ export default async function HomePage({
             <UpcomingQueue tenant={sessionTenant(access, access.organization.id, requestHeaders)} />
           </Suspense>
         ) : null}
-        <NeedsAttention />
+        {!releaseView ? <NeedsAttention /> : null}
         <SidebarLink href={gated('/library?view=brand')} className="platform-home home-brand group">
           <span className="flex items-center gap-3">
             <span className="grid size-8 shrink-0 place-items-center">

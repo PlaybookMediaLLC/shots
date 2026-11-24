@@ -7,6 +7,7 @@ import { CampaignStatusPill } from '@/components/campaigns/CampaignStatusPill'
 import { CampaignSubnav } from '@/components/launch/CampaignSubnav'
 import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Page, Pill } from '@/components/platform-ui'
 import { backendSDK } from '@/lib/backend/sdk'
 import { getCampaignPlans, getReleaseSpecs } from '@/lib/launch/store'
@@ -64,7 +65,14 @@ export default async function CampaignLayout({ children, params }: CampaignLayou
     <PlatformShell campaignsEnabled organizationName={access.organization.name}>
       <Page
         actions={
-          <AskShotsButton aiEnabled={bootstrap.capabilities.aiAgent} campaignId={campaign.id} />
+          <>
+            {campaign.release ? (
+              <ButtonLink href={`/releases/${campaign.release.id}`} variant="outline">
+                Source release
+              </ButtonLink>
+            ) : null}
+            <AskShotsButton aiEnabled={bootstrap.capabilities.aiAgent} campaignId={campaign.id} />
+          </>
         }
         description={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

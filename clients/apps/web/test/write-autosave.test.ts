@@ -279,11 +279,11 @@ test('a save conflict shows the newer version and keeps the local edit to restor
   const editor = await mount()
   await act(async () => {
     editor.state.update({ value: paragraph('My text') })
-    await assert.rejects(editor.state.flush(), /could not be saved/)
+    await assert.rejects(editor.state.flush(), /Restore or discard/)
   })
   assert.deepEqual(editor.state.document.value, paragraph('Their text'))
   assert.deepEqual(editor.state.conflict?.value, paragraph('My text'))
-  assert.equal(editor.state.saveState, 'saved')
+  assert.equal(editor.state.saveState, 'conflict')
 
   save.mock.mockImplementation(async () => ({ ...theirs, version: 6 }))
   await act(async () => editor.state.restoreConflict())
@@ -309,12 +309,77 @@ test('a conflicting edit survives reopening the draft until it is discarded', as
   await editor.unmount()
   const reopened = await mount()
   assert.deepEqual(reopened.state.conflict?.value, paragraph('Do not lose me'))
+  assert.equal(reopened.state.saveState, 'conflict')
+  await assert.rejects(reopened.state.flush(), /Restore or discard/)
+  const leaving = new dom.window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(leaving)
+  assert.equal(leaving.defaultPrevented, true)
   await act(async () => reopened.state.discardConflict())
   assert.equal(reopened.state.conflict, null)
+  await act(async () => reopened.state.flush())
+  const resolved = new dom.window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(resolved)
+  assert.equal(resolved.defaultPrevented, false)
   await reopened.unmount()
   const again = await mount()
   assert.equal(again.state.conflict, null)
   await again.unmount()
+})
+
+test('an unresolved conflict blocks repeated flushes without overwriting either version', async (t) => {
+  const save = t.mock.method(draftsApi, 'save', async (): Promise<DraftWire> => {
+    throw new DraftRequestError('Conflict', 409)
+  })
+  t.mock.method(draftsApi, 'get', async () => ({ ...draft, version: 2, title: 'Remote title' }))
+  const editor = await mount()
+  await act(async () => {
+    editor.state.update({ title: 'My title' })
+    await assert.rejects(editor.state.flush(), /Restore or discard/)
+  })
+  assert.equal(editor.state.saveState, 'conflict')
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(editor.state.flush(), /Restore or discard/)
+  }
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(editor.state.document.title, 'Remote title')
+  assert.equal(editor.state.conflict?.title, 'My title')
+  const leaving = new dom.window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(leaving)
+  assert.equal(leaving.defaultPrevented, true)
+  await act(async () => editor.state.discardConflict())
+  await editor.unmount()
+})
+
+test('discarding a conflict resumes autosave of edits made while it was open', async (t) => {
+  let attempts = 0
+  const save = t.mock.method(
+    draftsApi,
+    'save',
+    async (_id: string, input: DraftSave): Promise<DraftWire> => {
+      if (++attempts === 1) throw new DraftRequestError('Conflict', 409)
+      return { ...draft, title: input.title ?? draft.title, version: 3 }
+    }
+  )
+  t.mock.method(draftsApi, 'get', async () => ({ ...draft, version: 2, title: 'Remote title' }))
+  const editor = await mount()
+  t.after(() => editor.unmount())
+  await act(async () => {
+    editor.state.update({ title: 'Old conflicting edit' })
+    await assert.rejects(editor.state.flush(), /Restore or discard/)
+  })
+  await act(async () => {
+    editor.state.update({ title: 'Merged final title' })
+    await new Promise((resolve) => setTimeout(resolve, 950))
+  })
+  assert.equal(save.mock.callCount(), 1)
+  await act(async () => {
+    editor.state.discardConflict()
+    await new Promise((resolve) => setTimeout(resolve, 950))
+  })
+  assert.equal(editor.state.conflict, null)
+  assert.equal(editor.state.saveState, 'saved')
+  assert.equal(editor.state.server.title, 'Merged final title')
+  assert.equal(save.mock.calls[1].arguments[1].baseVersion, 2)
 })
 
 test('a sharing response adopts its clean document before a title-only save', async (t) => {

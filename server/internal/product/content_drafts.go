@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdrafttag"
@@ -576,6 +577,11 @@ func (c *Configuration) CreateContentDraft(ctx context.Context, actor Actor, inp
 		return nil, err
 	}
 	defer tx.Rollback()
+	if input.ReleaseID != "" {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	result, err := c.createContentDraft(ctx, tx, actor, input)
 	if err != nil {
 		return nil, err
@@ -769,6 +775,20 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 		}
 		if !known {
 			return nil, publishing.ErrNotFound
+		}
+		// Existing campaign work keeps its original release association after a merge.
+		fromCampaign := false
+		if input.campaignID != "" {
+			owner, err := tx.Campaign.Query().Where(campaign.ID(input.campaignID), campaign.OrganizationID(actor.OrganizationID)).Only(ctx)
+			if err != nil {
+				return nil, err
+			}
+			fromCampaign = optionalText(owner.ReleaseID) == input.ReleaseID
+		}
+		if !fromCampaign {
+			if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, input.ReleaseID); err != nil {
+				return nil, err
+			}
 		}
 		create.SetReleaseID(input.ReleaseID)
 	}

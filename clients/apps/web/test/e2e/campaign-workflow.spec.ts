@@ -1,6 +1,7 @@
 import {
   chooseOption,
   createWorkspace,
+  db,
   type E2EIdentity,
   expect,
   getE2EUrl,
@@ -23,6 +24,69 @@ const campaignSchema = z.object({
   }),
 })
 const campaignListSchema = z.object({ campaigns: z.array(z.object({ id: z.string() })) })
+
+test('an existing release creates and resumes campaigns without duplicating its sources', async ({
+  app,
+  page,
+  workspace,
+}) => {
+  const release = releaseSchema.parse(
+    (
+      await trpcMutation(page, 'release.create', {
+        title: 'Saved release',
+        benefitStatement: 'A useful release.',
+        sourceUrls: ['https://example.test/changes'],
+      })
+    ).body
+  ).release
+  await app.open(`/releases/${release.id}`)
+  await page.getByRole('link', { name: 'Create campaign from this release', exact: true }).click()
+  await expect(page.getByLabel('Campaign name')).toHaveValue('Saved release')
+  await expect(page.getByLabel('Campaign objective')).toHaveValue('A useful release.')
+  await expect(page.getByLabel('Source links')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Back to release', exact: true }).click()
+  await app.expectPath(`/releases/${release.id}`)
+  await page.getByRole('link', { name: 'Create campaign from this release', exact: true }).click()
+  await page.getByRole('button', { name: 'Create campaign', exact: true }).click()
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/campaigns\/c[a-z0-9]+$/)
+  const campaignPath = new URL(page.url()).pathname
+  await expect(
+    page.getByRole('link', { name: 'https://example.test/changes', exact: true })
+  ).toBeVisible()
+  await page.getByRole('link', { name: 'Source release', exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Saved release', exact: true })).toHaveAttribute(
+    'href',
+    campaignPath
+  )
+  await page.getByRole('link', { name: 'Saved release', exact: true }).click()
+  await app.expectPath(campaignPath)
+  expect(await db.rows('SELECT id FROM release WHERE "organizationId"=$1', [workspace.id])).toEqual(
+    [{ id: release.id }]
+  )
+  expect(
+    await db.rows('SELECT "releaseId" FROM campaign WHERE "organizationId"=$1', [workspace.id])
+  ).toEqual([{ releaseId: release.id }])
+
+  await db.query("UPDATE release SET status='ARCHIVED' WHERE id=$1", [release.id])
+  await app.open(`/releases/${release.id}`)
+  await expect(
+    page.getByRole('link', { name: 'Create campaign from this release', exact: true })
+  ).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Saved release', exact: true })).toBeVisible()
+  await app.open(`/campaigns/new?releaseId=${release.id}`)
+  await expect(
+    page.getByText('Restore this archived or cancelled release before creating a campaign.')
+  ).toBeVisible()
+  const blocked = await trpcMutation(page, 'campaign.create', {
+    name: 'Blocked',
+    objective: 'Blocked',
+    releaseId: release.id,
+  })
+  expect(blocked.status).toBe(409)
+  expect(
+    await db.rows('SELECT id FROM campaign WHERE "organizationId"=$1', [workspace.id])
+  ).toHaveLength(1)
+})
 
 test(
   'a founder connects a product, describes a release, and returns to the same draft',

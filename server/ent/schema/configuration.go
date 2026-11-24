@@ -97,6 +97,7 @@ func (SourceApp) Fields() []ent.Field {
 }
 func (SourceApp) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("organization_id", "id").Unique(),
 		index.Fields("organization_id", "name").Unique(),
 		index.Fields("organization_id", "provider", "external_id").Unique(),
 		index.Fields("provider", "external_id"),

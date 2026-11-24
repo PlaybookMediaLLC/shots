@@ -230,6 +230,7 @@ export const listOrganizationInvitationsContract = defineContract({
 
 /** Saved workspace settings, or the defaults when none are saved. */
 export const workspaceSettingsSchema = z.object({
+  releaseReadinessEnabled: z.boolean().optional(),
   createdAt: timestampSchema.optional(),
   defaultPublishTime: z.string(),
   description: z.string().nullable(),

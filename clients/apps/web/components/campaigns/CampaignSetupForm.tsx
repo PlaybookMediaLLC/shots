@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import type { BackendReleaseDetail } from 'screenshot-studio-backend-sdk'
 import { type FormEvent, type ReactNode, useRef, useState } from 'react'
 import { Group, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -15,6 +16,7 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { briefValidationMessage, normalizeProductUrl } from '@/lib/campaigns/brief-form'
 import { useUnsavedCampaignChanges } from '@/components/campaigns/useUnsavedCampaignChanges'
 import {
+  campaignCreateSchema,
   productSurfaceCreateSchema,
   releaseCreateSchema,
   productEnvironments,
@@ -36,20 +38,11 @@ import {
 
 type Surface = { environment: string; id: string; name: string; url: string }
 
-type ExistingRelease = {
-  audience: string
-  benefitStatement: string
-  id: string
-  productSurfaceId: string
-  sourceUrls: string[]
-  title: string
-}
-
 type CampaignSetupFormProps = {
   canCreate: boolean
   canManageProducts: boolean
-  initialRelease?: ExistingRelease
   surfaces: Surface[]
+  release?: Pick<BackendReleaseDetail, 'id' | 'title' | 'benefitStatement' | 'audience'>
 }
 
 const NEW_PRODUCT = 'new'
@@ -91,8 +84,8 @@ function parseSourceUrls(value: string): string[] {
 export function CampaignSetupForm({
   canCreate,
   canManageProducts,
-  initialRelease,
   surfaces: initialSurfaces,
+  release: existingRelease,
 }: CampaignSetupFormProps) {
   const router = useRouter()
   const trpcClient = useTRPCClient()
@@ -100,9 +93,7 @@ export function CampaignSetupForm({
   const [idempotencyKey] = useState(() => crypto.randomUUID())
   const [surfaces, setSurfaces] = useState(initialSurfaces)
   // A campaign needs what shipped, not a product: one can be added here or later.
-  const [surfaceChoice, setSurfaceChoice] = useState(
-    initialRelease?.productSurfaceId || initialSurfaces[0]?.id || ''
-  )
+  const [surfaceChoice, setSurfaceChoice] = useState(initialSurfaces[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -136,6 +127,7 @@ export function CampaignSetupForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
+    if (isSaving) return
     setError(null)
     setIsSaving(true)
     const data = new FormData(event.currentTarget)
@@ -144,37 +136,37 @@ export function CampaignSetupForm({
     try {
       const title = field(data, 'title')
       const benefitStatement = field(data, 'benefitStatement')
-      const audience = field(data, 'audience')
-      const parsed = releaseCreateSchema.safeParse({
-        audience: audience || undefined,
-        benefitStatement,
-        description: field(data, 'description') || undefined,
-        sourceUrls: parseSourceUrls(field(data, 'sourceUrls')),
-        title,
-      })
-      if (!parsed.success) throw new Error(briefValidationMessage(parsed.error))
-      if (!benefitStatement && !parsed.data.sourceUrls?.length) {
-        throw new Error('Why it matters: enter a benefit or add a source link.')
-      }
-      if (!initialRelease && isNewProduct) {
-        const product = productSurfaceCreateSchema.safeParse({
-          name: field(data, 'productName'),
-          url: normalizeProductUrl(field(data, 'appUrl')),
-          environment: field(data, 'environment'),
+      const audience = existingRelease?.audience ?? field(data, 'audience')
+      let releaseId = existingRelease?.id
+      if (!existingRelease) {
+        const parsed = releaseCreateSchema.safeParse({
+          audience: audience || undefined,
+          benefitStatement,
+          description: field(data, 'description') || undefined,
+          sourceUrls: parseSourceUrls(field(data, 'sourceUrls')),
+          title,
         })
-        if (!product.success) throw new Error(briefValidationMessage(product.error))
-        const marketingUrl = normalizeProductUrl(field(data, 'marketingUrl'))
-        if (marketingUrl) {
-          const marketing = productSurfaceCreateSchema.safeParse({
-            name: `${product.data.name} marketing site`,
-            url: marketingUrl,
-          })
-          if (!marketing.success)
-            throw new Error(`Marketing site: ${briefValidationMessage(marketing.error)}`)
+        if (!parsed.success) throw new Error(briefValidationMessage(parsed.error))
+        if (!benefitStatement && !parsed.data.sourceUrls?.length) {
+          throw new Error('Why it matters: enter a benefit or add a source link.')
         }
-      }
-      let releaseId = initialRelease?.id
-      if (!releaseId) {
+        if (isNewProduct) {
+          const product = productSurfaceCreateSchema.safeParse({
+            name: field(data, 'productName'),
+            url: normalizeProductUrl(field(data, 'appUrl')),
+            environment: field(data, 'environment'),
+          })
+          if (!product.success) throw new Error(briefValidationMessage(product.error))
+          const marketingUrl = normalizeProductUrl(field(data, 'marketingUrl'))
+          if (marketingUrl) {
+            const marketing = productSurfaceCreateSchema.safeParse({
+              name: `${product.data.name} marketing site`,
+              url: marketingUrl,
+            })
+            if (!marketing.success)
+              throw new Error(`Marketing site: ${briefValidationMessage(marketing.error)}`)
+          }
+        }
         const productSurfaceId = isNewProduct
           ? await createProduct(data, createdProducts)
           : surfaceChoice || undefined
@@ -183,20 +175,20 @@ export function CampaignSetupForm({
           idempotencyKey,
           productSurfaceId,
         })
+        releaseSaved = true
         releaseId = release.id
-        releaseSaved = true
         trackEvent('release_created', { source: 'campaign_setup' })
-      } else {
-        releaseSaved = true
       }
-      const { campaign } = await trpcClient.campaign.create.mutate({
+      const campaignInput = campaignCreateSchema.safeParse({
         audience: audience || undefined,
-        idempotencyKey,
         name: title,
-        // The release may skip why it matters when sources are linked; a
-        // campaign still needs an objective, so the title stands in.
         objective: benefitStatement || title,
         releaseId,
+      })
+      if (!campaignInput.success) throw new Error(briefValidationMessage(campaignInput.error))
+      const { campaign } = await trpcClient.campaign.create.mutate({
+        ...campaignInput.data,
+        idempotencyKey,
       })
       trackEvent('campaign_draft_created', {
         elapsedSeconds: Math.round((Date.now() - startedAt.current) / 1_000),
@@ -243,52 +235,73 @@ export function CampaignSetupForm({
       }}
       onSubmit={handleSubmit}
     >
-      <Section description="What did you ship? This becomes the campaign brief." title="Release">
+      <Section
+        description={
+          existingRelease
+            ? 'The existing release, sources and product stay linked. Name the campaign and choose its objective.'
+            : 'What did you ship? This becomes the campaign brief.'
+        }
+        title={existingRelease ? 'Campaign' : 'Release'}
+      >
         <Group>
           <Row>
-            <Field htmlFor="campaign-release-title" label="Release title (required)">
+            <Field
+              htmlFor="campaign-release-title"
+              label={existingRelease ? 'Campaign name (required)' : 'Release title (required)'}
+            >
               <Input
                 className={inputClassName}
-                defaultValue={initialRelease?.title}
                 id="campaign-release-title"
                 maxLength={160}
                 name="title"
+                defaultValue={existingRelease?.title}
                 required
               />
             </Field>
-            <Field htmlFor="campaign-benefit" label="Why it matters">
+            <Field
+              htmlFor="campaign-benefit"
+              label={existingRelease ? 'Campaign objective' : 'Why it matters'}
+            >
               <Input
                 aria-describedby="campaign-benefit-hint"
                 className={inputClassName}
-                defaultValue={initialRelease?.benefitStatement}
                 id="campaign-benefit"
                 maxLength={500}
                 name="benefitStatement"
+                defaultValue={
+                  existingRelease?.benefitStatement.length &&
+                  existingRelease.benefitStatement.length <= 500
+                    ? existingRelease.benefitStatement
+                    : existingRelease?.title
+                }
                 placeholder="One sentence on what this changes for your users"
               />
               <p className="text-xs text-muted-foreground" id="campaign-benefit-hint">
-                Or add a source link, and the AI drafts it from your sources.
+                {existingRelease
+                  ? 'This does not change the source release.'
+                  : 'Or add a source link, and the AI drafts it from your sources.'}
               </p>
             </Field>
-            <Field htmlFor="campaign-sources" label="Source links (optional)">
-              <Textarea
-                className={textareaClassName}
-                defaultValue={initialRelease?.sourceUrls.join('\n')}
-                id="campaign-sources"
-                name="sourceUrls"
-                placeholder="Changelog, pull request, or docs URLs, one per line"
-              />
-            </Field>
+            {!existingRelease ? (
+              <Field htmlFor="campaign-sources" label="Source links (optional)">
+                <Textarea
+                  className={textareaClassName}
+                  id="campaign-sources"
+                  name="sourceUrls"
+                  placeholder="Changelog, pull request, or docs URLs, one per line"
+                />
+              </Field>
+            ) : null}
           </Row>
         </Group>
       </Section>
 
-      <Disclosure>
-        <DisclosureTrigger className="py-2 text-sm font-medium text-foreground">
-          More details
-        </DisclosureTrigger>
-        <DisclosureContent className="flex flex-col gap-10 pt-4">
-          {!initialRelease ? (
+      {!existingRelease ? (
+        <Disclosure>
+          <DisclosureTrigger className="py-2 text-sm font-medium text-foreground">
+            More details
+          </DisclosureTrigger>
+          <DisclosureContent className="flex flex-col gap-10 pt-4">
             <Section
               description="The app this campaign captures and promotes. You can add it later."
               title="Product"
@@ -391,35 +404,34 @@ export function CampaignSetupForm({
                 ) : null}
               </Group>
             </Section>
-          ) : null}
 
-          <Section title="Brief">
-            <Group>
-              <Row>
-                <Field htmlFor="campaign-description" label="Description (optional)">
-                  <Textarea
-                    className={textareaClassName}
-                    id="campaign-description"
-                    maxLength={10_000}
-                    name="description"
-                    placeholder="What changed, in your own words. Plain text."
-                  />
-                </Field>
-                <Field htmlFor="campaign-audience" label="Target audience (optional)">
-                  <Input
-                    className={inputClassName}
-                    defaultValue={initialRelease?.audience}
-                    id="campaign-audience"
-                    maxLength={1_000}
-                    name="audience"
-                    placeholder="Who should hear about this?"
-                  />
-                </Field>
-              </Row>
-            </Group>
-          </Section>
-        </DisclosureContent>
-      </Disclosure>
+            <Section title="Brief">
+              <Group>
+                <Row>
+                  <Field htmlFor="campaign-description" label="Description (optional)">
+                    <Textarea
+                      className={textareaClassName}
+                      id="campaign-description"
+                      maxLength={10_000}
+                      name="description"
+                      placeholder="What changed, in your own words. Plain text."
+                    />
+                  </Field>
+                  <Field htmlFor="campaign-audience" label="Target audience (optional)">
+                    <Input
+                      className={inputClassName}
+                      id="campaign-audience"
+                      maxLength={1_000}
+                      name="audience"
+                      placeholder="Who should hear about this?"
+                    />
+                  </Field>
+                </Row>
+              </Group>
+            </Section>
+          </DisclosureContent>
+        </Disclosure>
+      ) : null}
 
       {error ? (
         <Alert

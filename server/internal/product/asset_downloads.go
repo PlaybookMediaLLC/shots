@@ -34,9 +34,11 @@ func assetDownloadLifetime() time.Duration {
 }
 
 type assetDownloadGrant struct {
-	Actor     Actor  `json:"actor"`
-	AssetID   string `json:"assetId"`
-	ExpiresAt int64  `json:"expiresAt"`
+	KitExportID string `json:"kitExportId,omitempty"`
+	ReleaseID   string `json:"releaseId,omitempty"`
+	Actor       Actor  `json:"actor"`
+	AssetID     string `json:"assetId"`
+	ExpiresAt   int64  `json:"expiresAt"`
 }
 
 // WithAssetDownloads derives a purpose-specific encryption key from the existing
@@ -85,30 +87,41 @@ func (c *Configuration) sealAssetDownload(grant assetDownloadGrant) (string, err
 // ReadAssetDownload redeems one expiring grant through the original principal's
 // current authorization. The web service's own authority cannot replace it.
 func (c *Configuration) ReadAssetDownload(ctx context.Context, assetID, token, requestID string) ([]byte, string, error) {
-	if c.assetDownloadCipher == nil {
-		return nil, "", ErrStorageUnavailable
-	}
-	if len(token) > 4096 {
-		return nil, "", publishing.ErrUnauthorized
-	}
-	sealed, err := base64.RawURLEncoding.DecodeString(token)
-	n := c.assetDownloadCipher.NonceSize()
-	if err != nil || len(sealed) < n+c.assetDownloadCipher.Overhead() {
-		return nil, "", publishing.ErrUnauthorized
-	}
-	body, err := c.assetDownloadCipher.Open(nil, sealed[:n], sealed[n:], []byte(assetDownloadPurpose))
+	grant, err := c.openDownloadGrant(token)
 	if err != nil {
-		return nil, "", publishing.ErrUnauthorized
+		return nil, "", err
 	}
-	var grant assetDownloadGrant
-	now := time.Now().Unix()
-	// The upper bound rejects a grant sealed with a longer lifetime than this
-	// process issues, so shortening the TTL cannot be undone by an old token.
-	if json.Unmarshal(body, &grant) != nil || grant.AssetID != assetID || grant.ExpiresAt <= now || grant.ExpiresAt > now+int64(assetDownloadDefaultLifetime.Seconds()) {
+	if grant.AssetID != assetID || grant.KitExportID != "" || grant.ReleaseID != "" {
 		return nil, "", publishing.ErrUnauthorized
 	}
 	grant.Actor.RequestID = requestID
 	return c.ReadAsset(ctx, grant.Actor, assetID)
+}
+
+// Both owned assets and retained kit exports share the existing encrypted,
+// short-lived principal grant. Each reader validates its own resource fields.
+func (c *Configuration) openDownloadGrant(token string) (assetDownloadGrant, error) {
+	var grant assetDownloadGrant
+	if c.assetDownloadCipher == nil {
+		return grant, ErrStorageUnavailable
+	}
+	if len(token) > 4096 {
+		return grant, publishing.ErrUnauthorized
+	}
+	sealed, err := base64.RawURLEncoding.DecodeString(token)
+	n := c.assetDownloadCipher.NonceSize()
+	if err != nil || len(sealed) < n+c.assetDownloadCipher.Overhead() {
+		return grant, publishing.ErrUnauthorized
+	}
+	body, err := c.assetDownloadCipher.Open(nil, sealed[:n], sealed[n:], []byte(assetDownloadPurpose))
+	if err != nil {
+		return grant, publishing.ErrUnauthorized
+	}
+	now := time.Now().Unix()
+	if json.Unmarshal(body, &grant) != nil || grant.ExpiresAt <= now || grant.ExpiresAt > now+int64(assetDownloadDefaultLifetime.Seconds()) {
+		return grant, publishing.ErrUnauthorized
+	}
+	return grant, nil
 }
 
 func (c *Configuration) authorizeAssetRead(ctx context.Context, actor Actor) error {

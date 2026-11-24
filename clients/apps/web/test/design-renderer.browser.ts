@@ -71,6 +71,19 @@ before(async () => {
     const url = new URL(request.url ?? '/', 'http://app.local')
     renderQueries.push(url.searchParams)
     response.setHeader('content-type', 'text/html')
+    if (url.pathname === '/render/local') {
+      response.end(`<!doctype html><script>
+        fetch(${JSON.stringify(thirdPartyUrl)}).catch(() => {})
+        window.addEventListener('message', event => {
+          if (event.data.type !== 'render') return
+          if (event.data.document.texts[0]?.text === 'Refused') {
+            window.postMessage({ type: 'error', id: event.data.id, message: 'Snapshot refused.' }, location.origin)
+          } else window.postMessage({ type: 'result', id: event.data.id, blob: new Blob(['Frozen: ' + event.data.document.texts[0]?.text]), width: 800, height: 400 }, location.origin)
+        })
+        window.postMessage({type: 'ready'}, location.origin)
+      </script>`)
+      return
+    }
     if (url.pathname.startsWith('/render/canvas/')) {
       // A print page: two named pages at their own sizes, or a strict-check refusal.
       response.end(
@@ -164,5 +177,25 @@ test('prints canvas artboards to one PDF, a page per artboard at its own size', 
     await assert.rejects(renderer.printCanvas('broken', 'org1', ['a']), CanvasPrintRefusedError)
   } finally {
     await renderer.close().catch(() => {})
+  }
+})
+
+test('renders the supplied immutable snapshot and propagates strict refusal', async () => {
+  const { createDesignRenderer } = await import('../lib/design/renderer')
+  const { getDesignTemplate } = await import('../lib/design/templates')
+  const document = getDesignTemplate('layout-headline-spotlight')!.build({
+    headline: 'Saved copy',
+    screenshot: 'asset:11111111-1111-4111-8111-111111111111',
+  })
+  const renderer = await createDesignRenderer()
+  try {
+    const output = await renderer.renderSnapshot(document)
+    assert.equal(output.bytes.toString(), `Frozen: ${document.texts[0].text}`)
+    assert.equal(output.mediaType, 'image/png')
+    assert.equal(thirdPartyRequests, 0)
+    document.texts[0].text = 'Refused'
+    await assert.rejects(renderer.renderSnapshot(document), /Snapshot refused/)
+  } finally {
+    await renderer.close()
   }
 })

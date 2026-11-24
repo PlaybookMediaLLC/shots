@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { QueryClient } from '@tanstack/react-query'
 import { ScreenshotStudioBackendSDK } from '../../../packages/screenshot-studio-backend-sdk/src'
-import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client'
 import { observable } from '@trpc/server/observable'
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import superjson from 'superjson'
@@ -14,8 +14,135 @@ import { cachedThumbnail, thumbnailKey } from '@/lib/workspace/thumbnail-cache'
 import { requestRead, withRequestReads } from '@/lib/auth/request-reads'
 import { createTRPCContext } from '@/lib/trpc/context'
 import { publicProcedure, router } from '@/lib/trpc/init'
+import { loadWork, recentWorkQuery } from '@/components/platform-hub/work'
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: productQueryOptions } })
+
+test('work discovery bounds each enabled collection and isolates partial failures and workspace caches', async () => {
+  const requests: { path: string; input: unknown }[] = []
+  const client = createTRPCClient<AppRouter>({
+    links: [
+      () =>
+        ({ op }) =>
+          observable((observer) => {
+            requests.push({ path: op.path, input: op.input })
+            if (op.path === 'campaign.list') {
+              observer.error(TRPCClientError.from(new Error('Campaign service unavailable')))
+              return
+            }
+            observer.next({
+              result: {
+                data:
+                  op.path === 'release.list'
+                    ? {
+                        releases: [
+                          {
+                            id: 'release-1',
+                            title: 'Older launch',
+                            updatedAt: '2026-11-20T00:00:00Z',
+                          },
+                        ],
+                      }
+                    : { items: [] },
+              },
+            })
+            observer.complete()
+          }),
+    ],
+  })
+  const work = await loadWork(client, {
+    campaignsEnabled: true,
+    draftsEnabled: false,
+    limit: 4,
+    paidPlan: true,
+    search: 'Older',
+  })
+  assert.equal(work.partial, true)
+  assert.deepEqual(
+    work.items.map(({ href, title, type }) => ({ href, title, type })),
+    [{ href: '/releases/release-1', title: 'Older launch', type: 'Release' }]
+  )
+  assert.equal(requests.length, 4)
+  assert.deepEqual(requests.find(({ path }) => path === 'campaign.list')?.input, {
+    limit: 4,
+    search: 'Older',
+    sort: 'updated',
+  })
+  assert.deepEqual(requests.find(({ path }) => path === 'release.list')?.input, {
+    limit: 4,
+    search: 'Older',
+  })
+  requests.length = 0
+  await loadWork(client, {
+    campaignsEnabled: false,
+    draftsEnabled: false,
+    limit: 4,
+    paidPlan: true,
+  })
+  assert.deepEqual(
+    requests.map(({ path }) => path),
+    ['project.list', 'canvas.list']
+  )
+  requests.length = 0
+  assert.deepEqual(
+    await loadWork(client, {
+      campaignsEnabled: true,
+      draftsEnabled: false,
+      limit: 4,
+      paidPlan: false,
+    }),
+    { items: [], partial: false }
+  )
+  assert.equal(requests.length, 0)
+  assert.notDeepEqual(
+    recentWorkQuery(client, 'a', true, true, true).queryKey,
+    recentWorkQuery(client, 'b', true, true, true).queryKey
+  )
+  assert.notDeepEqual(
+    recentWorkQuery(client, 'a', true, true, true).queryKey,
+    recentWorkQuery(client, 'a', true, true, false).queryKey
+  )
+})
+
+test('the shared recent cache retains visuals even when releases and campaigns are newer', async () => {
+  const client = createTRPCClient<AppRouter>({
+    links: [
+      () =>
+        ({ op }) =>
+          observable((observer) => {
+            const newer = op.path === 'release.list' || op.path === 'campaign.list'
+            const items = Array.from({ length: 5 }, (_, index) => ({
+              id: `${op.path}-${index}`,
+              name: `${op.path} ${index}`,
+              title: `${op.path} ${index}`,
+              updatedAt: newer ? '2026-11-20T00:00:00Z' : '2026-11-19T00:00:00Z',
+              document: null,
+            }))
+            observer.next({
+              result: {
+                data:
+                  op.path === 'release.list'
+                    ? { releases: items }
+                    : op.path === 'campaign.list'
+                      ? { campaigns: items }
+                      : { items },
+              },
+            })
+            observer.complete()
+          }),
+    ],
+  })
+  const work = await recentWorkQuery(client, 'workspace', false, true, true).queryFn({
+    signal: new AbortController().signal,
+  })
+  assert.equal(work.partial, false)
+  assert.equal(work.items.length, 20)
+  assert.equal(
+    work.items.filter(({ type }) => type === 'Screenshot' || type === 'Canvas').length,
+    10
+  )
+  assert.ok(work.items.slice(0, 8).every(({ type }) => type === 'Release' || type === 'Campaign'))
+})
 
 test('list pages reuse thirty-second results and imperative writes invalidate every filter', async (t) => {
   const queryClient = newClient()
@@ -75,11 +202,19 @@ test('the shell reuses the latest onboarding run until an onboarding change', as
   })
   const trpc = createTRPCOptionsProxy<AppRouter>({ client, queryClient })
   const latest = trpc.onboarding.latest.queryOptions()
+  const recent = recentWorkQuery(client, 'workspace', true, true, true)
+  queryClient.setQueryData(recent.queryKey, { items: [], partial: false })
+  queryClient.setQueryData(['shell-search', 'workspace', 'release'], { items: [], partial: false })
   await queryClient.fetchQuery(latest)
   await queryClient.fetchQuery(latest)
   assert.equal(reads, 1)
   await client.onboarding.rerun.mutate({ runId: 'run-1' })
   assert.equal(queryClient.getQueryState(latest.queryKey)?.isInvalidated, true)
+  assert.equal(queryClient.getQueryState(recent.queryKey)?.isInvalidated, true)
+  assert.equal(
+    queryClient.getQueryState(['shell-search', 'workspace', 'release'])?.isInvalidated,
+    true
+  )
 })
 
 test('a refused read (4xx) is not retried', () => {

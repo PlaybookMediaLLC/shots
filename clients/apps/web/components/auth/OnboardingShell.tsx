@@ -11,7 +11,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   { description: 'Your sign-in details.', title: 'Create your account' },
   { description: "Your team's shared home.", title: 'Create your workspace' },
   { description: 'Pick how often you ship.', title: 'Choose a plan' },
-  { description: 'Your first seven posts.', title: 'Your product' },
+  { description: 'Confirm your product context.', title: 'Your product' },
 ]
 
 /**

@@ -43,6 +43,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimpathbinding"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimsupportset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/claimverification"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
@@ -62,6 +66,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/enrichmentrecord"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceclearance"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidencesource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/evidenceversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendactivation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/frontendsource"
@@ -74,6 +81,13 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/idealcustomerprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/integrationconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/invitation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitexport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitmember"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitreviewdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitsourcepin"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrunstep"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
@@ -124,14 +138,28 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/projectversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/readinesscommandreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	entreleaseautomation "github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationexecutor"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaim"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseclaimversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasedocument"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseevidence"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasekit"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaselineage"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaselineagebinding"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalification"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationasset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationdecision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasequalificationsource"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasereadiness"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourcebinding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasespec"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/screenshotcache"
@@ -227,6 +255,14 @@ type Client struct {
 	CaptureRecipe *CaptureRecipeClient
 	// ChannelConnection is the client for interacting with the ChannelConnection builders.
 	ChannelConnection *ChannelConnectionClient
+	// ClaimPathBinding is the client for interacting with the ClaimPathBinding builders.
+	ClaimPathBinding *ClaimPathBindingClient
+	// ClaimSupport is the client for interacting with the ClaimSupport builders.
+	ClaimSupport *ClaimSupportClient
+	// ClaimSupportSet is the client for interacting with the ClaimSupportSet builders.
+	ClaimSupportSet *ClaimSupportSetClient
+	// ClaimVerification is the client for interacting with the ClaimVerification builders.
+	ClaimVerification *ClaimVerificationClient
 	// CommunicationAttempt is the client for interacting with the CommunicationAttempt builders.
 	CommunicationAttempt *CommunicationAttemptClient
 	// CommunicationRecipient is the client for interacting with the CommunicationRecipient builders.
@@ -265,6 +301,12 @@ type Client struct {
 	Design *DesignClient
 	// EnrichmentRecord is the client for interacting with the EnrichmentRecord builders.
 	EnrichmentRecord *EnrichmentRecordClient
+	// EvidenceClearance is the client for interacting with the EvidenceClearance builders.
+	EvidenceClearance *EvidenceClearanceClient
+	// EvidenceSource is the client for interacting with the EvidenceSource builders.
+	EvidenceSource *EvidenceSourceClient
+	// EvidenceVersion is the client for interacting with the EvidenceVersion builders.
+	EvidenceVersion *EvidenceVersionClient
 	// FrontendActivation is the client for interacting with the FrontendActivation builders.
 	FrontendActivation *FrontendActivationClient
 	// FrontendObservation is the client for interacting with the FrontendObservation builders.
@@ -289,6 +331,20 @@ type Client struct {
 	IntegrationConnection *IntegrationConnectionClient
 	// Invitation is the client for interacting with the Invitation builders.
 	Invitation *InvitationClient
+	// KitArtifactClaim is the client for interacting with the KitArtifactClaim builders.
+	KitArtifactClaim *KitArtifactClaimClient
+	// KitArtifactRevision is the client for interacting with the KitArtifactRevision builders.
+	KitArtifactRevision *KitArtifactRevisionClient
+	// KitExport is the client for interacting with the KitExport builders.
+	KitExport *KitExportClient
+	// KitMember is the client for interacting with the KitMember builders.
+	KitMember *KitMemberClient
+	// KitReviewDecision is the client for interacting with the KitReviewDecision builders.
+	KitReviewDecision *KitReviewDecisionClient
+	// KitRevision is the client for interacting with the KitRevision builders.
+	KitRevision *KitRevisionClient
+	// KitSourcePin is the client for interacting with the KitSourcePin builders.
+	KitSourcePin *KitSourcePinClient
 	// LaunchRun is the client for interacting with the LaunchRun builders.
 	LaunchRun *LaunchRunClient
 	// LaunchRunStep is the client for interacting with the LaunchRunStep builders.
@@ -389,6 +445,8 @@ type Client struct {
 	ProjectVersion *ProjectVersionClient
 	// PublicationAttempt is the client for interacting with the PublicationAttempt builders.
 	PublicationAttempt *PublicationAttemptClient
+	// ReadinessCommandReceipt is the client for interacting with the ReadinessCommandReceipt builders.
+	ReadinessCommandReceipt *ReadinessCommandReceiptClient
 	// Release is the client for interacting with the Release builders.
 	Release *ReleaseClient
 	// ReleaseAutomation is the client for interacting with the ReleaseAutomation builders.
@@ -401,10 +459,36 @@ type Client struct {
 	ReleaseAutomationRun *ReleaseAutomationRunClient
 	// ReleaseAutomationVersion is the client for interacting with the ReleaseAutomationVersion builders.
 	ReleaseAutomationVersion *ReleaseAutomationVersionClient
+	// ReleaseClaim is the client for interacting with the ReleaseClaim builders.
+	ReleaseClaim *ReleaseClaimClient
+	// ReleaseClaimVersion is the client for interacting with the ReleaseClaimVersion builders.
+	ReleaseClaimVersion *ReleaseClaimVersionClient
 	// ReleaseDocument is the client for interacting with the ReleaseDocument builders.
 	ReleaseDocument *ReleaseDocumentClient
+	// ReleaseEvidence is the client for interacting with the ReleaseEvidence builders.
+	ReleaseEvidence *ReleaseEvidenceClient
+	// ReleaseKit is the client for interacting with the ReleaseKit builders.
+	ReleaseKit *ReleaseKitClient
+	// ReleaseLineage is the client for interacting with the ReleaseLineage builders.
+	ReleaseLineage *ReleaseLineageClient
+	// ReleaseLineageBinding is the client for interacting with the ReleaseLineageBinding builders.
+	ReleaseLineageBinding *ReleaseLineageBindingClient
+	// ReleaseQualification is the client for interacting with the ReleaseQualification builders.
+	ReleaseQualification *ReleaseQualificationClient
+	// ReleaseQualificationAsset is the client for interacting with the ReleaseQualificationAsset builders.
+	ReleaseQualificationAsset *ReleaseQualificationAssetClient
+	// ReleaseQualificationDecision is the client for interacting with the ReleaseQualificationDecision builders.
+	ReleaseQualificationDecision *ReleaseQualificationDecisionClient
+	// ReleaseQualificationSource is the client for interacting with the ReleaseQualificationSource builders.
+	ReleaseQualificationSource *ReleaseQualificationSourceClient
+	// ReleaseReadiness is the client for interacting with the ReleaseReadiness builders.
+	ReleaseReadiness *ReleaseReadinessClient
+	// ReleaseSourceBinding is the client for interacting with the ReleaseSourceBinding builders.
+	ReleaseSourceBinding *ReleaseSourceBindingClient
 	// ReleaseSourceEvent is the client for interacting with the ReleaseSourceEvent builders.
 	ReleaseSourceEvent *ReleaseSourceEventClient
+	// ReleaseSourceObservation is the client for interacting with the ReleaseSourceObservation builders.
+	ReleaseSourceObservation *ReleaseSourceObservationClient
 	// ReleaseSpec is the client for interacting with the ReleaseSpec builders.
 	ReleaseSpec *ReleaseSpecClient
 	// ScheduledPost is the client for interacting with the ScheduledPost builders.
@@ -508,6 +592,10 @@ func (c *Client) init() {
 	c.CaptureJob = NewCaptureJobClient(c.config)
 	c.CaptureRecipe = NewCaptureRecipeClient(c.config)
 	c.ChannelConnection = NewChannelConnectionClient(c.config)
+	c.ClaimPathBinding = NewClaimPathBindingClient(c.config)
+	c.ClaimSupport = NewClaimSupportClient(c.config)
+	c.ClaimSupportSet = NewClaimSupportSetClient(c.config)
+	c.ClaimVerification = NewClaimVerificationClient(c.config)
 	c.CommunicationAttempt = NewCommunicationAttemptClient(c.config)
 	c.CommunicationRecipient = NewCommunicationRecipientClient(c.config)
 	c.ContentAngle = NewContentAngleClient(c.config)
@@ -527,6 +615,9 @@ func (c *Client) init() {
 	c.DeploymentEvent = NewDeploymentEventClient(c.config)
 	c.Design = NewDesignClient(c.config)
 	c.EnrichmentRecord = NewEnrichmentRecordClient(c.config)
+	c.EvidenceClearance = NewEvidenceClearanceClient(c.config)
+	c.EvidenceSource = NewEvidenceSourceClient(c.config)
+	c.EvidenceVersion = NewEvidenceVersionClient(c.config)
 	c.FrontendActivation = NewFrontendActivationClient(c.config)
 	c.FrontendObservation = NewFrontendObservationClient(c.config)
 	c.FrontendSource = NewFrontendSourceClient(c.config)
@@ -539,6 +630,13 @@ func (c *Client) init() {
 	c.IdealCustomerProfile = NewIdealCustomerProfileClient(c.config)
 	c.IntegrationConnection = NewIntegrationConnectionClient(c.config)
 	c.Invitation = NewInvitationClient(c.config)
+	c.KitArtifactClaim = NewKitArtifactClaimClient(c.config)
+	c.KitArtifactRevision = NewKitArtifactRevisionClient(c.config)
+	c.KitExport = NewKitExportClient(c.config)
+	c.KitMember = NewKitMemberClient(c.config)
+	c.KitReviewDecision = NewKitReviewDecisionClient(c.config)
+	c.KitRevision = NewKitRevisionClient(c.config)
+	c.KitSourcePin = NewKitSourcePinClient(c.config)
 	c.LaunchRun = NewLaunchRunClient(c.config)
 	c.LaunchRunStep = NewLaunchRunStepClient(c.config)
 	c.Member = NewMemberClient(c.config)
@@ -589,14 +687,28 @@ func (c *Client) init() {
 	c.Project = NewProjectClient(c.config)
 	c.ProjectVersion = NewProjectVersionClient(c.config)
 	c.PublicationAttempt = NewPublicationAttemptClient(c.config)
+	c.ReadinessCommandReceipt = NewReadinessCommandReceiptClient(c.config)
 	c.Release = NewReleaseClient(c.config)
 	c.ReleaseAutomation = NewReleaseAutomationClient(c.config)
 	c.ReleaseAutomationExecutor = NewReleaseAutomationExecutorClient(c.config)
 	c.ReleaseAutomationNode = NewReleaseAutomationNodeClient(c.config)
 	c.ReleaseAutomationRun = NewReleaseAutomationRunClient(c.config)
 	c.ReleaseAutomationVersion = NewReleaseAutomationVersionClient(c.config)
+	c.ReleaseClaim = NewReleaseClaimClient(c.config)
+	c.ReleaseClaimVersion = NewReleaseClaimVersionClient(c.config)
 	c.ReleaseDocument = NewReleaseDocumentClient(c.config)
+	c.ReleaseEvidence = NewReleaseEvidenceClient(c.config)
+	c.ReleaseKit = NewReleaseKitClient(c.config)
+	c.ReleaseLineage = NewReleaseLineageClient(c.config)
+	c.ReleaseLineageBinding = NewReleaseLineageBindingClient(c.config)
+	c.ReleaseQualification = NewReleaseQualificationClient(c.config)
+	c.ReleaseQualificationAsset = NewReleaseQualificationAssetClient(c.config)
+	c.ReleaseQualificationDecision = NewReleaseQualificationDecisionClient(c.config)
+	c.ReleaseQualificationSource = NewReleaseQualificationSourceClient(c.config)
+	c.ReleaseReadiness = NewReleaseReadinessClient(c.config)
+	c.ReleaseSourceBinding = NewReleaseSourceBindingClient(c.config)
 	c.ReleaseSourceEvent = NewReleaseSourceEventClient(c.config)
+	c.ReleaseSourceObservation = NewReleaseSourceObservationClient(c.config)
 	c.ReleaseSpec = NewReleaseSpecClient(c.config)
 	c.ScheduledPost = NewScheduledPostClient(c.config)
 	c.ScreenshotCache = NewScreenshotCacheClient(c.config)
@@ -749,6 +861,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CaptureJob:                      NewCaptureJobClient(cfg),
 		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
+		ClaimPathBinding:                NewClaimPathBindingClient(cfg),
+		ClaimSupport:                    NewClaimSupportClient(cfg),
+		ClaimSupportSet:                 NewClaimSupportSetClient(cfg),
+		ClaimVerification:               NewClaimVerificationClient(cfg),
 		CommunicationAttempt:            NewCommunicationAttemptClient(cfg),
 		CommunicationRecipient:          NewCommunicationRecipientClient(cfg),
 		ContentAngle:                    NewContentAngleClient(cfg),
@@ -768,6 +884,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DeploymentEvent:                 NewDeploymentEventClient(cfg),
 		Design:                          NewDesignClient(cfg),
 		EnrichmentRecord:                NewEnrichmentRecordClient(cfg),
+		EvidenceClearance:               NewEvidenceClearanceClient(cfg),
+		EvidenceSource:                  NewEvidenceSourceClient(cfg),
+		EvidenceVersion:                 NewEvidenceVersionClient(cfg),
 		FrontendActivation:              NewFrontendActivationClient(cfg),
 		FrontendObservation:             NewFrontendObservationClient(cfg),
 		FrontendSource:                  NewFrontendSourceClient(cfg),
@@ -780,6 +899,13 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		IdealCustomerProfile:            NewIdealCustomerProfileClient(cfg),
 		IntegrationConnection:           NewIntegrationConnectionClient(cfg),
 		Invitation:                      NewInvitationClient(cfg),
+		KitArtifactClaim:                NewKitArtifactClaimClient(cfg),
+		KitArtifactRevision:             NewKitArtifactRevisionClient(cfg),
+		KitExport:                       NewKitExportClient(cfg),
+		KitMember:                       NewKitMemberClient(cfg),
+		KitReviewDecision:               NewKitReviewDecisionClient(cfg),
+		KitRevision:                     NewKitRevisionClient(cfg),
+		KitSourcePin:                    NewKitSourcePinClient(cfg),
 		LaunchRun:                       NewLaunchRunClient(cfg),
 		LaunchRunStep:                   NewLaunchRunStepClient(cfg),
 		Member:                          NewMemberClient(cfg),
@@ -830,14 +956,28 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Project:                         NewProjectClient(cfg),
 		ProjectVersion:                  NewProjectVersionClient(cfg),
 		PublicationAttempt:              NewPublicationAttemptClient(cfg),
+		ReadinessCommandReceipt:         NewReadinessCommandReceiptClient(cfg),
 		Release:                         NewReleaseClient(cfg),
 		ReleaseAutomation:               NewReleaseAutomationClient(cfg),
 		ReleaseAutomationExecutor:       NewReleaseAutomationExecutorClient(cfg),
 		ReleaseAutomationNode:           NewReleaseAutomationNodeClient(cfg),
 		ReleaseAutomationRun:            NewReleaseAutomationRunClient(cfg),
 		ReleaseAutomationVersion:        NewReleaseAutomationVersionClient(cfg),
+		ReleaseClaim:                    NewReleaseClaimClient(cfg),
+		ReleaseClaimVersion:             NewReleaseClaimVersionClient(cfg),
 		ReleaseDocument:                 NewReleaseDocumentClient(cfg),
+		ReleaseEvidence:                 NewReleaseEvidenceClient(cfg),
+		ReleaseKit:                      NewReleaseKitClient(cfg),
+		ReleaseLineage:                  NewReleaseLineageClient(cfg),
+		ReleaseLineageBinding:           NewReleaseLineageBindingClient(cfg),
+		ReleaseQualification:            NewReleaseQualificationClient(cfg),
+		ReleaseQualificationAsset:       NewReleaseQualificationAssetClient(cfg),
+		ReleaseQualificationDecision:    NewReleaseQualificationDecisionClient(cfg),
+		ReleaseQualificationSource:      NewReleaseQualificationSourceClient(cfg),
+		ReleaseReadiness:                NewReleaseReadinessClient(cfg),
+		ReleaseSourceBinding:            NewReleaseSourceBindingClient(cfg),
 		ReleaseSourceEvent:              NewReleaseSourceEventClient(cfg),
+		ReleaseSourceObservation:        NewReleaseSourceObservationClient(cfg),
 		ReleaseSpec:                     NewReleaseSpecClient(cfg),
 		ScheduledPost:                   NewScheduledPostClient(cfg),
 		ScreenshotCache:                 NewScreenshotCacheClient(cfg),
@@ -917,6 +1057,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CaptureJob:                      NewCaptureJobClient(cfg),
 		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
+		ClaimPathBinding:                NewClaimPathBindingClient(cfg),
+		ClaimSupport:                    NewClaimSupportClient(cfg),
+		ClaimSupportSet:                 NewClaimSupportSetClient(cfg),
+		ClaimVerification:               NewClaimVerificationClient(cfg),
 		CommunicationAttempt:            NewCommunicationAttemptClient(cfg),
 		CommunicationRecipient:          NewCommunicationRecipientClient(cfg),
 		ContentAngle:                    NewContentAngleClient(cfg),
@@ -936,6 +1080,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DeploymentEvent:                 NewDeploymentEventClient(cfg),
 		Design:                          NewDesignClient(cfg),
 		EnrichmentRecord:                NewEnrichmentRecordClient(cfg),
+		EvidenceClearance:               NewEvidenceClearanceClient(cfg),
+		EvidenceSource:                  NewEvidenceSourceClient(cfg),
+		EvidenceVersion:                 NewEvidenceVersionClient(cfg),
 		FrontendActivation:              NewFrontendActivationClient(cfg),
 		FrontendObservation:             NewFrontendObservationClient(cfg),
 		FrontendSource:                  NewFrontendSourceClient(cfg),
@@ -948,6 +1095,13 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		IdealCustomerProfile:            NewIdealCustomerProfileClient(cfg),
 		IntegrationConnection:           NewIntegrationConnectionClient(cfg),
 		Invitation:                      NewInvitationClient(cfg),
+		KitArtifactClaim:                NewKitArtifactClaimClient(cfg),
+		KitArtifactRevision:             NewKitArtifactRevisionClient(cfg),
+		KitExport:                       NewKitExportClient(cfg),
+		KitMember:                       NewKitMemberClient(cfg),
+		KitReviewDecision:               NewKitReviewDecisionClient(cfg),
+		KitRevision:                     NewKitRevisionClient(cfg),
+		KitSourcePin:                    NewKitSourcePinClient(cfg),
 		LaunchRun:                       NewLaunchRunClient(cfg),
 		LaunchRunStep:                   NewLaunchRunStepClient(cfg),
 		Member:                          NewMemberClient(cfg),
@@ -998,14 +1152,28 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Project:                         NewProjectClient(cfg),
 		ProjectVersion:                  NewProjectVersionClient(cfg),
 		PublicationAttempt:              NewPublicationAttemptClient(cfg),
+		ReadinessCommandReceipt:         NewReadinessCommandReceiptClient(cfg),
 		Release:                         NewReleaseClient(cfg),
 		ReleaseAutomation:               NewReleaseAutomationClient(cfg),
 		ReleaseAutomationExecutor:       NewReleaseAutomationExecutorClient(cfg),
 		ReleaseAutomationNode:           NewReleaseAutomationNodeClient(cfg),
 		ReleaseAutomationRun:            NewReleaseAutomationRunClient(cfg),
 		ReleaseAutomationVersion:        NewReleaseAutomationVersionClient(cfg),
+		ReleaseClaim:                    NewReleaseClaimClient(cfg),
+		ReleaseClaimVersion:             NewReleaseClaimVersionClient(cfg),
 		ReleaseDocument:                 NewReleaseDocumentClient(cfg),
+		ReleaseEvidence:                 NewReleaseEvidenceClient(cfg),
+		ReleaseKit:                      NewReleaseKitClient(cfg),
+		ReleaseLineage:                  NewReleaseLineageClient(cfg),
+		ReleaseLineageBinding:           NewReleaseLineageBindingClient(cfg),
+		ReleaseQualification:            NewReleaseQualificationClient(cfg),
+		ReleaseQualificationAsset:       NewReleaseQualificationAssetClient(cfg),
+		ReleaseQualificationDecision:    NewReleaseQualificationDecisionClient(cfg),
+		ReleaseQualificationSource:      NewReleaseQualificationSourceClient(cfg),
+		ReleaseReadiness:                NewReleaseReadinessClient(cfg),
+		ReleaseSourceBinding:            NewReleaseSourceBindingClient(cfg),
 		ReleaseSourceEvent:              NewReleaseSourceEventClient(cfg),
+		ReleaseSourceObservation:        NewReleaseSourceObservationClient(cfg),
 		ReleaseSpec:                     NewReleaseSpecClient(cfg),
 		ScheduledPost:                   NewScheduledPostClient(cfg),
 		ScreenshotCache:                 NewScreenshotCacheClient(cfg),
@@ -1074,43 +1242,51 @@ func (c *Client) Use(hooks ...Hook) {
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
 		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
+		c.ClaimPathBinding, c.ClaimSupport, c.ClaimSupportSet, c.ClaimVerification,
 		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
 		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
 		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
 		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
 		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
-		c.EnrichmentRecord, c.FrontendActivation, c.FrontendObservation,
-		c.FrontendSource, c.GitHubDeliveryRecovery, c.GitHubInstallStart,
-		c.GitHubInstallation, c.GitHubObservation, c.GitHubProductionPolicy,
-		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
-		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
-		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
-		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
-		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
-		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
-		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
-		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
-		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
-		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
-		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
-		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
-		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
-		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
-		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.EnrichmentRecord, c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion,
+		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
+		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
+		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
+		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation,
+		c.KitArtifactClaim, c.KitArtifactRevision, c.KitExport, c.KitMember,
+		c.KitReviewDecision, c.KitRevision, c.KitSourcePin, c.LaunchRun,
+		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
+		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
+		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAppConnection,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformFounderHubDevice,
+		c.PlatformFounderHubDeviceCommand, c.PlatformFounderHubRevision,
+		c.PlatformFounderHubSettings, c.PlatformFounderHubTemplate,
+		c.PlatformFounderHubUser, c.PlatformFounderHubWorkspace,
+		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
+		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
+		c.PlatformNotificationSeenAction, c.PlatformOAuthAccessToken,
+		c.PlatformOAuthClient, c.PlatformOAuthConsent, c.PlatformOAuthJWK,
+		c.PlatformOAuthRefreshToken, c.PlatformSignupSource, c.PlatformSlackConnection,
+		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
-		c.ProjectVersion, c.PublicationAttempt, c.Release, c.ReleaseAutomation,
-		c.ReleaseAutomationExecutor, c.ReleaseAutomationNode, c.ReleaseAutomationRun,
-		c.ReleaseAutomationVersion, c.ReleaseDocument, c.ReleaseSourceEvent,
-		c.ReleaseSpec, c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink,
-		c.SocialOAuthStart, c.SocialSet, c.SocialSetWritingSample,
-		c.SocialTenantBinding, c.SourceApp, c.SourceChange,
-		c.StorePublishingCredential, c.StoreReview, c.StoreReviewComment,
-		c.SupportAccessGrant, c.SurfaceCapture, c.User, c.UserPreference,
-		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
-		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.ProjectVersion, c.PublicationAttempt, c.ReadinessCommandReceipt, c.Release,
+		c.ReleaseAutomation, c.ReleaseAutomationExecutor, c.ReleaseAutomationNode,
+		c.ReleaseAutomationRun, c.ReleaseAutomationVersion, c.ReleaseClaim,
+		c.ReleaseClaimVersion, c.ReleaseDocument, c.ReleaseEvidence, c.ReleaseKit,
+		c.ReleaseLineage, c.ReleaseLineageBinding, c.ReleaseQualification,
+		c.ReleaseQualificationAsset, c.ReleaseQualificationDecision,
+		c.ReleaseQualificationSource, c.ReleaseReadiness, c.ReleaseSourceBinding,
+		c.ReleaseSourceEvent, c.ReleaseSourceObservation, c.ReleaseSpec,
+		c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink, c.SocialOAuthStart,
+		c.SocialSet, c.SocialSetWritingSample, c.SocialTenantBinding, c.SourceApp,
+		c.SourceChange, c.StorePublishingCredential, c.StoreReview,
+		c.StoreReviewComment, c.SupportAccessGrant, c.SurfaceCapture, c.User,
+		c.UserPreference, c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings,
+		c.VoiceNote, c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
 		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceCreditGrant,
 		c.WorkspaceDeletion, c.WorkspaceEntitlement, c.WorkspaceGitHubInstallation,
 		c.WorkspaceSettings,
@@ -1130,43 +1306,51 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
 		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
+		c.ClaimPathBinding, c.ClaimSupport, c.ClaimSupportSet, c.ClaimVerification,
 		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
 		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
 		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
 		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
 		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
-		c.EnrichmentRecord, c.FrontendActivation, c.FrontendObservation,
-		c.FrontendSource, c.GitHubDeliveryRecovery, c.GitHubInstallStart,
-		c.GitHubInstallation, c.GitHubObservation, c.GitHubProductionPolicy,
-		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
-		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
-		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
-		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
-		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
-		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
-		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
-		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
-		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
-		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
-		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
-		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
-		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
-		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
-		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.EnrichmentRecord, c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion,
+		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
+		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
+		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
+		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation,
+		c.KitArtifactClaim, c.KitArtifactRevision, c.KitExport, c.KitMember,
+		c.KitReviewDecision, c.KitRevision, c.KitSourcePin, c.LaunchRun,
+		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
+		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
+		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAppConnection,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformFounderHubDevice,
+		c.PlatformFounderHubDeviceCommand, c.PlatformFounderHubRevision,
+		c.PlatformFounderHubSettings, c.PlatformFounderHubTemplate,
+		c.PlatformFounderHubUser, c.PlatformFounderHubWorkspace,
+		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
+		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
+		c.PlatformNotificationSeenAction, c.PlatformOAuthAccessToken,
+		c.PlatformOAuthClient, c.PlatformOAuthConsent, c.PlatformOAuthJWK,
+		c.PlatformOAuthRefreshToken, c.PlatformSignupSource, c.PlatformSlackConnection,
+		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
-		c.ProjectVersion, c.PublicationAttempt, c.Release, c.ReleaseAutomation,
-		c.ReleaseAutomationExecutor, c.ReleaseAutomationNode, c.ReleaseAutomationRun,
-		c.ReleaseAutomationVersion, c.ReleaseDocument, c.ReleaseSourceEvent,
-		c.ReleaseSpec, c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink,
-		c.SocialOAuthStart, c.SocialSet, c.SocialSetWritingSample,
-		c.SocialTenantBinding, c.SourceApp, c.SourceChange,
-		c.StorePublishingCredential, c.StoreReview, c.StoreReviewComment,
-		c.SupportAccessGrant, c.SurfaceCapture, c.User, c.UserPreference,
-		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
-		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.ProjectVersion, c.PublicationAttempt, c.ReadinessCommandReceipt, c.Release,
+		c.ReleaseAutomation, c.ReleaseAutomationExecutor, c.ReleaseAutomationNode,
+		c.ReleaseAutomationRun, c.ReleaseAutomationVersion, c.ReleaseClaim,
+		c.ReleaseClaimVersion, c.ReleaseDocument, c.ReleaseEvidence, c.ReleaseKit,
+		c.ReleaseLineage, c.ReleaseLineageBinding, c.ReleaseQualification,
+		c.ReleaseQualificationAsset, c.ReleaseQualificationDecision,
+		c.ReleaseQualificationSource, c.ReleaseReadiness, c.ReleaseSourceBinding,
+		c.ReleaseSourceEvent, c.ReleaseSourceObservation, c.ReleaseSpec,
+		c.ScheduledPost, c.ScreenshotCache, c.Session, c.ShareLink, c.SocialOAuthStart,
+		c.SocialSet, c.SocialSetWritingSample, c.SocialTenantBinding, c.SourceApp,
+		c.SourceChange, c.StorePublishingCredential, c.StoreReview,
+		c.StoreReviewComment, c.SupportAccessGrant, c.SurfaceCapture, c.User,
+		c.UserPreference, c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings,
+		c.VoiceNote, c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
 		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceCreditGrant,
 		c.WorkspaceDeletion, c.WorkspaceEntitlement, c.WorkspaceGitHubInstallation,
 		c.WorkspaceSettings,
@@ -1234,6 +1418,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CaptureRecipe.mutate(ctx, m)
 	case *ChannelConnectionMutation:
 		return c.ChannelConnection.mutate(ctx, m)
+	case *ClaimPathBindingMutation:
+		return c.ClaimPathBinding.mutate(ctx, m)
+	case *ClaimSupportMutation:
+		return c.ClaimSupport.mutate(ctx, m)
+	case *ClaimSupportSetMutation:
+		return c.ClaimSupportSet.mutate(ctx, m)
+	case *ClaimVerificationMutation:
+		return c.ClaimVerification.mutate(ctx, m)
 	case *CommunicationAttemptMutation:
 		return c.CommunicationAttempt.mutate(ctx, m)
 	case *CommunicationRecipientMutation:
@@ -1272,6 +1464,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Design.mutate(ctx, m)
 	case *EnrichmentRecordMutation:
 		return c.EnrichmentRecord.mutate(ctx, m)
+	case *EvidenceClearanceMutation:
+		return c.EvidenceClearance.mutate(ctx, m)
+	case *EvidenceSourceMutation:
+		return c.EvidenceSource.mutate(ctx, m)
+	case *EvidenceVersionMutation:
+		return c.EvidenceVersion.mutate(ctx, m)
 	case *FrontendActivationMutation:
 		return c.FrontendActivation.mutate(ctx, m)
 	case *FrontendObservationMutation:
@@ -1296,6 +1494,20 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.IntegrationConnection.mutate(ctx, m)
 	case *InvitationMutation:
 		return c.Invitation.mutate(ctx, m)
+	case *KitArtifactClaimMutation:
+		return c.KitArtifactClaim.mutate(ctx, m)
+	case *KitArtifactRevisionMutation:
+		return c.KitArtifactRevision.mutate(ctx, m)
+	case *KitExportMutation:
+		return c.KitExport.mutate(ctx, m)
+	case *KitMemberMutation:
+		return c.KitMember.mutate(ctx, m)
+	case *KitReviewDecisionMutation:
+		return c.KitReviewDecision.mutate(ctx, m)
+	case *KitRevisionMutation:
+		return c.KitRevision.mutate(ctx, m)
+	case *KitSourcePinMutation:
+		return c.KitSourcePin.mutate(ctx, m)
 	case *LaunchRunMutation:
 		return c.LaunchRun.mutate(ctx, m)
 	case *LaunchRunStepMutation:
@@ -1396,6 +1608,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProjectVersion.mutate(ctx, m)
 	case *PublicationAttemptMutation:
 		return c.PublicationAttempt.mutate(ctx, m)
+	case *ReadinessCommandReceiptMutation:
+		return c.ReadinessCommandReceipt.mutate(ctx, m)
 	case *ReleaseMutation:
 		return c.Release.mutate(ctx, m)
 	case *ReleaseAutomationMutation:
@@ -1408,10 +1622,36 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ReleaseAutomationRun.mutate(ctx, m)
 	case *ReleaseAutomationVersionMutation:
 		return c.ReleaseAutomationVersion.mutate(ctx, m)
+	case *ReleaseClaimMutation:
+		return c.ReleaseClaim.mutate(ctx, m)
+	case *ReleaseClaimVersionMutation:
+		return c.ReleaseClaimVersion.mutate(ctx, m)
 	case *ReleaseDocumentMutation:
 		return c.ReleaseDocument.mutate(ctx, m)
+	case *ReleaseEvidenceMutation:
+		return c.ReleaseEvidence.mutate(ctx, m)
+	case *ReleaseKitMutation:
+		return c.ReleaseKit.mutate(ctx, m)
+	case *ReleaseLineageMutation:
+		return c.ReleaseLineage.mutate(ctx, m)
+	case *ReleaseLineageBindingMutation:
+		return c.ReleaseLineageBinding.mutate(ctx, m)
+	case *ReleaseQualificationMutation:
+		return c.ReleaseQualification.mutate(ctx, m)
+	case *ReleaseQualificationAssetMutation:
+		return c.ReleaseQualificationAsset.mutate(ctx, m)
+	case *ReleaseQualificationDecisionMutation:
+		return c.ReleaseQualificationDecision.mutate(ctx, m)
+	case *ReleaseQualificationSourceMutation:
+		return c.ReleaseQualificationSource.mutate(ctx, m)
+	case *ReleaseReadinessMutation:
+		return c.ReleaseReadiness.mutate(ctx, m)
+	case *ReleaseSourceBindingMutation:
+		return c.ReleaseSourceBinding.mutate(ctx, m)
 	case *ReleaseSourceEventMutation:
 		return c.ReleaseSourceEvent.mutate(ctx, m)
+	case *ReleaseSourceObservationMutation:
+		return c.ReleaseSourceObservation.mutate(ctx, m)
 	case *ReleaseSpecMutation:
 		return c.ReleaseSpec.mutate(ctx, m)
 	case *ScheduledPostMutation:
@@ -5253,6 +5493,538 @@ func (c *ChannelConnectionClient) mutate(ctx context.Context, m *ChannelConnecti
 	}
 }
 
+// ClaimPathBindingClient is a client for the ClaimPathBinding schema.
+type ClaimPathBindingClient struct {
+	config
+}
+
+// NewClaimPathBindingClient returns a client for the ClaimPathBinding from the given config.
+func NewClaimPathBindingClient(c config) *ClaimPathBindingClient {
+	return &ClaimPathBindingClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `claimpathbinding.Hooks(f(g(h())))`.
+func (c *ClaimPathBindingClient) Use(hooks ...Hook) {
+	c.hooks.ClaimPathBinding = append(c.hooks.ClaimPathBinding, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `claimpathbinding.Intercept(f(g(h())))`.
+func (c *ClaimPathBindingClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ClaimPathBinding = append(c.inters.ClaimPathBinding, interceptors...)
+}
+
+// Create returns a builder for creating a ClaimPathBinding entity.
+func (c *ClaimPathBindingClient) Create() *ClaimPathBindingCreate {
+	mutation := newClaimPathBindingMutation(c.config, OpCreate)
+	return &ClaimPathBindingCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ClaimPathBinding entities.
+func (c *ClaimPathBindingClient) CreateBulk(builders ...*ClaimPathBindingCreate) *ClaimPathBindingCreateBulk {
+	return &ClaimPathBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ClaimPathBindingClient) MapCreateBulk(slice any, setFunc func(*ClaimPathBindingCreate, int)) *ClaimPathBindingCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ClaimPathBindingCreateBulk{err: fmt.Errorf("calling to ClaimPathBindingClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ClaimPathBindingCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ClaimPathBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ClaimPathBinding.
+func (c *ClaimPathBindingClient) Update() *ClaimPathBindingUpdate {
+	mutation := newClaimPathBindingMutation(c.config, OpUpdate)
+	return &ClaimPathBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ClaimPathBindingClient) UpdateOne(_m *ClaimPathBinding) *ClaimPathBindingUpdateOne {
+	mutation := newClaimPathBindingMutation(c.config, OpUpdateOne, withClaimPathBinding(_m))
+	return &ClaimPathBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ClaimPathBindingClient) UpdateOneID(id string) *ClaimPathBindingUpdateOne {
+	mutation := newClaimPathBindingMutation(c.config, OpUpdateOne, withClaimPathBindingID(id))
+	return &ClaimPathBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ClaimPathBinding.
+func (c *ClaimPathBindingClient) Delete() *ClaimPathBindingDelete {
+	mutation := newClaimPathBindingMutation(c.config, OpDelete)
+	return &ClaimPathBindingDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ClaimPathBindingClient) DeleteOne(_m *ClaimPathBinding) *ClaimPathBindingDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ClaimPathBindingClient) DeleteOneID(id string) *ClaimPathBindingDeleteOne {
+	builder := c.Delete().Where(claimpathbinding.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ClaimPathBindingDeleteOne{builder}
+}
+
+// Query returns a query builder for ClaimPathBinding.
+func (c *ClaimPathBindingClient) Query() *ClaimPathBindingQuery {
+	return &ClaimPathBindingQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeClaimPathBinding},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ClaimPathBinding entity by its id.
+func (c *ClaimPathBindingClient) Get(ctx context.Context, id string) (*ClaimPathBinding, error) {
+	return c.Query().Where(claimpathbinding.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ClaimPathBindingClient) GetX(ctx context.Context, id string) *ClaimPathBinding {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ClaimPathBindingClient) Hooks() []Hook {
+	return c.hooks.ClaimPathBinding
+}
+
+// Interceptors returns the client interceptors.
+func (c *ClaimPathBindingClient) Interceptors() []Interceptor {
+	return c.inters.ClaimPathBinding
+}
+
+func (c *ClaimPathBindingClient) mutate(ctx context.Context, m *ClaimPathBindingMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ClaimPathBindingCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ClaimPathBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ClaimPathBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ClaimPathBindingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ClaimPathBinding mutation op: %q", m.Op())
+	}
+}
+
+// ClaimSupportClient is a client for the ClaimSupport schema.
+type ClaimSupportClient struct {
+	config
+}
+
+// NewClaimSupportClient returns a client for the ClaimSupport from the given config.
+func NewClaimSupportClient(c config) *ClaimSupportClient {
+	return &ClaimSupportClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `claimsupport.Hooks(f(g(h())))`.
+func (c *ClaimSupportClient) Use(hooks ...Hook) {
+	c.hooks.ClaimSupport = append(c.hooks.ClaimSupport, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `claimsupport.Intercept(f(g(h())))`.
+func (c *ClaimSupportClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ClaimSupport = append(c.inters.ClaimSupport, interceptors...)
+}
+
+// Create returns a builder for creating a ClaimSupport entity.
+func (c *ClaimSupportClient) Create() *ClaimSupportCreate {
+	mutation := newClaimSupportMutation(c.config, OpCreate)
+	return &ClaimSupportCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ClaimSupport entities.
+func (c *ClaimSupportClient) CreateBulk(builders ...*ClaimSupportCreate) *ClaimSupportCreateBulk {
+	return &ClaimSupportCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ClaimSupportClient) MapCreateBulk(slice any, setFunc func(*ClaimSupportCreate, int)) *ClaimSupportCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ClaimSupportCreateBulk{err: fmt.Errorf("calling to ClaimSupportClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ClaimSupportCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ClaimSupportCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ClaimSupport.
+func (c *ClaimSupportClient) Update() *ClaimSupportUpdate {
+	mutation := newClaimSupportMutation(c.config, OpUpdate)
+	return &ClaimSupportUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ClaimSupportClient) UpdateOne(_m *ClaimSupport) *ClaimSupportUpdateOne {
+	mutation := newClaimSupportMutation(c.config, OpUpdateOne, withClaimSupport(_m))
+	return &ClaimSupportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ClaimSupportClient) UpdateOneID(id string) *ClaimSupportUpdateOne {
+	mutation := newClaimSupportMutation(c.config, OpUpdateOne, withClaimSupportID(id))
+	return &ClaimSupportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ClaimSupport.
+func (c *ClaimSupportClient) Delete() *ClaimSupportDelete {
+	mutation := newClaimSupportMutation(c.config, OpDelete)
+	return &ClaimSupportDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ClaimSupportClient) DeleteOne(_m *ClaimSupport) *ClaimSupportDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ClaimSupportClient) DeleteOneID(id string) *ClaimSupportDeleteOne {
+	builder := c.Delete().Where(claimsupport.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ClaimSupportDeleteOne{builder}
+}
+
+// Query returns a query builder for ClaimSupport.
+func (c *ClaimSupportClient) Query() *ClaimSupportQuery {
+	return &ClaimSupportQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeClaimSupport},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ClaimSupport entity by its id.
+func (c *ClaimSupportClient) Get(ctx context.Context, id string) (*ClaimSupport, error) {
+	return c.Query().Where(claimsupport.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ClaimSupportClient) GetX(ctx context.Context, id string) *ClaimSupport {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ClaimSupportClient) Hooks() []Hook {
+	return c.hooks.ClaimSupport
+}
+
+// Interceptors returns the client interceptors.
+func (c *ClaimSupportClient) Interceptors() []Interceptor {
+	return c.inters.ClaimSupport
+}
+
+func (c *ClaimSupportClient) mutate(ctx context.Context, m *ClaimSupportMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ClaimSupportCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ClaimSupportUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ClaimSupportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ClaimSupportDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ClaimSupport mutation op: %q", m.Op())
+	}
+}
+
+// ClaimSupportSetClient is a client for the ClaimSupportSet schema.
+type ClaimSupportSetClient struct {
+	config
+}
+
+// NewClaimSupportSetClient returns a client for the ClaimSupportSet from the given config.
+func NewClaimSupportSetClient(c config) *ClaimSupportSetClient {
+	return &ClaimSupportSetClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `claimsupportset.Hooks(f(g(h())))`.
+func (c *ClaimSupportSetClient) Use(hooks ...Hook) {
+	c.hooks.ClaimSupportSet = append(c.hooks.ClaimSupportSet, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `claimsupportset.Intercept(f(g(h())))`.
+func (c *ClaimSupportSetClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ClaimSupportSet = append(c.inters.ClaimSupportSet, interceptors...)
+}
+
+// Create returns a builder for creating a ClaimSupportSet entity.
+func (c *ClaimSupportSetClient) Create() *ClaimSupportSetCreate {
+	mutation := newClaimSupportSetMutation(c.config, OpCreate)
+	return &ClaimSupportSetCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ClaimSupportSet entities.
+func (c *ClaimSupportSetClient) CreateBulk(builders ...*ClaimSupportSetCreate) *ClaimSupportSetCreateBulk {
+	return &ClaimSupportSetCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ClaimSupportSetClient) MapCreateBulk(slice any, setFunc func(*ClaimSupportSetCreate, int)) *ClaimSupportSetCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ClaimSupportSetCreateBulk{err: fmt.Errorf("calling to ClaimSupportSetClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ClaimSupportSetCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ClaimSupportSetCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ClaimSupportSet.
+func (c *ClaimSupportSetClient) Update() *ClaimSupportSetUpdate {
+	mutation := newClaimSupportSetMutation(c.config, OpUpdate)
+	return &ClaimSupportSetUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ClaimSupportSetClient) UpdateOne(_m *ClaimSupportSet) *ClaimSupportSetUpdateOne {
+	mutation := newClaimSupportSetMutation(c.config, OpUpdateOne, withClaimSupportSet(_m))
+	return &ClaimSupportSetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ClaimSupportSetClient) UpdateOneID(id string) *ClaimSupportSetUpdateOne {
+	mutation := newClaimSupportSetMutation(c.config, OpUpdateOne, withClaimSupportSetID(id))
+	return &ClaimSupportSetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ClaimSupportSet.
+func (c *ClaimSupportSetClient) Delete() *ClaimSupportSetDelete {
+	mutation := newClaimSupportSetMutation(c.config, OpDelete)
+	return &ClaimSupportSetDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ClaimSupportSetClient) DeleteOne(_m *ClaimSupportSet) *ClaimSupportSetDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ClaimSupportSetClient) DeleteOneID(id string) *ClaimSupportSetDeleteOne {
+	builder := c.Delete().Where(claimsupportset.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ClaimSupportSetDeleteOne{builder}
+}
+
+// Query returns a query builder for ClaimSupportSet.
+func (c *ClaimSupportSetClient) Query() *ClaimSupportSetQuery {
+	return &ClaimSupportSetQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeClaimSupportSet},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ClaimSupportSet entity by its id.
+func (c *ClaimSupportSetClient) Get(ctx context.Context, id string) (*ClaimSupportSet, error) {
+	return c.Query().Where(claimsupportset.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ClaimSupportSetClient) GetX(ctx context.Context, id string) *ClaimSupportSet {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ClaimSupportSetClient) Hooks() []Hook {
+	return c.hooks.ClaimSupportSet
+}
+
+// Interceptors returns the client interceptors.
+func (c *ClaimSupportSetClient) Interceptors() []Interceptor {
+	return c.inters.ClaimSupportSet
+}
+
+func (c *ClaimSupportSetClient) mutate(ctx context.Context, m *ClaimSupportSetMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ClaimSupportSetCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ClaimSupportSetUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ClaimSupportSetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ClaimSupportSetDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ClaimSupportSet mutation op: %q", m.Op())
+	}
+}
+
+// ClaimVerificationClient is a client for the ClaimVerification schema.
+type ClaimVerificationClient struct {
+	config
+}
+
+// NewClaimVerificationClient returns a client for the ClaimVerification from the given config.
+func NewClaimVerificationClient(c config) *ClaimVerificationClient {
+	return &ClaimVerificationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `claimverification.Hooks(f(g(h())))`.
+func (c *ClaimVerificationClient) Use(hooks ...Hook) {
+	c.hooks.ClaimVerification = append(c.hooks.ClaimVerification, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `claimverification.Intercept(f(g(h())))`.
+func (c *ClaimVerificationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ClaimVerification = append(c.inters.ClaimVerification, interceptors...)
+}
+
+// Create returns a builder for creating a ClaimVerification entity.
+func (c *ClaimVerificationClient) Create() *ClaimVerificationCreate {
+	mutation := newClaimVerificationMutation(c.config, OpCreate)
+	return &ClaimVerificationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ClaimVerification entities.
+func (c *ClaimVerificationClient) CreateBulk(builders ...*ClaimVerificationCreate) *ClaimVerificationCreateBulk {
+	return &ClaimVerificationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ClaimVerificationClient) MapCreateBulk(slice any, setFunc func(*ClaimVerificationCreate, int)) *ClaimVerificationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ClaimVerificationCreateBulk{err: fmt.Errorf("calling to ClaimVerificationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ClaimVerificationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ClaimVerificationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ClaimVerification.
+func (c *ClaimVerificationClient) Update() *ClaimVerificationUpdate {
+	mutation := newClaimVerificationMutation(c.config, OpUpdate)
+	return &ClaimVerificationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ClaimVerificationClient) UpdateOne(_m *ClaimVerification) *ClaimVerificationUpdateOne {
+	mutation := newClaimVerificationMutation(c.config, OpUpdateOne, withClaimVerification(_m))
+	return &ClaimVerificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ClaimVerificationClient) UpdateOneID(id string) *ClaimVerificationUpdateOne {
+	mutation := newClaimVerificationMutation(c.config, OpUpdateOne, withClaimVerificationID(id))
+	return &ClaimVerificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ClaimVerification.
+func (c *ClaimVerificationClient) Delete() *ClaimVerificationDelete {
+	mutation := newClaimVerificationMutation(c.config, OpDelete)
+	return &ClaimVerificationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ClaimVerificationClient) DeleteOne(_m *ClaimVerification) *ClaimVerificationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ClaimVerificationClient) DeleteOneID(id string) *ClaimVerificationDeleteOne {
+	builder := c.Delete().Where(claimverification.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ClaimVerificationDeleteOne{builder}
+}
+
+// Query returns a query builder for ClaimVerification.
+func (c *ClaimVerificationClient) Query() *ClaimVerificationQuery {
+	return &ClaimVerificationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeClaimVerification},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ClaimVerification entity by its id.
+func (c *ClaimVerificationClient) Get(ctx context.Context, id string) (*ClaimVerification, error) {
+	return c.Query().Where(claimverification.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ClaimVerificationClient) GetX(ctx context.Context, id string) *ClaimVerification {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ClaimVerificationClient) Hooks() []Hook {
+	return c.hooks.ClaimVerification
+}
+
+// Interceptors returns the client interceptors.
+func (c *ClaimVerificationClient) Interceptors() []Interceptor {
+	return c.inters.ClaimVerification
+}
+
+func (c *ClaimVerificationClient) mutate(ctx context.Context, m *ClaimVerificationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ClaimVerificationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ClaimVerificationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ClaimVerificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ClaimVerificationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ClaimVerification mutation op: %q", m.Op())
+	}
+}
+
 // CommunicationAttemptClient is a client for the CommunicationAttempt schema.
 type CommunicationAttemptClient struct {
 	config
@@ -7812,6 +8584,405 @@ func (c *EnrichmentRecordClient) mutate(ctx context.Context, m *EnrichmentRecord
 	}
 }
 
+// EvidenceClearanceClient is a client for the EvidenceClearance schema.
+type EvidenceClearanceClient struct {
+	config
+}
+
+// NewEvidenceClearanceClient returns a client for the EvidenceClearance from the given config.
+func NewEvidenceClearanceClient(c config) *EvidenceClearanceClient {
+	return &EvidenceClearanceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `evidenceclearance.Hooks(f(g(h())))`.
+func (c *EvidenceClearanceClient) Use(hooks ...Hook) {
+	c.hooks.EvidenceClearance = append(c.hooks.EvidenceClearance, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `evidenceclearance.Intercept(f(g(h())))`.
+func (c *EvidenceClearanceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EvidenceClearance = append(c.inters.EvidenceClearance, interceptors...)
+}
+
+// Create returns a builder for creating a EvidenceClearance entity.
+func (c *EvidenceClearanceClient) Create() *EvidenceClearanceCreate {
+	mutation := newEvidenceClearanceMutation(c.config, OpCreate)
+	return &EvidenceClearanceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EvidenceClearance entities.
+func (c *EvidenceClearanceClient) CreateBulk(builders ...*EvidenceClearanceCreate) *EvidenceClearanceCreateBulk {
+	return &EvidenceClearanceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EvidenceClearanceClient) MapCreateBulk(slice any, setFunc func(*EvidenceClearanceCreate, int)) *EvidenceClearanceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EvidenceClearanceCreateBulk{err: fmt.Errorf("calling to EvidenceClearanceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EvidenceClearanceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EvidenceClearanceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EvidenceClearance.
+func (c *EvidenceClearanceClient) Update() *EvidenceClearanceUpdate {
+	mutation := newEvidenceClearanceMutation(c.config, OpUpdate)
+	return &EvidenceClearanceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EvidenceClearanceClient) UpdateOne(_m *EvidenceClearance) *EvidenceClearanceUpdateOne {
+	mutation := newEvidenceClearanceMutation(c.config, OpUpdateOne, withEvidenceClearance(_m))
+	return &EvidenceClearanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EvidenceClearanceClient) UpdateOneID(id string) *EvidenceClearanceUpdateOne {
+	mutation := newEvidenceClearanceMutation(c.config, OpUpdateOne, withEvidenceClearanceID(id))
+	return &EvidenceClearanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EvidenceClearance.
+func (c *EvidenceClearanceClient) Delete() *EvidenceClearanceDelete {
+	mutation := newEvidenceClearanceMutation(c.config, OpDelete)
+	return &EvidenceClearanceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EvidenceClearanceClient) DeleteOne(_m *EvidenceClearance) *EvidenceClearanceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EvidenceClearanceClient) DeleteOneID(id string) *EvidenceClearanceDeleteOne {
+	builder := c.Delete().Where(evidenceclearance.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EvidenceClearanceDeleteOne{builder}
+}
+
+// Query returns a query builder for EvidenceClearance.
+func (c *EvidenceClearanceClient) Query() *EvidenceClearanceQuery {
+	return &EvidenceClearanceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEvidenceClearance},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EvidenceClearance entity by its id.
+func (c *EvidenceClearanceClient) Get(ctx context.Context, id string) (*EvidenceClearance, error) {
+	return c.Query().Where(evidenceclearance.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EvidenceClearanceClient) GetX(ctx context.Context, id string) *EvidenceClearance {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EvidenceClearanceClient) Hooks() []Hook {
+	return c.hooks.EvidenceClearance
+}
+
+// Interceptors returns the client interceptors.
+func (c *EvidenceClearanceClient) Interceptors() []Interceptor {
+	return c.inters.EvidenceClearance
+}
+
+func (c *EvidenceClearanceClient) mutate(ctx context.Context, m *EvidenceClearanceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EvidenceClearanceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EvidenceClearanceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EvidenceClearanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EvidenceClearanceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EvidenceClearance mutation op: %q", m.Op())
+	}
+}
+
+// EvidenceSourceClient is a client for the EvidenceSource schema.
+type EvidenceSourceClient struct {
+	config
+}
+
+// NewEvidenceSourceClient returns a client for the EvidenceSource from the given config.
+func NewEvidenceSourceClient(c config) *EvidenceSourceClient {
+	return &EvidenceSourceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `evidencesource.Hooks(f(g(h())))`.
+func (c *EvidenceSourceClient) Use(hooks ...Hook) {
+	c.hooks.EvidenceSource = append(c.hooks.EvidenceSource, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `evidencesource.Intercept(f(g(h())))`.
+func (c *EvidenceSourceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EvidenceSource = append(c.inters.EvidenceSource, interceptors...)
+}
+
+// Create returns a builder for creating a EvidenceSource entity.
+func (c *EvidenceSourceClient) Create() *EvidenceSourceCreate {
+	mutation := newEvidenceSourceMutation(c.config, OpCreate)
+	return &EvidenceSourceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EvidenceSource entities.
+func (c *EvidenceSourceClient) CreateBulk(builders ...*EvidenceSourceCreate) *EvidenceSourceCreateBulk {
+	return &EvidenceSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EvidenceSourceClient) MapCreateBulk(slice any, setFunc func(*EvidenceSourceCreate, int)) *EvidenceSourceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EvidenceSourceCreateBulk{err: fmt.Errorf("calling to EvidenceSourceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EvidenceSourceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EvidenceSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EvidenceSource.
+func (c *EvidenceSourceClient) Update() *EvidenceSourceUpdate {
+	mutation := newEvidenceSourceMutation(c.config, OpUpdate)
+	return &EvidenceSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EvidenceSourceClient) UpdateOne(_m *EvidenceSource) *EvidenceSourceUpdateOne {
+	mutation := newEvidenceSourceMutation(c.config, OpUpdateOne, withEvidenceSource(_m))
+	return &EvidenceSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EvidenceSourceClient) UpdateOneID(id string) *EvidenceSourceUpdateOne {
+	mutation := newEvidenceSourceMutation(c.config, OpUpdateOne, withEvidenceSourceID(id))
+	return &EvidenceSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EvidenceSource.
+func (c *EvidenceSourceClient) Delete() *EvidenceSourceDelete {
+	mutation := newEvidenceSourceMutation(c.config, OpDelete)
+	return &EvidenceSourceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EvidenceSourceClient) DeleteOne(_m *EvidenceSource) *EvidenceSourceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EvidenceSourceClient) DeleteOneID(id string) *EvidenceSourceDeleteOne {
+	builder := c.Delete().Where(evidencesource.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EvidenceSourceDeleteOne{builder}
+}
+
+// Query returns a query builder for EvidenceSource.
+func (c *EvidenceSourceClient) Query() *EvidenceSourceQuery {
+	return &EvidenceSourceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEvidenceSource},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EvidenceSource entity by its id.
+func (c *EvidenceSourceClient) Get(ctx context.Context, id string) (*EvidenceSource, error) {
+	return c.Query().Where(evidencesource.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EvidenceSourceClient) GetX(ctx context.Context, id string) *EvidenceSource {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EvidenceSourceClient) Hooks() []Hook {
+	return c.hooks.EvidenceSource
+}
+
+// Interceptors returns the client interceptors.
+func (c *EvidenceSourceClient) Interceptors() []Interceptor {
+	return c.inters.EvidenceSource
+}
+
+func (c *EvidenceSourceClient) mutate(ctx context.Context, m *EvidenceSourceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EvidenceSourceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EvidenceSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EvidenceSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EvidenceSourceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EvidenceSource mutation op: %q", m.Op())
+	}
+}
+
+// EvidenceVersionClient is a client for the EvidenceVersion schema.
+type EvidenceVersionClient struct {
+	config
+}
+
+// NewEvidenceVersionClient returns a client for the EvidenceVersion from the given config.
+func NewEvidenceVersionClient(c config) *EvidenceVersionClient {
+	return &EvidenceVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `evidenceversion.Hooks(f(g(h())))`.
+func (c *EvidenceVersionClient) Use(hooks ...Hook) {
+	c.hooks.EvidenceVersion = append(c.hooks.EvidenceVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `evidenceversion.Intercept(f(g(h())))`.
+func (c *EvidenceVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EvidenceVersion = append(c.inters.EvidenceVersion, interceptors...)
+}
+
+// Create returns a builder for creating a EvidenceVersion entity.
+func (c *EvidenceVersionClient) Create() *EvidenceVersionCreate {
+	mutation := newEvidenceVersionMutation(c.config, OpCreate)
+	return &EvidenceVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EvidenceVersion entities.
+func (c *EvidenceVersionClient) CreateBulk(builders ...*EvidenceVersionCreate) *EvidenceVersionCreateBulk {
+	return &EvidenceVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EvidenceVersionClient) MapCreateBulk(slice any, setFunc func(*EvidenceVersionCreate, int)) *EvidenceVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EvidenceVersionCreateBulk{err: fmt.Errorf("calling to EvidenceVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EvidenceVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EvidenceVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EvidenceVersion.
+func (c *EvidenceVersionClient) Update() *EvidenceVersionUpdate {
+	mutation := newEvidenceVersionMutation(c.config, OpUpdate)
+	return &EvidenceVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EvidenceVersionClient) UpdateOne(_m *EvidenceVersion) *EvidenceVersionUpdateOne {
+	mutation := newEvidenceVersionMutation(c.config, OpUpdateOne, withEvidenceVersion(_m))
+	return &EvidenceVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EvidenceVersionClient) UpdateOneID(id string) *EvidenceVersionUpdateOne {
+	mutation := newEvidenceVersionMutation(c.config, OpUpdateOne, withEvidenceVersionID(id))
+	return &EvidenceVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EvidenceVersion.
+func (c *EvidenceVersionClient) Delete() *EvidenceVersionDelete {
+	mutation := newEvidenceVersionMutation(c.config, OpDelete)
+	return &EvidenceVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EvidenceVersionClient) DeleteOne(_m *EvidenceVersion) *EvidenceVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EvidenceVersionClient) DeleteOneID(id string) *EvidenceVersionDeleteOne {
+	builder := c.Delete().Where(evidenceversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EvidenceVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for EvidenceVersion.
+func (c *EvidenceVersionClient) Query() *EvidenceVersionQuery {
+	return &EvidenceVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEvidenceVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EvidenceVersion entity by its id.
+func (c *EvidenceVersionClient) Get(ctx context.Context, id string) (*EvidenceVersion, error) {
+	return c.Query().Where(evidenceversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EvidenceVersionClient) GetX(ctx context.Context, id string) *EvidenceVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EvidenceVersionClient) Hooks() []Hook {
+	return c.hooks.EvidenceVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *EvidenceVersionClient) Interceptors() []Interceptor {
+	return c.inters.EvidenceVersion
+}
+
+func (c *EvidenceVersionClient) mutate(ctx context.Context, m *EvidenceVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EvidenceVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EvidenceVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EvidenceVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EvidenceVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EvidenceVersion mutation op: %q", m.Op())
+	}
+}
+
 // FrontendActivationClient is a client for the FrontendActivation schema.
 type FrontendActivationClient struct {
 	config
@@ -9405,6 +10576,937 @@ func (c *InvitationClient) mutate(ctx context.Context, m *InvitationMutation) (V
 		return (&InvitationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Invitation mutation op: %q", m.Op())
+	}
+}
+
+// KitArtifactClaimClient is a client for the KitArtifactClaim schema.
+type KitArtifactClaimClient struct {
+	config
+}
+
+// NewKitArtifactClaimClient returns a client for the KitArtifactClaim from the given config.
+func NewKitArtifactClaimClient(c config) *KitArtifactClaimClient {
+	return &KitArtifactClaimClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitartifactclaim.Hooks(f(g(h())))`.
+func (c *KitArtifactClaimClient) Use(hooks ...Hook) {
+	c.hooks.KitArtifactClaim = append(c.hooks.KitArtifactClaim, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitartifactclaim.Intercept(f(g(h())))`.
+func (c *KitArtifactClaimClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitArtifactClaim = append(c.inters.KitArtifactClaim, interceptors...)
+}
+
+// Create returns a builder for creating a KitArtifactClaim entity.
+func (c *KitArtifactClaimClient) Create() *KitArtifactClaimCreate {
+	mutation := newKitArtifactClaimMutation(c.config, OpCreate)
+	return &KitArtifactClaimCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitArtifactClaim entities.
+func (c *KitArtifactClaimClient) CreateBulk(builders ...*KitArtifactClaimCreate) *KitArtifactClaimCreateBulk {
+	return &KitArtifactClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitArtifactClaimClient) MapCreateBulk(slice any, setFunc func(*KitArtifactClaimCreate, int)) *KitArtifactClaimCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitArtifactClaimCreateBulk{err: fmt.Errorf("calling to KitArtifactClaimClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitArtifactClaimCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitArtifactClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitArtifactClaim.
+func (c *KitArtifactClaimClient) Update() *KitArtifactClaimUpdate {
+	mutation := newKitArtifactClaimMutation(c.config, OpUpdate)
+	return &KitArtifactClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitArtifactClaimClient) UpdateOne(_m *KitArtifactClaim) *KitArtifactClaimUpdateOne {
+	mutation := newKitArtifactClaimMutation(c.config, OpUpdateOne, withKitArtifactClaim(_m))
+	return &KitArtifactClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitArtifactClaimClient) UpdateOneID(id string) *KitArtifactClaimUpdateOne {
+	mutation := newKitArtifactClaimMutation(c.config, OpUpdateOne, withKitArtifactClaimID(id))
+	return &KitArtifactClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitArtifactClaim.
+func (c *KitArtifactClaimClient) Delete() *KitArtifactClaimDelete {
+	mutation := newKitArtifactClaimMutation(c.config, OpDelete)
+	return &KitArtifactClaimDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitArtifactClaimClient) DeleteOne(_m *KitArtifactClaim) *KitArtifactClaimDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitArtifactClaimClient) DeleteOneID(id string) *KitArtifactClaimDeleteOne {
+	builder := c.Delete().Where(kitartifactclaim.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitArtifactClaimDeleteOne{builder}
+}
+
+// Query returns a query builder for KitArtifactClaim.
+func (c *KitArtifactClaimClient) Query() *KitArtifactClaimQuery {
+	return &KitArtifactClaimQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitArtifactClaim},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitArtifactClaim entity by its id.
+func (c *KitArtifactClaimClient) Get(ctx context.Context, id string) (*KitArtifactClaim, error) {
+	return c.Query().Where(kitartifactclaim.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitArtifactClaimClient) GetX(ctx context.Context, id string) *KitArtifactClaim {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitArtifactClaimClient) Hooks() []Hook {
+	return c.hooks.KitArtifactClaim
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitArtifactClaimClient) Interceptors() []Interceptor {
+	return c.inters.KitArtifactClaim
+}
+
+func (c *KitArtifactClaimClient) mutate(ctx context.Context, m *KitArtifactClaimMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitArtifactClaimCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitArtifactClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitArtifactClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitArtifactClaimDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitArtifactClaim mutation op: %q", m.Op())
+	}
+}
+
+// KitArtifactRevisionClient is a client for the KitArtifactRevision schema.
+type KitArtifactRevisionClient struct {
+	config
+}
+
+// NewKitArtifactRevisionClient returns a client for the KitArtifactRevision from the given config.
+func NewKitArtifactRevisionClient(c config) *KitArtifactRevisionClient {
+	return &KitArtifactRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitartifactrevision.Hooks(f(g(h())))`.
+func (c *KitArtifactRevisionClient) Use(hooks ...Hook) {
+	c.hooks.KitArtifactRevision = append(c.hooks.KitArtifactRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitartifactrevision.Intercept(f(g(h())))`.
+func (c *KitArtifactRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitArtifactRevision = append(c.inters.KitArtifactRevision, interceptors...)
+}
+
+// Create returns a builder for creating a KitArtifactRevision entity.
+func (c *KitArtifactRevisionClient) Create() *KitArtifactRevisionCreate {
+	mutation := newKitArtifactRevisionMutation(c.config, OpCreate)
+	return &KitArtifactRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitArtifactRevision entities.
+func (c *KitArtifactRevisionClient) CreateBulk(builders ...*KitArtifactRevisionCreate) *KitArtifactRevisionCreateBulk {
+	return &KitArtifactRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitArtifactRevisionClient) MapCreateBulk(slice any, setFunc func(*KitArtifactRevisionCreate, int)) *KitArtifactRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitArtifactRevisionCreateBulk{err: fmt.Errorf("calling to KitArtifactRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitArtifactRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitArtifactRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitArtifactRevision.
+func (c *KitArtifactRevisionClient) Update() *KitArtifactRevisionUpdate {
+	mutation := newKitArtifactRevisionMutation(c.config, OpUpdate)
+	return &KitArtifactRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitArtifactRevisionClient) UpdateOne(_m *KitArtifactRevision) *KitArtifactRevisionUpdateOne {
+	mutation := newKitArtifactRevisionMutation(c.config, OpUpdateOne, withKitArtifactRevision(_m))
+	return &KitArtifactRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitArtifactRevisionClient) UpdateOneID(id string) *KitArtifactRevisionUpdateOne {
+	mutation := newKitArtifactRevisionMutation(c.config, OpUpdateOne, withKitArtifactRevisionID(id))
+	return &KitArtifactRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitArtifactRevision.
+func (c *KitArtifactRevisionClient) Delete() *KitArtifactRevisionDelete {
+	mutation := newKitArtifactRevisionMutation(c.config, OpDelete)
+	return &KitArtifactRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitArtifactRevisionClient) DeleteOne(_m *KitArtifactRevision) *KitArtifactRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitArtifactRevisionClient) DeleteOneID(id string) *KitArtifactRevisionDeleteOne {
+	builder := c.Delete().Where(kitartifactrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitArtifactRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for KitArtifactRevision.
+func (c *KitArtifactRevisionClient) Query() *KitArtifactRevisionQuery {
+	return &KitArtifactRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitArtifactRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitArtifactRevision entity by its id.
+func (c *KitArtifactRevisionClient) Get(ctx context.Context, id string) (*KitArtifactRevision, error) {
+	return c.Query().Where(kitartifactrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitArtifactRevisionClient) GetX(ctx context.Context, id string) *KitArtifactRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitArtifactRevisionClient) Hooks() []Hook {
+	return c.hooks.KitArtifactRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitArtifactRevisionClient) Interceptors() []Interceptor {
+	return c.inters.KitArtifactRevision
+}
+
+func (c *KitArtifactRevisionClient) mutate(ctx context.Context, m *KitArtifactRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitArtifactRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitArtifactRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitArtifactRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitArtifactRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitArtifactRevision mutation op: %q", m.Op())
+	}
+}
+
+// KitExportClient is a client for the KitExport schema.
+type KitExportClient struct {
+	config
+}
+
+// NewKitExportClient returns a client for the KitExport from the given config.
+func NewKitExportClient(c config) *KitExportClient {
+	return &KitExportClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitexport.Hooks(f(g(h())))`.
+func (c *KitExportClient) Use(hooks ...Hook) {
+	c.hooks.KitExport = append(c.hooks.KitExport, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitexport.Intercept(f(g(h())))`.
+func (c *KitExportClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitExport = append(c.inters.KitExport, interceptors...)
+}
+
+// Create returns a builder for creating a KitExport entity.
+func (c *KitExportClient) Create() *KitExportCreate {
+	mutation := newKitExportMutation(c.config, OpCreate)
+	return &KitExportCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitExport entities.
+func (c *KitExportClient) CreateBulk(builders ...*KitExportCreate) *KitExportCreateBulk {
+	return &KitExportCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitExportClient) MapCreateBulk(slice any, setFunc func(*KitExportCreate, int)) *KitExportCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitExportCreateBulk{err: fmt.Errorf("calling to KitExportClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitExportCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitExportCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitExport.
+func (c *KitExportClient) Update() *KitExportUpdate {
+	mutation := newKitExportMutation(c.config, OpUpdate)
+	return &KitExportUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitExportClient) UpdateOne(_m *KitExport) *KitExportUpdateOne {
+	mutation := newKitExportMutation(c.config, OpUpdateOne, withKitExport(_m))
+	return &KitExportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitExportClient) UpdateOneID(id string) *KitExportUpdateOne {
+	mutation := newKitExportMutation(c.config, OpUpdateOne, withKitExportID(id))
+	return &KitExportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitExport.
+func (c *KitExportClient) Delete() *KitExportDelete {
+	mutation := newKitExportMutation(c.config, OpDelete)
+	return &KitExportDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitExportClient) DeleteOne(_m *KitExport) *KitExportDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitExportClient) DeleteOneID(id string) *KitExportDeleteOne {
+	builder := c.Delete().Where(kitexport.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitExportDeleteOne{builder}
+}
+
+// Query returns a query builder for KitExport.
+func (c *KitExportClient) Query() *KitExportQuery {
+	return &KitExportQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitExport},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitExport entity by its id.
+func (c *KitExportClient) Get(ctx context.Context, id string) (*KitExport, error) {
+	return c.Query().Where(kitexport.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitExportClient) GetX(ctx context.Context, id string) *KitExport {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitExportClient) Hooks() []Hook {
+	return c.hooks.KitExport
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitExportClient) Interceptors() []Interceptor {
+	return c.inters.KitExport
+}
+
+func (c *KitExportClient) mutate(ctx context.Context, m *KitExportMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitExportCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitExportUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitExportUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitExportDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitExport mutation op: %q", m.Op())
+	}
+}
+
+// KitMemberClient is a client for the KitMember schema.
+type KitMemberClient struct {
+	config
+}
+
+// NewKitMemberClient returns a client for the KitMember from the given config.
+func NewKitMemberClient(c config) *KitMemberClient {
+	return &KitMemberClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitmember.Hooks(f(g(h())))`.
+func (c *KitMemberClient) Use(hooks ...Hook) {
+	c.hooks.KitMember = append(c.hooks.KitMember, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitmember.Intercept(f(g(h())))`.
+func (c *KitMemberClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitMember = append(c.inters.KitMember, interceptors...)
+}
+
+// Create returns a builder for creating a KitMember entity.
+func (c *KitMemberClient) Create() *KitMemberCreate {
+	mutation := newKitMemberMutation(c.config, OpCreate)
+	return &KitMemberCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitMember entities.
+func (c *KitMemberClient) CreateBulk(builders ...*KitMemberCreate) *KitMemberCreateBulk {
+	return &KitMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitMemberClient) MapCreateBulk(slice any, setFunc func(*KitMemberCreate, int)) *KitMemberCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitMemberCreateBulk{err: fmt.Errorf("calling to KitMemberClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitMemberCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitMember.
+func (c *KitMemberClient) Update() *KitMemberUpdate {
+	mutation := newKitMemberMutation(c.config, OpUpdate)
+	return &KitMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitMemberClient) UpdateOne(_m *KitMember) *KitMemberUpdateOne {
+	mutation := newKitMemberMutation(c.config, OpUpdateOne, withKitMember(_m))
+	return &KitMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitMemberClient) UpdateOneID(id string) *KitMemberUpdateOne {
+	mutation := newKitMemberMutation(c.config, OpUpdateOne, withKitMemberID(id))
+	return &KitMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitMember.
+func (c *KitMemberClient) Delete() *KitMemberDelete {
+	mutation := newKitMemberMutation(c.config, OpDelete)
+	return &KitMemberDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitMemberClient) DeleteOne(_m *KitMember) *KitMemberDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitMemberClient) DeleteOneID(id string) *KitMemberDeleteOne {
+	builder := c.Delete().Where(kitmember.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitMemberDeleteOne{builder}
+}
+
+// Query returns a query builder for KitMember.
+func (c *KitMemberClient) Query() *KitMemberQuery {
+	return &KitMemberQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitMember},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitMember entity by its id.
+func (c *KitMemberClient) Get(ctx context.Context, id string) (*KitMember, error) {
+	return c.Query().Where(kitmember.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitMemberClient) GetX(ctx context.Context, id string) *KitMember {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitMemberClient) Hooks() []Hook {
+	return c.hooks.KitMember
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitMemberClient) Interceptors() []Interceptor {
+	return c.inters.KitMember
+}
+
+func (c *KitMemberClient) mutate(ctx context.Context, m *KitMemberMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitMemberCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitMember mutation op: %q", m.Op())
+	}
+}
+
+// KitReviewDecisionClient is a client for the KitReviewDecision schema.
+type KitReviewDecisionClient struct {
+	config
+}
+
+// NewKitReviewDecisionClient returns a client for the KitReviewDecision from the given config.
+func NewKitReviewDecisionClient(c config) *KitReviewDecisionClient {
+	return &KitReviewDecisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitreviewdecision.Hooks(f(g(h())))`.
+func (c *KitReviewDecisionClient) Use(hooks ...Hook) {
+	c.hooks.KitReviewDecision = append(c.hooks.KitReviewDecision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitreviewdecision.Intercept(f(g(h())))`.
+func (c *KitReviewDecisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitReviewDecision = append(c.inters.KitReviewDecision, interceptors...)
+}
+
+// Create returns a builder for creating a KitReviewDecision entity.
+func (c *KitReviewDecisionClient) Create() *KitReviewDecisionCreate {
+	mutation := newKitReviewDecisionMutation(c.config, OpCreate)
+	return &KitReviewDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitReviewDecision entities.
+func (c *KitReviewDecisionClient) CreateBulk(builders ...*KitReviewDecisionCreate) *KitReviewDecisionCreateBulk {
+	return &KitReviewDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitReviewDecisionClient) MapCreateBulk(slice any, setFunc func(*KitReviewDecisionCreate, int)) *KitReviewDecisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitReviewDecisionCreateBulk{err: fmt.Errorf("calling to KitReviewDecisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitReviewDecisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitReviewDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitReviewDecision.
+func (c *KitReviewDecisionClient) Update() *KitReviewDecisionUpdate {
+	mutation := newKitReviewDecisionMutation(c.config, OpUpdate)
+	return &KitReviewDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitReviewDecisionClient) UpdateOne(_m *KitReviewDecision) *KitReviewDecisionUpdateOne {
+	mutation := newKitReviewDecisionMutation(c.config, OpUpdateOne, withKitReviewDecision(_m))
+	return &KitReviewDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitReviewDecisionClient) UpdateOneID(id string) *KitReviewDecisionUpdateOne {
+	mutation := newKitReviewDecisionMutation(c.config, OpUpdateOne, withKitReviewDecisionID(id))
+	return &KitReviewDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitReviewDecision.
+func (c *KitReviewDecisionClient) Delete() *KitReviewDecisionDelete {
+	mutation := newKitReviewDecisionMutation(c.config, OpDelete)
+	return &KitReviewDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitReviewDecisionClient) DeleteOne(_m *KitReviewDecision) *KitReviewDecisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitReviewDecisionClient) DeleteOneID(id string) *KitReviewDecisionDeleteOne {
+	builder := c.Delete().Where(kitreviewdecision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitReviewDecisionDeleteOne{builder}
+}
+
+// Query returns a query builder for KitReviewDecision.
+func (c *KitReviewDecisionClient) Query() *KitReviewDecisionQuery {
+	return &KitReviewDecisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitReviewDecision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitReviewDecision entity by its id.
+func (c *KitReviewDecisionClient) Get(ctx context.Context, id string) (*KitReviewDecision, error) {
+	return c.Query().Where(kitreviewdecision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitReviewDecisionClient) GetX(ctx context.Context, id string) *KitReviewDecision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitReviewDecisionClient) Hooks() []Hook {
+	return c.hooks.KitReviewDecision
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitReviewDecisionClient) Interceptors() []Interceptor {
+	return c.inters.KitReviewDecision
+}
+
+func (c *KitReviewDecisionClient) mutate(ctx context.Context, m *KitReviewDecisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitReviewDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitReviewDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitReviewDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitReviewDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitReviewDecision mutation op: %q", m.Op())
+	}
+}
+
+// KitRevisionClient is a client for the KitRevision schema.
+type KitRevisionClient struct {
+	config
+}
+
+// NewKitRevisionClient returns a client for the KitRevision from the given config.
+func NewKitRevisionClient(c config) *KitRevisionClient {
+	return &KitRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitrevision.Hooks(f(g(h())))`.
+func (c *KitRevisionClient) Use(hooks ...Hook) {
+	c.hooks.KitRevision = append(c.hooks.KitRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitrevision.Intercept(f(g(h())))`.
+func (c *KitRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitRevision = append(c.inters.KitRevision, interceptors...)
+}
+
+// Create returns a builder for creating a KitRevision entity.
+func (c *KitRevisionClient) Create() *KitRevisionCreate {
+	mutation := newKitRevisionMutation(c.config, OpCreate)
+	return &KitRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitRevision entities.
+func (c *KitRevisionClient) CreateBulk(builders ...*KitRevisionCreate) *KitRevisionCreateBulk {
+	return &KitRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitRevisionClient) MapCreateBulk(slice any, setFunc func(*KitRevisionCreate, int)) *KitRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitRevisionCreateBulk{err: fmt.Errorf("calling to KitRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitRevision.
+func (c *KitRevisionClient) Update() *KitRevisionUpdate {
+	mutation := newKitRevisionMutation(c.config, OpUpdate)
+	return &KitRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitRevisionClient) UpdateOne(_m *KitRevision) *KitRevisionUpdateOne {
+	mutation := newKitRevisionMutation(c.config, OpUpdateOne, withKitRevision(_m))
+	return &KitRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitRevisionClient) UpdateOneID(id string) *KitRevisionUpdateOne {
+	mutation := newKitRevisionMutation(c.config, OpUpdateOne, withKitRevisionID(id))
+	return &KitRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitRevision.
+func (c *KitRevisionClient) Delete() *KitRevisionDelete {
+	mutation := newKitRevisionMutation(c.config, OpDelete)
+	return &KitRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitRevisionClient) DeleteOne(_m *KitRevision) *KitRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitRevisionClient) DeleteOneID(id string) *KitRevisionDeleteOne {
+	builder := c.Delete().Where(kitrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for KitRevision.
+func (c *KitRevisionClient) Query() *KitRevisionQuery {
+	return &KitRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitRevision entity by its id.
+func (c *KitRevisionClient) Get(ctx context.Context, id string) (*KitRevision, error) {
+	return c.Query().Where(kitrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitRevisionClient) GetX(ctx context.Context, id string) *KitRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitRevisionClient) Hooks() []Hook {
+	return c.hooks.KitRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitRevisionClient) Interceptors() []Interceptor {
+	return c.inters.KitRevision
+}
+
+func (c *KitRevisionClient) mutate(ctx context.Context, m *KitRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitRevision mutation op: %q", m.Op())
+	}
+}
+
+// KitSourcePinClient is a client for the KitSourcePin schema.
+type KitSourcePinClient struct {
+	config
+}
+
+// NewKitSourcePinClient returns a client for the KitSourcePin from the given config.
+func NewKitSourcePinClient(c config) *KitSourcePinClient {
+	return &KitSourcePinClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `kitsourcepin.Hooks(f(g(h())))`.
+func (c *KitSourcePinClient) Use(hooks ...Hook) {
+	c.hooks.KitSourcePin = append(c.hooks.KitSourcePin, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `kitsourcepin.Intercept(f(g(h())))`.
+func (c *KitSourcePinClient) Intercept(interceptors ...Interceptor) {
+	c.inters.KitSourcePin = append(c.inters.KitSourcePin, interceptors...)
+}
+
+// Create returns a builder for creating a KitSourcePin entity.
+func (c *KitSourcePinClient) Create() *KitSourcePinCreate {
+	mutation := newKitSourcePinMutation(c.config, OpCreate)
+	return &KitSourcePinCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of KitSourcePin entities.
+func (c *KitSourcePinClient) CreateBulk(builders ...*KitSourcePinCreate) *KitSourcePinCreateBulk {
+	return &KitSourcePinCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *KitSourcePinClient) MapCreateBulk(slice any, setFunc func(*KitSourcePinCreate, int)) *KitSourcePinCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &KitSourcePinCreateBulk{err: fmt.Errorf("calling to KitSourcePinClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*KitSourcePinCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &KitSourcePinCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for KitSourcePin.
+func (c *KitSourcePinClient) Update() *KitSourcePinUpdate {
+	mutation := newKitSourcePinMutation(c.config, OpUpdate)
+	return &KitSourcePinUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *KitSourcePinClient) UpdateOne(_m *KitSourcePin) *KitSourcePinUpdateOne {
+	mutation := newKitSourcePinMutation(c.config, OpUpdateOne, withKitSourcePin(_m))
+	return &KitSourcePinUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *KitSourcePinClient) UpdateOneID(id string) *KitSourcePinUpdateOne {
+	mutation := newKitSourcePinMutation(c.config, OpUpdateOne, withKitSourcePinID(id))
+	return &KitSourcePinUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for KitSourcePin.
+func (c *KitSourcePinClient) Delete() *KitSourcePinDelete {
+	mutation := newKitSourcePinMutation(c.config, OpDelete)
+	return &KitSourcePinDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *KitSourcePinClient) DeleteOne(_m *KitSourcePin) *KitSourcePinDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *KitSourcePinClient) DeleteOneID(id string) *KitSourcePinDeleteOne {
+	builder := c.Delete().Where(kitsourcepin.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &KitSourcePinDeleteOne{builder}
+}
+
+// Query returns a query builder for KitSourcePin.
+func (c *KitSourcePinClient) Query() *KitSourcePinQuery {
+	return &KitSourcePinQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeKitSourcePin},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a KitSourcePin entity by its id.
+func (c *KitSourcePinClient) Get(ctx context.Context, id string) (*KitSourcePin, error) {
+	return c.Query().Where(kitsourcepin.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *KitSourcePinClient) GetX(ctx context.Context, id string) *KitSourcePin {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *KitSourcePinClient) Hooks() []Hook {
+	return c.hooks.KitSourcePin
+}
+
+// Interceptors returns the client interceptors.
+func (c *KitSourcePinClient) Interceptors() []Interceptor {
+	return c.inters.KitSourcePin
+}
+
+func (c *KitSourcePinClient) mutate(ctx context.Context, m *KitSourcePinMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&KitSourcePinCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&KitSourcePinUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&KitSourcePinUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&KitSourcePinDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown KitSourcePin mutation op: %q", m.Op())
 	}
 }
 
@@ -16074,6 +18176,139 @@ func (c *PublicationAttemptClient) mutate(ctx context.Context, m *PublicationAtt
 	}
 }
 
+// ReadinessCommandReceiptClient is a client for the ReadinessCommandReceipt schema.
+type ReadinessCommandReceiptClient struct {
+	config
+}
+
+// NewReadinessCommandReceiptClient returns a client for the ReadinessCommandReceipt from the given config.
+func NewReadinessCommandReceiptClient(c config) *ReadinessCommandReceiptClient {
+	return &ReadinessCommandReceiptClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `readinesscommandreceipt.Hooks(f(g(h())))`.
+func (c *ReadinessCommandReceiptClient) Use(hooks ...Hook) {
+	c.hooks.ReadinessCommandReceipt = append(c.hooks.ReadinessCommandReceipt, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `readinesscommandreceipt.Intercept(f(g(h())))`.
+func (c *ReadinessCommandReceiptClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReadinessCommandReceipt = append(c.inters.ReadinessCommandReceipt, interceptors...)
+}
+
+// Create returns a builder for creating a ReadinessCommandReceipt entity.
+func (c *ReadinessCommandReceiptClient) Create() *ReadinessCommandReceiptCreate {
+	mutation := newReadinessCommandReceiptMutation(c.config, OpCreate)
+	return &ReadinessCommandReceiptCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReadinessCommandReceipt entities.
+func (c *ReadinessCommandReceiptClient) CreateBulk(builders ...*ReadinessCommandReceiptCreate) *ReadinessCommandReceiptCreateBulk {
+	return &ReadinessCommandReceiptCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReadinessCommandReceiptClient) MapCreateBulk(slice any, setFunc func(*ReadinessCommandReceiptCreate, int)) *ReadinessCommandReceiptCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReadinessCommandReceiptCreateBulk{err: fmt.Errorf("calling to ReadinessCommandReceiptClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReadinessCommandReceiptCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReadinessCommandReceiptCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReadinessCommandReceipt.
+func (c *ReadinessCommandReceiptClient) Update() *ReadinessCommandReceiptUpdate {
+	mutation := newReadinessCommandReceiptMutation(c.config, OpUpdate)
+	return &ReadinessCommandReceiptUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReadinessCommandReceiptClient) UpdateOne(_m *ReadinessCommandReceipt) *ReadinessCommandReceiptUpdateOne {
+	mutation := newReadinessCommandReceiptMutation(c.config, OpUpdateOne, withReadinessCommandReceipt(_m))
+	return &ReadinessCommandReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReadinessCommandReceiptClient) UpdateOneID(id string) *ReadinessCommandReceiptUpdateOne {
+	mutation := newReadinessCommandReceiptMutation(c.config, OpUpdateOne, withReadinessCommandReceiptID(id))
+	return &ReadinessCommandReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReadinessCommandReceipt.
+func (c *ReadinessCommandReceiptClient) Delete() *ReadinessCommandReceiptDelete {
+	mutation := newReadinessCommandReceiptMutation(c.config, OpDelete)
+	return &ReadinessCommandReceiptDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReadinessCommandReceiptClient) DeleteOne(_m *ReadinessCommandReceipt) *ReadinessCommandReceiptDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReadinessCommandReceiptClient) DeleteOneID(id string) *ReadinessCommandReceiptDeleteOne {
+	builder := c.Delete().Where(readinesscommandreceipt.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReadinessCommandReceiptDeleteOne{builder}
+}
+
+// Query returns a query builder for ReadinessCommandReceipt.
+func (c *ReadinessCommandReceiptClient) Query() *ReadinessCommandReceiptQuery {
+	return &ReadinessCommandReceiptQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReadinessCommandReceipt},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReadinessCommandReceipt entity by its id.
+func (c *ReadinessCommandReceiptClient) Get(ctx context.Context, id string) (*ReadinessCommandReceipt, error) {
+	return c.Query().Where(readinesscommandreceipt.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReadinessCommandReceiptClient) GetX(ctx context.Context, id string) *ReadinessCommandReceipt {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReadinessCommandReceiptClient) Hooks() []Hook {
+	return c.hooks.ReadinessCommandReceipt
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReadinessCommandReceiptClient) Interceptors() []Interceptor {
+	return c.inters.ReadinessCommandReceipt
+}
+
+func (c *ReadinessCommandReceiptClient) mutate(ctx context.Context, m *ReadinessCommandReceiptMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReadinessCommandReceiptCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReadinessCommandReceiptUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReadinessCommandReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReadinessCommandReceiptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReadinessCommandReceipt mutation op: %q", m.Op())
+	}
+}
+
 // ReleaseClient is a client for the Release schema.
 type ReleaseClient struct {
 	config
@@ -16872,6 +19107,272 @@ func (c *ReleaseAutomationVersionClient) mutate(ctx context.Context, m *ReleaseA
 	}
 }
 
+// ReleaseClaimClient is a client for the ReleaseClaim schema.
+type ReleaseClaimClient struct {
+	config
+}
+
+// NewReleaseClaimClient returns a client for the ReleaseClaim from the given config.
+func NewReleaseClaimClient(c config) *ReleaseClaimClient {
+	return &ReleaseClaimClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releaseclaim.Hooks(f(g(h())))`.
+func (c *ReleaseClaimClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseClaim = append(c.hooks.ReleaseClaim, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releaseclaim.Intercept(f(g(h())))`.
+func (c *ReleaseClaimClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseClaim = append(c.inters.ReleaseClaim, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseClaim entity.
+func (c *ReleaseClaimClient) Create() *ReleaseClaimCreate {
+	mutation := newReleaseClaimMutation(c.config, OpCreate)
+	return &ReleaseClaimCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseClaim entities.
+func (c *ReleaseClaimClient) CreateBulk(builders ...*ReleaseClaimCreate) *ReleaseClaimCreateBulk {
+	return &ReleaseClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseClaimClient) MapCreateBulk(slice any, setFunc func(*ReleaseClaimCreate, int)) *ReleaseClaimCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseClaimCreateBulk{err: fmt.Errorf("calling to ReleaseClaimClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseClaimCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseClaimCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseClaim.
+func (c *ReleaseClaimClient) Update() *ReleaseClaimUpdate {
+	mutation := newReleaseClaimMutation(c.config, OpUpdate)
+	return &ReleaseClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseClaimClient) UpdateOne(_m *ReleaseClaim) *ReleaseClaimUpdateOne {
+	mutation := newReleaseClaimMutation(c.config, OpUpdateOne, withReleaseClaim(_m))
+	return &ReleaseClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseClaimClient) UpdateOneID(id string) *ReleaseClaimUpdateOne {
+	mutation := newReleaseClaimMutation(c.config, OpUpdateOne, withReleaseClaimID(id))
+	return &ReleaseClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseClaim.
+func (c *ReleaseClaimClient) Delete() *ReleaseClaimDelete {
+	mutation := newReleaseClaimMutation(c.config, OpDelete)
+	return &ReleaseClaimDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseClaimClient) DeleteOne(_m *ReleaseClaim) *ReleaseClaimDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseClaimClient) DeleteOneID(id string) *ReleaseClaimDeleteOne {
+	builder := c.Delete().Where(releaseclaim.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseClaimDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseClaim.
+func (c *ReleaseClaimClient) Query() *ReleaseClaimQuery {
+	return &ReleaseClaimQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseClaim},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseClaim entity by its id.
+func (c *ReleaseClaimClient) Get(ctx context.Context, id string) (*ReleaseClaim, error) {
+	return c.Query().Where(releaseclaim.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseClaimClient) GetX(ctx context.Context, id string) *ReleaseClaim {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseClaimClient) Hooks() []Hook {
+	return c.hooks.ReleaseClaim
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseClaimClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseClaim
+}
+
+func (c *ReleaseClaimClient) mutate(ctx context.Context, m *ReleaseClaimMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseClaimCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseClaimUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseClaimUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseClaimDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseClaim mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseClaimVersionClient is a client for the ReleaseClaimVersion schema.
+type ReleaseClaimVersionClient struct {
+	config
+}
+
+// NewReleaseClaimVersionClient returns a client for the ReleaseClaimVersion from the given config.
+func NewReleaseClaimVersionClient(c config) *ReleaseClaimVersionClient {
+	return &ReleaseClaimVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releaseclaimversion.Hooks(f(g(h())))`.
+func (c *ReleaseClaimVersionClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseClaimVersion = append(c.hooks.ReleaseClaimVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releaseclaimversion.Intercept(f(g(h())))`.
+func (c *ReleaseClaimVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseClaimVersion = append(c.inters.ReleaseClaimVersion, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseClaimVersion entity.
+func (c *ReleaseClaimVersionClient) Create() *ReleaseClaimVersionCreate {
+	mutation := newReleaseClaimVersionMutation(c.config, OpCreate)
+	return &ReleaseClaimVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseClaimVersion entities.
+func (c *ReleaseClaimVersionClient) CreateBulk(builders ...*ReleaseClaimVersionCreate) *ReleaseClaimVersionCreateBulk {
+	return &ReleaseClaimVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseClaimVersionClient) MapCreateBulk(slice any, setFunc func(*ReleaseClaimVersionCreate, int)) *ReleaseClaimVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseClaimVersionCreateBulk{err: fmt.Errorf("calling to ReleaseClaimVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseClaimVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseClaimVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseClaimVersion.
+func (c *ReleaseClaimVersionClient) Update() *ReleaseClaimVersionUpdate {
+	mutation := newReleaseClaimVersionMutation(c.config, OpUpdate)
+	return &ReleaseClaimVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseClaimVersionClient) UpdateOne(_m *ReleaseClaimVersion) *ReleaseClaimVersionUpdateOne {
+	mutation := newReleaseClaimVersionMutation(c.config, OpUpdateOne, withReleaseClaimVersion(_m))
+	return &ReleaseClaimVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseClaimVersionClient) UpdateOneID(id string) *ReleaseClaimVersionUpdateOne {
+	mutation := newReleaseClaimVersionMutation(c.config, OpUpdateOne, withReleaseClaimVersionID(id))
+	return &ReleaseClaimVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseClaimVersion.
+func (c *ReleaseClaimVersionClient) Delete() *ReleaseClaimVersionDelete {
+	mutation := newReleaseClaimVersionMutation(c.config, OpDelete)
+	return &ReleaseClaimVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseClaimVersionClient) DeleteOne(_m *ReleaseClaimVersion) *ReleaseClaimVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseClaimVersionClient) DeleteOneID(id string) *ReleaseClaimVersionDeleteOne {
+	builder := c.Delete().Where(releaseclaimversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseClaimVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseClaimVersion.
+func (c *ReleaseClaimVersionClient) Query() *ReleaseClaimVersionQuery {
+	return &ReleaseClaimVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseClaimVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseClaimVersion entity by its id.
+func (c *ReleaseClaimVersionClient) Get(ctx context.Context, id string) (*ReleaseClaimVersion, error) {
+	return c.Query().Where(releaseclaimversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseClaimVersionClient) GetX(ctx context.Context, id string) *ReleaseClaimVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseClaimVersionClient) Hooks() []Hook {
+	return c.hooks.ReleaseClaimVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseClaimVersionClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseClaimVersion
+}
+
+func (c *ReleaseClaimVersionClient) mutate(ctx context.Context, m *ReleaseClaimVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseClaimVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseClaimVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseClaimVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseClaimVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseClaimVersion mutation op: %q", m.Op())
+	}
+}
+
 // ReleaseDocumentClient is a client for the ReleaseDocument schema.
 type ReleaseDocumentClient struct {
 	config
@@ -17005,6 +19506,1336 @@ func (c *ReleaseDocumentClient) mutate(ctx context.Context, m *ReleaseDocumentMu
 	}
 }
 
+// ReleaseEvidenceClient is a client for the ReleaseEvidence schema.
+type ReleaseEvidenceClient struct {
+	config
+}
+
+// NewReleaseEvidenceClient returns a client for the ReleaseEvidence from the given config.
+func NewReleaseEvidenceClient(c config) *ReleaseEvidenceClient {
+	return &ReleaseEvidenceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releaseevidence.Hooks(f(g(h())))`.
+func (c *ReleaseEvidenceClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseEvidence = append(c.hooks.ReleaseEvidence, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releaseevidence.Intercept(f(g(h())))`.
+func (c *ReleaseEvidenceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseEvidence = append(c.inters.ReleaseEvidence, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseEvidence entity.
+func (c *ReleaseEvidenceClient) Create() *ReleaseEvidenceCreate {
+	mutation := newReleaseEvidenceMutation(c.config, OpCreate)
+	return &ReleaseEvidenceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseEvidence entities.
+func (c *ReleaseEvidenceClient) CreateBulk(builders ...*ReleaseEvidenceCreate) *ReleaseEvidenceCreateBulk {
+	return &ReleaseEvidenceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseEvidenceClient) MapCreateBulk(slice any, setFunc func(*ReleaseEvidenceCreate, int)) *ReleaseEvidenceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseEvidenceCreateBulk{err: fmt.Errorf("calling to ReleaseEvidenceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseEvidenceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseEvidenceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseEvidence.
+func (c *ReleaseEvidenceClient) Update() *ReleaseEvidenceUpdate {
+	mutation := newReleaseEvidenceMutation(c.config, OpUpdate)
+	return &ReleaseEvidenceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseEvidenceClient) UpdateOne(_m *ReleaseEvidence) *ReleaseEvidenceUpdateOne {
+	mutation := newReleaseEvidenceMutation(c.config, OpUpdateOne, withReleaseEvidence(_m))
+	return &ReleaseEvidenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseEvidenceClient) UpdateOneID(id string) *ReleaseEvidenceUpdateOne {
+	mutation := newReleaseEvidenceMutation(c.config, OpUpdateOne, withReleaseEvidenceID(id))
+	return &ReleaseEvidenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseEvidence.
+func (c *ReleaseEvidenceClient) Delete() *ReleaseEvidenceDelete {
+	mutation := newReleaseEvidenceMutation(c.config, OpDelete)
+	return &ReleaseEvidenceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseEvidenceClient) DeleteOne(_m *ReleaseEvidence) *ReleaseEvidenceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseEvidenceClient) DeleteOneID(id string) *ReleaseEvidenceDeleteOne {
+	builder := c.Delete().Where(releaseevidence.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseEvidenceDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseEvidence.
+func (c *ReleaseEvidenceClient) Query() *ReleaseEvidenceQuery {
+	return &ReleaseEvidenceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseEvidence},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseEvidence entity by its id.
+func (c *ReleaseEvidenceClient) Get(ctx context.Context, id string) (*ReleaseEvidence, error) {
+	return c.Query().Where(releaseevidence.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseEvidenceClient) GetX(ctx context.Context, id string) *ReleaseEvidence {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseEvidenceClient) Hooks() []Hook {
+	return c.hooks.ReleaseEvidence
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseEvidenceClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseEvidence
+}
+
+func (c *ReleaseEvidenceClient) mutate(ctx context.Context, m *ReleaseEvidenceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseEvidenceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseEvidenceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseEvidenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseEvidenceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseEvidence mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseKitClient is a client for the ReleaseKit schema.
+type ReleaseKitClient struct {
+	config
+}
+
+// NewReleaseKitClient returns a client for the ReleaseKit from the given config.
+func NewReleaseKitClient(c config) *ReleaseKitClient {
+	return &ReleaseKitClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasekit.Hooks(f(g(h())))`.
+func (c *ReleaseKitClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseKit = append(c.hooks.ReleaseKit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasekit.Intercept(f(g(h())))`.
+func (c *ReleaseKitClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseKit = append(c.inters.ReleaseKit, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseKit entity.
+func (c *ReleaseKitClient) Create() *ReleaseKitCreate {
+	mutation := newReleaseKitMutation(c.config, OpCreate)
+	return &ReleaseKitCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseKit entities.
+func (c *ReleaseKitClient) CreateBulk(builders ...*ReleaseKitCreate) *ReleaseKitCreateBulk {
+	return &ReleaseKitCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseKitClient) MapCreateBulk(slice any, setFunc func(*ReleaseKitCreate, int)) *ReleaseKitCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseKitCreateBulk{err: fmt.Errorf("calling to ReleaseKitClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseKitCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseKitCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseKit.
+func (c *ReleaseKitClient) Update() *ReleaseKitUpdate {
+	mutation := newReleaseKitMutation(c.config, OpUpdate)
+	return &ReleaseKitUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseKitClient) UpdateOne(_m *ReleaseKit) *ReleaseKitUpdateOne {
+	mutation := newReleaseKitMutation(c.config, OpUpdateOne, withReleaseKit(_m))
+	return &ReleaseKitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseKitClient) UpdateOneID(id string) *ReleaseKitUpdateOne {
+	mutation := newReleaseKitMutation(c.config, OpUpdateOne, withReleaseKitID(id))
+	return &ReleaseKitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseKit.
+func (c *ReleaseKitClient) Delete() *ReleaseKitDelete {
+	mutation := newReleaseKitMutation(c.config, OpDelete)
+	return &ReleaseKitDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseKitClient) DeleteOne(_m *ReleaseKit) *ReleaseKitDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseKitClient) DeleteOneID(id string) *ReleaseKitDeleteOne {
+	builder := c.Delete().Where(releasekit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseKitDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseKit.
+func (c *ReleaseKitClient) Query() *ReleaseKitQuery {
+	return &ReleaseKitQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseKit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseKit entity by its id.
+func (c *ReleaseKitClient) Get(ctx context.Context, id string) (*ReleaseKit, error) {
+	return c.Query().Where(releasekit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseKitClient) GetX(ctx context.Context, id string) *ReleaseKit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseKitClient) Hooks() []Hook {
+	return c.hooks.ReleaseKit
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseKitClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseKit
+}
+
+func (c *ReleaseKitClient) mutate(ctx context.Context, m *ReleaseKitMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseKitCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseKitUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseKitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseKitDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseKit mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseLineageClient is a client for the ReleaseLineage schema.
+type ReleaseLineageClient struct {
+	config
+}
+
+// NewReleaseLineageClient returns a client for the ReleaseLineage from the given config.
+func NewReleaseLineageClient(c config) *ReleaseLineageClient {
+	return &ReleaseLineageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releaselineage.Hooks(f(g(h())))`.
+func (c *ReleaseLineageClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseLineage = append(c.hooks.ReleaseLineage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releaselineage.Intercept(f(g(h())))`.
+func (c *ReleaseLineageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseLineage = append(c.inters.ReleaseLineage, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseLineage entity.
+func (c *ReleaseLineageClient) Create() *ReleaseLineageCreate {
+	mutation := newReleaseLineageMutation(c.config, OpCreate)
+	return &ReleaseLineageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseLineage entities.
+func (c *ReleaseLineageClient) CreateBulk(builders ...*ReleaseLineageCreate) *ReleaseLineageCreateBulk {
+	return &ReleaseLineageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseLineageClient) MapCreateBulk(slice any, setFunc func(*ReleaseLineageCreate, int)) *ReleaseLineageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseLineageCreateBulk{err: fmt.Errorf("calling to ReleaseLineageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseLineageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseLineageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseLineage.
+func (c *ReleaseLineageClient) Update() *ReleaseLineageUpdate {
+	mutation := newReleaseLineageMutation(c.config, OpUpdate)
+	return &ReleaseLineageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseLineageClient) UpdateOne(_m *ReleaseLineage) *ReleaseLineageUpdateOne {
+	mutation := newReleaseLineageMutation(c.config, OpUpdateOne, withReleaseLineage(_m))
+	return &ReleaseLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseLineageClient) UpdateOneID(id string) *ReleaseLineageUpdateOne {
+	mutation := newReleaseLineageMutation(c.config, OpUpdateOne, withReleaseLineageID(id))
+	return &ReleaseLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseLineage.
+func (c *ReleaseLineageClient) Delete() *ReleaseLineageDelete {
+	mutation := newReleaseLineageMutation(c.config, OpDelete)
+	return &ReleaseLineageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseLineageClient) DeleteOne(_m *ReleaseLineage) *ReleaseLineageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseLineageClient) DeleteOneID(id string) *ReleaseLineageDeleteOne {
+	builder := c.Delete().Where(releaselineage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseLineageDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseLineage.
+func (c *ReleaseLineageClient) Query() *ReleaseLineageQuery {
+	return &ReleaseLineageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseLineage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseLineage entity by its id.
+func (c *ReleaseLineageClient) Get(ctx context.Context, id string) (*ReleaseLineage, error) {
+	return c.Query().Where(releaselineage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseLineageClient) GetX(ctx context.Context, id string) *ReleaseLineage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseLineageClient) Hooks() []Hook {
+	return c.hooks.ReleaseLineage
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseLineageClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseLineage
+}
+
+func (c *ReleaseLineageClient) mutate(ctx context.Context, m *ReleaseLineageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseLineageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseLineageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseLineageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseLineageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseLineage mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseLineageBindingClient is a client for the ReleaseLineageBinding schema.
+type ReleaseLineageBindingClient struct {
+	config
+}
+
+// NewReleaseLineageBindingClient returns a client for the ReleaseLineageBinding from the given config.
+func NewReleaseLineageBindingClient(c config) *ReleaseLineageBindingClient {
+	return &ReleaseLineageBindingClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releaselineagebinding.Hooks(f(g(h())))`.
+func (c *ReleaseLineageBindingClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseLineageBinding = append(c.hooks.ReleaseLineageBinding, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releaselineagebinding.Intercept(f(g(h())))`.
+func (c *ReleaseLineageBindingClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseLineageBinding = append(c.inters.ReleaseLineageBinding, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseLineageBinding entity.
+func (c *ReleaseLineageBindingClient) Create() *ReleaseLineageBindingCreate {
+	mutation := newReleaseLineageBindingMutation(c.config, OpCreate)
+	return &ReleaseLineageBindingCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseLineageBinding entities.
+func (c *ReleaseLineageBindingClient) CreateBulk(builders ...*ReleaseLineageBindingCreate) *ReleaseLineageBindingCreateBulk {
+	return &ReleaseLineageBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseLineageBindingClient) MapCreateBulk(slice any, setFunc func(*ReleaseLineageBindingCreate, int)) *ReleaseLineageBindingCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseLineageBindingCreateBulk{err: fmt.Errorf("calling to ReleaseLineageBindingClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseLineageBindingCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseLineageBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseLineageBinding.
+func (c *ReleaseLineageBindingClient) Update() *ReleaseLineageBindingUpdate {
+	mutation := newReleaseLineageBindingMutation(c.config, OpUpdate)
+	return &ReleaseLineageBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseLineageBindingClient) UpdateOne(_m *ReleaseLineageBinding) *ReleaseLineageBindingUpdateOne {
+	mutation := newReleaseLineageBindingMutation(c.config, OpUpdateOne, withReleaseLineageBinding(_m))
+	return &ReleaseLineageBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseLineageBindingClient) UpdateOneID(id string) *ReleaseLineageBindingUpdateOne {
+	mutation := newReleaseLineageBindingMutation(c.config, OpUpdateOne, withReleaseLineageBindingID(id))
+	return &ReleaseLineageBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseLineageBinding.
+func (c *ReleaseLineageBindingClient) Delete() *ReleaseLineageBindingDelete {
+	mutation := newReleaseLineageBindingMutation(c.config, OpDelete)
+	return &ReleaseLineageBindingDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseLineageBindingClient) DeleteOne(_m *ReleaseLineageBinding) *ReleaseLineageBindingDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseLineageBindingClient) DeleteOneID(id string) *ReleaseLineageBindingDeleteOne {
+	builder := c.Delete().Where(releaselineagebinding.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseLineageBindingDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseLineageBinding.
+func (c *ReleaseLineageBindingClient) Query() *ReleaseLineageBindingQuery {
+	return &ReleaseLineageBindingQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseLineageBinding},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseLineageBinding entity by its id.
+func (c *ReleaseLineageBindingClient) Get(ctx context.Context, id string) (*ReleaseLineageBinding, error) {
+	return c.Query().Where(releaselineagebinding.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseLineageBindingClient) GetX(ctx context.Context, id string) *ReleaseLineageBinding {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseLineageBindingClient) Hooks() []Hook {
+	return c.hooks.ReleaseLineageBinding
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseLineageBindingClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseLineageBinding
+}
+
+func (c *ReleaseLineageBindingClient) mutate(ctx context.Context, m *ReleaseLineageBindingMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseLineageBindingCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseLineageBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseLineageBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseLineageBindingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseLineageBinding mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseQualificationClient is a client for the ReleaseQualification schema.
+type ReleaseQualificationClient struct {
+	config
+}
+
+// NewReleaseQualificationClient returns a client for the ReleaseQualification from the given config.
+func NewReleaseQualificationClient(c config) *ReleaseQualificationClient {
+	return &ReleaseQualificationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasequalification.Hooks(f(g(h())))`.
+func (c *ReleaseQualificationClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseQualification = append(c.hooks.ReleaseQualification, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasequalification.Intercept(f(g(h())))`.
+func (c *ReleaseQualificationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseQualification = append(c.inters.ReleaseQualification, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseQualification entity.
+func (c *ReleaseQualificationClient) Create() *ReleaseQualificationCreate {
+	mutation := newReleaseQualificationMutation(c.config, OpCreate)
+	return &ReleaseQualificationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseQualification entities.
+func (c *ReleaseQualificationClient) CreateBulk(builders ...*ReleaseQualificationCreate) *ReleaseQualificationCreateBulk {
+	return &ReleaseQualificationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseQualificationClient) MapCreateBulk(slice any, setFunc func(*ReleaseQualificationCreate, int)) *ReleaseQualificationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseQualificationCreateBulk{err: fmt.Errorf("calling to ReleaseQualificationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseQualificationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseQualificationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseQualification.
+func (c *ReleaseQualificationClient) Update() *ReleaseQualificationUpdate {
+	mutation := newReleaseQualificationMutation(c.config, OpUpdate)
+	return &ReleaseQualificationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseQualificationClient) UpdateOne(_m *ReleaseQualification) *ReleaseQualificationUpdateOne {
+	mutation := newReleaseQualificationMutation(c.config, OpUpdateOne, withReleaseQualification(_m))
+	return &ReleaseQualificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseQualificationClient) UpdateOneID(id string) *ReleaseQualificationUpdateOne {
+	mutation := newReleaseQualificationMutation(c.config, OpUpdateOne, withReleaseQualificationID(id))
+	return &ReleaseQualificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseQualification.
+func (c *ReleaseQualificationClient) Delete() *ReleaseQualificationDelete {
+	mutation := newReleaseQualificationMutation(c.config, OpDelete)
+	return &ReleaseQualificationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseQualificationClient) DeleteOne(_m *ReleaseQualification) *ReleaseQualificationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseQualificationClient) DeleteOneID(id string) *ReleaseQualificationDeleteOne {
+	builder := c.Delete().Where(releasequalification.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseQualificationDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseQualification.
+func (c *ReleaseQualificationClient) Query() *ReleaseQualificationQuery {
+	return &ReleaseQualificationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseQualification},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseQualification entity by its id.
+func (c *ReleaseQualificationClient) Get(ctx context.Context, id string) (*ReleaseQualification, error) {
+	return c.Query().Where(releasequalification.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseQualificationClient) GetX(ctx context.Context, id string) *ReleaseQualification {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseQualificationClient) Hooks() []Hook {
+	return c.hooks.ReleaseQualification
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseQualificationClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseQualification
+}
+
+func (c *ReleaseQualificationClient) mutate(ctx context.Context, m *ReleaseQualificationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseQualificationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseQualificationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseQualificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseQualificationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseQualification mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseQualificationAssetClient is a client for the ReleaseQualificationAsset schema.
+type ReleaseQualificationAssetClient struct {
+	config
+}
+
+// NewReleaseQualificationAssetClient returns a client for the ReleaseQualificationAsset from the given config.
+func NewReleaseQualificationAssetClient(c config) *ReleaseQualificationAssetClient {
+	return &ReleaseQualificationAssetClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasequalificationasset.Hooks(f(g(h())))`.
+func (c *ReleaseQualificationAssetClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseQualificationAsset = append(c.hooks.ReleaseQualificationAsset, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasequalificationasset.Intercept(f(g(h())))`.
+func (c *ReleaseQualificationAssetClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseQualificationAsset = append(c.inters.ReleaseQualificationAsset, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseQualificationAsset entity.
+func (c *ReleaseQualificationAssetClient) Create() *ReleaseQualificationAssetCreate {
+	mutation := newReleaseQualificationAssetMutation(c.config, OpCreate)
+	return &ReleaseQualificationAssetCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseQualificationAsset entities.
+func (c *ReleaseQualificationAssetClient) CreateBulk(builders ...*ReleaseQualificationAssetCreate) *ReleaseQualificationAssetCreateBulk {
+	return &ReleaseQualificationAssetCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseQualificationAssetClient) MapCreateBulk(slice any, setFunc func(*ReleaseQualificationAssetCreate, int)) *ReleaseQualificationAssetCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseQualificationAssetCreateBulk{err: fmt.Errorf("calling to ReleaseQualificationAssetClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseQualificationAssetCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseQualificationAssetCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseQualificationAsset.
+func (c *ReleaseQualificationAssetClient) Update() *ReleaseQualificationAssetUpdate {
+	mutation := newReleaseQualificationAssetMutation(c.config, OpUpdate)
+	return &ReleaseQualificationAssetUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseQualificationAssetClient) UpdateOne(_m *ReleaseQualificationAsset) *ReleaseQualificationAssetUpdateOne {
+	mutation := newReleaseQualificationAssetMutation(c.config, OpUpdateOne, withReleaseQualificationAsset(_m))
+	return &ReleaseQualificationAssetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseQualificationAssetClient) UpdateOneID(id string) *ReleaseQualificationAssetUpdateOne {
+	mutation := newReleaseQualificationAssetMutation(c.config, OpUpdateOne, withReleaseQualificationAssetID(id))
+	return &ReleaseQualificationAssetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseQualificationAsset.
+func (c *ReleaseQualificationAssetClient) Delete() *ReleaseQualificationAssetDelete {
+	mutation := newReleaseQualificationAssetMutation(c.config, OpDelete)
+	return &ReleaseQualificationAssetDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseQualificationAssetClient) DeleteOne(_m *ReleaseQualificationAsset) *ReleaseQualificationAssetDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseQualificationAssetClient) DeleteOneID(id string) *ReleaseQualificationAssetDeleteOne {
+	builder := c.Delete().Where(releasequalificationasset.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseQualificationAssetDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseQualificationAsset.
+func (c *ReleaseQualificationAssetClient) Query() *ReleaseQualificationAssetQuery {
+	return &ReleaseQualificationAssetQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseQualificationAsset},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseQualificationAsset entity by its id.
+func (c *ReleaseQualificationAssetClient) Get(ctx context.Context, id string) (*ReleaseQualificationAsset, error) {
+	return c.Query().Where(releasequalificationasset.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseQualificationAssetClient) GetX(ctx context.Context, id string) *ReleaseQualificationAsset {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseQualificationAssetClient) Hooks() []Hook {
+	return c.hooks.ReleaseQualificationAsset
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseQualificationAssetClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseQualificationAsset
+}
+
+func (c *ReleaseQualificationAssetClient) mutate(ctx context.Context, m *ReleaseQualificationAssetMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseQualificationAssetCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseQualificationAssetUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseQualificationAssetUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseQualificationAssetDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseQualificationAsset mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseQualificationDecisionClient is a client for the ReleaseQualificationDecision schema.
+type ReleaseQualificationDecisionClient struct {
+	config
+}
+
+// NewReleaseQualificationDecisionClient returns a client for the ReleaseQualificationDecision from the given config.
+func NewReleaseQualificationDecisionClient(c config) *ReleaseQualificationDecisionClient {
+	return &ReleaseQualificationDecisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasequalificationdecision.Hooks(f(g(h())))`.
+func (c *ReleaseQualificationDecisionClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseQualificationDecision = append(c.hooks.ReleaseQualificationDecision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasequalificationdecision.Intercept(f(g(h())))`.
+func (c *ReleaseQualificationDecisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseQualificationDecision = append(c.inters.ReleaseQualificationDecision, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseQualificationDecision entity.
+func (c *ReleaseQualificationDecisionClient) Create() *ReleaseQualificationDecisionCreate {
+	mutation := newReleaseQualificationDecisionMutation(c.config, OpCreate)
+	return &ReleaseQualificationDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseQualificationDecision entities.
+func (c *ReleaseQualificationDecisionClient) CreateBulk(builders ...*ReleaseQualificationDecisionCreate) *ReleaseQualificationDecisionCreateBulk {
+	return &ReleaseQualificationDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseQualificationDecisionClient) MapCreateBulk(slice any, setFunc func(*ReleaseQualificationDecisionCreate, int)) *ReleaseQualificationDecisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseQualificationDecisionCreateBulk{err: fmt.Errorf("calling to ReleaseQualificationDecisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseQualificationDecisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseQualificationDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseQualificationDecision.
+func (c *ReleaseQualificationDecisionClient) Update() *ReleaseQualificationDecisionUpdate {
+	mutation := newReleaseQualificationDecisionMutation(c.config, OpUpdate)
+	return &ReleaseQualificationDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseQualificationDecisionClient) UpdateOne(_m *ReleaseQualificationDecision) *ReleaseQualificationDecisionUpdateOne {
+	mutation := newReleaseQualificationDecisionMutation(c.config, OpUpdateOne, withReleaseQualificationDecision(_m))
+	return &ReleaseQualificationDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseQualificationDecisionClient) UpdateOneID(id string) *ReleaseQualificationDecisionUpdateOne {
+	mutation := newReleaseQualificationDecisionMutation(c.config, OpUpdateOne, withReleaseQualificationDecisionID(id))
+	return &ReleaseQualificationDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseQualificationDecision.
+func (c *ReleaseQualificationDecisionClient) Delete() *ReleaseQualificationDecisionDelete {
+	mutation := newReleaseQualificationDecisionMutation(c.config, OpDelete)
+	return &ReleaseQualificationDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseQualificationDecisionClient) DeleteOne(_m *ReleaseQualificationDecision) *ReleaseQualificationDecisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseQualificationDecisionClient) DeleteOneID(id string) *ReleaseQualificationDecisionDeleteOne {
+	builder := c.Delete().Where(releasequalificationdecision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseQualificationDecisionDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseQualificationDecision.
+func (c *ReleaseQualificationDecisionClient) Query() *ReleaseQualificationDecisionQuery {
+	return &ReleaseQualificationDecisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseQualificationDecision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseQualificationDecision entity by its id.
+func (c *ReleaseQualificationDecisionClient) Get(ctx context.Context, id string) (*ReleaseQualificationDecision, error) {
+	return c.Query().Where(releasequalificationdecision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseQualificationDecisionClient) GetX(ctx context.Context, id string) *ReleaseQualificationDecision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseQualificationDecisionClient) Hooks() []Hook {
+	return c.hooks.ReleaseQualificationDecision
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseQualificationDecisionClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseQualificationDecision
+}
+
+func (c *ReleaseQualificationDecisionClient) mutate(ctx context.Context, m *ReleaseQualificationDecisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseQualificationDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseQualificationDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseQualificationDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseQualificationDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseQualificationDecision mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseQualificationSourceClient is a client for the ReleaseQualificationSource schema.
+type ReleaseQualificationSourceClient struct {
+	config
+}
+
+// NewReleaseQualificationSourceClient returns a client for the ReleaseQualificationSource from the given config.
+func NewReleaseQualificationSourceClient(c config) *ReleaseQualificationSourceClient {
+	return &ReleaseQualificationSourceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasequalificationsource.Hooks(f(g(h())))`.
+func (c *ReleaseQualificationSourceClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseQualificationSource = append(c.hooks.ReleaseQualificationSource, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasequalificationsource.Intercept(f(g(h())))`.
+func (c *ReleaseQualificationSourceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseQualificationSource = append(c.inters.ReleaseQualificationSource, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseQualificationSource entity.
+func (c *ReleaseQualificationSourceClient) Create() *ReleaseQualificationSourceCreate {
+	mutation := newReleaseQualificationSourceMutation(c.config, OpCreate)
+	return &ReleaseQualificationSourceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseQualificationSource entities.
+func (c *ReleaseQualificationSourceClient) CreateBulk(builders ...*ReleaseQualificationSourceCreate) *ReleaseQualificationSourceCreateBulk {
+	return &ReleaseQualificationSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseQualificationSourceClient) MapCreateBulk(slice any, setFunc func(*ReleaseQualificationSourceCreate, int)) *ReleaseQualificationSourceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseQualificationSourceCreateBulk{err: fmt.Errorf("calling to ReleaseQualificationSourceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseQualificationSourceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseQualificationSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseQualificationSource.
+func (c *ReleaseQualificationSourceClient) Update() *ReleaseQualificationSourceUpdate {
+	mutation := newReleaseQualificationSourceMutation(c.config, OpUpdate)
+	return &ReleaseQualificationSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseQualificationSourceClient) UpdateOne(_m *ReleaseQualificationSource) *ReleaseQualificationSourceUpdateOne {
+	mutation := newReleaseQualificationSourceMutation(c.config, OpUpdateOne, withReleaseQualificationSource(_m))
+	return &ReleaseQualificationSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseQualificationSourceClient) UpdateOneID(id string) *ReleaseQualificationSourceUpdateOne {
+	mutation := newReleaseQualificationSourceMutation(c.config, OpUpdateOne, withReleaseQualificationSourceID(id))
+	return &ReleaseQualificationSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseQualificationSource.
+func (c *ReleaseQualificationSourceClient) Delete() *ReleaseQualificationSourceDelete {
+	mutation := newReleaseQualificationSourceMutation(c.config, OpDelete)
+	return &ReleaseQualificationSourceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseQualificationSourceClient) DeleteOne(_m *ReleaseQualificationSource) *ReleaseQualificationSourceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseQualificationSourceClient) DeleteOneID(id string) *ReleaseQualificationSourceDeleteOne {
+	builder := c.Delete().Where(releasequalificationsource.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseQualificationSourceDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseQualificationSource.
+func (c *ReleaseQualificationSourceClient) Query() *ReleaseQualificationSourceQuery {
+	return &ReleaseQualificationSourceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseQualificationSource},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseQualificationSource entity by its id.
+func (c *ReleaseQualificationSourceClient) Get(ctx context.Context, id string) (*ReleaseQualificationSource, error) {
+	return c.Query().Where(releasequalificationsource.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseQualificationSourceClient) GetX(ctx context.Context, id string) *ReleaseQualificationSource {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseQualificationSourceClient) Hooks() []Hook {
+	return c.hooks.ReleaseQualificationSource
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseQualificationSourceClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseQualificationSource
+}
+
+func (c *ReleaseQualificationSourceClient) mutate(ctx context.Context, m *ReleaseQualificationSourceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseQualificationSourceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseQualificationSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseQualificationSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseQualificationSourceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseQualificationSource mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseReadinessClient is a client for the ReleaseReadiness schema.
+type ReleaseReadinessClient struct {
+	config
+}
+
+// NewReleaseReadinessClient returns a client for the ReleaseReadiness from the given config.
+func NewReleaseReadinessClient(c config) *ReleaseReadinessClient {
+	return &ReleaseReadinessClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasereadiness.Hooks(f(g(h())))`.
+func (c *ReleaseReadinessClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseReadiness = append(c.hooks.ReleaseReadiness, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasereadiness.Intercept(f(g(h())))`.
+func (c *ReleaseReadinessClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseReadiness = append(c.inters.ReleaseReadiness, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseReadiness entity.
+func (c *ReleaseReadinessClient) Create() *ReleaseReadinessCreate {
+	mutation := newReleaseReadinessMutation(c.config, OpCreate)
+	return &ReleaseReadinessCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseReadiness entities.
+func (c *ReleaseReadinessClient) CreateBulk(builders ...*ReleaseReadinessCreate) *ReleaseReadinessCreateBulk {
+	return &ReleaseReadinessCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseReadinessClient) MapCreateBulk(slice any, setFunc func(*ReleaseReadinessCreate, int)) *ReleaseReadinessCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseReadinessCreateBulk{err: fmt.Errorf("calling to ReleaseReadinessClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseReadinessCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseReadinessCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseReadiness.
+func (c *ReleaseReadinessClient) Update() *ReleaseReadinessUpdate {
+	mutation := newReleaseReadinessMutation(c.config, OpUpdate)
+	return &ReleaseReadinessUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseReadinessClient) UpdateOne(_m *ReleaseReadiness) *ReleaseReadinessUpdateOne {
+	mutation := newReleaseReadinessMutation(c.config, OpUpdateOne, withReleaseReadiness(_m))
+	return &ReleaseReadinessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseReadinessClient) UpdateOneID(id string) *ReleaseReadinessUpdateOne {
+	mutation := newReleaseReadinessMutation(c.config, OpUpdateOne, withReleaseReadinessID(id))
+	return &ReleaseReadinessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseReadiness.
+func (c *ReleaseReadinessClient) Delete() *ReleaseReadinessDelete {
+	mutation := newReleaseReadinessMutation(c.config, OpDelete)
+	return &ReleaseReadinessDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseReadinessClient) DeleteOne(_m *ReleaseReadiness) *ReleaseReadinessDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseReadinessClient) DeleteOneID(id string) *ReleaseReadinessDeleteOne {
+	builder := c.Delete().Where(releasereadiness.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseReadinessDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseReadiness.
+func (c *ReleaseReadinessClient) Query() *ReleaseReadinessQuery {
+	return &ReleaseReadinessQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseReadiness},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseReadiness entity by its id.
+func (c *ReleaseReadinessClient) Get(ctx context.Context, id string) (*ReleaseReadiness, error) {
+	return c.Query().Where(releasereadiness.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseReadinessClient) GetX(ctx context.Context, id string) *ReleaseReadiness {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseReadinessClient) Hooks() []Hook {
+	return c.hooks.ReleaseReadiness
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseReadinessClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseReadiness
+}
+
+func (c *ReleaseReadinessClient) mutate(ctx context.Context, m *ReleaseReadinessMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseReadinessCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseReadinessUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseReadinessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseReadinessDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseReadiness mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseSourceBindingClient is a client for the ReleaseSourceBinding schema.
+type ReleaseSourceBindingClient struct {
+	config
+}
+
+// NewReleaseSourceBindingClient returns a client for the ReleaseSourceBinding from the given config.
+func NewReleaseSourceBindingClient(c config) *ReleaseSourceBindingClient {
+	return &ReleaseSourceBindingClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasesourcebinding.Hooks(f(g(h())))`.
+func (c *ReleaseSourceBindingClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseSourceBinding = append(c.hooks.ReleaseSourceBinding, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasesourcebinding.Intercept(f(g(h())))`.
+func (c *ReleaseSourceBindingClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseSourceBinding = append(c.inters.ReleaseSourceBinding, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseSourceBinding entity.
+func (c *ReleaseSourceBindingClient) Create() *ReleaseSourceBindingCreate {
+	mutation := newReleaseSourceBindingMutation(c.config, OpCreate)
+	return &ReleaseSourceBindingCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseSourceBinding entities.
+func (c *ReleaseSourceBindingClient) CreateBulk(builders ...*ReleaseSourceBindingCreate) *ReleaseSourceBindingCreateBulk {
+	return &ReleaseSourceBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseSourceBindingClient) MapCreateBulk(slice any, setFunc func(*ReleaseSourceBindingCreate, int)) *ReleaseSourceBindingCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseSourceBindingCreateBulk{err: fmt.Errorf("calling to ReleaseSourceBindingClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseSourceBindingCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseSourceBindingCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseSourceBinding.
+func (c *ReleaseSourceBindingClient) Update() *ReleaseSourceBindingUpdate {
+	mutation := newReleaseSourceBindingMutation(c.config, OpUpdate)
+	return &ReleaseSourceBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseSourceBindingClient) UpdateOne(_m *ReleaseSourceBinding) *ReleaseSourceBindingUpdateOne {
+	mutation := newReleaseSourceBindingMutation(c.config, OpUpdateOne, withReleaseSourceBinding(_m))
+	return &ReleaseSourceBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseSourceBindingClient) UpdateOneID(id string) *ReleaseSourceBindingUpdateOne {
+	mutation := newReleaseSourceBindingMutation(c.config, OpUpdateOne, withReleaseSourceBindingID(id))
+	return &ReleaseSourceBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseSourceBinding.
+func (c *ReleaseSourceBindingClient) Delete() *ReleaseSourceBindingDelete {
+	mutation := newReleaseSourceBindingMutation(c.config, OpDelete)
+	return &ReleaseSourceBindingDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseSourceBindingClient) DeleteOne(_m *ReleaseSourceBinding) *ReleaseSourceBindingDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseSourceBindingClient) DeleteOneID(id string) *ReleaseSourceBindingDeleteOne {
+	builder := c.Delete().Where(releasesourcebinding.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseSourceBindingDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseSourceBinding.
+func (c *ReleaseSourceBindingClient) Query() *ReleaseSourceBindingQuery {
+	return &ReleaseSourceBindingQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseSourceBinding},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseSourceBinding entity by its id.
+func (c *ReleaseSourceBindingClient) Get(ctx context.Context, id string) (*ReleaseSourceBinding, error) {
+	return c.Query().Where(releasesourcebinding.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseSourceBindingClient) GetX(ctx context.Context, id string) *ReleaseSourceBinding {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseSourceBindingClient) Hooks() []Hook {
+	return c.hooks.ReleaseSourceBinding
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseSourceBindingClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseSourceBinding
+}
+
+func (c *ReleaseSourceBindingClient) mutate(ctx context.Context, m *ReleaseSourceBindingMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseSourceBindingCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseSourceBindingUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseSourceBindingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseSourceBindingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseSourceBinding mutation op: %q", m.Op())
+	}
+}
+
 // ReleaseSourceEventClient is a client for the ReleaseSourceEvent schema.
 type ReleaseSourceEventClient struct {
 	config
@@ -17135,6 +20966,139 @@ func (c *ReleaseSourceEventClient) mutate(ctx context.Context, m *ReleaseSourceE
 		return (&ReleaseSourceEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ReleaseSourceEvent mutation op: %q", m.Op())
+	}
+}
+
+// ReleaseSourceObservationClient is a client for the ReleaseSourceObservation schema.
+type ReleaseSourceObservationClient struct {
+	config
+}
+
+// NewReleaseSourceObservationClient returns a client for the ReleaseSourceObservation from the given config.
+func NewReleaseSourceObservationClient(c config) *ReleaseSourceObservationClient {
+	return &ReleaseSourceObservationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasesourceobservation.Hooks(f(g(h())))`.
+func (c *ReleaseSourceObservationClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseSourceObservation = append(c.hooks.ReleaseSourceObservation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasesourceobservation.Intercept(f(g(h())))`.
+func (c *ReleaseSourceObservationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseSourceObservation = append(c.inters.ReleaseSourceObservation, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseSourceObservation entity.
+func (c *ReleaseSourceObservationClient) Create() *ReleaseSourceObservationCreate {
+	mutation := newReleaseSourceObservationMutation(c.config, OpCreate)
+	return &ReleaseSourceObservationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseSourceObservation entities.
+func (c *ReleaseSourceObservationClient) CreateBulk(builders ...*ReleaseSourceObservationCreate) *ReleaseSourceObservationCreateBulk {
+	return &ReleaseSourceObservationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseSourceObservationClient) MapCreateBulk(slice any, setFunc func(*ReleaseSourceObservationCreate, int)) *ReleaseSourceObservationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseSourceObservationCreateBulk{err: fmt.Errorf("calling to ReleaseSourceObservationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseSourceObservationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseSourceObservationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseSourceObservation.
+func (c *ReleaseSourceObservationClient) Update() *ReleaseSourceObservationUpdate {
+	mutation := newReleaseSourceObservationMutation(c.config, OpUpdate)
+	return &ReleaseSourceObservationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseSourceObservationClient) UpdateOne(_m *ReleaseSourceObservation) *ReleaseSourceObservationUpdateOne {
+	mutation := newReleaseSourceObservationMutation(c.config, OpUpdateOne, withReleaseSourceObservation(_m))
+	return &ReleaseSourceObservationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseSourceObservationClient) UpdateOneID(id string) *ReleaseSourceObservationUpdateOne {
+	mutation := newReleaseSourceObservationMutation(c.config, OpUpdateOne, withReleaseSourceObservationID(id))
+	return &ReleaseSourceObservationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseSourceObservation.
+func (c *ReleaseSourceObservationClient) Delete() *ReleaseSourceObservationDelete {
+	mutation := newReleaseSourceObservationMutation(c.config, OpDelete)
+	return &ReleaseSourceObservationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseSourceObservationClient) DeleteOne(_m *ReleaseSourceObservation) *ReleaseSourceObservationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseSourceObservationClient) DeleteOneID(id string) *ReleaseSourceObservationDeleteOne {
+	builder := c.Delete().Where(releasesourceobservation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseSourceObservationDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseSourceObservation.
+func (c *ReleaseSourceObservationClient) Query() *ReleaseSourceObservationQuery {
+	return &ReleaseSourceObservationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseSourceObservation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseSourceObservation entity by its id.
+func (c *ReleaseSourceObservationClient) Get(ctx context.Context, id string) (*ReleaseSourceObservation, error) {
+	return c.Query().Where(releasesourceobservation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseSourceObservationClient) GetX(ctx context.Context, id string) *ReleaseSourceObservation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseSourceObservationClient) Hooks() []Hook {
+	return c.hooks.ReleaseSourceObservation
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseSourceObservationClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseSourceObservation
+}
+
+func (c *ReleaseSourceObservationClient) mutate(ctx context.Context, m *ReleaseSourceObservationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseSourceObservationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseSourceObservationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseSourceObservationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseSourceObservationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseSourceObservation mutation op: %q", m.Op())
 	}
 }
 
@@ -21435,20 +25399,23 @@ type (
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
 		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
+		ClaimPathBinding, ClaimSupport, ClaimSupportSet, ClaimVerification,
 		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
 		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
 		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
 		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
-		DeploymentEvent, Design, EnrichmentRecord, FrontendActivation,
-		FrontendObservation, FrontendSource, GitHubDeliveryRecovery,
-		GitHubInstallStart, GitHubInstallation, GitHubObservation,
-		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
-		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
-		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
-		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
-		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
-		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
-		PlatformDraftImport, PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
+		DeploymentEvent, Design, EnrichmentRecord, EvidenceClearance, EvidenceSource,
+		EvidenceVersion, FrontendActivation, FrontendObservation, FrontendSource,
+		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
+		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
+		IdealCustomerProfile, IntegrationConnection, Invitation, KitArtifactClaim,
+		KitArtifactRevision, KitExport, KitMember, KitReviewDecision, KitRevision,
+		KitSourcePin, LaunchRun, LaunchRunStep, Member, OnboardingRun, Organization,
+		OrganizationEnterpriseSettings, OutboxEvent, PageKnowledge, PermissionGroup,
+		PermissionGroupMember, PlatformAppConnection, PlatformAutoDMCampaign,
+		PlatformAutoDMDelivery, PlatformAutoDMOptOut, PlatformAutoDMRecipient,
+		PlatformCreativeSet, PlatformCreativeSetVersion, PlatformDraftImport,
+		PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
 		PlatformFounderHubRevision, PlatformFounderHubSettings,
 		PlatformFounderHubTemplate, PlatformFounderHubUser,
 		PlatformFounderHubWorkspace, PlatformNotificationDelivery,
@@ -21460,9 +25427,13 @@ type (
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		PostDeletion, ProductProfile, ProductSurface, Project, ProjectVersion,
-		PublicationAttempt, Release, ReleaseAutomation, ReleaseAutomationExecutor,
-		ReleaseAutomationNode, ReleaseAutomationRun, ReleaseAutomationVersion,
-		ReleaseDocument, ReleaseSourceEvent, ReleaseSpec, ScheduledPost,
+		PublicationAttempt, ReadinessCommandReceipt, Release, ReleaseAutomation,
+		ReleaseAutomationExecutor, ReleaseAutomationNode, ReleaseAutomationRun,
+		ReleaseAutomationVersion, ReleaseClaim, ReleaseClaimVersion, ReleaseDocument,
+		ReleaseEvidence, ReleaseKit, ReleaseLineage, ReleaseLineageBinding,
+		ReleaseQualification, ReleaseQualificationAsset, ReleaseQualificationDecision,
+		ReleaseQualificationSource, ReleaseReadiness, ReleaseSourceBinding,
+		ReleaseSourceEvent, ReleaseSourceObservation, ReleaseSpec, ScheduledPost,
 		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
 		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
 		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,
@@ -21479,20 +25450,23 @@ type (
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
 		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
+		ClaimPathBinding, ClaimSupport, ClaimSupportSet, ClaimVerification,
 		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
 		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
 		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
 		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
-		DeploymentEvent, Design, EnrichmentRecord, FrontendActivation,
-		FrontendObservation, FrontendSource, GitHubDeliveryRecovery,
-		GitHubInstallStart, GitHubInstallation, GitHubObservation,
-		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
-		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
-		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
-		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
-		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
-		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
-		PlatformDraftImport, PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
+		DeploymentEvent, Design, EnrichmentRecord, EvidenceClearance, EvidenceSource,
+		EvidenceVersion, FrontendActivation, FrontendObservation, FrontendSource,
+		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
+		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
+		IdealCustomerProfile, IntegrationConnection, Invitation, KitArtifactClaim,
+		KitArtifactRevision, KitExport, KitMember, KitReviewDecision, KitRevision,
+		KitSourcePin, LaunchRun, LaunchRunStep, Member, OnboardingRun, Organization,
+		OrganizationEnterpriseSettings, OutboxEvent, PageKnowledge, PermissionGroup,
+		PermissionGroupMember, PlatformAppConnection, PlatformAutoDMCampaign,
+		PlatformAutoDMDelivery, PlatformAutoDMOptOut, PlatformAutoDMRecipient,
+		PlatformCreativeSet, PlatformCreativeSetVersion, PlatformDraftImport,
+		PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
 		PlatformFounderHubRevision, PlatformFounderHubSettings,
 		PlatformFounderHubTemplate, PlatformFounderHubUser,
 		PlatformFounderHubWorkspace, PlatformNotificationDelivery,
@@ -21504,9 +25478,13 @@ type (
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		PostDeletion, ProductProfile, ProductSurface, Project, ProjectVersion,
-		PublicationAttempt, Release, ReleaseAutomation, ReleaseAutomationExecutor,
-		ReleaseAutomationNode, ReleaseAutomationRun, ReleaseAutomationVersion,
-		ReleaseDocument, ReleaseSourceEvent, ReleaseSpec, ScheduledPost,
+		PublicationAttempt, ReadinessCommandReceipt, Release, ReleaseAutomation,
+		ReleaseAutomationExecutor, ReleaseAutomationNode, ReleaseAutomationRun,
+		ReleaseAutomationVersion, ReleaseClaim, ReleaseClaimVersion, ReleaseDocument,
+		ReleaseEvidence, ReleaseKit, ReleaseLineage, ReleaseLineageBinding,
+		ReleaseQualification, ReleaseQualificationAsset, ReleaseQualificationDecision,
+		ReleaseQualificationSource, ReleaseReadiness, ReleaseSourceBinding,
+		ReleaseSourceEvent, ReleaseSourceObservation, ReleaseSpec, ScheduledPost,
 		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
 		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
 		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,

@@ -90,6 +90,20 @@ func (_c *WorkspaceSettingsCreate) SetNillableAiAgentEnabled(v *bool) *Workspace
 	return _c
 }
 
+// SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
+func (_c *WorkspaceSettingsCreate) SetReleaseReadinessEnabled(v bool) *WorkspaceSettingsCreate {
+	_c.mutation.SetReleaseReadinessEnabled(v)
+	return _c
+}
+
+// SetNillableReleaseReadinessEnabled sets the "release_readiness_enabled" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableReleaseReadinessEnabled(v *bool) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetReleaseReadinessEnabled(*v)
+	}
+	return _c
+}
+
 // SetDisabledExperiments sets the "disabled_experiments" field.
 func (_c *WorkspaceSettingsCreate) SetDisabledExperiments(v []string) *WorkspaceSettingsCreate {
 	_c.mutation.SetDisabledExperiments(v)
@@ -181,6 +195,10 @@ func (_c *WorkspaceSettingsCreate) defaults() {
 		v := workspacesettings.DefaultAiAgentEnabled
 		_c.mutation.SetAiAgentEnabled(v)
 	}
+	if _, ok := _c.mutation.ReleaseReadinessEnabled(); !ok {
+		v := workspacesettings.DefaultReleaseReadinessEnabled
+		_c.mutation.SetReleaseReadinessEnabled(v)
+	}
 	if _, ok := _c.mutation.DisabledExperiments(); !ok {
 		v := workspacesettings.DefaultDisabledExperiments
 		_c.mutation.SetDisabledExperiments(v)
@@ -208,6 +226,9 @@ func (_c *WorkspaceSettingsCreate) check() error {
 	}
 	if _, ok := _c.mutation.AiAgentEnabled(); !ok {
 		return &ValidationError{Name: "ai_agent_enabled", err: errors.New(`ent: missing required field "WorkspaceSettings.ai_agent_enabled"`)}
+	}
+	if _, ok := _c.mutation.ReleaseReadinessEnabled(); !ok {
+		return &ValidationError{Name: "release_readiness_enabled", err: errors.New(`ent: missing required field "WorkspaceSettings.release_readiness_enabled"`)}
 	}
 	if _, ok := _c.mutation.DisabledExperiments(); !ok {
 		return &ValidationError{Name: "disabled_experiments", err: errors.New(`ent: missing required field "WorkspaceSettings.disabled_experiments"`)}
@@ -272,6 +293,10 @@ func (_c *WorkspaceSettingsCreate) createSpec() (*WorkspaceSettings, *sqlgraph.C
 	if value, ok := _c.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
 		_node.AiAgentEnabled = value
+	}
+	if value, ok := _c.mutation.ReleaseReadinessEnabled(); ok {
+		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
+		_node.ReleaseReadinessEnabled = value
 	}
 	if value, ok := _c.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)

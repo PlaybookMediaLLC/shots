@@ -3,6 +3,14 @@
 # production serves it. There is no second lane; the few hooks the suite needs
 # are asked for here instead of being inferred from NODE_ENV.
 services:
+  publishing-orchestrator:
+    environment:
+      # Exercise durable kit preparation/export through the production worker.
+      RUN_MAINTENANCE: 'true'
+      RESEND_API_KEY: re_e2e_no_delivery
+      AUTH_EMAIL_FROM: 'Shots E2E <noreply@localhost.test>'
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      PLATFORM_WORKFLOW_RENDER_URL: http://app:3000
   app:
     image: screenshot-studio-web-e2e
     build:

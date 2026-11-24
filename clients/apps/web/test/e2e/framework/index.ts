@@ -275,6 +275,7 @@ export const test = base.extend<
 
 export type { Browser, Download, Locator, Page, Request, Route } from '@playwright/test'
 export type { E2EIdentity }
+export { waitForHydration }
 
 // One import for every spec. Where two modules once shared a name, this is
 // the one to use.
@@ -327,7 +328,7 @@ export {
 } from './controls'
 export { mockBrowserJson } from './downstream'
 export { startHttpMockServer, type HttpMockRequest, type HttpMockServer } from './http-server'
-export { getMaintenanceHeaders } from './maintenance'
+export { getMaintenanceHeaders, triggerTenantOutbox } from './maintenance'
 export { decodeMp4, readMp4Tracks } from './mp4'
 export {
   apiRequest,

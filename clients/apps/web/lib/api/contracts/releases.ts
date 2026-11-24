@@ -33,6 +33,9 @@ export const releaseSummarySchema = z.object({
   title: z.string(),
 })
 
+/** Release choices shared by source selection and grouping in the browser. */
+export const releaseChoicesSchema = z.object({ releases: z.array(releaseSummarySchema) })
+
 /**
  * A client idempotency key. Longer keys are rejected, not truncated, so two
  * long keys can never collide.

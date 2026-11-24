@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  qualificationErrorDetailsSchema,
+  kitReadinessErrorDetailsSchema,
+  sourceSelectionErrorDetailsSchema,
+} from 'screenshot-studio-backend-sdk'
 import { API_DOCS_URL, type ApiErrorCode } from '@/lib/api/errors'
 import {
   workspaceFeatureSchema,
@@ -55,6 +60,14 @@ export const platformErrorBodySchema = z
     hint: z.string().describe('How to resolve the error.'),
     message: z.string().describe('Human-readable error message, same value as `error`.'),
     status: z.int().describe('HTTP status code, repeated in the body.'),
+    details: z
+      .union([
+        kitReadinessErrorDetailsSchema,
+        qualificationErrorDetailsSchema,
+        sourceSelectionErrorDetailsSchema,
+      ])
+      .optional()
+      .describe('Release qualification or source selection conflict and repair details.'),
   })
   .describe(
     'Every failing request returns this envelope. `code` is stable and safe to branch on; `error` and `message` carry the same human-readable text.'
@@ -312,12 +325,35 @@ export function toApiFailure(error: unknown): ApiFailure | null {
     return failureForStatus(503, DEPENDENCY_UNAVAILABLE)
   }
   return (
+    getQualificationFailure(error) ??
     getQuotaFailure(error) ??
     getEntitlementFailure(error) ??
     getQueueSlotFailure(error) ??
     getDuplicateContentFailure(error) ??
     getNamedFailure(error)
   )
+}
+
+function getQualificationFailure(error: unknown): ApiFailure | null {
+  const parsed = z
+    .object({
+      name: z.literal('BackendSDKError'),
+      message: z.string(),
+      status: z.literal([403, 409, 503]),
+      details: z.object({
+        details: z.union([
+          kitReadinessErrorDetailsSchema,
+          qualificationErrorDetailsSchema,
+          sourceSelectionErrorDetailsSchema,
+        ]),
+      }),
+    })
+    .safeParse(error)
+  if (!parsed.success) return null
+  return {
+    ...failureForStatus(parsed.data.status, parsed.data.message),
+    extra: { details: parsed.data.details.details },
+  }
 }
 
 const planRefusalSchema = z.union([

@@ -20,6 +20,15 @@ var ErrPayload = errors.New("invalid supported GitHub event")
 // closed milestones. Ignored actions need no full payload; malformed supported
 // actions must fail visibly. Delivery IDs never contribute to semantic identity.
 func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, error) {
+	return normalizeGitHub(eventName, body, false)
+}
+
+// NormalizeGitHubSource retains edits to merged PRs without making them workflow triggers.
+func NormalizeGitHubSource(eventName string, body json.RawMessage) (int64, *Event, error) {
+	return normalizeGitHub(eventName, body, true)
+}
+
+func normalizeGitHub(eventName string, body json.RawMessage, sourceOnly bool) (int64, *Event, error) {
 	if len(body) > MaxGitHubPayloadBytes {
 		return 0, nil, ErrPayload
 	}
@@ -47,7 +56,8 @@ func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, err
 	if eventName != "deployment_status" && header.Action == "" {
 		return 0, nil, ErrPayload
 	}
-	if eventName == "release" && header.Action != "published" || eventName == "pull_request" && header.Action != "closed" {
+	observationOnly := sourceOnly && eventName == "pull_request" && header.Action == "edited"
+	if eventName == "release" && header.Action != "published" || eventName == "pull_request" && header.Action != "closed" && !observationOnly {
 		return 0, nil, nil
 	}
 	if eventName == "pull_request" && header.PR.Merged != nil && !*header.PR.Merged {
@@ -78,14 +88,15 @@ func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, err
 			Prerelease  *bool     `json:"prerelease"`
 		} `json:"release"`
 		PR struct {
-			ID       int64     `json:"id"`
-			Number   int       `json:"number"`
-			Title    string    `json:"title"`
-			Body     string    `json:"body"`
-			URL      string    `json:"html_url"`
-			MergedAt time.Time `json:"merged_at"`
-			Merged   *bool     `json:"merged"`
-			Base     struct {
+			ID        int64      `json:"id"`
+			Number    int        `json:"number"`
+			Title     string     `json:"title"`
+			Body      string     `json:"body"`
+			URL       string     `json:"html_url"`
+			MergedAt  time.Time  `json:"merged_at"`
+			UpdatedAt *time.Time `json:"updated_at"`
+			Merged    *bool      `json:"merged"`
+			Base      struct {
 				Ref string `json:"ref"`
 			} `json:"base"`
 			User struct {
@@ -120,7 +131,7 @@ func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, err
 	if err := json.Unmarshal(body, &payload); err != nil || payload.Installation.ID <= 0 || payload.Repository.ID <= 0 {
 		return 0, nil, ErrPayload
 	}
-	e := &Event{RepositoryID: strconv.FormatInt(payload.Repository.ID, 10), RepositoryName: payload.Repository.FullName, DefaultBranch: payload.Repository.DefaultBranch, Origin: "live", Fields: map[string]Value{}}
+	e := &Event{RepositoryID: strconv.FormatInt(payload.Repository.ID, 10), RepositoryName: payload.Repository.FullName, DefaultBranch: payload.Repository.DefaultBranch, Origin: "live", Fields: map[string]Value{}, ObservationOnly: observationOnly}
 	e.Fields["repository.id"] = StringValue(e.RepositoryID)
 	if e.RepositoryName != "" {
 		e.Fields["repository.name"] = StringValue(e.RepositoryName)
@@ -152,6 +163,9 @@ func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, err
 			return 0, nil, ErrPayload
 		}
 		e.Family, e.ObjectID, e.Number, e.OccurredAt, e.URL = Merged, strconv.FormatInt(pr.ID, 10), pr.Number, pr.MergedAt, pr.URL
+		if pr.UpdatedAt != nil && !pr.UpdatedAt.IsZero() {
+			e.SourceUpdatedAt = pr.UpdatedAt
+		}
 		e.Title, e.Notes = releasenotes.Clean(pr.Title, 160), releasenotes.Clean(pr.Body, 10000)
 		e.SemanticKey = fmt.Sprintf("pr:%s:%d", e.RepositoryID, pr.Number)
 		e.Fields["pr.base"], e.Fields["pr.title"], e.Fields["pr.number"] = StringValue(pr.Base.Ref), StringValue(e.Title), StringValue(strconv.Itoa(pr.Number))
@@ -193,6 +207,7 @@ func NormalizeGitHub(eventName string, body json.RawMessage) (int64, *Event, err
 			return 0, nil, ErrPayload
 		}
 		e.Family, e.ObjectID, e.OccurredAt, e.URL = Deployed, strconv.FormatInt(d.ID, 10), s.CreatedAt, s.URL
+		e.SourceUpdatedAt = &s.CreatedAt
 		if e.URL == "" {
 			e.URL = s.TargetURL
 		}

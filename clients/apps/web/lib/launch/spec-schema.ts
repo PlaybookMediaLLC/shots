@@ -11,12 +11,30 @@ import { z } from 'zod'
 /** "brief" (what a person entered) or a fetched source id, S1–S99. */
 export const sourceRefSchema = z
   .string()
-  .regex(/^(brief|S[1-9][0-9]?)$/, 'Cite "brief" or a source id such as S1.')
+  .regex(
+    /^(brief|S[1-9][0-9]?|evidence:[A-Za-z0-9_-]{1,128})$/,
+    'Cite "brief" or a source id such as S1.'
+  )
 
 const text = (max: number) => z.string().trim().min(1).max(max)
 const sourceRefs = z.array(sourceRefSchema).min(1, 'Cite at least one source.').max(6)
 
-export const specClaimSchema = z.object({ sources: sourceRefs, text: text(600) })
+const stableClaimIdentity = {
+  claimId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
+  claimVersionId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
+}
+
+export const specClaimSchema = z.object({
+  ...stableClaimIdentity,
+  sources: sourceRefs,
+  text: text(600),
+})
 
 export const SPEC_SECTIONS = [
   'summary',
@@ -48,21 +66,51 @@ export const SPEC_SECTION_LABELS: Record<SpecSectionKey, string> = {
 }
 
 export const specSectionSchemas = {
-  audience: z.array(z.object({ need: text(500), segment: text(160), sources: sourceRefs })).max(6),
+  audience: z
+    .array(
+      z.object({ ...stableClaimIdentity, need: text(500), segment: text(160), sources: sourceRefs })
+    )
+    .max(6),
   beforeAfter: z
-    .array(z.object({ after: text(400), before: text(400), sources: sourceRefs }))
+    .array(
+      z.object({ ...stableClaimIdentity, after: text(400), before: text(400), sources: sourceRefs })
+    )
     .max(6),
   capabilities: z
-    .array(z.object({ description: text(600), name: text(120), sources: sourceRefs }))
+    .array(
+      z.object({
+        ...stableClaimIdentity,
+        description: text(600),
+        name: text(120),
+        sources: sourceRefs,
+      })
+    )
     .max(10),
-  faqs: z.array(z.object({ answer: text(800), question: text(300), sources: sourceRefs })).max(10),
+  faqs: z
+    .array(
+      z.object({
+        ...stableClaimIdentity,
+        answer: text(800),
+        question: text(300),
+        sources: sourceRefs,
+      })
+    )
+    .max(10),
   limitations: z.array(specClaimSchema).max(8),
   messaging: z.object({
     ctas: z.array(text(120)).max(5),
     pillars: z
-      .array(z.object({ message: text(500), sources: sourceRefs, title: text(120) }))
+      .array(
+        z.object({
+          ...stableClaimIdentity,
+          message: text(500),
+          sources: sourceRefs,
+          title: text(120),
+        })
+      )
       .max(5),
     positioning: z.object({
+      ...stableClaimIdentity,
       alternatives: z.array(text(120)).max(6),
       sources: z.array(sourceRefSchema).max(6),
       statement: z.string().trim().max(800),
@@ -81,7 +129,7 @@ export const specSectionSchemas = {
     .max(15),
   problem: z.array(specClaimSchema).max(6),
   proofPoints: z.array(specClaimSchema).max(8),
-  summary: z.object({ sources: sourceRefs, text: text(1_200) }),
+  summary: z.object({ ...stableClaimIdentity, sources: sourceRefs, text: text(1_200) }),
   whatChanged: z.array(specClaimSchema).max(10),
 } satisfies Record<SpecSectionKey, z.ZodType>
 
@@ -125,84 +173,125 @@ export type SpecSource = z.infer<typeof specSourceSchema>
 export const claimRefSchema = z
   .string()
   .regex(
-    /^(summary|messaging\.positioning|(problem|audience|whatChanged|capabilities|beforeAfter|proofPoints|limitations|faqs|messaging\.pillars)\.\d{1,2})$/,
+    /^(claim:[A-Za-z0-9_-]{1,128}:[A-Za-z0-9_-]{1,128}|summary|messaging\.positioning|(problem|audience|whatChanged|capabilities|beforeAfter|proofPoints|limitations|faqs|messaging\.pillars)\.\d{1,2})$/,
     'Reference a spec claim such as capabilities.0, proofPoints.1, or messaging.pillars.0.'
   )
 
-export type SpecClaimEntry = { ref: string; section: SpecSectionKey; text: string }
+export type SpecClaimEntry = {
+  ref: string
+  section: SpecSectionKey
+  text: string
+  versionedRef?: string
+}
+
+function versionedClaimRef(identity: {
+  claimId?: string
+  claimVersionId?: string
+}): string | undefined {
+  return identity.claimId && identity.claimVersionId
+    ? `claim:${identity.claimId}:${identity.claimVersionId}`
+    : undefined
+}
 
 /** Every citable claim in a spec with its ref, for prompts and provenance checks. */
 export function listSpecClaims(spec: ReleaseSpecContent): SpecClaimEntry[] {
   const entries: SpecClaimEntry[] = [
-    { ref: 'summary', section: 'summary', text: spec.summary.text },
+    {
+      ref: 'summary',
+      section: 'summary',
+      text: spec.summary.text,
+      versionedRef: versionedClaimRef(spec.summary),
+    },
   ]
-  const push = (section: SpecSectionKey, prefix: string, texts: string[]) =>
+  const push = (
+    section: SpecSectionKey,
+    prefix: string,
+    texts: string[],
+    identities: { claimId?: string; claimVersionId?: string }[]
+  ) =>
     texts.forEach((value, index) =>
-      entries.push({ ref: `${prefix}.${index}`, section, text: value })
+      entries.push({
+        ref: `${prefix}.${index}`,
+        section,
+        text: value,
+        versionedRef: versionedClaimRef(identities[index]),
+      })
     )
   push(
     'problem',
     'problem',
-    spec.problem.map((claim) => claim.text)
+    spec.problem.map((claim) => claim.text),
+    spec.problem
   )
   push(
     'audience',
     'audience',
-    spec.audience.map((item) => `${item.segment}: ${item.need}`)
+    spec.audience.map((item) => `${item.segment}: ${item.need}`),
+    spec.audience
   )
   push(
     'whatChanged',
     'whatChanged',
-    spec.whatChanged.map((claim) => claim.text)
+    spec.whatChanged.map((claim) => claim.text),
+    spec.whatChanged
   )
   push(
     'capabilities',
     'capabilities',
-    spec.capabilities.map((item) => `${item.name}: ${item.description}`)
+    spec.capabilities.map((item) => `${item.name}: ${item.description}`),
+    spec.capabilities
   )
   push(
     'beforeAfter',
     'beforeAfter',
-    spec.beforeAfter.map((item) => `Before: ${item.before} After: ${item.after}`)
+    spec.beforeAfter.map((item) => `Before: ${item.before} After: ${item.after}`),
+    spec.beforeAfter
   )
   push(
     'proofPoints',
     'proofPoints',
-    spec.proofPoints.map((claim) => claim.text)
+    spec.proofPoints.map((claim) => claim.text),
+    spec.proofPoints
   )
   push(
     'limitations',
     'limitations',
-    spec.limitations.map((claim) => claim.text)
+    spec.limitations.map((claim) => claim.text),
+    spec.limitations
   )
   push(
     'faqs',
     'faqs',
-    spec.faqs.map((item) => `${item.question} ${item.answer}`)
+    spec.faqs.map((item) => `${item.question} ${item.answer}`),
+    spec.faqs
   )
   push(
     'messaging',
     'messaging.pillars',
-    spec.messaging.pillars.map((pillar) => `${pillar.title}: ${pillar.message}`)
+    spec.messaging.pillars.map((pillar) => `${pillar.title}: ${pillar.message}`),
+    spec.messaging.pillars
   )
   if (spec.messaging.positioning.statement) {
     entries.push({
       ref: 'messaging.positioning',
       section: 'messaging',
       text: spec.messaging.positioning.statement,
+      versionedRef: versionedClaimRef(spec.messaging.positioning),
     })
   }
   return entries
 }
 
 export function resolveClaimRef(spec: ReleaseSpecContent, ref: string): SpecClaimEntry | null {
-  return listSpecClaims(spec).find((entry) => entry.ref === ref) ?? null
+  return (
+    listSpecClaims(spec).find((entry) => entry.ref === ref || entry.versionedRef === ref) ?? null
+  )
 }
 
 /**
  * Whether claim refs mean the same in two spec versions: each resolves in
- * both, to the same text. A post written from an earlier version whose refs
- * pass still agrees with the later one, so its claims can be trusted there.
+ * both, to the same text. This is a compatibility check only; factual support
+ * still requires an exact human decision in the release evidence graph.
  */
 export function claimsMeanTheSame(
   refs: readonly string[],
@@ -217,7 +306,8 @@ export function claimsMeanTheSame(
 }
 
 /** The spec section a claim ref belongs to. */
-export function claimRefSection(ref: string): SpecSectionKey | null {
+export function claimRefSection(ref: string, spec?: ReleaseSpecContent): SpecSectionKey | null {
+  if (ref.startsWith('claim:')) return spec ? (resolveClaimRef(spec, ref)?.section ?? null) : null
   const head = ref.split('.')[0] as SpecSectionKey
   return (SPEC_SECTIONS as readonly string[]).includes(head) ? head : null
 }

@@ -266,6 +266,12 @@ func (c *Configuration) SaveLaunchSpec(ctx context.Context, actor Actor, release
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR UPDATE`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
+	if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, releaseID); err != nil {
+		return nil, err
+	}
 	if err := mutableReleaseCampaigns(ctx, tx, actor, releaseID); err != nil {
 		return nil, err
 	}
@@ -294,6 +300,9 @@ func (c *Configuration) SaveLaunchSpec(ctx context.Context, actor Actor, release
 	if err != nil {
 		return nil, err
 	}
+	if err := importNewReleaseSpec(ctx, tx, actor, row, last); err != nil {
+		return nil, err
+	}
 	action := "product.release_spec_updated"
 	if input.Origin == "ai" {
 		action = "product.release_spec_generated"
@@ -320,6 +329,9 @@ func (c *Configuration) ApproveLaunchSpec(ctx context.Context, actor Actor, id s
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
 	if _, err = tx.PlatformExec(ctx, `SELECT id FROM release_spec WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, id, actor.OrganizationID); err != nil {
 		return nil, err
 	}
@@ -328,6 +340,9 @@ func (c *Configuration) ApproveLaunchSpec(ctx context.Context, actor Actor, id s
 		return nil, launchNotFound("Spec")
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, spec.ReleaseID); err != nil {
 		return nil, err
 	}
 	if err := mutableReleaseCampaigns(ctx, tx, actor, spec.ReleaseID); err != nil {
@@ -844,6 +859,9 @@ func (c *Configuration) ApplyLaunchRevision(ctx context.Context, actor Actor, id
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR UPDATE`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
 	revision, err := decideLaunchRevision(ctx, tx, actor, id, campaignrevision.StatusAPPLIED)
 	if err != nil {
 		return nil, err
@@ -932,6 +950,9 @@ func applyLaunchChange(ctx context.Context, tx *ent.Tx, actor Actor, revision *e
 		if err != nil {
 			return "", nil, err
 		}
+		if err := requireCanonicalRelease(ctx, tx.Client(), organizationID, spec.ReleaseID); err != nil {
+			return "", nil, err
+		}
 		newer, err := tx.ReleaseSpec.Query().Where(releasespec.ReleaseID(spec.ReleaseID), releasespec.VersionGT(spec.Version)).Exist(ctx)
 		if err != nil {
 			return "", nil, err
@@ -957,6 +978,9 @@ func applyLaunchChange(ctx context.Context, tx *ent.Tx, actor Actor, revision *e
 			return "", nil, errLaunchStale
 		}
 		if err != nil {
+			return "", nil, err
+		}
+		if err := importNewReleaseSpec(ctx, tx, actor, created, spec); err != nil {
 			return "", nil, err
 		}
 		if err := appendConfigurationAudit(ctx, tx, actor, "product.release_spec_updated", "release_spec", created.ID,

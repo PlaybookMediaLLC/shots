@@ -851,6 +851,11 @@ func (c *Configuration) CreateContentBatchItemDraft(ctx context.Context, actor A
 		return nil, err
 	}
 	defer tx.Rollback()
+	if input.ReleaseID != "" {
+		if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	row, _, item, err := c.batchItem(ctx, tx, actor, batchID, itemID)
 	if err != nil {
 		return nil, err

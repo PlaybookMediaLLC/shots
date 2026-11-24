@@ -90,6 +90,18 @@ type CaptureRecipe func(*sql.Selector)
 // ChannelConnection is the predicate function for channelconnection builders.
 type ChannelConnection func(*sql.Selector)
 
+// ClaimPathBinding is the predicate function for claimpathbinding builders.
+type ClaimPathBinding func(*sql.Selector)
+
+// ClaimSupport is the predicate function for claimsupport builders.
+type ClaimSupport func(*sql.Selector)
+
+// ClaimSupportSet is the predicate function for claimsupportset builders.
+type ClaimSupportSet func(*sql.Selector)
+
+// ClaimVerification is the predicate function for claimverification builders.
+type ClaimVerification func(*sql.Selector)
+
 // CommunicationAttempt is the predicate function for communicationattempt builders.
 type CommunicationAttempt func(*sql.Selector)
 
@@ -147,6 +159,15 @@ type Design func(*sql.Selector)
 // EnrichmentRecord is the predicate function for enrichmentrecord builders.
 type EnrichmentRecord func(*sql.Selector)
 
+// EvidenceClearance is the predicate function for evidenceclearance builders.
+type EvidenceClearance func(*sql.Selector)
+
+// EvidenceSource is the predicate function for evidencesource builders.
+type EvidenceSource func(*sql.Selector)
+
+// EvidenceVersion is the predicate function for evidenceversion builders.
+type EvidenceVersion func(*sql.Selector)
+
 // FrontendActivation is the predicate function for frontendactivation builders.
 type FrontendActivation func(*sql.Selector)
 
@@ -182,6 +203,27 @@ type IntegrationConnection func(*sql.Selector)
 
 // Invitation is the predicate function for invitation builders.
 type Invitation func(*sql.Selector)
+
+// KitArtifactClaim is the predicate function for kitartifactclaim builders.
+type KitArtifactClaim func(*sql.Selector)
+
+// KitArtifactRevision is the predicate function for kitartifactrevision builders.
+type KitArtifactRevision func(*sql.Selector)
+
+// KitExport is the predicate function for kitexport builders.
+type KitExport func(*sql.Selector)
+
+// KitMember is the predicate function for kitmember builders.
+type KitMember func(*sql.Selector)
+
+// KitReviewDecision is the predicate function for kitreviewdecision builders.
+type KitReviewDecision func(*sql.Selector)
+
+// KitRevision is the predicate function for kitrevision builders.
+type KitRevision func(*sql.Selector)
+
+// KitSourcePin is the predicate function for kitsourcepin builders.
+type KitSourcePin func(*sql.Selector)
 
 // LaunchRun is the predicate function for launchrun builders.
 type LaunchRun func(*sql.Selector)
@@ -333,6 +375,9 @@ type ProjectVersion func(*sql.Selector)
 // PublicationAttempt is the predicate function for publicationattempt builders.
 type PublicationAttempt func(*sql.Selector)
 
+// ReadinessCommandReceipt is the predicate function for readinesscommandreceipt builders.
+type ReadinessCommandReceipt func(*sql.Selector)
+
 // Release is the predicate function for release builders.
 type Release func(*sql.Selector)
 
@@ -351,11 +396,50 @@ type ReleaseAutomationRun func(*sql.Selector)
 // ReleaseAutomationVersion is the predicate function for releaseautomationversion builders.
 type ReleaseAutomationVersion func(*sql.Selector)
 
+// ReleaseClaim is the predicate function for releaseclaim builders.
+type ReleaseClaim func(*sql.Selector)
+
+// ReleaseClaimVersion is the predicate function for releaseclaimversion builders.
+type ReleaseClaimVersion func(*sql.Selector)
+
 // ReleaseDocument is the predicate function for releasedocument builders.
 type ReleaseDocument func(*sql.Selector)
 
+// ReleaseEvidence is the predicate function for releaseevidence builders.
+type ReleaseEvidence func(*sql.Selector)
+
+// ReleaseKit is the predicate function for releasekit builders.
+type ReleaseKit func(*sql.Selector)
+
+// ReleaseLineage is the predicate function for releaselineage builders.
+type ReleaseLineage func(*sql.Selector)
+
+// ReleaseLineageBinding is the predicate function for releaselineagebinding builders.
+type ReleaseLineageBinding func(*sql.Selector)
+
+// ReleaseQualification is the predicate function for releasequalification builders.
+type ReleaseQualification func(*sql.Selector)
+
+// ReleaseQualificationAsset is the predicate function for releasequalificationasset builders.
+type ReleaseQualificationAsset func(*sql.Selector)
+
+// ReleaseQualificationDecision is the predicate function for releasequalificationdecision builders.
+type ReleaseQualificationDecision func(*sql.Selector)
+
+// ReleaseQualificationSource is the predicate function for releasequalificationsource builders.
+type ReleaseQualificationSource func(*sql.Selector)
+
+// ReleaseReadiness is the predicate function for releasereadiness builders.
+type ReleaseReadiness func(*sql.Selector)
+
+// ReleaseSourceBinding is the predicate function for releasesourcebinding builders.
+type ReleaseSourceBinding func(*sql.Selector)
+
 // ReleaseSourceEvent is the predicate function for releasesourceevent builders.
 type ReleaseSourceEvent func(*sql.Selector)
+
+// ReleaseSourceObservation is the predicate function for releasesourceobservation builders.
+type ReleaseSourceObservation func(*sql.Selector)
 
 // ReleaseSpec is the predicate function for releasespec builders.
 type ReleaseSpec func(*sql.Selector)

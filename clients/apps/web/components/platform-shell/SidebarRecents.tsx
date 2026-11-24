@@ -14,10 +14,12 @@ import { SidebarLink } from './SidebarLink'
  * Publish. Shown only when expanded and when there is something to show.
  */
 export function SidebarRecents({
+  campaignsEnabled,
   draftsEnabled,
   onNavigate,
   paidPlan,
 }: {
+  campaignsEnabled: boolean
   draftsEnabled: boolean
   onNavigate?: () => void
   paidPlan: boolean
@@ -25,14 +27,19 @@ export function SidebarRecents({
   const client = useTRPCClient()
   const workspaceId = useHydratedSession().data?.session.activeOrganizationId ?? ''
   const query = useQuery({
-    ...recentWorkQuery(client, workspaceId, draftsEnabled, paidPlan),
+    ...recentWorkQuery(client, workspaceId, draftsEnabled, paidPlan, campaignsEnabled),
     enabled: Boolean(workspaceId) && paidPlan,
   })
-  const items = (query.data?.items ?? []).filter((item) => item.type !== 'Post').slice(0, 5)
+  const items = (query.data?.items ?? [])
+    .filter((item) => item.type === 'Screenshot' || item.type === 'Canvas')
+    .slice(0, 5)
   if (!items.length) return null
   return (
     <section aria-labelledby="sidebar-recents" className="grid gap-0.5">
-      <h2 id="sidebar-recents" className="px-2.5 pt-2 pb-1.5 text-[0.78125rem] text-muted-foreground">
+      <h2
+        id="sidebar-recents"
+        className="px-2.5 pt-2 pb-1.5 text-[0.78125rem] text-muted-foreground"
+      >
         Recents
       </h2>
       <ul className="grid gap-0.5">

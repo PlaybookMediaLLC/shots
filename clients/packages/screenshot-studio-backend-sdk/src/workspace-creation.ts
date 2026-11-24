@@ -57,7 +57,12 @@ export const signupSourceInputSchema = z
   .strictObject({
     source: signupSourceSchema,
     // Plain text: the database refuses NUL, and nothing here needs a control character.
-    detail: z.string().trim().max(200).regex(/^\P{Cc}*$/u, 'Use plain text.').optional(),
+    detail: z
+      .string()
+      .trim()
+      .max(200)
+      .regex(/^\P{Cc}*$/u, 'Use plain text.')
+      .optional(),
   })
   .refine((answer) => !answer.detail || answer.source === 'other', 'Only "Other" takes a detail.')
 
@@ -103,6 +108,7 @@ export const workspaceCreationResultSchema = z.strictObject({
     timeZone: z.string(),
     defaultPublishTime: z.string(),
     aiAgentEnabled: z.boolean(),
+    releaseReadinessEnabled: z.boolean().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   }),

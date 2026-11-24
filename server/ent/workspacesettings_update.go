@@ -105,6 +105,20 @@ func (_u *WorkspaceSettingsUpdate) SetNillableAiAgentEnabled(v *bool) *Workspace
 	return _u
 }
 
+// SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
+func (_u *WorkspaceSettingsUpdate) SetReleaseReadinessEnabled(v bool) *WorkspaceSettingsUpdate {
+	_u.mutation.SetReleaseReadinessEnabled(v)
+	return _u
+}
+
+// SetNillableReleaseReadinessEnabled sets the "release_readiness_enabled" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableReleaseReadinessEnabled(v *bool) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetReleaseReadinessEnabled(*v)
+	}
+	return _u
+}
+
 // SetDisabledExperiments sets the "disabled_experiments" field.
 func (_u *WorkspaceSettingsUpdate) SetDisabledExperiments(v []string) *WorkspaceSettingsUpdate {
 	_u.mutation.SetDisabledExperiments(v)
@@ -190,6 +204,9 @@ func (_u *WorkspaceSettingsUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
+		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)
@@ -294,6 +311,20 @@ func (_u *WorkspaceSettingsUpdateOne) SetAiAgentEnabled(v bool) *WorkspaceSettin
 func (_u *WorkspaceSettingsUpdateOne) SetNillableAiAgentEnabled(v *bool) *WorkspaceSettingsUpdateOne {
 	if v != nil {
 		_u.SetAiAgentEnabled(*v)
+	}
+	return _u
+}
+
+// SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
+func (_u *WorkspaceSettingsUpdateOne) SetReleaseReadinessEnabled(v bool) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetReleaseReadinessEnabled(v)
+	return _u
+}
+
+// SetNillableReleaseReadinessEnabled sets the "release_readiness_enabled" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableReleaseReadinessEnabled(v *bool) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetReleaseReadinessEnabled(*v)
 	}
 	return _u
 }
@@ -413,6 +444,9 @@ func (_u *WorkspaceSettingsUpdateOne) sqlSave(ctx context.Context) (_node *Works
 	}
 	if value, ok := _u.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
+		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)

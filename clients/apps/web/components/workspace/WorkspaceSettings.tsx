@@ -22,6 +22,7 @@ export type WorkspaceSettingsProps = {
     workspaceDeletion?: { requestedByUserId: string; scheduledFor: Date; status: string } | null
     workspaceSettings?: {
       aiAgentEnabled: boolean
+      releaseReadinessEnabled?: boolean
       defaultPublishTime: string
       description: string | null
       locale: string

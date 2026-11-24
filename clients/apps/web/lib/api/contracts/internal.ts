@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '@/lib/api/contract'
+import { kitRenderOutputSchema } from '@/lib/releases/kit-render-schema'
 import { emptyRequestSchema } from '@/lib/api/schemas'
 
 /**
@@ -65,4 +66,30 @@ export const workflowCanvasContract = defineContract({
   output: z.object({ canvasId: z.string() }),
   path: '/api/internal/workflow-canvases',
   summary: 'Lay out a canvas from a release for a workflow run',
+})
+
+/** `POST /api/internal/kit-renders`: prepare only the worker's pinned native bytes. */
+export const kitRenderContract = defineContract({
+  body: z.string().max(140 << 20),
+  bodyFormat: 'text',
+  maxBodyBytes: 140 << 20,
+  method: 'POST',
+  name: 'release-kits.renders.create',
+  output: kitRenderOutputSchema,
+  path: '/api/internal/kit-renders',
+  summary: 'Prepare an immutable release kit artifact',
+})
+
+/** Redeem an encrypted, expiring grant through its original principal and current kit readiness. */
+export const kitExportContentContract = defineContract({
+  method: 'GET',
+  name: 'release-kits.content',
+  params: z.object({
+    id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+    exportId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+  }),
+  query: z.object({ downloadToken: z.string().min(1).max(4096) }),
+  output: z.never(),
+  path: '/api/v1/releases/{id}/kit-exports/{exportId}/content',
+  summary: 'Read currently authorized approved kit bytes',
 })

@@ -54,6 +54,56 @@ function socialFixture(organizationId: string, destinationId: string) {
 
 const FIXTURE_COPY = 'Fixture AI copy for x: exports now finish faster and more reliably.'
 
+test('Automate keeps failed connection reads distinct from missing setup and scopes history links', async ({
+  app,
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ plan: 'pro' })
+  const failed = new Set(['frontendDeployments.sources', 'capture.overview'])
+  await page.route('**/api/trpc/**', async (route) => {
+    const url = new URL(route.request().url())
+    const paths = decodeURIComponent(url.pathname.split('/').at(-1)!).split(',')
+    if (!paths.some((path) => failed.has(path))) return route.fallback()
+    const response = await route.fetch()
+    // Only replace downstream read results; the real requests retain session and tenant checks.
+    const body = z.array(z.unknown()).parse(await response.json())
+    await route.fulfill({
+      response,
+      json: body.map((entry, index) =>
+        failed.has(paths[index])
+          ? {
+              error: {
+                json: {
+                  message: 'Connection status could not load.',
+                  code: -32603,
+                  data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 503, path: paths[index] },
+                },
+              },
+            }
+          : entry
+      ),
+    })
+  })
+  await app.open('/workflows/overview')
+  await expect(page.getByText('Hosts could not load', { exact: true })).toBeVisible()
+  await expect(page.getByText('Capture status could not load', { exact: true })).toBeVisible()
+  await expect(page.getByText('No hosts connected', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Not set up', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Open Workflow runs', exact: true })).toHaveAttribute(
+    'href',
+    '/workflows/runs?mode=automation'
+  )
+  await expect(
+    page.getByRole('link', { name: 'Open Release inbox runs', exact: true })
+  ).toHaveAttribute('href', '/workflows/runs?mode=legacy')
+  failed.clear()
+  await page.getByRole('button', { name: 'Retry Deployments', exact: true }).click()
+  await page.getByRole('button', { name: 'Retry Signed-in capture', exact: true }).click()
+  await expect(page.getByText('No hosts connected', { exact: true })).toBeVisible()
+  await expect(page.getByText('Capture status could not load', { exact: true })).toHaveCount(0)
+})
+
 /** Calls the GitHub protocol fixture's counters (install pages, mail and fake-model calls). */
 async function fixtureCounts() {
   const response = await fetch(`http://127.0.0.1:${process.env.E2E_GITHUB_PORT ?? 8039}/__counts`)
@@ -468,7 +518,7 @@ test(
       // The overview says where each page stands, with the runs this journey made.
       await expect(page.getByText(/^\d+ active, \d+ not active$/)).toBeVisible()
       await expect(page.getByText('1 repository watched')).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Latest runs' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Latest workflow runs' })).toBeVisible()
       await expectPlainWords(page)
       await app.open('/workflows/sources')
       await expect(page.getByText(/^fixture\/product/).first()).toBeVisible()

@@ -1,7 +1,182 @@
 import { apiRequest, expect, test, trpcMutation } from './framework'
 import { socialSetSchema } from '../../lib/api/contracts/social-sets'
+import { z } from 'zod'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
+
+test('the release Home preview preserves standalone creation and resumes its saved release', async ({
+  app,
+  page,
+}) => {
+  await app.open('/home')
+  await expect(page.getByRole('region', { name: 'Start something new' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Prepare a release', exact: true })).toHaveCount(0)
+  await app.open('/home?view=release')
+  const starters = page.getByRole('region', {
+    name: 'Start with a release, or create something on its own',
+  })
+  await expect(starters.getByRole('link', { name: /Create a visual/ })).toBeVisible()
+  await expect(starters.getByRole('button', { name: /Write a post/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Find an existing release' })).toHaveAttribute(
+    'href',
+    '/campaigns/releases'
+  )
+  await page.getByRole('link', { name: 'Prepare a release', exact: true }).click()
+  await page.getByLabel('Release title').fill('Preview release')
+  await page.getByLabel('Why it matters').fill('Return to the same reviewed work.')
+  await page.getByRole('button', { name: 'Create campaign', exact: true }).click()
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/campaigns\/c[a-z0-9]+$/)
+  const campaignPath = new URL(page.url()).pathname
+  await app.open('/home?view=release')
+  const recent = page.getByRole('region', { name: 'Continue working' })
+  await recent.getByRole('button', { name: 'Campaigns', exact: true }).click()
+  await expect(recent.getByRole('link', { name: /Preview release/ })).toHaveAttribute(
+    'href',
+    campaignPath
+  )
+  await recent.getByRole('link', { name: /Preview release/ }).click()
+  await app.expectPath(campaignPath)
+  await expect(page.getByRole('link', { name: 'Source release' })).toBeVisible()
+  await app.open('/home?view=release')
+  await page.getByRole('link', { name: 'Show all starters' }).click()
+  await app.expectPath('/home')
+  await expect(page.getByRole('region', { name: 'Start something new' })).toBeVisible()
+})
+
+test('Home and command search find releases and campaigns beyond the recent window', async ({
+  app,
+  page,
+}) => {
+  const visual = z.object({ id: z.string() }).parse(
+    (
+      await trpcMutation(page, 'project.create', {
+        name: 'Older visual',
+        document: { version: 2, image: { src: null } },
+      })
+    ).body
+  )
+  const release = z.object({ release: z.object({ id: z.string() }) }).parse(
+    (
+      await trpcMutation(page, 'release.create', {
+        title: 'Needle release',
+        benefitStatement: 'Find the original context.',
+      })
+    ).body
+  ).release
+  const campaign = z.object({ campaign: z.object({ id: z.string() }) }).parse(
+    (
+      await trpcMutation(page, 'campaign.create', {
+        name: 'Needle campaign',
+        objective: 'Explain this release',
+        releaseId: release.id,
+      })
+    ).body
+  ).campaign
+  for (let index = 0; index < 6; index++) {
+    expect(
+      (
+        await trpcMutation(page, 'release.create', {
+          title: `Later release ${index}`,
+          benefitStatement: 'Later work',
+        })
+      ).status
+    ).toBe(200)
+    expect(
+      (
+        await trpcMutation(page, 'campaign.create', {
+          name: `Later campaign ${index}`,
+          objective: 'Later work',
+        })
+      ).status
+    ).toBe(200)
+  }
+  const reads = new Map<string, number>()
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (!path.startsWith('/api/trpc/')) return
+    for (const name of path.slice('/api/trpc/'.length).split(',')) {
+      if (name === 'release.list' || name === 'campaign.list')
+        reads.set(name, (reads.get(name) ?? 0) + 1)
+    }
+  })
+  await app.open('/home')
+  const recent = page.getByRole('region', { name: 'Continue working' })
+  await expect(
+    page
+      .getByRole('region', { name: 'Recents', exact: true })
+      .getByRole('link', { name: 'Older visual', exact: true })
+  ).toHaveAttribute('href', `/editor?project=${visual.id}`)
+  await expect(recent.getByRole('link', { name: /Later campaign/ }).first()).toBeVisible()
+  await expect(recent.getByRole('link', { name: /Needle/ })).toHaveCount(0)
+  await recent.getByRole('button', { name: 'Releases', exact: true }).click()
+  await expect(recent.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
+    'href',
+    '/campaigns/releases'
+  )
+  for (const width of [320, 390, 640, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    const posts = recent.getByRole('button', { name: 'Posts', exact: true })
+    await posts.focus()
+    await expect(posts).toBeInViewport()
+    await page.keyboard.press('Enter')
+    await expect(posts).toHaveAttribute('aria-pressed', 'true')
+    await page.screenshot({
+      path: test.info().outputPath(`home-work-${width}.png`),
+      fullPage: true,
+    })
+  }
+  await page.keyboard.press('ControlOrMeta+k')
+  const search = page.getByRole('dialog')
+  await expect(search).toBeVisible()
+  expect(Object.fromEntries(reads)).toEqual({ 'release.list': 1, 'campaign.list': 1 })
+  await search.getByRole('searchbox', { name: 'Search destinations' }).fill('Needle')
+  await expect(
+    search.getByRole('link', { name: 'Needle release Release', exact: true })
+  ).toHaveAttribute('href', `/releases/${release.id}`)
+  await expect(
+    search.getByRole('link', { name: 'Needle campaign Campaign', exact: true })
+  ).toHaveAttribute('href', `/campaigns/${campaign.id}`)
+  await search.getByRole('link', { name: 'Needle campaign Campaign', exact: true }).click()
+  await app.expectPath(`/campaigns/${campaign.id}`)
+  await expect(page.getByRole('link', { name: 'Source release', exact: true })).toBeVisible()
+})
+
+test('Home sends each recent-work kind to its owning collection', async ({ app, page }) => {
+  const created = await apiRequest(page, '/api/v1/content-drafts', {
+    method: 'POST',
+    body: { title: 'Find this post again' },
+  })
+  expect(created.status).toBe(201)
+  await app.open('/home')
+  const recent = page.getByRole('region', { name: 'Continue working' })
+  await expect(recent.getByRole('link', { name: /Find this post again/ })).toBeVisible()
+  await recent.getByRole('button', { name: 'Posts', exact: true }).click()
+  await expect(recent.getByRole('link', { name: 'View all posts' })).toHaveAttribute(
+    'href',
+    '/publish'
+  )
+  await expect(recent.getByRole('link', { name: 'View all screenshots' })).toHaveCount(0)
+  await recent.getByRole('link', { name: 'View all posts' }).click()
+  await app.expectPath('/publish')
+  await expect(page.getByText('Find this post again', { exact: true }).first()).toBeVisible()
+  await app.open('/home')
+  await recent.getByRole('button', { name: 'Screenshots', exact: true }).click()
+  await expect(recent.getByRole('link', { name: 'View all screenshots' })).toHaveAttribute(
+    'href',
+    '/library'
+  )
+  await expect(recent.getByText(/Open the full collection below/)).toBeVisible()
+  await app.open('/create')
+  await expect(
+    page.getByRole('link', {
+      name: 'Store screenshots App Store studio · Browser and workspace projects',
+      exact: true,
+    })
+  ).toBeVisible()
+})
 
 /** Each section with pages, as the sidebar lists them; the first is where the section opens. */
 const SECTIONS = [

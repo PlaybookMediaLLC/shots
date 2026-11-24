@@ -19,13 +19,17 @@ test('recent runs request six summaries and history retains filters and tenant s
       return Response.json({ items: [] })
     }
   )
-  await sdk.listReleaseAutomationRunSummaries({}, 6)
+  await sdk.listReleaseAutomationRunSummaries({ mode: 'automation' }, 6)
   await sdk.listReleaseAutomationRunSummaries({
     status: 'skipped',
     before: 'run-2',
     definitionId: 'workflow-1',
   })
-  assert.deepEqual(Object.fromEntries(requests[0].searchParams), { summary: 'true', limit: '6' })
+  assert.deepEqual(Object.fromEntries(requests[0].searchParams), {
+    summary: 'true',
+    limit: '6',
+    mode: 'automation',
+  })
   assert.deepEqual(Object.fromEntries(requests[1].searchParams), {
     summary: 'true',
     limit: '50',

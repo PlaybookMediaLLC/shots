@@ -549,6 +549,12 @@ func TestScopesLimitTheToolList(t *testing.T) {
 	if _, err := session.CallTool(f.ctx, &sdk.CallToolParams{Name: "createRelease", Arguments: map[string]any{"title": "x"}}); err == nil {
 		t.Fatal("a read-only key called createRelease")
 	}
+	privileged := f.session("a")
+	for _, tool := range []string{"verifyReleaseClaim", "changeEvidenceAccess", "importReleaseSpecClaims"} {
+		if result, err := privileged.CallTool(f.ctx, &sdk.CallToolParams{Name: tool, Arguments: map[string]any{"id": "release", "claimId": "claim", "decision": "SUPPORTED"}}); err == nil && !result.IsError {
+			t.Fatalf("agent invoked human operation %s", tool)
+		}
+	}
 }
 
 // A mutation through MCP is audited in its transaction with the call's

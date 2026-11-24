@@ -55,6 +55,90 @@ test('a 409 carries the conflict code instead of internal_error', () => {
   assert.equal(toApiFailure(new WorkspaceError('Changed.', 409))?.code, 'conflict')
 })
 
+test('source association conflicts retain the existing release as a repair destination', async (t) => {
+  const details = {
+    reason: 'SOURCE_ALREADY_ASSOCIATED',
+    bindingId: 'binding-1',
+    releaseId: 'release-1',
+  }
+  const failure = toApiFailure(new BackendSDKError('Open the existing release.', 409, { details }))
+  assert.equal(failure?.status, 409)
+  assert.deepEqual(failure?.extra, { details })
+  const unavailable = { reason: 'SOURCE_UNAVAILABLE', bindingId: null, releaseId: null }
+  assert.deepEqual(
+    toApiFailure(new BackendSDKError('Reconnect source.', 403, { details: unavailable }))?.extra,
+    { details: unavailable }
+  )
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json(
+      { code: 'conflict', message: 'Open the existing release.', details },
+      { status: 409 }
+    )
+  )
+  await assert.rejects(
+    settingsRequest('/api/v1/release-sources/selections', z.object({}), {
+      method: 'POST',
+      body: {},
+      commandKey: 'same-selection',
+      scope: { userId: 'user-1', workspaceId: 'org-1' },
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof SettingsRequestError)
+      assert.deepEqual(error.details, details)
+      return true
+    }
+  )
+})
+
+test('qualification conflicts retain typed repair details through SDK, REST and settings client', async (t) => {
+  const details = {
+    reason: 'MISSING_FACTS',
+    currentRevision: '9007199254740993',
+    blockers: [
+      {
+        field: 'rollout',
+        reason: 'ROLLOUT_UNKNOWN',
+        objectId: null,
+        ownerUserId: 'user-1',
+        repairAction: 'REVISE_FACTS',
+      },
+    ],
+  }
+  const error = new BackendSDKError('Confirm the rollout.', 409, { details })
+  const failure = toApiFailure(error)
+  assert.equal(failure?.status, 409)
+  assert.deepEqual(failure?.extra, { details })
+  let observed: Headers | undefined
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init?: RequestInit) => {
+    observed = new Headers(init?.headers)
+    return Response.json(
+      { code: 'conflict', message: 'Confirm the rollout.', details },
+      { status: 409 }
+    )
+  })
+  await assert.rejects(
+    settingsRequest('/api/v1/releases/release-1/qualification/revisions', z.object({}), {
+      method: 'POST',
+      body: {},
+      commandKey: 'retry-same',
+      scope: { userId: 'user-1', workspaceId: 'org-1' },
+    }),
+    (failure: unknown) => {
+      assert.ok(failure instanceof SettingsRequestError)
+      assert.deepEqual(failure.details, details)
+      return true
+    }
+  )
+  assert.equal(observed?.get('idempotency-key'), 'retry-same')
+  assert.equal(observed?.get('x-playbook-workspace'), 'org-1')
+  assert.equal(
+    toApiFailure(
+      new BackendSDKError('Changed', 409, { details: { ...details, reason: 'provider-secret' } })
+    )?.extra,
+    undefined
+  )
+})
+
 test('validation and dependency failures never echo internal details', () => {
   assert.equal(
     toApiFailure(new SyntaxError('Unexpected token < in JSON'))?.message,

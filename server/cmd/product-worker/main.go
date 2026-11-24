@@ -306,6 +306,9 @@ func main() {
 		if objectStore != nil {
 			events.WithObjectStore(objectStore)
 		}
+		if renderer := product.AutomationRendererFromEnvironment(); renderer != nil {
+			events.WithAutomationRenderer(renderer)
+		}
 		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
 		if deploymentCaptureEnabled {
 			events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})

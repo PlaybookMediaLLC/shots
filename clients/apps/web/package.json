@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "pilot:report": "tsx scripts/pilot-report.ts",
     "api:generate": "tsx scripts/openapi.ts && openapi-typescript ../../../server/internal/shotsapi/openapi.json -o ../../packages/shots-api-client/src/schema.ts",
     "start": "next start",
     "typecheck": "rm -rf .next/types && next typegen && tsgo --noEmit",

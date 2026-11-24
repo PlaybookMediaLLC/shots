@@ -261,7 +261,7 @@ test(
     ).toHaveAttribute('href', `/editor?project=${id}`)
     await box.fill('qzxj nothing')
     await expect(results.getByRole('status')).toContainText(
-      'Search finds places in Shots and posts, screenshots, and canvases by name or words.'
+      'Search finds places in Shots and posts, screenshots, canvases, releases, and campaigns by name or words.'
     )
     // A collection that cannot be searched says so instead of looking empty.
     await page.route('**/api/v1/content-drafts?*', (route) =>
@@ -608,9 +608,12 @@ test(
     })
     await sidebar.getByRole('button', { name: 'Search and commands' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
+    const rem = await page.evaluate(() =>
+      parseFloat(getComputedStyle(document.documentElement).fontSize)
+    )
     await expect
       .poll(async () => (await page.getByRole('dialog').boundingBox())!.width)
-      .toBeCloseTo(576, 0)
+      .toBeCloseTo(36 * rem, 0)
     await page.screenshot({
       path: '.context/ux-redesign/search-polished.png',
       style: 'nextjs-portal {display:none}',

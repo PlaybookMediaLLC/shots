@@ -86,48 +86,6 @@ test(
     await expect(day(later)).toContainText('Calendar first')
     await page.screenshot({ path: '.context/shots/typefully-month.png', fullPage: true })
 
-    await app.open(`/publish/${one}`)
-    // Publish now is irreversible, so it sits in the queued post's menu.
-    const menu = page
-      .getByTestId('draft-post')
-      .getByRole('button', { name: 'More actions for the X post', exact: true })
-    const publishNow = page.getByRole('menuitem', { name: 'Publish now…', exact: true })
-    const confirm = page.getByRole('alertdialog')
-    const openConfirmation = async () => {
-      // The page renders the trigger before React attaches its handler, so an early
-      // click is dropped; the proof of a handled click is the open dialog.
-      await expect(async () => {
-        if (!(await confirm.isVisible())) {
-          if (!(await publishNow.isVisible())) await menu.click()
-          await publishNow.click({ timeout: 2_000 })
-        }
-        await expect(confirm).toBeVisible({ timeout: 2_000 })
-      }).toPass({ timeout: 60_000 })
-    }
-    await openConfirmation()
-    await expect(confirm).toContainText('Later draft edits are not included')
-    await page.getByRole('button', { name: 'Keep scheduled' }).click()
-    await expect(confirm).toBeHidden()
-    await openConfirmation()
-    const publishing = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/publish-now') && response.request().method() === 'POST'
-    )
-    await page.getByRole('button', { name: 'Confirm publish now' }).click()
-    const response = await publishing
-    expect(response.ok(), await response.text()).toBeTruthy()
-    const successor = (await response.json()) as { post: { id: string; scheduledFor: string } }
-    expect(new Date(successor.post.scheduledFor).getTime()).toBeLessThanOrEqual(Date.now())
-    const rows = await db.rows<{ id: string; status: string }>(
-      'SELECT id,status FROM scheduled_post WHERE "contentDraftId"=$1 AND status<>\'CANCELLED\'',
-      [one]
-    )
-    expect(rows.map((row) => row.id)).toEqual([successor.post.id])
-    const other = await db.rows<{ status: string }>(
-      'SELECT status FROM scheduled_post WHERE "contentDraftId"=$1 ORDER BY "createdAt" DESC LIMIT 1',
-      [two]
-    )
-    expect(other[0].status).toBe('SCHEDULED')
     const past = new Date(Date.now() - 86_400_000)
     past.setUTCHours(15, 0, 0, 0)
     // A confirmed provider receipt is seeded; no real network is published to.
@@ -170,6 +128,50 @@ test(
       'Added'
     )
     await page.screenshot({ path: '.context/shots/typefully-posting-times.png', fullPage: true })
+
+    // Do delivery last: the worker may refuse fixture credentials and mark the account for reconnection.
+    await app.open(`/publish/${one}`)
+    // Publish now is irreversible, so it sits in the queued post's menu.
+    const menu = page
+      .getByTestId('draft-post')
+      .getByRole('button', { name: 'More actions for the X post', exact: true })
+    const publishNow = page.getByRole('menuitem', { name: 'Publish now…', exact: true })
+    const confirm = page.getByRole('alertdialog')
+    const openConfirmation = async () => {
+      // The page renders the trigger before React attaches its handler, so an early
+      // click is dropped; the proof of a handled click is the open dialog.
+      await expect(async () => {
+        if (!(await confirm.isVisible())) {
+          if (!(await publishNow.isVisible())) await menu.click()
+          await publishNow.click({ timeout: 2_000 })
+        }
+        await expect(confirm).toBeVisible({ timeout: 2_000 })
+      }).toPass({ timeout: 60_000 })
+    }
+    await openConfirmation()
+    await expect(confirm).toContainText('Later draft edits are not included')
+    await page.getByRole('button', { name: 'Keep scheduled' }).click()
+    await expect(confirm).toBeHidden()
+    await openConfirmation()
+    const publishing = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/publish-now') && response.request().method() === 'POST'
+    )
+    await page.getByRole('button', { name: 'Confirm publish now' }).click()
+    const response = await publishing
+    expect(response.ok(), await response.text()).toBeTruthy()
+    const successor = (await response.json()) as { post: { id: string; scheduledFor: string } }
+    expect(new Date(successor.post.scheduledFor).getTime()).toBeLessThanOrEqual(Date.now())
+    const rows = await db.rows<{ id: string; status: string }>(
+      'SELECT id,status FROM scheduled_post WHERE "contentDraftId"=$1 AND status<>\'CANCELLED\'',
+      [one]
+    )
+    expect(rows.map((row) => row.id)).toEqual([successor.post.id])
+    const other = await db.rows<{ status: string }>(
+      'SELECT status FROM scheduled_post WHERE "contentDraftId"=$1 ORDER BY "createdAt" DESC LIMIT 1',
+      [two]
+    )
+    expect(other[0].status).toBe('PUBLISHED')
   }
 )
 

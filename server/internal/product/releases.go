@@ -94,6 +94,7 @@ type ReleaseSurface struct {
 }
 
 type ReleaseDetail struct {
+	CanonicalReleaseID string                 `json:"canonicalReleaseId"`
 	Audience           *string                `json:"audience"`
 	BenefitStatement   string                 `json:"benefitStatement"`
 	CreatedAt          time.Time              `json:"createdAt"`
@@ -159,15 +160,22 @@ func validReleaseBrief(title, benefit string, audience, description *string, url
 		(description == nil || validReleaseText(*description, 10000))
 }
 
-func (c *Configuration) ListReleases(ctx context.Context, actor Actor, limit int) ([]ReleaseListItem, error) {
+func (c *Configuration) ListReleases(ctx context.Context, actor Actor, limit int, searches ...string) ([]ReleaseListItem, error) {
 	if err := c.AuthorizeRead(ctx, actor); err != nil {
 		return nil, err
 	}
 	if limit < 1 || limit > 100 {
 		return nil, ErrInvalidInput
 	}
-	rows, err := c.client.Release.Query().Where(release.OrganizationID(actor.OrganizationID)).
-		Order(ent.Desc(release.FieldUpdatedAt), ent.Desc(release.FieldID)).Limit(limit).All(ctx)
+	query := c.client.Release.Query().Where(release.OrganizationID(actor.OrganizationID))
+	if len(searches) > 0 {
+		search := strings.TrimSpace(searches[0])
+		if utf8.RuneCountInString(search) > 200 || strings.ContainsRune(search, 0) {
+			return nil, ErrInvalidInput
+		}
+		query.Where(release.TitleContainsFold(search))
+	}
+	rows, err := query.Order(ent.Desc(release.FieldUpdatedAt), ent.Desc(release.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +197,13 @@ func (c *Configuration) GetRelease(ctx context.Context, actor Actor, id string) 
 	if err != nil {
 		return nil, err
 	}
+	canonical, err := canonicalReleaseID(ctx, c.client, actor.OrganizationID, id)
+	if err != nil {
+		return nil, err
+	}
 	detail := &ReleaseDetail{
-		Audience: row.Audience, BenefitStatement: row.BenefitStatement, CreatedAt: row.CreatedAt,
+		CanonicalReleaseID: canonical,
+		Audience:           row.Audience, BenefitStatement: row.BenefitStatement, CreatedAt: row.CreatedAt,
 		Description: row.Description, ID: row.ID, ProductSurfaceID: row.ProductSurfaceID,
 		Notes: row.Notes, Features: row.Features, ScreenshotAssetIDs: row.ScreenshotAssetIds,
 		SourceURLs: row.SourceUrls, Status: string(row.Status), Title: row.Title, UpdatedAt: row.UpdatedAt,
@@ -256,39 +269,7 @@ func (c *Configuration) CreateRelease(ctx context.Context, actor Actor, input Cr
 			}
 			return &ReleaseCreation{Created: false, Release: releaseSummary(row)}, nil
 		}
-		if input.ProductSurfaceID != nil {
-			owned, err := tx.ProductSurface.Query().Where(productsurface.ID(*input.ProductSurfaceID),
-				productsurface.OrganizationID(actor.OrganizationID)).Exist(ctx)
-			if err != nil || !owned {
-				_ = tx.Rollback()
-				if err != nil {
-					return nil, err
-				}
-				return nil, publishing.ErrNotFound
-			}
-		}
-		// Release IDs are UUIDs, as the web created them and webhooks still do.
-		id := uuid.NewString()
-		create := tx.Release.Create().SetID(id).SetOrganizationID(actor.OrganizationID).
-			SetTitle(input.Title).SetBenefitStatement(input.BenefitStatement).SetSourceUrls(input.SourceURLs)
-		if input.Audience != nil && *input.Audience != "" {
-			create.SetAudience(*input.Audience)
-		}
-		if input.Description != nil && *input.Description != "" {
-			create.SetDescription(*input.Description)
-		}
-		if input.ProductSurfaceID != nil {
-			create.SetProductSurfaceID(*input.ProductSurfaceID)
-		}
-		if actor.UserID != "" {
-			create.SetCreatedByUserID(actor.UserID)
-		}
-		row, err := create.Save(ctx)
-		if err == nil {
-			_, err = tx.OutboxEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
-				SetType("release.created").SetAggregateType("release").SetAggregateID(id).
-				SetPayload(map[string]any{"releaseId": id, "actorUserId": actor.UserID}).SetIdempotencyKey(input.IdempotencyKey).Save(ctx)
-		}
+		row, err := createReleaseInTx(ctx, tx, actor, input)
 		if ent.IsConstraintError(err) {
 			_ = tx.Rollback()
 			continue
@@ -297,7 +278,7 @@ func (c *Configuration) CreateRelease(ctx context.Context, actor Actor, input Cr
 			_ = tx.Rollback()
 			return nil, err
 		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.release_created", "release", id,
+		if err := appendConfigurationAudit(ctx, tx, actor, "product.release_created", "release", row.ID,
 			map[string]any{"productSurfaceId": input.ProductSurfaceID}); err != nil {
 			_ = tx.Rollback()
 			return nil, err
@@ -310,6 +291,45 @@ func (c *Configuration) CreateRelease(ctx context.Context, actor Actor, input Cr
 	return nil, publishing.ErrConflict
 }
 
+// Callers validate the brief and authorize before committing this row with their other effects.
+func createReleaseInTx(ctx context.Context, tx *ent.Tx, actor Actor, input CreateReleaseInput) (*ent.Release, error) {
+	if input.ProductSurfaceID != nil {
+		owned, err := tx.ProductSurface.Query().Where(productsurface.ID(*input.ProductSurfaceID), productsurface.OrganizationID(actor.OrganizationID)).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !owned {
+			return nil, publishing.ErrNotFound
+		}
+	}
+	// Release IDs are UUIDs, as the web created them and webhooks still do.
+	id := uuid.NewString()
+	create := tx.Release.Create().SetID(id).SetOrganizationID(actor.OrganizationID).
+		SetTitle(input.Title).SetBenefitStatement(input.BenefitStatement).SetSourceUrls(input.SourceURLs)
+	if input.Audience != nil && *input.Audience != "" {
+		create.SetAudience(*input.Audience)
+	}
+	if input.Description != nil && *input.Description != "" {
+		create.SetDescription(*input.Description)
+	}
+	if input.ProductSurfaceID != nil {
+		create.SetProductSurfaceID(*input.ProductSurfaceID)
+	}
+	if actor.UserID != "" {
+		create.SetCreatedByUserID(actor.UserID)
+	}
+	row, err := create.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.OutboxEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
+		SetType("release.created").SetAggregateType("release").SetAggregateID(id).
+		SetPayload(map[string]any{"releaseId": id, "actorUserId": actor.UserID}).SetIdempotencyKey(input.IdempotencyKey).Exec(ctx); err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
 func (c *Configuration) UpdateRelease(ctx context.Context, actor Actor, id string, input UpdateReleaseInput) (*ReleaseDetail, error) {
 	if err := c.authorizeRoles(ctx, actor,
 		"owner", "admin", "creator"); err != nil {
@@ -320,6 +340,23 @@ func (c *Configuration) UpdateRelease(ctx context.Context, actor Actor, id strin
 		return nil, err
 	}
 	defer tx.Rollback()
+	if actor.IsSession() {
+		if err := lockWorkspaceMembership(ctx, tx, actor); err != nil {
+			return nil, err
+		}
+	}
+	if err := NewConfiguration(tx.Client()).authorizeRoles(ctx, actor, launchEditRoles...); err != nil {
+		return nil, err
+	}
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
+	if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, id); err != nil {
+		return nil, err
+	}
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM release WHERE "organizationId"=$1 AND id=$2 FOR UPDATE`, actor.OrganizationID, id); err != nil {
+		return nil, err
+	}
 	if err := mutableReleaseCampaigns(ctx, tx, actor, id); err != nil {
 		return nil, err
 	}
@@ -398,6 +435,13 @@ func (c *Configuration) UpdateRelease(ctx context.Context, actor Actor, id strin
 	}
 	if _, err := update.Save(ctx); err != nil {
 		return nil, err
+	}
+	// Titles are part of the factual brief; a no-op save must not invalidate review.
+	if title != current.Title || benefit != current.BenefitStatement || optionalText(audience) != optionalText(current.Audience) ||
+		optionalText(description) != optionalText(current.Description) || optionalText(surfaceID) != optionalText(current.ProductSurfaceID) || !slices.Equal(urls, current.SourceUrls) {
+		if err := invalidateReleaseQualification(ctx, tx, actor, id); err != nil {
+			return nil, err
+		}
 	}
 	slices.Sort(fields)
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.release_updated", "release", id,

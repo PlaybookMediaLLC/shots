@@ -202,7 +202,7 @@ test(
 test(
   'blockers show beside Schedule, an empty thread post is named, and empty slots invite a draft',
   { tag: '@journey' },
-  async ({ page, startWorkspace }) => {
+  async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'bluesky'] })
     await weeklySlots(page)
     await openNewDraft(page)
@@ -231,10 +231,12 @@ test(
     await expect(page.getByTestId('post-header')).toHaveCount(1)
 
     // Fewer than three posts are queued this week: Home asks for one.
-    await page.goto('/home')
-    await expect(page.getByTestId('queue-nudge')).toContainText('Write one now')
+    await app.open('/home')
+    await expect(
+      page.getByRole('region', { name: 'Page content' }).getByTestId('queue-nudge')
+    ).toContainText('Write one now')
 
-    await page.goto('/write?tab=queue')
+    await app.open('/write?tab=queue')
     const queue = page.getByTestId('queue')
     await expect(queue.getByTestId('queue-goal')).toContainText(
       'recurring slots used in the next 7 days'

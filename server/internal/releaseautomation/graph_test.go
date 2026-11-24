@@ -189,7 +189,7 @@ func TestNormalizeMergedPRAndDeploymentEvidence(t *testing.T) {
 	}
 	deployment := []byte(`{"installation":{"id":7},"repository":{"id":42,"full_name":"acme/app"},"deployment":{"id":99,"environment":"staging","sha":"abc123","production_environment":true},"deployment_status":{"state":"success","environment":"production","created_at":"2026-10-19T10:00:00Z","environment_url":"https://example.com"}}`)
 	_, event, err = NormalizeGitHub("deployment_status", deployment)
-	if err != nil || event.SemanticKey != "deployment:42:99:success" || event.Fields["deployment.environment"].Values[0] != "production" || event.Fields["deployment.sha"].Values[0] != "abc123" {
+	if err != nil || event.SemanticKey != "deployment:42:99:success" || event.Fields["deployment.environment"].Values[0] != "production" || event.Fields["deployment.sha"].Values[0] != "abc123" || event.SourceUpdatedAt == nil || !event.SourceUpdatedAt.Equal(event.OccurredAt) {
 		t.Fatalf("deployment=%+v err=%v", event, err)
 	}
 }
@@ -246,7 +246,7 @@ func TestGenerationRequiresVersionTwoAndBudget(t *testing.T) {
 
 func TestNormalizedPullRequestExposesNumberAndRepository(t *testing.T) {
 	body := []byte(`{"action":"closed","installation":{"id":7},"repository":{"id":9,"full_name":"acme/app","default_branch":"main"},
-		"pull_request":{"id":3,"number":42,"title":"Faster exports","merged":true,"merged_at":"2026-10-19T10:00:00Z","base":{"ref":"main"},"user":{"login":"dev","type":"User"},"labels":[]}}`)
+		"pull_request":{"id":3,"number":42,"title":"Faster exports","merged":true,"merged_at":"2026-10-19T10:00:00Z","updated_at":"2026-10-20T12:00:00Z","base":{"ref":"main"},"user":{"login":"dev","type":"User"},"labels":[]}}`)
 	_, event, err := NormalizeGitHub("pull_request", body)
 	if err != nil || event == nil {
 		t.Fatal(err)
@@ -259,6 +259,30 @@ func TestNormalizedPullRequestExposesNumberAndRepository(t *testing.T) {
 	}
 	if Evaluate(Condition{Field: "pr.number", Operator: "in", Values: []string{"41", "42"}}, *event).Match != true {
 		t.Fatal("pr.number was not evaluated")
+	}
+	if event.SourceUpdatedAt == nil || event.SourceUpdatedAt.Format(time.RFC3339) != "2026-10-20T12:00:00Z" || event.OccurredAt.Format(time.RFC3339) != "2026-10-19T10:00:00Z" {
+		t.Fatalf("source update and merge times were conflated: %+v", event)
+	}
+	missing := strings.Replace(string(body), `,"updated_at":"2026-10-20T12:00:00Z"`, "", 1)
+	_, unknown, err := NormalizeGitHub("pull_request", []byte(missing))
+	if err != nil || unknown == nil || unknown.SourceUpdatedAt != nil || unknown.SemanticKey != event.SemanticKey {
+		t.Fatalf("missing source update must remain unknown with the same identity: %+v, %v", unknown, err)
+	}
+	invalid := strings.Replace(string(body), "2026-10-20T12:00:00Z", "not-a-time", 1)
+	if _, _, err := NormalizeGitHub("pull_request", []byte(invalid)); err == nil {
+		t.Fatal("malformed provider update time accepted")
+	}
+	edited := strings.Replace(string(body), `"action":"closed"`, `"action":"edited"`, 1)
+	if _, trigger, err := NormalizeGitHub("pull_request", []byte(edited)); err != nil || trigger != nil {
+		t.Fatalf("edited facts became a workflow trigger: %+v %v", trigger, err)
+	}
+	_, observation, err := NormalizeGitHubSource("pull_request", []byte(edited))
+	if err != nil || observation == nil || !observation.ObservationOnly || observation.SemanticKey != event.SemanticKey || observation.SourceUpdatedAt == nil {
+		t.Fatalf("merged PR edit lost source evidence: %+v %v", observation, err)
+	}
+	unmerged := strings.Replace(edited, `"merged":true`, `"merged":false`, 1)
+	if _, observation, err := NormalizeGitHubSource("pull_request", []byte(unmerged)); err != nil || observation != nil {
+		t.Fatalf("unmerged PR entered release suggestions: %+v %v", observation, err)
 	}
 }
 

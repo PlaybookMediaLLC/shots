@@ -30,6 +30,29 @@ type fakeConfiguration struct {
 	founderHubActor     *product.Actor
 }
 
+func TestWorkspaceCreationPreservesSettingsContract(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		workspace := &product.Workspace{
+			ID: "workspace-1", CreationMember: &product.WorkspaceCreationMember{ID: "member-1"},
+			WorkspaceSettings: &ent.WorkspaceSettings{ID: "workspace-1", ReleaseReadinessEnabled: enabled},
+		}
+		response := workspaceMutationResponse(workspace)
+		settings := response["settings"].(map[string]any)
+		if _, exists := settings["releaseReadinessEnabled"]; exists {
+			t.Fatal("creation and replay must remain compatible with older strict clients")
+		}
+		if len(settings) != 8 || settings["organizationId"] != workspace.ID {
+			t.Fatalf("creation settings changed: %v", settings)
+		}
+		workspace.CreationMember = nil
+		updated := workspaceMutationResponse(workspace)["settings"].(map[string]any)
+		read := workspaceResponse(workspace)["workspaceSettings"].(map[string]any)
+		if updated["releaseReadinessEnabled"] != enabled || read["releaseReadinessEnabled"] != enabled {
+			t.Fatal("workspace reads and updates must retain the opt-in setting")
+		}
+	}
+}
+
 func (f *fakeConfiguration) Authorize(_ context.Context, actor product.Actor) error {
 	f.actor = actor
 	return f.authorizationError
@@ -166,7 +189,7 @@ func (f *fakeConfiguration) ConsumeWorkspaceQuota(context.Context, product.Actor
 func (f *fakeConfiguration) ChargeMonthlyQuota(context.Context, string, string, int) (func(), error) {
 	return func() {}, nil
 }
-func (f *fakeConfiguration) ListReleases(context.Context, product.Actor, int) ([]product.ReleaseListItem, error) {
+func (f *fakeConfiguration) ListReleases(context.Context, product.Actor, int, ...string) ([]product.ReleaseListItem, error) {
 	return []product.ReleaseListItem{}, nil
 }
 func (f *fakeConfiguration) GetRelease(context.Context, product.Actor, string) (*product.ReleaseDetail, error) {
@@ -179,7 +202,7 @@ func (f *fakeConfiguration) UpdateRelease(_ context.Context, _ product.Actor, _ 
 	f.releaseUpdate = input
 	return &product.ReleaseDetail{ID: "release-1", Title: "Updated", SourceURLs: []string{}}, nil
 }
-func (f *fakeConfiguration) ListCampaigns(context.Context, product.Actor) ([]product.CampaignItem, error) {
+func (f *fakeConfiguration) ListCampaigns(context.Context, product.Actor, ...product.CampaignListFilter) ([]product.CampaignItem, error) {
 	return []product.CampaignItem{}, nil
 }
 func (f *fakeConfiguration) ListPendingApprovals(_ context.Context, actor product.Actor, limit int, cursor string) (*product.ApprovalPage, error) {
@@ -360,6 +383,14 @@ func TestReleaseRoutesValidateAndPreserveNullableUpdate(t *testing.T) {
 func TestCampaignRoutesRejectInvalidIDsAndRequireSession(t *testing.T) {
 	scheduler := &fakeScheduler{}
 	handler := NewWithConfiguration(&fakeStore{}, scheduler, &fakeVerifier{}, "secret", &fakeConfiguration{})
+	for _, query := range []string{"limit=0", "limit=101", "limit=bad", "limit=2&cursor=bad", "limit=2&releaseId=bad", "releaseId=c123456789012345678901234", "limit=1&idempotencyKey=" + strings.Repeat("x", 129)} {
+		if response := configurationRequest(handler, http.MethodGet, "/v1/campaigns?"+query, ""); response.Code != http.StatusBadRequest {
+			t.Fatalf("invalid campaign query %q status=%d", query, response.Code)
+		}
+	}
+	if response := configurationRequest(handler, http.MethodGet, "/v1/campaigns?limit=2&releaseId=c123456789012345678901234", ""); response.Code != http.StatusOK {
+		t.Fatalf("bounded campaign query status=%d", response.Code)
+	}
 	if response := configurationRequest(handler, http.MethodGet, "/v1/campaigns/invalid-id", ""); response.Code != http.StatusBadRequest {
 		t.Fatalf("invalid campaign ID status=%d", response.Code)
 	}

@@ -28,7 +28,7 @@ import { readVersions } from '@/lib/write/versions'
  */
 
 /** Where the last save stands. */
-export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error' | 'offline'
+export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error' | 'offline' | 'conflict'
 
 /** How long typing waits before a save. */
 const AUTOSAVE_DELAY_MS = 800
@@ -143,6 +143,7 @@ export function useDraftDocument({
   )
 
   const save = React.useCallback(async (): Promise<boolean> => {
+    if (conflictedDocuments.has(draft.id)) return false
     if (!canEdit) return !dirty.current
     if (inFlight.current) return inFlight.current
     if (!dirty.current) return true
@@ -314,15 +315,21 @@ export function useDraftDocument({
   const discardConflict = React.useCallback(() => {
     conflictedDocuments.delete(draft.id)
     setConflict(null)
-  }, [draft.id])
+    if (dirty.current) scheduleSave()
+  }, [draft.id, scheduleSave])
 
   /** Save now, waiting for any save in flight: before scheduling, sharing, or leaving. */
   const flush = React.useCallback(async () => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
-    if (!(await save()))
+    const saved = await save()
+    if (conflictedDocuments.has(draft.id))
+      throw new Error(
+        'Your edit conflicts with a newer version. Restore or discard it before continuing.'
+      )
+    if (!saved)
       throw new Error('The latest changes could not be saved. Try again before continuing.')
-  }, [save])
+  }, [draft.id, save])
 
   const onDiscussionsChange = React.useCallback(
     (next: DraftDiscussions) => {
@@ -355,11 +362,12 @@ export function useDraftDocument({
   // Leaving with unsaved edits asks first.
   React.useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => {
-      if (dirty.current || inFlight.current) event.preventDefault()
+      if (dirty.current || inFlight.current || conflictedDocuments.has(draft.id))
+        event.preventDefault()
     }
     window.addEventListener('beforeunload', guard)
     return () => window.removeEventListener('beforeunload', guard)
-  }, [])
+  }, [draft.id])
   React.useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current)
@@ -393,7 +401,7 @@ export function useDraftDocument({
     onDiscussionsChange,
     reloadLatest,
     restoreConflict,
-    saveState,
+    saveState: conflict ? ('conflict' as const) : saveState,
     server,
     setServer: adopt,
     update,

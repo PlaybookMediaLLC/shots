@@ -177,6 +177,12 @@ func (c *Configuration) CreateCreativeVariant(ctx context.Context, actor Actor, 
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM organization WHERE id=$1 FOR KEY SHARE`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
+	if err := requireCanonicalRelease(ctx, tx.Client(), actor.OrganizationID, input.ReleaseID); err != nil {
+		return nil, err
+	}
 	assetOwned, err := tx.Asset.Query().Where(asset.ID(input.SourceAssetID), asset.OrganizationID(actor.OrganizationID),
 		asset.StatusEQ(asset.StatusUPLOADED)).Exist(ctx)
 	if err != nil {

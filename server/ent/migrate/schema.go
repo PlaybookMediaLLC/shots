@@ -264,6 +264,11 @@ var (
 				Columns: []*schema.Column{AssetColumns[4]},
 			},
 			{
+				Name:    "asset_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{AssetColumns[1], AssetColumns[0]},
+			},
+			{
 				Name:    "asset_organizationId_createdAt",
 				Unique:  false,
 				Columns: []*schema.Column{AssetColumns[1], AssetColumns[15]},
@@ -901,6 +906,169 @@ var (
 			},
 		},
 	}
+	// PlatformClaimPathBindingColumns holds the columns for the "platform_claim_path_binding" table.
+	PlatformClaimPathBindingColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "specId", Type: field.TypeString},
+		{Name: "legacyPath", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "claimVersionId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformClaimPathBindingTable holds the schema information for the "platform_claim_path_binding" table.
+	PlatformClaimPathBindingTable = &schema.Table{
+		Name:       "platform_claim_path_binding",
+		Columns:    PlatformClaimPathBindingColumns,
+		PrimaryKey: []*schema.Column{PlatformClaimPathBindingColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "claimpathbinding_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimPathBindingColumns[1], PlatformClaimPathBindingColumns[0]},
+			},
+			{
+				Name:    "claimpathbinding_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimPathBindingColumns[1], PlatformClaimPathBindingColumns[2], PlatformClaimPathBindingColumns[0]},
+			},
+			{
+				Name:    "claimpathbinding_organizationId_specId_legacyPath",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimPathBindingColumns[1], PlatformClaimPathBindingColumns[3], PlatformClaimPathBindingColumns[4]},
+			},
+		},
+	}
+	// PlatformClaimSupportColumns holds the columns for the "platform_claim_support" table.
+	PlatformClaimSupportColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "claimVersionId", Type: field.TypeString},
+		{Name: "supportSetId", Type: field.TypeString},
+		{Name: "evidenceVersionId", Type: field.TypeString},
+		{Name: "relation", Type: field.TypeEnum, Enums: []string{"SUPPORTS", "CONTRADICTS", "CONTEXT"}},
+		{Name: "selector", Type: field.TypeJSON},
+		{Name: "selectorSha256", Type: field.TypeString},
+		{Name: "exclusionReason", Type: field.TypeString, Default: ""},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformClaimSupportTable holds the schema information for the "platform_claim_support" table.
+	PlatformClaimSupportTable = &schema.Table{
+		Name:       "platform_claim_support",
+		Columns:    PlatformClaimSupportColumns,
+		PrimaryKey: []*schema.Column{PlatformClaimSupportColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "claimsupport_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportColumns[1], PlatformClaimSupportColumns[0]},
+			},
+			{
+				Name:    "claimsupport_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportColumns[1], PlatformClaimSupportColumns[2], PlatformClaimSupportColumns[0]},
+			},
+			{
+				Name:    "claimsupport_organizationId_supportSetId_evidenceVersionId_relation_selectorSha256",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportColumns[1], PlatformClaimSupportColumns[5], PlatformClaimSupportColumns[6], PlatformClaimSupportColumns[7], PlatformClaimSupportColumns[9]},
+			},
+			{
+				Name:    "claimsupport_organizationId_evidenceVersionId_claimVersionId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformClaimSupportColumns[1], PlatformClaimSupportColumns[6], PlatformClaimSupportColumns[4]},
+			},
+		},
+	}
+	// PlatformClaimSupportSetColumns holds the columns for the "platform_claim_support_set" table.
+	PlatformClaimSupportSetColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "claimVersionId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt64, Default: 1},
+		{Name: "supportSha256", Type: field.TypeString},
+		{Name: "sourcePins", Type: field.TypeJSON},
+		{Name: "authorId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformClaimSupportSetTable holds the schema information for the "platform_claim_support_set" table.
+	PlatformClaimSupportSetTable = &schema.Table{
+		Name:       "platform_claim_support_set",
+		Columns:    PlatformClaimSupportSetColumns,
+		PrimaryKey: []*schema.Column{PlatformClaimSupportSetColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "claimsupportset_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportSetColumns[1], PlatformClaimSupportSetColumns[0]},
+			},
+			{
+				Name:    "claimsupportset_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportSetColumns[1], PlatformClaimSupportSetColumns[2], PlatformClaimSupportSetColumns[0]},
+			},
+			{
+				Name:    "claimsupportset_organizationId_releaseId_claimId_claimVersionId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportSetColumns[1], PlatformClaimSupportSetColumns[2], PlatformClaimSupportSetColumns[3], PlatformClaimSupportSetColumns[4], PlatformClaimSupportSetColumns[0]},
+			},
+			{
+				Name:    "claimsupportset_organizationId_claimVersionId_version",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimSupportSetColumns[1], PlatformClaimSupportSetColumns[4], PlatformClaimSupportSetColumns[5]},
+			},
+		},
+	}
+	// PlatformClaimVerificationColumns holds the columns for the "platform_claim_verification" table.
+	PlatformClaimVerificationColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "claimVersionId", Type: field.TypeString},
+		{Name: "supportSetId", Type: field.TypeString},
+		{Name: "supportSha256", Type: field.TypeString},
+		{Name: "claimSha256", Type: field.TypeString},
+		{Name: "decision", Type: field.TypeEnum, Enums: []string{"SUPPORTED", "CONTRADICTED", "UNRESOLVED", "WITHDRAWN"}},
+		{Name: "humanUserId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "supersedesId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformClaimVerificationTable holds the schema information for the "platform_claim_verification" table.
+	PlatformClaimVerificationTable = &schema.Table{
+		Name:       "platform_claim_verification",
+		Columns:    PlatformClaimVerificationColumns,
+		PrimaryKey: []*schema.Column{PlatformClaimVerificationColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "claimverification_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimVerificationColumns[1], PlatformClaimVerificationColumns[0]},
+			},
+			{
+				Name:    "claimverification_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimVerificationColumns[1], PlatformClaimVerificationColumns[2], PlatformClaimVerificationColumns[0]},
+			},
+			{
+				Name:    "claimverification_organizationId_releaseId_claimId_claimVersionId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformClaimVerificationColumns[1], PlatformClaimVerificationColumns[2], PlatformClaimVerificationColumns[3], PlatformClaimVerificationColumns[4], PlatformClaimVerificationColumns[0]},
+			},
+			{
+				Name:    "claimverification_organizationId_claimVersionId_createdAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformClaimVerificationColumns[1], PlatformClaimVerificationColumns[4], PlatformClaimVerificationColumns[13], PlatformClaimVerificationColumns[0]},
+			},
+		},
+	}
 	// CommunicationAttemptColumns holds the columns for the "communication_attempt" table.
 	CommunicationAttemptColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1516,6 +1684,129 @@ var (
 			},
 		},
 	}
+	// PlatformEvidenceClearanceColumns holds the columns for the "platform_evidence_clearance" table.
+	PlatformEvidenceClearanceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "evidenceVersionId", Type: field.TypeString},
+		{Name: "audienceIds", Type: field.TypeJSON},
+		{Name: "humanUserId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformEvidenceClearanceTable holds the schema information for the "platform_evidence_clearance" table.
+	PlatformEvidenceClearanceTable = &schema.Table{
+		Name:       "platform_evidence_clearance",
+		Columns:    PlatformEvidenceClearanceColumns,
+		PrimaryKey: []*schema.Column{PlatformEvidenceClearanceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "evidenceclearance_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceClearanceColumns[1], PlatformEvidenceClearanceColumns[0]},
+			},
+			{
+				Name:    "evidenceclearance_organizationId_evidenceVersionId_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformEvidenceClearanceColumns[1], PlatformEvidenceClearanceColumns[2], PlatformEvidenceClearanceColumns[7]},
+			},
+		},
+	}
+	// PlatformEvidenceSourceColumns holds the columns for the "platform_evidence_source" table.
+	PlatformEvidenceSourceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"TEXT", "ATTESTATION", "ASSET", "RELEASE_SOURCE"}},
+		{Name: "identitySha256", Type: field.TypeString},
+		{Name: "accessClass", Type: field.TypeEnum, Enums: []string{"PRIVATE_SOURCE", "INTERNAL_MATERIAL", "CUSTOMER_CLEARED"}, Default: "PRIVATE_SOURCE"},
+		{Name: "availability", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "UNAVAILABLE", "WITHDRAWN"}, Default: "AVAILABLE"},
+		{Name: "changeSequence", Type: field.TypeInt64, Default: 1},
+		{Name: "currentVersionId", Type: field.TypeString, Nullable: true},
+		{Name: "sourceBindingId", Type: field.TypeString, Nullable: true},
+		{Name: "lastAttemptedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "lastSuccessAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformEvidenceSourceTable holds the schema information for the "platform_evidence_source" table.
+	PlatformEvidenceSourceTable = &schema.Table{
+		Name:       "platform_evidence_source",
+		Columns:    PlatformEvidenceSourceColumns,
+		PrimaryKey: []*schema.Column{PlatformEvidenceSourceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "evidencesource_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceSourceColumns[1], PlatformEvidenceSourceColumns[0]},
+			},
+			{
+				Name:    "evidencesource_organizationId_kind_identitySha256",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceSourceColumns[1], PlatformEvidenceSourceColumns[2], PlatformEvidenceSourceColumns[3]},
+			},
+			{
+				Name:    "evidencesource_organizationId_sourceBindingId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformEvidenceSourceColumns[1], PlatformEvidenceSourceColumns[8]},
+			},
+		},
+	}
+	// PlatformEvidenceVersionColumns holds the columns for the "platform_evidence_version" table.
+	PlatformEvidenceVersionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt64, Default: 1},
+		{Name: "format", Type: field.TypeEnum, Enums: []string{"TEXT", "IMAGE"}},
+		{Name: "origin", Type: field.TypeEnum, Enums: []string{"HUMAN", "PROVIDER", "AI"}},
+		{Name: "rawSha256", Type: field.TypeString},
+		{Name: "normalizedSha256", Type: field.TypeString},
+		{Name: "normalizationVersion", Type: field.TypeString},
+		{Name: "normalizedText", Type: field.TypeString, Nullable: true},
+		{Name: "assetId", Type: field.TypeString, Nullable: true},
+		{Name: "sourceUrl", Type: field.TypeString, Nullable: true},
+		{Name: "providerRevision", Type: field.TypeString, Default: ""},
+		{Name: "byteLength", Type: field.TypeInt64, Default: 0},
+		{Name: "imageWidth", Type: field.TypeInt, Default: 0},
+		{Name: "imageHeight", Type: field.TypeInt, Default: 0},
+		{Name: "redactionAssetId", Type: field.TypeString, Nullable: true},
+		{Name: "observedAt", Type: field.TypeTime},
+		{Name: "authorId", Type: field.TypeString},
+		{Name: "confirmedByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "confirmedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "attestationScope", Type: field.TypeString, Default: ""},
+		{Name: "limitations", Type: field.TypeString, Default: ""},
+		{Name: "tombstonedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformEvidenceVersionTable holds the schema information for the "platform_evidence_version" table.
+	PlatformEvidenceVersionTable = &schema.Table{
+		Name:       "platform_evidence_version",
+		Columns:    PlatformEvidenceVersionColumns,
+		PrimaryKey: []*schema.Column{PlatformEvidenceVersionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "evidenceversion_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceVersionColumns[1], PlatformEvidenceVersionColumns[0]},
+			},
+			{
+				Name:    "evidenceversion_organizationId_sourceId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceVersionColumns[1], PlatformEvidenceVersionColumns[2], PlatformEvidenceVersionColumns[0]},
+			},
+			{
+				Name:    "evidenceversion_organizationId_sourceId_version",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformEvidenceVersionColumns[1], PlatformEvidenceVersionColumns[2], PlatformEvidenceVersionColumns[3]},
+			},
+			{
+				Name:    "evidenceversion_organizationId_assetId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformEvidenceVersionColumns[1], PlatformEvidenceVersionColumns[10]},
+			},
+		},
+	}
 	// FrontendActivationColumns holds the columns for the "frontend_activation" table.
 	FrontendActivationColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1889,6 +2180,264 @@ var (
 				Name:    "invitation_organizationId_status_createdAt",
 				Unique:  false,
 				Columns: []*schema.Column{InvitationColumns[1], InvitationColumns[4], InvitationColumns[6]},
+			},
+		},
+	}
+	// PlatformKitArtifactClaimColumns holds the columns for the "platform_kit_artifact_claim" table.
+	PlatformKitArtifactClaimColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "artifactRevisionId", Type: field.TypeString},
+		{Name: "nodeId", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "claimVersionId", Type: field.TypeString},
+		{Name: "supportSetId", Type: field.TypeString, Nullable: true},
+		{Name: "verificationId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitArtifactClaimTable holds the schema information for the "platform_kit_artifact_claim" table.
+	PlatformKitArtifactClaimTable = &schema.Table{
+		Name:       "platform_kit_artifact_claim",
+		Columns:    PlatformKitArtifactClaimColumns,
+		PrimaryKey: []*schema.Column{PlatformKitArtifactClaimColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitartifactclaim_organizationId_artifactRevisionId_nodeId_claimVersionId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitArtifactClaimColumns[1], PlatformKitArtifactClaimColumns[3], PlatformKitArtifactClaimColumns[4], PlatformKitArtifactClaimColumns[6]},
+			},
+			{
+				Name:    "kitartifactclaim_organizationId_claimVersionId_artifactRevisionId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformKitArtifactClaimColumns[1], PlatformKitArtifactClaimColumns[6], PlatformKitArtifactClaimColumns[3]},
+			},
+		},
+	}
+	// PlatformKitArtifactRevisionColumns holds the columns for the "platform_kit_artifact_revision" table.
+	PlatformKitArtifactRevisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"FACT_SHEET", "SALES_NOTES", "CS_NOTES", "ANNOUNCEMENT", "FAQ", "SCREENSHOT"}},
+		{Name: "audienceId", Type: field.TypeString},
+		{Name: "classification", Type: field.TypeEnum, Enums: []string{"INTERNAL_MATERIAL", "CUSTOMER_CLEARED"}},
+		{Name: "snapshot", Type: field.TypeJSON},
+		{Name: "snapshotSha256", Type: field.TypeString},
+		{Name: "claimLinks", Type: field.TypeJSON},
+		{Name: "claimMapSha256", Type: field.TypeString},
+		{Name: "outputKey", Type: field.TypeString, Nullable: true},
+		{Name: "outputSha256", Type: field.TypeString, Nullable: true},
+		{Name: "outputBytes", Type: field.TypeInt64, Default: 0},
+		{Name: "mediaType", Type: field.TypeString, Default: ""},
+		{Name: "rendererVersion", Type: field.TypeString, Default: ""},
+		{Name: "preparedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitArtifactRevisionTable holds the schema information for the "platform_kit_artifact_revision" table.
+	PlatformKitArtifactRevisionTable = &schema.Table{
+		Name:       "platform_kit_artifact_revision",
+		Columns:    PlatformKitArtifactRevisionColumns,
+		PrimaryKey: []*schema.Column{PlatformKitArtifactRevisionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitartifactrevision_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitArtifactRevisionColumns[1], PlatformKitArtifactRevisionColumns[0]},
+			},
+			{
+				Name:    "kitartifactrevision_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitArtifactRevisionColumns[1], PlatformKitArtifactRevisionColumns[2], PlatformKitArtifactRevisionColumns[0]},
+			},
+		},
+	}
+	// PlatformKitExportColumns holds the columns for the "platform_kit_export" table.
+	PlatformKitExportColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kitRevisionId", Type: field.TypeString},
+		{Name: "audienceIds", Type: field.TypeJSON},
+		{Name: "audienceScope", Type: field.TypeString},
+		{Name: "exportVersion", Type: field.TypeInt, Default: 1},
+		{Name: "requestedByUserId", Type: field.TypeString},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"BUILDING", "READY", "FAILED"}, Default: "BUILDING"},
+		{Name: "objectKey", Type: field.TypeString, Nullable: true},
+		{Name: "sha256", Type: field.TypeString, Nullable: true},
+		{Name: "bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "fileIndex", Type: field.TypeJSON},
+		{Name: "failureCode", Type: field.TypeString, Default: ""},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitExportTable holds the schema information for the "platform_kit_export" table.
+	PlatformKitExportTable = &schema.Table{
+		Name:       "platform_kit_export",
+		Columns:    PlatformKitExportColumns,
+		PrimaryKey: []*schema.Column{PlatformKitExportColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitexport_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitExportColumns[1], PlatformKitExportColumns[0]},
+			},
+			{
+				Name:    "kitexport_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitExportColumns[1], PlatformKitExportColumns[2], PlatformKitExportColumns[0]},
+			},
+			{
+				Name:    "kitexport_organizationId_kitRevisionId_audienceScope_exportVersion",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitExportColumns[1], PlatformKitExportColumns[3], PlatformKitExportColumns[5], PlatformKitExportColumns[6]},
+			},
+		},
+	}
+	// PlatformKitMemberColumns holds the columns for the "platform_kit_member" table.
+	PlatformKitMemberColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kitRevisionId", Type: field.TypeString},
+		{Name: "artifactRevisionId", Type: field.TypeString},
+		{Name: "audienceId", Type: field.TypeString},
+		{Name: "requirementId", Type: field.TypeString},
+		{Name: "displayOrder", Type: field.TypeInt},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitMemberTable holds the schema information for the "platform_kit_member" table.
+	PlatformKitMemberTable = &schema.Table{
+		Name:       "platform_kit_member",
+		Columns:    PlatformKitMemberColumns,
+		PrimaryKey: []*schema.Column{PlatformKitMemberColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitmember_organizationId_kitRevisionId_artifactRevisionId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitMemberColumns[1], PlatformKitMemberColumns[3], PlatformKitMemberColumns[4]},
+			},
+			{
+				Name:    "kitmember_organizationId_artifactRevisionId_kitRevisionId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformKitMemberColumns[1], PlatformKitMemberColumns[4], PlatformKitMemberColumns[3]},
+			},
+		},
+	}
+	// PlatformKitReviewDecisionColumns holds the columns for the "platform_kit_review_decision" table.
+	PlatformKitReviewDecisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kitRevisionId", Type: field.TypeString},
+		{Name: "reviewType", Type: field.TypeEnum, Enums: []string{"CONTENT_COVERAGE", "FINAL_APPROVAL"}},
+		{Name: "decision", Type: field.TypeEnum, Enums: []string{"APPROVE", "REJECT", "WITHDRAW"}},
+		{Name: "manifestSha256", Type: field.TypeString},
+		{Name: "dependencyToken", Type: field.TypeString},
+		{Name: "policyVersion", Type: field.TypeInt},
+		{Name: "humanUserId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "assertionsConfirmed", Type: field.TypeBool, Default: false},
+		{Name: "screenshotsConfirmed", Type: field.TypeBool, Default: false},
+		{Name: "audienceConfirmed", Type: field.TypeBool, Default: false},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitReviewDecisionTable holds the schema information for the "platform_kit_review_decision" table.
+	PlatformKitReviewDecisionTable = &schema.Table{
+		Name:       "platform_kit_review_decision",
+		Columns:    PlatformKitReviewDecisionColumns,
+		PrimaryKey: []*schema.Column{PlatformKitReviewDecisionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitreviewdecision_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitReviewDecisionColumns[1], PlatformKitReviewDecisionColumns[0]},
+			},
+			{
+				Name:    "kitreviewdecision_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitReviewDecisionColumns[1], PlatformKitReviewDecisionColumns[2], PlatformKitReviewDecisionColumns[0]},
+			},
+			{
+				Name:    "kitreviewdecision_organizationId_kitRevisionId_reviewType_createdAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformKitReviewDecisionColumns[1], PlatformKitReviewDecisionColumns[3], PlatformKitReviewDecisionColumns[4], PlatformKitReviewDecisionColumns[15], PlatformKitReviewDecisionColumns[0]},
+			},
+		},
+	}
+	// PlatformReleaseKitRevisionColumns holds the columns for the "platform_release_kit_revision" table.
+	PlatformReleaseKitRevisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kitId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt64},
+		{Name: "qualificationRevisionId", Type: field.TypeString},
+		{Name: "approverUserId", Type: field.TypeString},
+		{Name: "requestedByUserId", Type: field.TypeString},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"DRAFT", "BUILDING", "REVIEWABLE", "APPROVED", "REJECTED", "SUPERSEDED", "WITHDRAWN", "FAILED"}, Default: "DRAFT"},
+		{Name: "manifest", Type: field.TypeJSON},
+		{Name: "manifestSha256", Type: field.TypeString, Default: ""},
+		{Name: "manifestCanonical", Type: field.TypeString, Default: ""},
+		{Name: "preparationJobId", Type: field.TypeString, Nullable: true},
+		{Name: "failureCode", Type: field.TypeString, Default: ""},
+		{Name: "preparedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseKitRevisionTable holds the schema information for the "platform_release_kit_revision" table.
+	PlatformReleaseKitRevisionTable = &schema.Table{
+		Name:       "platform_release_kit_revision",
+		Columns:    PlatformReleaseKitRevisionColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseKitRevisionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitrevision_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitRevisionColumns[1], PlatformReleaseKitRevisionColumns[0]},
+			},
+			{
+				Name:    "kitrevision_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitRevisionColumns[1], PlatformReleaseKitRevisionColumns[2], PlatformReleaseKitRevisionColumns[0]},
+			},
+			{
+				Name:    "kitrevision_organizationId_releaseId_kitId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitRevisionColumns[1], PlatformReleaseKitRevisionColumns[2], PlatformReleaseKitRevisionColumns[3], PlatformReleaseKitRevisionColumns[0]},
+			},
+			{
+				Name:    "kitrevision_organizationId_kitId_version",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitRevisionColumns[1], PlatformReleaseKitRevisionColumns[3], PlatformReleaseKitRevisionColumns[4]},
+			},
+		},
+	}
+	// PlatformKitSourcePinColumns holds the columns for the "platform_kit_source_pin" table.
+	PlatformKitSourcePinColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "kitRevisionId", Type: field.TypeString},
+		{Name: "sourceId", Type: field.TypeString},
+		{Name: "acknowledgedSequence", Type: field.TypeInt64},
+		{Name: "evidenceVersionIds", Type: field.TypeJSON},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformKitSourcePinTable holds the schema information for the "platform_kit_source_pin" table.
+	PlatformKitSourcePinTable = &schema.Table{
+		Name:       "platform_kit_source_pin",
+		Columns:    PlatformKitSourcePinColumns,
+		PrimaryKey: []*schema.Column{PlatformKitSourcePinColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "kitsourcepin_organizationId_kitRevisionId_sourceId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformKitSourcePinColumns[1], PlatformKitSourcePinColumns[3], PlatformKitSourcePinColumns[4]},
+			},
+			{
+				Name:    "kitsourcepin_organizationId_sourceId_kitRevisionId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformKitSourcePinColumns[1], PlatformKitSourcePinColumns[4], PlatformKitSourcePinColumns[3]},
 			},
 		},
 	}
@@ -3235,6 +3784,32 @@ var (
 			},
 		},
 	}
+	// PlatformReadinessCommandReceiptColumns holds the columns for the "platform_readiness_command_receipt" table.
+	PlatformReadinessCommandReceiptColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "actorKind", Type: field.TypeEnum, Enums: []string{"session", "api_key"}},
+		{Name: "actorId", Type: field.TypeString},
+		{Name: "operation", Type: field.TypeString},
+		{Name: "commandKey", Type: field.TypeString, Size: 128},
+		{Name: "requestSha256", Type: field.TypeString, Size: 64},
+		{Name: "responseRef", Type: field.TypeJSON},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReadinessCommandReceiptTable holds the schema information for the "platform_readiness_command_receipt" table.
+	PlatformReadinessCommandReceiptTable = &schema.Table{
+		Name:       "platform_readiness_command_receipt",
+		Columns:    PlatformReadinessCommandReceiptColumns,
+		PrimaryKey: []*schema.Column{PlatformReadinessCommandReceiptColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "readinesscommandreceipt_organizationId_actorKind_actorId_operation_commandKey",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReadinessCommandReceiptColumns[1], PlatformReadinessCommandReceiptColumns[3], PlatformReadinessCommandReceiptColumns[4], PlatformReadinessCommandReceiptColumns[5], PlatformReadinessCommandReceiptColumns[6]},
+			},
+		},
+	}
 	// ReleaseColumns holds the columns for the "release" table.
 	ReleaseColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -3259,6 +3834,11 @@ var (
 		Columns:    ReleaseColumns,
 		PrimaryKey: []*schema.Column{ReleaseColumns[0]},
 		Indexes: []*schema.Index{
+			{
+				Name:    "release_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{ReleaseColumns[1], ReleaseColumns[0]},
+			},
 			{
 				Name:    "release_organizationId_status_updatedAt",
 				Unique:  false,
@@ -3429,6 +4009,82 @@ var (
 			},
 		},
 	}
+	// PlatformReleaseClaimColumns holds the columns for the "platform_release_claim" table.
+	PlatformReleaseClaimColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "currentVersionId", Type: field.TypeString, Nullable: true},
+		{Name: "currentSupportSetId", Type: field.TypeString, Nullable: true},
+		{Name: "currentDecisionId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseClaimTable holds the schema information for the "platform_release_claim" table.
+	PlatformReleaseClaimTable = &schema.Table{
+		Name:       "platform_release_claim",
+		Columns:    PlatformReleaseClaimColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseClaimColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releaseclaim_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimColumns[1], PlatformReleaseClaimColumns[0]},
+			},
+			{
+				Name:    "releaseclaim_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimColumns[1], PlatformReleaseClaimColumns[2], PlatformReleaseClaimColumns[0]},
+			},
+			{
+				Name:    "releaseclaim_organizationId_releaseId_createdAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseClaimColumns[1], PlatformReleaseClaimColumns[2], PlatformReleaseClaimColumns[6], PlatformReleaseClaimColumns[0]},
+			},
+		},
+	}
+	// PlatformReleaseClaimVersionColumns holds the columns for the "platform_release_claim_version" table.
+	PlatformReleaseClaimVersionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "claimId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt64, Default: 1},
+		{Name: "specId", Type: field.TypeString, Nullable: true},
+		{Name: "text", Type: field.TypeString},
+		{Name: "qualifiers", Type: field.TypeJSON},
+		{Name: "contentSha256", Type: field.TypeString},
+		{Name: "origin", Type: field.TypeEnum, Enums: []string{"HUMAN", "PROVIDER", "AI"}},
+		{Name: "authorId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseClaimVersionTable holds the schema information for the "platform_release_claim_version" table.
+	PlatformReleaseClaimVersionTable = &schema.Table{
+		Name:       "platform_release_claim_version",
+		Columns:    PlatformReleaseClaimVersionColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseClaimVersionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releaseclaimversion_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimVersionColumns[1], PlatformReleaseClaimVersionColumns[0]},
+			},
+			{
+				Name:    "releaseclaimversion_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimVersionColumns[1], PlatformReleaseClaimVersionColumns[2], PlatformReleaseClaimVersionColumns[0]},
+			},
+			{
+				Name:    "releaseclaimversion_organizationId_releaseId_claimId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimVersionColumns[1], PlatformReleaseClaimVersionColumns[2], PlatformReleaseClaimVersionColumns[3], PlatformReleaseClaimVersionColumns[0]},
+			},
+			{
+				Name:    "releaseclaimversion_organizationId_releaseId_claimId_version",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseClaimVersionColumns[1], PlatformReleaseClaimVersionColumns[2], PlatformReleaseClaimVersionColumns[3], PlatformReleaseClaimVersionColumns[4]},
+			},
+		},
+	}
 	// ReleaseDocumentColumns holds the columns for the "release_document" table.
 	ReleaseDocumentColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -3458,6 +4114,344 @@ var (
 				Name:    "releasedocument_organizationId_createdAt",
 				Unique:  false,
 				Columns: []*schema.Column{ReleaseDocumentColumns[1], ReleaseDocumentColumns[9]},
+			},
+		},
+	}
+	// PlatformReleaseEvidenceColumns holds the columns for the "platform_release_evidence" table.
+	PlatformReleaseEvidenceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "evidenceVersionId", Type: field.TypeString},
+		{Name: "purpose", Type: field.TypeString},
+		{Name: "attachedByUserId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseEvidenceTable holds the schema information for the "platform_release_evidence" table.
+	PlatformReleaseEvidenceTable = &schema.Table{
+		Name:       "platform_release_evidence",
+		Columns:    PlatformReleaseEvidenceColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseEvidenceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releaseevidence_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseEvidenceColumns[1], PlatformReleaseEvidenceColumns[0]},
+			},
+			{
+				Name:    "releaseevidence_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseEvidenceColumns[1], PlatformReleaseEvidenceColumns[2], PlatformReleaseEvidenceColumns[0]},
+			},
+			{
+				Name:    "releaseevidence_organizationId_releaseId_evidenceVersionId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseEvidenceColumns[1], PlatformReleaseEvidenceColumns[2], PlatformReleaseEvidenceColumns[3]},
+			},
+			{
+				Name:    "releaseevidence_organizationId_evidenceVersionId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseEvidenceColumns[1], PlatformReleaseEvidenceColumns[3]},
+			},
+		},
+	}
+	// PlatformReleaseKitColumns holds the columns for the "platform_release_kit" table.
+	PlatformReleaseKitColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "currentRevisionId", Type: field.TypeString, Nullable: true},
+		{Name: "approvedRevisionId", Type: field.TypeString, Nullable: true},
+		{Name: "lastVersion", Type: field.TypeInt64, Default: 0},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseKitTable holds the schema information for the "platform_release_kit" table.
+	PlatformReleaseKitTable = &schema.Table{
+		Name:       "platform_release_kit",
+		Columns:    PlatformReleaseKitColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseKitColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasekit_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitColumns[1], PlatformReleaseKitColumns[0]},
+			},
+			{
+				Name:    "releasekit_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitColumns[1], PlatformReleaseKitColumns[2], PlatformReleaseKitColumns[0]},
+			},
+			{
+				Name:    "releasekit_organizationId_releaseId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseKitColumns[1], PlatformReleaseKitColumns[2]},
+			},
+		},
+	}
+	// PlatformReleaseLineageColumns holds the columns for the "platform_release_lineage" table.
+	PlatformReleaseLineageColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "operation", Type: field.TypeEnum, Enums: []string{"MERGE", "SPLIT"}},
+		{Name: "sourceReleaseId", Type: field.TypeString},
+		{Name: "destinationReleaseId", Type: field.TypeString},
+		{Name: "sourceRevision", Type: field.TypeInt64},
+		{Name: "destinationRevision", Type: field.TypeInt64},
+		{Name: "reason", Type: field.TypeString, Size: 4000},
+		{Name: "humanUserId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseLineageTable holds the schema information for the "platform_release_lineage" table.
+	PlatformReleaseLineageTable = &schema.Table{
+		Name:       "platform_release_lineage",
+		Columns:    PlatformReleaseLineageColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseLineageColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releaselineage_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseLineageColumns[1], PlatformReleaseLineageColumns[0]},
+			},
+			{
+				Name:    "releaselineage_organizationId_sourceReleaseId_createdAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseLineageColumns[1], PlatformReleaseLineageColumns[3], PlatformReleaseLineageColumns[10], PlatformReleaseLineageColumns[0]},
+			},
+			{
+				Name:    "releaselineage_organizationId_destinationReleaseId_createdAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseLineageColumns[1], PlatformReleaseLineageColumns[4], PlatformReleaseLineageColumns[10], PlatformReleaseLineageColumns[0]},
+			},
+		},
+	}
+	// PlatformReleaseLineageBindingColumns holds the columns for the "platform_release_lineage_binding" table.
+	PlatformReleaseLineageBindingColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "lineageId", Type: field.TypeString},
+		{Name: "bindingId", Type: field.TypeString},
+	}
+	// PlatformReleaseLineageBindingTable holds the schema information for the "platform_release_lineage_binding" table.
+	PlatformReleaseLineageBindingTable = &schema.Table{
+		Name:       "platform_release_lineage_binding",
+		Columns:    PlatformReleaseLineageBindingColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseLineageBindingColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releaselineagebinding_organizationId_lineageId_bindingId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseLineageBindingColumns[1], PlatformReleaseLineageBindingColumns[2], PlatformReleaseLineageBindingColumns[3]},
+			},
+			{
+				Name:    "releaselineagebinding_organizationId_bindingId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseLineageBindingColumns[1], PlatformReleaseLineageBindingColumns[3]},
+			},
+		},
+	}
+	// PlatformReleaseQualificationColumns holds the columns for the "platform_release_qualification" table.
+	PlatformReleaseQualificationColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt64},
+		{Name: "aggregateRevision", Type: field.TypeInt64},
+		{Name: "parentRevisionId", Type: field.TypeString, Nullable: true},
+		{Name: "ownerUserId", Type: field.TypeString, Nullable: true},
+		{Name: "factReviewerUserId", Type: field.TypeString, Nullable: true},
+		{Name: "rationale", Type: field.TypeString, Nullable: true},
+		{Name: "rollout", Type: field.TypeEnum, Enums: []string{"UNKNOWN", "PLANNED", "LIMITED", "GENERAL", "WITHDRAWN"}},
+		{Name: "availability", Type: field.TypeString, Nullable: true},
+		{Name: "exclusions", Type: field.TypeString, Nullable: true},
+		{Name: "eligibility", Type: field.TypeString, Nullable: true},
+		{Name: "plannedAvailability", Type: field.TypeString, Nullable: true},
+		{Name: "readyAt", Type: field.TypeTime, Nullable: true},
+		{Name: "humanBrief", Type: field.TypeString, Nullable: true},
+		{Name: "humanBriefAuthorUserId", Type: field.TypeString, Nullable: true},
+		{Name: "sourceUrls", Type: field.TypeJSON},
+		{Name: "schemaVersion", Type: field.TypeInt, Default: 1},
+		{Name: "requirements", Type: field.TypeJSON},
+		{Name: "authorKind", Type: field.TypeEnum, Enums: []string{"session", "api_key"}},
+		{Name: "authorId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseQualificationTable holds the schema information for the "platform_release_qualification" table.
+	PlatformReleaseQualificationTable = &schema.Table{
+		Name:       "platform_release_qualification",
+		Columns:    PlatformReleaseQualificationColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseQualificationColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasequalification_organizationId_releaseId_version",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationColumns[1], PlatformReleaseQualificationColumns[2], PlatformReleaseQualificationColumns[3]},
+			},
+			{
+				Name:    "releasequalification_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationColumns[1], PlatformReleaseQualificationColumns[2], PlatformReleaseQualificationColumns[0]},
+			},
+		},
+	}
+	// PlatformReleaseQualificationAssetColumns holds the columns for the "platform_release_qualification_asset" table.
+	PlatformReleaseQualificationAssetColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "qualificationRevisionId", Type: field.TypeString},
+		{Name: "assetId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseQualificationAssetTable holds the schema information for the "platform_release_qualification_asset" table.
+	PlatformReleaseQualificationAssetTable = &schema.Table{
+		Name:       "platform_release_qualification_asset",
+		Columns:    PlatformReleaseQualificationAssetColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseQualificationAssetColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasequalificationasset_organizationId_releaseId_qualificationRevisionId_assetId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationAssetColumns[1], PlatformReleaseQualificationAssetColumns[2], PlatformReleaseQualificationAssetColumns[3], PlatformReleaseQualificationAssetColumns[4]},
+			},
+			{
+				Name:    "releasequalificationasset_organizationId_assetId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseQualificationAssetColumns[1], PlatformReleaseQualificationAssetColumns[4]},
+			},
+		},
+	}
+	// PlatformReleaseQualificationDecisionColumns holds the columns for the "platform_release_qualification_decision" table.
+	PlatformReleaseQualificationDecisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "qualificationRevisionId", Type: field.TypeString},
+		{Name: "decision", Type: field.TypeEnum, Enums: []string{"QUALIFIED", "NO_COMMUNICATION", "DEFERRED", "WITHDRAWN"}},
+		{Name: "humanUserId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "revisitAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseQualificationDecisionTable holds the schema information for the "platform_release_qualification_decision" table.
+	PlatformReleaseQualificationDecisionTable = &schema.Table{
+		Name:       "platform_release_qualification_decision",
+		Columns:    PlatformReleaseQualificationDecisionColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseQualificationDecisionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasequalificationdecision_organizationId_releaseId_qualificationRevisionId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationDecisionColumns[1], PlatformReleaseQualificationDecisionColumns[2], PlatformReleaseQualificationDecisionColumns[3]},
+			},
+			{
+				Name:    "releasequalificationdecision_organizationId_releaseId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationDecisionColumns[1], PlatformReleaseQualificationDecisionColumns[2], PlatformReleaseQualificationDecisionColumns[0]},
+			},
+		},
+	}
+	// PlatformReleaseQualificationSourceColumns holds the columns for the "platform_release_qualification_source" table.
+	PlatformReleaseQualificationSourceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "qualificationRevisionId", Type: field.TypeString},
+		{Name: "bindingId", Type: field.TypeString},
+		{Name: "observationId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseQualificationSourceTable holds the schema information for the "platform_release_qualification_source" table.
+	PlatformReleaseQualificationSourceTable = &schema.Table{
+		Name:       "platform_release_qualification_source",
+		Columns:    PlatformReleaseQualificationSourceColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseQualificationSourceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasequalificationsource_organizationId_releaseId_qualificationRevisionId_bindingId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseQualificationSourceColumns[1], PlatformReleaseQualificationSourceColumns[2], PlatformReleaseQualificationSourceColumns[3], PlatformReleaseQualificationSourceColumns[4]},
+			},
+			{
+				Name:    "releasequalificationsource_organizationId_bindingId_observationId",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseQualificationSourceColumns[1], PlatformReleaseQualificationSourceColumns[4], PlatformReleaseQualificationSourceColumns[5]},
+			},
+		},
+	}
+	// PlatformReleaseReadinessColumns holds the columns for the "platform_release_readiness" table.
+	PlatformReleaseReadinessColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString},
+		{Name: "headRevision", Type: field.TypeInt64, Default: 0},
+		{Name: "qualificationRevisionId", Type: field.TypeString, Nullable: true},
+		{Name: "firstQualifiedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "canonicalState", Type: field.TypeEnum, Enums: []string{"ACTIVE", "MERGED", "WITHDRAWN"}, Default: "ACTIVE"},
+		{Name: "mergedIntoReleaseId", Type: field.TypeString, Nullable: true},
+		{Name: "needsReview", Type: field.TypeBool, Default: false},
+		{Name: "claimImportProgress", Type: field.TypeJSON, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseReadinessTable holds the schema information for the "platform_release_readiness" table.
+	PlatformReleaseReadinessTable = &schema.Table{
+		Name:       "platform_release_readiness",
+		Columns:    PlatformReleaseReadinessColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseReadinessColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasereadiness_organizationId_releaseId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseReadinessColumns[1], PlatformReleaseReadinessColumns[2]},
+			},
+		},
+	}
+	// PlatformReleaseSourceBindingColumns holds the columns for the "platform_release_source_binding" table.
+	PlatformReleaseSourceBindingColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceAppId", Type: field.TypeString},
+		{Name: "provider", Type: field.TypeString, Size: 64},
+		{Name: "objectKind", Type: field.TypeEnum, Enums: []string{"PULL_REQUEST", "DEPLOYMENT"}},
+		{Name: "repositoryId", Type: field.TypeString, Size: 128},
+		{Name: "providerObjectId", Type: field.TypeString, Size: 200},
+		{Name: "canonicalReleaseId", Type: field.TypeString, Nullable: true},
+		{Name: "lastEventSequence", Type: field.TypeInt64, Default: 0},
+		{Name: "changeSequence", Type: field.TypeInt64, Default: 0},
+		{Name: "currentObservationId", Type: field.TypeString, Nullable: true},
+		{Name: "selectedObservationId", Type: field.TypeString, Nullable: true},
+		{Name: "selectedChangeSequence", Type: field.TypeInt64, Default: 0},
+		{Name: "needsResolution", Type: field.TypeBool, Default: false},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseSourceBindingTable holds the schema information for the "platform_release_source_binding" table.
+	PlatformReleaseSourceBindingTable = &schema.Table{
+		Name:       "platform_release_source_binding",
+		Columns:    PlatformReleaseSourceBindingColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseSourceBindingColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasesourcebinding_organizationId_sourceAppId_objectKind_repositoryId_providerObjectId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceBindingColumns[1], PlatformReleaseSourceBindingColumns[2], PlatformReleaseSourceBindingColumns[4], PlatformReleaseSourceBindingColumns[5], PlatformReleaseSourceBindingColumns[6]},
+			},
+			{
+				Name:    "releasesourcebinding_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceBindingColumns[1], PlatformReleaseSourceBindingColumns[0]},
+			},
+			{
+				Name:    "releasesourcebinding_organizationId_sourceAppId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceBindingColumns[1], PlatformReleaseSourceBindingColumns[2], PlatformReleaseSourceBindingColumns[0]},
+			},
+			{
+				Name:    "releasesourcebinding_organizationId_canonicalReleaseId_updatedAt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformReleaseSourceBindingColumns[1], PlatformReleaseSourceBindingColumns[7], PlatformReleaseSourceBindingColumns[15], PlatformReleaseSourceBindingColumns[0]},
 			},
 		},
 	}
@@ -3493,6 +4487,46 @@ var (
 				Name:    "releasesourceevent_organizationId_receivedAt",
 				Unique:  false,
 				Columns: []*schema.Column{ReleaseSourceEventColumns[1], ReleaseSourceEventColumns[13]},
+			},
+		},
+	}
+	// PlatformReleaseSourceObservationColumns holds the columns for the "platform_release_source_observation" table.
+	PlatformReleaseSourceObservationColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceAppId", Type: field.TypeString},
+		{Name: "bindingId", Type: field.TypeString},
+		{Name: "eventKey", Type: field.TypeString, Size: 512},
+		{Name: "providerEventId", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "sequence", Type: field.TypeInt64},
+		{Name: "bodySha256", Type: field.TypeString, Size: 64},
+		{Name: "sourceUpdatedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "occurredAt", Type: field.TypeTime},
+		{Name: "origin", Type: field.TypeEnum, Enums: []string{"LIVE", "HISTORICAL"}},
+		{Name: "schemaVersion", Type: field.TypeInt, Default: 1},
+		{Name: "snapshot", Type: field.TypeJSON},
+		{Name: "receivedAt", Type: field.TypeTime},
+	}
+	// PlatformReleaseSourceObservationTable holds the schema information for the "platform_release_source_observation" table.
+	PlatformReleaseSourceObservationTable = &schema.Table{
+		Name:       "platform_release_source_observation",
+		Columns:    PlatformReleaseSourceObservationColumns,
+		PrimaryKey: []*schema.Column{PlatformReleaseSourceObservationColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "releasesourceobservation_organizationId_sourceAppId_eventKey",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceObservationColumns[1], PlatformReleaseSourceObservationColumns[2], PlatformReleaseSourceObservationColumns[4]},
+			},
+			{
+				Name:    "releasesourceobservation_organizationId_bindingId_sequence",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceObservationColumns[1], PlatformReleaseSourceObservationColumns[3], PlatformReleaseSourceObservationColumns[6]},
+			},
+			{
+				Name:    "releasesourceobservation_organizationId_bindingId_id",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformReleaseSourceObservationColumns[1], PlatformReleaseSourceObservationColumns[3], PlatformReleaseSourceObservationColumns[0]},
 			},
 		},
 	}
@@ -3845,6 +4879,11 @@ var (
 		Columns:    SourceAppColumns,
 		PrimaryKey: []*schema.Column{SourceAppColumns[0]},
 		Indexes: []*schema.Index{
+			{
+				Name:    "sourceapp_organizationId_id",
+				Unique:  true,
+				Columns: []*schema.Column{SourceAppColumns[1], SourceAppColumns[0]},
+			},
 			{
 				Name:    "sourceapp_organizationId_name",
 				Unique:  true,
@@ -4477,6 +5516,7 @@ var (
 		{Name: "timeZone", Type: field.TypeString, Default: "UTC"},
 		{Name: "defaultPublishTime", Type: field.TypeString, Default: "09:00"},
 		{Name: "aiAgentEnabled", Type: field.TypeBool, Default: true},
+		{Name: "releaseReadinessEnabled", Type: field.TypeBool, Default: false},
 		{Name: "disabledExperiments", Type: field.TypeJSON},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -4517,6 +5557,10 @@ var (
 		CaptureJobTable,
 		CaptureRecipeTable,
 		ChannelConnectionTable,
+		PlatformClaimPathBindingTable,
+		PlatformClaimSupportTable,
+		PlatformClaimSupportSetTable,
+		PlatformClaimVerificationTable,
 		CommunicationAttemptTable,
 		CommunicationRecipientTable,
 		ContentAngleTable,
@@ -4536,6 +5580,9 @@ var (
 		DeploymentEventTable,
 		DesignTable,
 		EnrichmentRecordTable,
+		PlatformEvidenceClearanceTable,
+		PlatformEvidenceSourceTable,
+		PlatformEvidenceVersionTable,
 		FrontendActivationTable,
 		FrontendObservationTable,
 		FrontendSourceTable,
@@ -4548,6 +5595,13 @@ var (
 		IdealCustomerProfileTable,
 		IntegrationConnectionTable,
 		InvitationTable,
+		PlatformKitArtifactClaimTable,
+		PlatformKitArtifactRevisionTable,
+		PlatformKitExportTable,
+		PlatformKitMemberTable,
+		PlatformKitReviewDecisionTable,
+		PlatformReleaseKitRevisionTable,
+		PlatformKitSourcePinTable,
 		LaunchRunTable,
 		LaunchRunStepTable,
 		MemberTable,
@@ -4598,14 +5652,28 @@ var (
 		ProjectTable,
 		ProjectVersionTable,
 		PublicationAttemptTable,
+		PlatformReadinessCommandReceiptTable,
 		ReleaseTable,
 		ReleaseAutomationTable,
 		ReleaseAutomationExecutorTable,
 		ReleaseAutomationNodeTable,
 		ReleaseAutomationRunTable,
 		ReleaseAutomationVersionTable,
+		PlatformReleaseClaimTable,
+		PlatformReleaseClaimVersionTable,
 		ReleaseDocumentTable,
+		PlatformReleaseEvidenceTable,
+		PlatformReleaseKitTable,
+		PlatformReleaseLineageTable,
+		PlatformReleaseLineageBindingTable,
+		PlatformReleaseQualificationTable,
+		PlatformReleaseQualificationAssetTable,
+		PlatformReleaseQualificationDecisionTable,
+		PlatformReleaseQualificationSourceTable,
+		PlatformReleaseReadinessTable,
+		PlatformReleaseSourceBindingTable,
 		ReleaseSourceEventTable,
+		PlatformReleaseSourceObservationTable,
 		ReleaseSpecTable,
 		ScheduledPostTable,
 		ScreenshotCacheTable,
@@ -4727,6 +5795,18 @@ func init() {
 	ChannelConnectionTable.Annotation = &entsql.Annotation{
 		Table: "channel_connection",
 	}
+	PlatformClaimPathBindingTable.Annotation = &entsql.Annotation{
+		Table: "platform_claim_path_binding",
+	}
+	PlatformClaimSupportTable.Annotation = &entsql.Annotation{
+		Table: "platform_claim_support",
+	}
+	PlatformClaimSupportSetTable.Annotation = &entsql.Annotation{
+		Table: "platform_claim_support_set",
+	}
+	PlatformClaimVerificationTable.Annotation = &entsql.Annotation{
+		Table: "platform_claim_verification",
+	}
 	CommunicationAttemptTable.Annotation = &entsql.Annotation{
 		Table: "communication_attempt",
 	}
@@ -4785,6 +5865,15 @@ func init() {
 	EnrichmentRecordTable.Annotation = &entsql.Annotation{
 		Table: "enrichment_record",
 	}
+	PlatformEvidenceClearanceTable.Annotation = &entsql.Annotation{
+		Table: "platform_evidence_clearance",
+	}
+	PlatformEvidenceSourceTable.Annotation = &entsql.Annotation{
+		Table: "platform_evidence_source",
+	}
+	PlatformEvidenceVersionTable.Annotation = &entsql.Annotation{
+		Table: "platform_evidence_version",
+	}
 	FrontendActivationTable.Annotation = &entsql.Annotation{
 		Table: "frontend_activation",
 	}
@@ -4820,6 +5909,27 @@ func init() {
 	}
 	InvitationTable.Annotation = &entsql.Annotation{
 		Table: "invitation",
+	}
+	PlatformKitArtifactClaimTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_artifact_claim",
+	}
+	PlatformKitArtifactRevisionTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_artifact_revision",
+	}
+	PlatformKitExportTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_export",
+	}
+	PlatformKitMemberTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_member",
+	}
+	PlatformKitReviewDecisionTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_review_decision",
+	}
+	PlatformReleaseKitRevisionTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_kit_revision",
+	}
+	PlatformKitSourcePinTable.Annotation = &entsql.Annotation{
+		Table: "platform_kit_source_pin",
 	}
 	LaunchRunTable.Annotation = &entsql.Annotation{
 		Table: "launch_run",
@@ -4972,6 +6082,9 @@ func init() {
 	PublicationAttemptTable.Annotation = &entsql.Annotation{
 		Table: "publication_attempt",
 	}
+	PlatformReadinessCommandReceiptTable.Annotation = &entsql.Annotation{
+		Table: "platform_readiness_command_receipt",
+	}
 	ReleaseTable.Annotation = &entsql.Annotation{
 		Table: "release",
 	}
@@ -4990,11 +6103,50 @@ func init() {
 	ReleaseAutomationVersionTable.Annotation = &entsql.Annotation{
 		Table: "release_automation_version",
 	}
+	PlatformReleaseClaimTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_claim",
+	}
+	PlatformReleaseClaimVersionTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_claim_version",
+	}
 	ReleaseDocumentTable.Annotation = &entsql.Annotation{
 		Table: "release_document",
 	}
+	PlatformReleaseEvidenceTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_evidence",
+	}
+	PlatformReleaseKitTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_kit",
+	}
+	PlatformReleaseLineageTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_lineage",
+	}
+	PlatformReleaseLineageBindingTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_lineage_binding",
+	}
+	PlatformReleaseQualificationTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_qualification",
+	}
+	PlatformReleaseQualificationAssetTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_qualification_asset",
+	}
+	PlatformReleaseQualificationDecisionTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_qualification_decision",
+	}
+	PlatformReleaseQualificationSourceTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_qualification_source",
+	}
+	PlatformReleaseReadinessTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_readiness",
+	}
+	PlatformReleaseSourceBindingTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_source_binding",
+	}
 	ReleaseSourceEventTable.Annotation = &entsql.Annotation{
 		Table: "release_source_event",
+	}
+	PlatformReleaseSourceObservationTable.Annotation = &entsql.Annotation{
+		Table: "platform_release_source_observation",
 	}
 	ReleaseSpecTable.Annotation = &entsql.Annotation{
 		Table: "release_spec",
