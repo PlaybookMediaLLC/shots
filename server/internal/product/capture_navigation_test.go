@@ -123,7 +123,7 @@ func TestVisionVerificationClassifiesAllOutcomes(t *testing.T) {
 
 	t.Run("fails closed when AI unconfigured", func(t *testing.T) {
 		cfg := &Configuration{}
-		err := cfg.verifyCaptureWithVision(context.Background(), &captureClaim{
+		_, err := cfg.verifyCaptureWithVision(context.Background(), &captureClaim{
 			job:    &ent.CaptureJob{OrganizationID: "org-1"},
 			recipe: &ent.CaptureRecipe{Name: "Dashboard"},
 		}, browser.Recipe{VerifyWithVision: true}, pngBytes)
@@ -132,25 +132,28 @@ func TestVisionVerificationClassifiesAllOutcomes(t *testing.T) {
 		}
 	})
 
-	t.Run("verified succeeds and sanitizes NaN cost", func(t *testing.T) {
+	t.Run("verified succeeds, extracts sanitized AI focus, and sanitizes NaN cost", func(t *testing.T) {
 		var sawReq platformai.Request
 		model := fakeVisionModel{fn: func(_ context.Context, req platformai.Request, out any) (platformai.Usage, error) {
 			sawReq = req
-			_ = json.Unmarshal([]byte(`{"verified":true,"reason":"ok"}`), out)
+			_ = json.Unmarshal([]byte(`{"verified":true,"reason":"ok","focus":{"x":0.1,"y":0.2,"w":0.5,"h":0.4}}`), out)
 			return platformai.Usage{InputTokens: 100, OutputTokens: 20, CostUSD: math.NaN()}, nil
 		}}
-		usage, err := runVisionVerification(context.Background(), model, "Dashboard", "Added chart", pngBytes)
+		usage, focus, err := runVisionVerification(context.Background(), model, "Dashboard", "Added chart", pngBytes)
 		if err != nil || usage.CostUSD != 0 || len(sawReq.Images) != 1 || sawReq.MaxTokens != 1024 {
 			t.Fatalf("err=%v usage=%+v images=%d maxTokens=%d", err, usage, len(sawReq.Images), sawReq.MaxTokens)
+		}
+		if focus == nil || math.Abs(focus.X-0.1) > 1e-6 || math.Abs(focus.W-0.5) > 1e-6 {
+			t.Fatalf("expected AI focus box, got %+v", focus)
 		}
 	})
 
 	t.Run("rejected returns non-retryable CaptureUnverified", func(t *testing.T) {
 		model := fakeVisionModel{fn: func(_ context.Context, _ platformai.Request, out any) (platformai.Usage, error) {
-			_ = json.Unmarshal([]byte(`{"verified":false,"reason":"login screen"}`), out)
+			_ = json.Unmarshal([]byte(`{"verified":false,"reason":"login screen","focus":null}`), out)
 			return platformai.Usage{InputTokens: 50, OutputTokens: 10}, nil
 		}}
-		_, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
+		_, _, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
 		if browserCode(err) != browser.CaptureUnverified {
 			t.Fatalf("got %v, want %s", err, browser.CaptureUnverified)
 		}
@@ -165,7 +168,7 @@ func TestVisionVerificationClassifiesAllOutcomes(t *testing.T) {
 			t.Fatal("model should not be called for corrupt image")
 			return platformai.Usage{}, nil
 		}}
-		_, err := runVisionVerification(context.Background(), model, "Dashboard", "", []byte("bad"))
+		_, _, err := runVisionVerification(context.Background(), model, "Dashboard", "", []byte("bad"))
 		if browserCode(err) != browser.ImageInvalid {
 			t.Fatalf("got %v, want %s", err, browser.ImageInvalid)
 		}
@@ -179,7 +182,7 @@ func TestVisionVerificationClassifiesAllOutcomes(t *testing.T) {
 			model := fakeVisionModel{fn: func(context.Context, platformai.Request, any) (platformai.Usage, error) {
 				return platformai.Usage{}, modelErr
 			}}
-			_, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
+			_, _, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
 			if browserCode(err) != browser.NavigationInvalid {
 				t.Errorf("%s: got %v, want %s", name, err, browser.NavigationInvalid)
 			}
@@ -187,11 +190,82 @@ func TestVisionVerificationClassifiesAllOutcomes(t *testing.T) {
 		model := fakeVisionModel{fn: func(context.Context, platformai.Request, any) (platformai.Usage, error) {
 			return platformai.Usage{}, &platformai.Error{Status: 503, Retryable: true}
 		}}
-		_, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
+		_, _, err := runVisionVerification(context.Background(), model, "Dashboard", "", pngBytes)
 		if browserCode(err) != browser.NavigationUnavailable {
 			t.Fatalf("503: got %v, want %s", err, browser.NavigationUnavailable)
 		}
 	})
+}
+
+func TestSanitizeAIFocusAndBuildProposedRecipe(t *testing.T) {
+	if sanitizeAIFocus(nil) != nil {
+		t.Fatal("nil focus should stay nil")
+	}
+	if sanitizeAIFocus(&browser.Focus{X: 0, Y: 0, W: 0.99, H: 0.99}) != nil {
+		t.Fatal("full-viewport box should be dropped")
+	}
+	if sanitizeAIFocus(&browser.Focus{X: 0.1, Y: 0.1, W: 0.01, H: 0.01}) != nil {
+		t.Fatal("tiny box should be dropped")
+	}
+	if sanitizeAIFocus(&browser.Focus{X: math.NaN(), Y: 0.1, W: 0.4, H: 0.4}) != nil {
+		t.Fatal("NaN box should be dropped")
+	}
+	if sanitizeAIFocus(&browser.Focus{X: math.Inf(1), Y: 0.1, W: 0.4, H: 0.4}) != nil {
+		t.Fatal("Inf box should be dropped")
+	}
+	if clamped := sanitizeAIFocus(&browser.Focus{X: 0.6, Y: 0.2, W: 0.4005, H: 0.4}); clamped == nil || clamped.X+clamped.W > 1.0 {
+		t.Fatalf("expected clamped focus within 1.0, got %+v", clamped)
+	}
+	if got := sanitizeAIFocus(&browser.Focus{X: 0.2, Y: 0.15, W: 0.5, H: 0.4}); got == nil || got.W != 0.5 {
+		t.Fatalf("valid focus rejected: %+v", got)
+	}
+
+	// ViewportPNG must never serialize into navigationPrompt JSON text.
+	promptJSON, ok := navigationPrompt("Show chart", "", browser.NavigationObservation{
+		Path:        "/analytics",
+		Ready:       true,
+		ViewportPNG: []byte("SECRET_PNG_BYTES"),
+	})
+	if !ok || strings.Contains(promptJSON, "SECRET_PNG_BYTES") {
+		t.Fatalf("ViewportPNG leaked into prompt text: ok=%v", ok)
+	}
+
+	routes := []map[string]string{
+		{"path": "/dashboard", "label": "Dashboard"},
+		{"path": "/analytics/cohorts", "label": "Cohorts"},
+	}
+	proposed := buildProposedRecipe("Show the dark mode cohorts walkthrough on mobile", "/dashboard", routes, 0, nil)
+	if err := proposed.Definition.Validate(); err != nil {
+		t.Fatalf("proposed recipe invalid: %v", err)
+	}
+	if proposed.Definition.Steps[0].Path != "/analytics/cohorts" || proposed.Definition.ColorScheme != browser.ColorSchemeDark ||
+		proposed.Definition.Viewport.Width != 390 || proposed.Definition.SequenceShots != 3 ||
+		proposed.Definition.Navigation == nil || !proposed.Definition.Navigation.UseVision || !proposed.Definition.Navigation.AllowSearchFill ||
+		!proposed.Definition.VerifyWithVision || proposed.Definition.Markers[0] != browser.DefaultZeroConfigMarker {
+		t.Fatalf("unexpected deterministic proposal: %+v", proposed.Definition)
+	}
+	// Model reply overrides safely and drops hostile paths or invalid enums.
+	fromModel := buildProposedRecipe("Show billing", "/dashboard", routes, 0, &proposedRecipeReply{
+		Name:          "  Invoice   table  ",
+		Path:          "https://evil.example/phish",
+		Objective:     "Open billing invoices",
+		ColorScheme:   "neon",
+		MaskStyle:     "invisible",
+		Mobile:        false,
+		SequenceShots: 2,
+		Reasoning:     "Checked routes.",
+	})
+	if err := fromModel.Definition.Validate(); err != nil {
+		t.Fatalf("model proposal invalid: %v", err)
+	}
+	if fromModel.Name != "Invoice table" || fromModel.Definition.Steps[0].Path != "/dashboard" || fromModel.Definition.ColorScheme != "" || fromModel.Definition.MaskStyle != browser.MaskStyleBlur || fromModel.Definition.SequenceShots != 2 {
+		t.Fatalf("unexpected sanitized model proposal: %+v", fromModel)
+	}
+	// Explicit requestedShots overrides inference.
+	override := buildProposedRecipe("Show billing", "/billing", nil, 4, nil)
+	if override.Definition.SequenceShots != 4 || override.Definition.Viewport.Width != 1440 {
+		t.Fatalf("expected 4 desktop shots, got %+v", override.Definition)
+	}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

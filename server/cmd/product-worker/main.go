@@ -184,7 +184,11 @@ func main() {
 	}
 	captureProvider := browser.FromEnvironment()
 	if captureKeys != nil && captureProvider != nil {
-		automationStore.WithAuthenticatedCapture(browser.Runner{Provider: captureProvider}, captureKeys)
+		var runner product.CaptureRunner = browser.Runner{Provider: captureProvider}
+		if agentRunner := browser.AgentRunnerFromEnvironment(captureProvider); agentRunner != nil {
+			runner = agentRunner
+		}
+		automationStore.WithAuthenticatedCapture(runner, captureKeys)
 	}
 	if github != nil {
 		// render_code_visual reads a merged pull request's diff only where its owner allowed it.

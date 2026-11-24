@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
@@ -240,6 +241,24 @@ func (_u *CaptureJobUpdate) ClearAssetID() *CaptureJobUpdate {
 	return _u
 }
 
+// SetSequenceAssetIds sets the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdate) SetSequenceAssetIds(v []string) *CaptureJobUpdate {
+	_u.mutation.SetSequenceAssetIds(v)
+	return _u
+}
+
+// AppendSequenceAssetIds appends value to the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdate) AppendSequenceAssetIds(v []string) *CaptureJobUpdate {
+	_u.mutation.AppendSequenceAssetIds(v)
+	return _u
+}
+
+// ClearSequenceAssetIds clears the value of the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdate) ClearSequenceAssetIds() *CaptureJobUpdate {
+	_u.mutation.ClearSequenceAssetIds()
+	return _u
+}
+
 // SetResumeCount sets the "resume_count" field.
 func (_u *CaptureJobUpdate) SetResumeCount(v int) *CaptureJobUpdate {
 	_u.mutation.ResetResumeCount()
@@ -418,6 +437,17 @@ func (_u *CaptureJobUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.AssetIDCleared() {
 		_spec.ClearField(capturejob.FieldAssetID, field.TypeString)
+	}
+	if value, ok := _u.mutation.SequenceAssetIds(); ok {
+		_spec.SetField(capturejob.FieldSequenceAssetIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSequenceAssetIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, capturejob.FieldSequenceAssetIds, value)
+		})
+	}
+	if _u.mutation.SequenceAssetIdsCleared() {
+		_spec.ClearField(capturejob.FieldSequenceAssetIds, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ResumeCount(); ok {
 		_spec.SetField(capturejob.FieldResumeCount, field.TypeInt, value)
@@ -660,6 +690,24 @@ func (_u *CaptureJobUpdateOne) ClearAssetID() *CaptureJobUpdateOne {
 	return _u
 }
 
+// SetSequenceAssetIds sets the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdateOne) SetSequenceAssetIds(v []string) *CaptureJobUpdateOne {
+	_u.mutation.SetSequenceAssetIds(v)
+	return _u
+}
+
+// AppendSequenceAssetIds appends value to the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdateOne) AppendSequenceAssetIds(v []string) *CaptureJobUpdateOne {
+	_u.mutation.AppendSequenceAssetIds(v)
+	return _u
+}
+
+// ClearSequenceAssetIds clears the value of the "sequence_asset_ids" field.
+func (_u *CaptureJobUpdateOne) ClearSequenceAssetIds() *CaptureJobUpdateOne {
+	_u.mutation.ClearSequenceAssetIds()
+	return _u
+}
+
 // SetResumeCount sets the "resume_count" field.
 func (_u *CaptureJobUpdateOne) SetResumeCount(v int) *CaptureJobUpdateOne {
 	_u.mutation.ResetResumeCount()
@@ -868,6 +916,17 @@ func (_u *CaptureJobUpdateOne) sqlSave(ctx context.Context) (_node *CaptureJob, 
 	}
 	if _u.mutation.AssetIDCleared() {
 		_spec.ClearField(capturejob.FieldAssetID, field.TypeString)
+	}
+	if value, ok := _u.mutation.SequenceAssetIds(); ok {
+		_spec.SetField(capturejob.FieldSequenceAssetIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSequenceAssetIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, capturejob.FieldSequenceAssetIds, value)
+		})
+	}
+	if _u.mutation.SequenceAssetIdsCleared() {
+		_spec.ClearField(capturejob.FieldSequenceAssetIds, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ResumeCount(); ok {
 		_spec.SetField(capturejob.FieldResumeCount, field.TypeInt, value)

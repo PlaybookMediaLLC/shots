@@ -1154,7 +1154,7 @@ func TestCaptureFencingRefusesAnOlderAttemptWhileANewerOneRuns(t *testing.T) {
 	if row.LeaseJobID == nil || row.LeaseToken != newer.token {
 		t.Fatalf("the older attempt touched the newer lease: %+v", row)
 	}
-	if outcome, err := w.repo.commitCapture(w.ctx, newer, nil, *attempts[0].AssetID, attempts[0].ObservedRevision, false); err != nil || !outcome.Done {
+	if outcome, err := w.repo.commitCapture(w.ctx, newer, nil, *attempts[0].AssetID, nil, attempts[0].ObservedRevision, false); err != nil || !outcome.Done {
 		t.Fatalf("newer commit: %+v %v", outcome, err)
 	}
 	if w.job(t, job.ID).Phase != "SUCCEEDED" {

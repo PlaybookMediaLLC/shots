@@ -24,9 +24,14 @@ const (
 	MaxHeight           = 1080
 	MaxStepTimeoutMs    = 30_000
 	MaxNavigationSteps  = 6
+	MaxSequenceShots    = 4
 	maxPathLength       = 256
 	maxSelectorLength   = 200
 )
+
+// DefaultZeroConfigMarker matches standard app content containers so zero-config
+// AI recipes do not require the user to enter any CSS selector manually.
+const DefaultZeroConfigMarker = "main, [role=main], body"
 
 // Step kinds. There is no way to run a script, type, or submit. Fixed steps
 // click only tabs; AI navigation may also press buttons that open menus,
@@ -118,13 +123,18 @@ type Recipe struct {
 	Navigation *Navigation `json:"navigation,omitempty"`
 	// Crop is empty for the whole viewport, or CropMarker.
 	Crop string `json:"crop,omitempty"`
+	// SequenceShots captures up to 4 frames (before -> interaction -> result)
+	// during AI navigation when > 1; 0 or 1 captures a single final screenshot.
+	SequenceShots int `json:"sequenceShots,omitempty"`
 }
 
 // Navigation is an explicit, bounded feature objective for this recipe.
 type Navigation struct {
-	Objective   string `json:"objective"`
-	MaxSteps    int    `json:"maxSteps"`
-	CreditLimit int    `json:"creditLimit"`
+	Objective       string `json:"objective"`
+	MaxSteps        int    `json:"maxSteps"`
+	CreditLimit     int    `json:"creditLimit"`
+	UseVision       bool   `json:"useVision,omitempty"`
+	AllowSearchFill bool   `json:"allowSearchFill,omitempty"`
 }
 
 var (
@@ -164,6 +174,9 @@ func (r Recipe) Validate() error {
 	}
 	if r.Crop != "" && r.Crop != CropMarker {
 		return errors.New("Crop to the first marker, or capture the whole viewport.")
+	}
+	if r.SequenceShots < 0 || r.SequenceShots > MaxSequenceShots {
+		return errors.New("Sequence shots must be between 1 and 4.")
 	}
 	if r.ColorScheme != "" && r.ColorScheme != ColorSchemeLight && r.ColorScheme != ColorSchemeDark {
 		return errors.New("Color scheme must be light or dark.")

@@ -140,6 +140,7 @@ func (CaptureJob) Fields() []ent.Field {
 		field.String("requested_by_user_id").StorageKey("requestedByUserId").Optional().Nillable().Immutable(),
 		field.String("surface_capture_id").StorageKey("surfaceCaptureId").Optional().Nillable(),
 		field.String("asset_id").StorageKey("assetId").Optional().Nillable(),
+		field.JSON("sequence_asset_ids", []string{}).StorageKey("sequenceAssetIds").Optional(),
 		field.Int("resume_count").StorageKey("resumeCount").Default(0),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),

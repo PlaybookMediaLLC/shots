@@ -1589,6 +1589,16 @@ func AssetIDContainsFold(v string) predicate.CaptureJob {
 	return predicate.CaptureJob(sql.FieldContainsFold(FieldAssetID, v))
 }
 
+// SequenceAssetIdsIsNil applies the IsNil predicate on the "sequence_asset_ids" field.
+func SequenceAssetIdsIsNil() predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldIsNull(FieldSequenceAssetIds))
+}
+
+// SequenceAssetIdsNotNil applies the NotNil predicate on the "sequence_asset_ids" field.
+func SequenceAssetIdsNotNil() predicate.CaptureJob {
+	return predicate.CaptureJob(sql.FieldNotNull(FieldSequenceAssetIds))
+}
+
 // ResumeCountEQ applies the EQ predicate on the "resume_count" field.
 func ResumeCountEQ(v int) predicate.CaptureJob {
 	return predicate.CaptureJob(sql.FieldEQ(FieldResumeCount, v))

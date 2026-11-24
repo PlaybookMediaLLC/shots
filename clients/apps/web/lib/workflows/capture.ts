@@ -120,6 +120,9 @@ export function captureConnectionInput(form: CaptureConnectionForm) {
   }
 }
 
+/** Fallback marker when the user omits a custom CSS selector for a zero-config AI capture. */
+export const DEFAULT_ZERO_CONFIG_MARKER = 'main, [role=main], body'
+
 /** A recipe form's text, before it is parsed. */
 export type CaptureRecipeForm = {
   name: string
@@ -140,6 +143,12 @@ export type CaptureRecipeForm = {
   objective: string
   navigationSteps: string
   navigationCredits: string
+  /** Attach Set-of-Mark annotated screenshots during AI navigation. */
+  useVision?: boolean
+  /** Allow read-only typing into safe search and filter inputs during AI navigation. */
+  allowSearchFill?: boolean
+  /** Number of ordered frames to capture (1 to 4). */
+  sequenceShots?: string
   /** Capture at twice the pixel density. */
   sharp?: boolean
   /** Make the image the proving element and a small margin around it. */
@@ -160,10 +169,13 @@ export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput 
   const versionPath = form.versionPath.trim()
   const versionSelector = (form.versionSelector ?? '').trim()
   const objective = form.objective.trim()
+  const marker = form.marker.trim() || DEFAULT_ZERO_CONFIG_MARKER
+  const sequenceShotsText = (form.sequenceShots ?? '').trim()
+  const parsedShots = sequenceShotsText ? Number(sequenceShotsText) : undefined
   return {
     connectionId: form.connectionId,
     definition: {
-      markers: [form.marker.trim()],
+      markers: [marker],
       schemaVersion: 1,
       steps: [{ kind: 'NAVIGATE', path: form.path.trim() }],
       viewport: {
@@ -175,6 +187,9 @@ export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput 
       ...(form.colorScheme ? { colorScheme: form.colorScheme } : {}),
       ...(form.maskStyle === 'blur' ? { maskStyle: 'blur' as const } : {}),
       ...(form.verifyWithVision ? { verifyWithVision: true } : {}),
+      ...(objective && parsedShots !== undefined && parsedShots !== 1
+        ? { sequenceShots: parsedShots }
+        : {}),
       ...(masks.length ? { masks } : {}),
       ...(optionalMasks.length ? { optionalMasks } : {}),
       ...(forbidden.length ? { forbidden } : {}),
@@ -190,6 +205,8 @@ export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput 
               objective,
               maxSteps: Number(form.navigationSteps),
               creditLimit: Number(form.navigationCredits),
+              ...(form.useVision ? { useVision: true } : {}),
+              ...(form.allowSearchFill ? { allowSearchFill: true } : {}),
             },
           }
         : {}),
@@ -203,6 +220,7 @@ const NAVIGATION_STEP: Record<string, string> = {
   link: 'opened',
   tab: 'selected a tab on',
   button: 'pressed a button on',
+  fill: 'filtered on',
   scroll: 'scrolled on',
   frame: 'framed the result on',
 }
@@ -213,4 +231,10 @@ export function captureNavigationSummary(job: Pick<CaptureJob, 'navigationAction
   return `AI ${job.navigationActions
     .map((step) => `${NAVIGATION_STEP[step.kind] ?? step.kind} ${step.path}`)
     .join(', then ')}.`
+}
+
+/** Ordered asset IDs for a capture job (multi-shot sequence when present, else primary asset). */
+export function captureJobFrames(job: Pick<CaptureJob, 'assetId' | 'sequenceAssetIds'>): string[] {
+  if (job.sequenceAssetIds && job.sequenceAssetIds.length > 1) return job.sequenceAssetIds
+  return job.assetId ? [job.assetId] : []
 }

@@ -529,11 +529,19 @@ func (s *scope) applyMasks(ctx context.Context, masks []string, style string, re
 // RunInput is one attempt at one recipe. ExpectedRevision is empty only for a
 // capture explicitly labeled as the current state.
 type RunInput struct {
-	Target           Target
-	Recipe           Recipe
-	State            *State
-	ExpectedRevision string
-	NextNavigation   NextNavigationAction
+	Target             Target
+	Recipe             Recipe
+	State              *State
+	ExpectedRevision   string
+	NextNavigation     NextNavigationAction
+	ReserveExternalRun func(context.Context) error
+}
+
+// SequenceShot is one intermediate masked frame captured during a multi-shot AI
+// navigation flow (e.g. before click -> menu open -> final state).
+type SequenceShot struct {
+	Image         []byte
+	Width, Height int
 }
 
 // RunResult is a verified image and, when the app rotated tokens, new state.
@@ -547,6 +555,8 @@ type RunResult struct {
 	NavigationActions []NavigationAction
 	// Focus is where the first marker sat in the captured viewport, as fractions.
 	Focus *Focus
+	// Sequence holds optional intermediate frames when Recipe.SequenceShots > 1.
+	Sequence []SequenceShot
 }
 
 // Focus is a box in fractions of the viewport, from its top left corner.
@@ -624,7 +634,7 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 				return nil, err
 			}
 		}
-		if result.NavigationActions, err = s.navigateFeature(ctx, input); err != nil {
+		if result.NavigationActions, result.Sequence, err = s.navigateFeature(ctx, input); err != nil {
 			return nil, err
 		}
 		if err := s.checkIdentity(ctx, input.Target, requested); err != nil {
@@ -687,6 +697,8 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 		}
 		request.Clip, width, height = clip, clip.Width, clip.Height
 	}
+	// Belt-and-suspenders: strip any transient navigation overlays before final capture.
+	_, _ = s.page.Context(ctx).Eval(`() => document.querySelectorAll('[data-shots-som],[data-shots-seq-mask]').forEach(n => n.remove())`)
 	shot, err := s.page.Context(ctx).Screenshot(false, request)
 	if err != nil {
 		return nil, &Failure{Code: PageFailed}

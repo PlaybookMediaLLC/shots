@@ -22,6 +22,8 @@ type captureStore interface {
 	BootstrapCaptureConnection(context.Context, product.Actor, string) (*product.CaptureConnectionRecord, error)
 	RevokeCaptureConnection(context.Context, product.Actor, string) error
 	CreateCaptureRecipe(context.Context, product.Actor, product.CreateCaptureRecipeInput) (*product.CaptureRecipeRecord, error)
+	ProposeCaptureRecipe(context.Context, product.Actor, product.ProposeCaptureRecipeInput) (*product.ProposedCaptureRecipe, error)
+	AutoCaptureFromPrompt(context.Context, product.Actor, product.ProposeCaptureRecipeInput) (*product.AutoCaptureResult, error)
 	ListCaptureRecipes(context.Context, product.Actor) ([]product.CaptureRecipeRecord, error)
 	ActivateCaptureRecipe(context.Context, product.Actor, string) (*product.CaptureRecipeRecord, error)
 	ArchiveCaptureRecipe(context.Context, product.Actor, string) error
@@ -47,6 +49,8 @@ func (s *Server) registerCapture(mux *http.ServeMux) {
 	authenticated("POST /v1/capture/connections/{id}/bootstrap", bootstrapCaptureConnection)
 	authenticated("POST /v1/capture/connections/{id}/revoke", revokeCaptureConnection)
 	authenticated("POST /v1/capture/recipes", createCaptureRecipe)
+	authenticated("POST /v1/capture/recipes/propose", proposeCaptureRecipe)
+	authenticated("POST /v1/capture/auto", autoCaptureFromPrompt)
 	authenticated("POST /v1/capture/recipes/{id}/activate", activateCaptureRecipe)
 	authenticated("POST /v1/capture/recipes/{id}/archive", archiveCaptureRecipe)
 	authenticated("POST /v1/capture/recipes/{id}/jobs", requestCaptureJob)
@@ -179,6 +183,34 @@ func createCaptureRecipe(w http.ResponseWriter, r *http.Request, store captureSt
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"recipe": recipe})
+}
+
+func proposeCaptureRecipe(w http.ResponseWriter, r *http.Request, store captureStore) {
+	var input product.ProposeCaptureRecipeInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	proposal, err := store.ProposeCaptureRecipe(r.Context(), workspaceActor(r), input)
+	if err != nil {
+		writeCaptureError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"proposal": proposal})
+}
+
+func autoCaptureFromPrompt(w http.ResponseWriter, r *http.Request, store captureStore) {
+	var input product.ProposeCaptureRecipeInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := store.AutoCaptureFromPrompt(r.Context(), workspaceActor(r), input)
+	if err != nil {
+		writeCaptureError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, result)
 }
 
 func activateCaptureRecipe(w http.ResponseWriter, r *http.Request, store captureStore) {

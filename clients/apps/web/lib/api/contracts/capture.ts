@@ -97,6 +97,8 @@ export const captureRecipeDefinitionSchema = z.object({
   colorScheme: z.enum(['light', 'dark']).optional(),
   /** Verify the captured screenshot visually before committing it to campaigns. */
   verifyWithVision: z.boolean().optional(),
+  /** Capture 1 to 4 ordered frames (before -> interaction -> final) for walkthrough carousels. */
+  sequenceShots: z.number().int().min(1).max(4).optional(),
   version: z
     .object({ path: pathSchema.optional(), selector: selectorSchema.optional() })
     .optional(),
@@ -108,6 +110,10 @@ export const captureRecipeDefinitionSchema = z.object({
       objective: z.string().trim().min(1).max(1000),
       maxSteps: z.number().int().min(1).max(6),
       creditLimit: z.number().int().min(1).max(20),
+      /** Attach Set-of-Mark annotated viewport screenshots so AI sees controls visually. */
+      useVision: z.boolean().optional(),
+      /** Allow read-only typing into safe search and filter inputs. */
+      allowSearchFill: z.boolean().optional(),
     })
     .optional(),
 })
@@ -165,6 +171,29 @@ export const captureJobSchema = z.object({
   navigationActions: z.array(z.object({ kind: z.string(), path: z.string() })).optional(),
   /** Normalized bounding box (0-1 fractions) of the captured marker element. */
   focusBox: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(),
+  /** Ordered asset IDs for multi-shot sequence captures (before -> interaction -> final). */
+  sequenceAssetIds: z.array(idSchema).optional(),
+})
+
+/** Plain-English input for zero-config AI recipe authoring or 1-click auto-capture. */
+export const proposeCaptureRecipeInputSchema = z.object({
+  connectionId: idSchema,
+  surfaceId: idSchema,
+  prompt: z.string().trim().min(1, 'Describe what you want captured.').max(600),
+  sequenceShots: z.number().int().min(1).max(4).optional(),
+})
+
+/** A validated, ready-to-save AI capture recipe proposed from a plain-English prompt. */
+export const proposedCaptureRecipeSchema = z.object({
+  name: z.string().min(1).max(160),
+  definition: captureRecipeDefinitionSchema,
+  reasoning: z.string(),
+})
+
+/** Result of 1-click zero-config AI capture: the created recipe and queued job. */
+export const autoCaptureResultSchema = z.object({
+  recipe: captureRecipeSchema,
+  job: captureJobSchema,
 })
 
 /** Everything a member may read about this workspace's authenticated capture. */
@@ -194,3 +223,9 @@ export type CaptureRecipeInput = z.infer<typeof captureRecipeInputSchema>
 export type CaptureJob = z.infer<typeof captureJobSchema>
 /** The workspace's connections, recipes and recent jobs. */
 export type CaptureOverview = z.infer<typeof captureOverviewSchema>
+/** Plain-English input for zero-config AI capture authoring or 1-click auto-capture. */
+export type ProposeCaptureRecipeInput = z.infer<typeof proposeCaptureRecipeInputSchema>
+/** A validated, ready-to-save AI capture recipe proposed from a plain-English prompt. */
+export type ProposedCaptureRecipe = z.infer<typeof proposedCaptureRecipeSchema>
+/** Result of 1-click zero-config AI capture: the created recipe and queued job. */
+export type AutoCaptureResult = z.infer<typeof autoCaptureResultSchema>

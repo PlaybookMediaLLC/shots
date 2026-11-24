@@ -150,6 +150,7 @@ import type {
 } from './release-automation.js'
 export type * from './release-automation.js'
 import type {
+  AutoCaptureResult,
   CaptureConnection,
   CaptureConnectionInput,
   CaptureConnectStart,
@@ -157,6 +158,8 @@ import type {
   CaptureOverview,
   CaptureRecipe,
   CaptureRecipeInput,
+  ProposeCaptureRecipeInput,
+  ProposedCaptureRecipe,
 } from './capture.js'
 export type * from './capture.js'
 import type {
@@ -5468,6 +5471,22 @@ export class ScreenshotStudioBackendSDK {
 
   async createCaptureRecipe(input: CaptureRecipeInput) {
     return this.request<{ recipe: CaptureRecipe }>('v1/capture/recipes', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Proposes a zero-config AI capture recipe from a single plain-English prompt. */
+  async proposeCaptureRecipe(input: ProposeCaptureRecipeInput) {
+    return this.request<{ proposal: ProposedCaptureRecipe }>('v1/capture/recipes/propose', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Proposes, saves, and immediately queues a zero-config AI capture from plain English. */
+  async autoCaptureFromPrompt(input: ProposeCaptureRecipeInput) {
+    return this.request<AutoCaptureResult>('v1/capture/auto', {
       body: input,
       method: 'POST',
     })

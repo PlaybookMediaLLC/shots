@@ -818,6 +818,7 @@ var (
 		{Name: "requestedByUserId", Type: field.TypeString, Nullable: true},
 		{Name: "surfaceCaptureId", Type: field.TypeString, Nullable: true},
 		{Name: "assetId", Type: field.TypeString, Nullable: true},
+		{Name: "sequenceAssetIds", Type: field.TypeJSON, Nullable: true},
 		{Name: "resumeCount", Type: field.TypeInt, Default: 0},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -836,7 +837,7 @@ var (
 			{
 				Name:    "capturejob_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[26]},
+				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[27]},
 			},
 		},
 	}

@@ -3,10 +3,13 @@ package browser
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
-	_ "image/png"
+	"image/png"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -1181,5 +1184,176 @@ func TestStateMergePreviousAndBootstrapFilter(t *testing.T) {
 		if _, err := FilterBootstrapState(raw, target); !errors.As(err, &failure) || failure.Code != SessionRestoreFailed {
 			t.Errorf("%s: got %v, want %s", name, err, SessionRestoreFailed)
 		}
+	}
+}
+
+type browserRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f browserRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestPhase3RecipeValidationSearchValueAndAgentRunner(t *testing.T) {
+	r := validRecipe()
+	r.SequenceShots = MaxSequenceShots
+	r.Navigation = &Navigation{Objective: "Find cohorts", MaxSteps: 3, CreditLimit: 5, UseVision: true, AllowSearchFill: true}
+	if err := r.Validate(); err != nil {
+		t.Fatalf("valid phase3 recipe failed: %v", err)
+	}
+	r.SequenceShots = MaxSequenceShots + 1
+	if err := r.Validate(); err == nil {
+		t.Fatal("expected error for sequenceShots > MaxSequenceShots")
+	}
+	r.SequenceShots = -1
+	if err := r.Validate(); err == nil {
+		t.Fatal("expected error for negative sequenceShots")
+	}
+
+	// validSearchValue blocks empty, oversized, control chars, emails, and URLs.
+	for _, good := range []string{"cohorts", "Q4 revenue", "invoice-2026"} {
+		if _, ok := validSearchValue(good); !ok {
+			t.Errorf("validSearchValue(%q) = false, want true", good)
+		}
+	}
+	for _, bad := range []string{"", "   ", "alice@example.com", "https://evil.example", "http://127.0.0.1", "line1\nline2", strings.Repeat("x", 81)} {
+		if _, ok := validSearchValue(bad); ok {
+			t.Errorf("validSearchValue(%q) = true, want false", bad)
+		}
+	}
+
+	// AgentRunnerFromEnvironment enforces HTTPS + token for non-loopback hosts.
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "http://agent.example.com")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "tok")
+	if AgentRunnerFromEnvironment(nil) != nil {
+		t.Fatal("non-loopback http:// agent URL should be rejected")
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "https://agent.example.com")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "")
+	if AgentRunnerFromEnvironment(nil) != nil {
+		t.Fatal("non-loopback https:// without token should be rejected")
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "tok")
+	if got := AgentRunnerFromEnvironment(nil); got == nil || got.AgentURL != "https://agent.example.com" {
+		t.Fatalf("expected valid https agent runner, got %+v", got)
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "http://127.0.0.1:9000/")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "")
+	if got := AgentRunnerFromEnvironment(nil); got == nil || got.AgentURL != "http://127.0.0.1:9000" {
+		t.Fatalf("expected valid loopback agent runner, got %+v", got)
+	}
+
+	// AgentRunner validates external PNGs + dimensions + actions + sequence + focus.
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 800, 600))); err != nil {
+		t.Fatal(err)
+	}
+	b64PNG := base64.StdEncoding.EncodeToString(pngBuf.Bytes())
+
+	var sawAuth string
+	var sawAccount string
+	agentClient := &http.Client{Transport: browserRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		sawAuth = req.Header.Get("Authorization")
+		var sent externalAgentRequest
+		_ = json.NewDecoder(req.Body).Decode(&sent)
+		sawAccount = sent.ExpectedAccount
+		body, _ := json.Marshal(externalAgentResponse{
+			ImageBase64:      b64PNG,
+			SourcePath:       "/analytics",
+			ObservedRevision: "abc123",
+			Focus:            &Focus{X: 0.1, Y: 0.2, W: 0.5, H: 0.4},
+			Sequence:         []externalAgentSequence{{ImageBase64: b64PNG}, {ImageBase64: "bad"}, {ImageBase64: b64PNG}, {ImageBase64: b64PNG}},
+			NavigationActions: []NavigationAction{
+				{Kind: "fill", Path: "/analytics"},
+				{Kind: "evil", Path: "/analytics"},
+				{Kind: "link", Path: "https://evil.example/steal"},
+			},
+		})
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(body)), Header: http.Header{}}, nil
+	})}
+	navRecipe := validRecipe()
+	navRecipe.SequenceShots = 3
+	navRecipe.Version = &VersionCheck{Path: "/api/version"}
+	navRecipe.Navigation = &Navigation{Objective: "Show analytics", MaxSteps: 3, CreditLimit: 5, UseVision: true}
+	target := Target{Origin: "https://app.example.com", Hosts: []string{"app.example.com"}, ProtectedPath: "/dashboard", ExpectedAccount: "demo@example.com"}
+	runner := &AgentRunner{AgentURL: "https://agent.internal", AgentToken: "secret-tok", HTTP: agentClient}
+	reserved := false
+	res, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:             target,
+		Recipe:             navRecipe,
+		ExpectedRevision:   "abc123",
+		ReserveExternalRun: func(context.Context) error { reserved = true; return nil },
+	})
+	if err != nil {
+		t.Fatalf("AgentRunner valid response failed: %v", err)
+	}
+	if !reserved || sawAuth != "Bearer secret-tok" || sawAccount != "demo@example.com" || res.SourcePath != "/analytics" || res.Focus == nil || len(res.Sequence) != 2 || len(res.NavigationActions) != 1 {
+		t.Fatalf("unexpected AgentRunner result: reserved=%v auth=%q acct=%q res=%+v", reserved, sawAuth, sawAccount, res)
+	}
+
+	// Mismatched ExpectedRevision returns WaitingForDeployment; missing Version returns DeploymentUnverified.
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:           target,
+		Recipe:           navRecipe,
+		ExpectedRevision: "different-sha",
+	}); err == nil {
+		t.Fatal("expected WaitingForDeployment on mismatched revision")
+	} else {
+		failed(t, err, WaitingForDeployment)
+	}
+	noVerRecipe := navRecipe
+	noVerRecipe.Version = nil
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:           target,
+		Recipe:           noVerRecipe,
+		ExpectedRevision: "abc123",
+	}); err == nil {
+		t.Fatal("expected DeploymentUnverified when ExpectedRevision has no Recipe.Version")
+	} else {
+		failed(t, err, DeploymentUnverified)
+	}
+
+	// ReserveExternalRun failure blocks external sidecar call.
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:             target,
+		Recipe:             navRecipe,
+		ReserveExternalRun: func(context.Context) error { return &Failure{Code: NavigationBudget} },
+	}); err == nil {
+		t.Fatal("expected NavigationBudget from ReserveExternalRun")
+	} else {
+		failed(t, err, NavigationBudget)
+	}
+
+	// Cancelled parent context returns ProviderUnavailable instead of falling back.
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := runner.Run(canceledCtx, "sess-1", RunInput{Target: target, Recipe: navRecipe}); err == nil {
+		t.Fatal("expected ProviderUnavailable on canceled ctx")
+	} else {
+		failed(t, err, ProviderUnavailable)
+	}
+
+	// Wrong-dimension PNG from agent must be rejected with ImageInvalid.
+	var smallBuf bytes.Buffer
+	_ = png.Encode(&smallBuf, image.NewRGBA(image.Rect(0, 0, 120, 80)))
+	smallBody, _ := json.Marshal(externalAgentResponse{ImageBase64: base64.StdEncoding.EncodeToString(smallBuf.Bytes())})
+	wrongDimRunner := &AgentRunner{AgentURL: "https://agent.internal", HTTP: &http.Client{Transport: browserRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(smallBody)), Header: http.Header{}}, nil
+	})}}
+	if _, err := wrongDimRunner.Run(context.Background(), "sess-1", RunInput{Target: target, Recipe: navRecipe}); err == nil {
+		t.Fatal("expected ImageInvalid for wrong viewport dimensions")
+	} else {
+		failed(t, err, ImageInvalid)
+	}
+
+	// Invalid PNG bytes from agent must be rejected with ImageInvalid (never passed through).
+	badClient := &http.Client{Transport: browserRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"imageBase64":"bm90LWEtcG5n"}`)), Header: http.Header{}}, nil
+	})}
+	badRunner := &AgentRunner{AgentURL: "https://agent.internal", HTTP: badClient}
+	if _, err := badRunner.Run(context.Background(), "sess-1", RunInput{
+		Target: target,
+		Recipe: navRecipe,
+	}); err == nil {
+		t.Fatal("expected AgentRunner to reject invalid image bytes")
+	} else {
+		failed(t, err, ImageInvalid)
 	}
 }

@@ -496,15 +496,15 @@ func init() {
 	// capturejob.DefaultFencingToken holds the default value on creation for the fencing_token field.
 	capturejob.DefaultFencingToken = capturejobDescFencingToken.Default.(int64)
 	// capturejobDescResumeCount is the schema descriptor for resume_count field.
-	capturejobDescResumeCount := capturejobFields[25].Descriptor()
+	capturejobDescResumeCount := capturejobFields[26].Descriptor()
 	// capturejob.DefaultResumeCount holds the default value on creation for the resume_count field.
 	capturejob.DefaultResumeCount = capturejobDescResumeCount.Default.(int)
 	// capturejobDescCreatedAt is the schema descriptor for created_at field.
-	capturejobDescCreatedAt := capturejobFields[26].Descriptor()
+	capturejobDescCreatedAt := capturejobFields[27].Descriptor()
 	// capturejob.DefaultCreatedAt holds the default value on creation for the created_at field.
 	capturejob.DefaultCreatedAt = capturejobDescCreatedAt.Default.(func() time.Time)
 	// capturejobDescUpdatedAt is the schema descriptor for updated_at field.
-	capturejobDescUpdatedAt := capturejobFields[27].Descriptor()
+	capturejobDescUpdatedAt := capturejobFields[28].Descriptor()
 	// capturejob.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	capturejob.DefaultUpdatedAt = capturejobDescUpdatedAt.Default.(func() time.Time)
 	// capturejob.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

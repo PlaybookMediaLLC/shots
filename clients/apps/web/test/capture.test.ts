@@ -5,16 +5,21 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { ScreenshotStudioBackendSDK } from '../../../packages/screenshot-studio-backend-sdk/src'
 import { SignInPanel } from '@/components/workflows/CaptureSignInPanel'
 import {
+  autoCaptureResultSchema,
   captureConnectionInputSchema,
   captureConnectStartSchema,
   captureOverviewSchema,
   captureRecipeInputSchema,
+  proposeCaptureRecipeInputSchema,
+  proposedCaptureRecipeSchema,
   type CaptureOverview,
 } from '@/lib/api/contracts/capture'
 import {
+  DEFAULT_ZERO_CONFIG_MARKER,
   activeRecipeForSurface,
   captureConnectionInput,
   captureInProgress,
+  captureJobFrames,
   captureNavigationSummary,
   captureRecipeInput,
   latestCaptureTest,
@@ -333,6 +338,17 @@ test('the SDK calls each capture route in the workspace scope', async () => {
   await sdk.finishCaptureConnect('c1', 'intent')
   await sdk.bootstrapCaptureConnection('c/1')
   await sdk.revokeCaptureConnection('c1')
+  await sdk.proposeCaptureRecipe({
+    connectionId: 'c1',
+    surfaceId: 's1',
+    prompt: 'Show cohorts',
+  })
+  await sdk.autoCaptureFromPrompt({
+    connectionId: 'c1',
+    surfaceId: 's1',
+    prompt: 'Show cohorts',
+    sequenceShots: 3,
+  })
   await sdk.activateCaptureRecipe('r1')
   await sdk.archiveCaptureRecipe('r1')
   await sdk.requestCaptureJob('r1', { test: true })
@@ -345,6 +361,8 @@ test('the SDK calls each capture route in the workspace scope', async () => {
     'POST /v1/capture/connections/c1/connect/finish {"intentId":"intent"}',
     'POST /v1/capture/connections/c%2F1/bootstrap',
     'POST /v1/capture/connections/c1/revoke',
+    'POST /v1/capture/recipes/propose {"connectionId":"c1","surfaceId":"s1","prompt":"Show cohorts"}',
+    'POST /v1/capture/auto {"connectionId":"c1","surfaceId":"s1","prompt":"Show cohorts","sequenceShots":3}',
     'POST /v1/capture/recipes/r1/activate',
     'POST /v1/capture/recipes/r1/archive',
     'POST /v1/capture/recipes/r1/jobs {"test":true}',
@@ -376,10 +394,72 @@ test('capture connection form encodes optional bootstrap fields and scroll navig
     captureNavigationSummary({
       navigationActions: [
         { kind: 'link', path: '/analytics' },
+        { kind: 'fill', path: '/analytics' },
         { kind: 'scroll', path: '/analytics' },
         { kind: 'frame', path: '/analytics' },
       ],
     }),
-    'AI opened /analytics, then scrolled on /analytics, then framed the result on /analytics.'
+    'AI opened /analytics, then filtered on /analytics, then scrolled on /analytics, then framed the result on /analytics.'
   )
+})
+
+test('zero-config AI capture defaults empty markers and validates vision, fill, sequence, and auto-capture contracts', () => {
+  const zeroConfig = captureRecipeInputSchema.parse(
+    captureRecipeInput({
+      ...recipeForm,
+      marker: '   ',
+      objective: 'Find the weekly cohort chart',
+      useVision: true,
+      allowSearchFill: true,
+      sequenceShots: '3',
+    })
+  )
+  assert.deepEqual(zeroConfig.definition.markers, [DEFAULT_ZERO_CONFIG_MARKER])
+  assert.equal(zeroConfig.definition.sequenceShots, 3)
+  assert.equal(zeroConfig.definition.navigation?.useVision, true)
+  assert.equal(zeroConfig.definition.navigation?.allowSearchFill, true)
+
+  assert.equal(
+    captureRecipeInputSchema.safeParse(
+      captureRecipeInput({ ...recipeForm, objective: 'Show cohorts', sequenceShots: '5' })
+    ).success,
+    false
+  )
+  // Without an AI objective, sequenceShots is omitted so stale values are never saved.
+  const withoutObjective = captureRecipeInputSchema.parse(
+    captureRecipeInput({ ...recipeForm, objective: ' ', sequenceShots: '3' })
+  )
+  assert.equal(withoutObjective.definition.sequenceShots, undefined)
+
+  const proposeInput = proposeCaptureRecipeInputSchema.parse({
+    connectionId: 'connection_1',
+    surfaceId: 'surface_1',
+    prompt: 'Show dark mode cohort chart',
+    sequenceShots: 3,
+  })
+  assert.equal(proposeInput.sequenceShots, 3)
+  for (const bad of [
+    { connectionId: 'c1', surfaceId: 's1', prompt: '   ' },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'x'.repeat(601) },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'ok', sequenceShots: 0 },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'ok', sequenceShots: 5 },
+  ]) {
+    assert.equal(proposeCaptureRecipeInputSchema.safeParse(bad).success, false)
+  }
+
+  const proposed = proposedCaptureRecipeSchema.parse({
+    name: 'Dark cohort chart',
+    reasoning: 'Matched /analytics from discovered routes.',
+    definition: zeroConfig.definition,
+  })
+  assert.equal(proposed.name, 'Dark cohort chart')
+
+  const auto = autoCaptureResultSchema.parse({
+    recipe,
+    job: { ...job, sequenceAssetIds: ['asset_1', 'asset_2', 'asset_3'] },
+  })
+  assert.deepEqual(auto.job.sequenceAssetIds, ['asset_1', 'asset_2', 'asset_3'])
+  assert.deepEqual(captureJobFrames(auto.job), ['asset_1', 'asset_2', 'asset_3'])
+  assert.deepEqual(captureJobFrames({ assetId: 'asset_only' }), ['asset_only'])
+  assert.deepEqual(captureJobFrames({ assetId: null }), [])
 })
