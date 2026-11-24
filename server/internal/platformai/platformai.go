@@ -72,9 +72,16 @@ func FromEnvironment() *Client {
 	return &Client{APIKey: key, BaseURL: base, HTTP: &http.Client{Timeout: 2 * time.Minute}, Models: models}
 }
 
+// ImageInput is a base64-encoded image attached to a multimodal model request.
+type ImageInput struct {
+	MediaType string
+	Base64    string
+}
+
 // Request is one schema-constrained call. Prompt holds the user turn; untrusted
 // content belongs there, fenced, never in System.
 type Request struct {
+	Images     []ImageInput
 	MaxTokens  int
 	Prompt     string
 	Role       Role
@@ -121,11 +128,25 @@ func (c *Client) Structured(ctx context.Context, request Request, out any) (Usag
 	system := request.System + "\n\nReply with only a JSON object that matches this JSON Schema:\n" + string(request.Schema)
 	// No temperature: Claude 5.5 models reject any but the default. Low effort
 	// keeps their default thinking, which counts toward max_tokens, short.
+	var userContent any = request.Prompt
+	if len(request.Images) > 0 {
+		parts := []map[string]any{{"type": "text", "text": request.Prompt}}
+		for _, img := range request.Images {
+			if img.Base64 == "" || img.MediaType == "" {
+				continue
+			}
+			parts = append(parts, map[string]any{
+				"type":      "image_url",
+				"image_url": map[string]string{"url": "data:" + img.MediaType + ";base64," + img.Base64},
+			})
+		}
+		userContent = parts
+	}
 	body, err := json.Marshal(map[string]any{
 		"max_tokens": maxTokens,
-		"messages": []map[string]string{
+		"messages": []map[string]any{
 			{"content": system, "role": "system"},
-			{"content": request.Prompt, "role": "user"},
+			{"content": userContent, "role": "user"},
 		},
 		"model": model,
 		// OPENROUTER_PROVIDER_PREFERENCES in clients/apps/web/lib/ai/models/provider.ts, plus

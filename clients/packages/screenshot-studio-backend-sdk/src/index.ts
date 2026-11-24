@@ -5451,6 +5451,14 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Exchanges a signed request to the connection's bootstrap URL for a verified session. */
+  async bootstrapCaptureConnection(id: string) {
+    return this.request<{ connection: CaptureConnection }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/bootstrap`,
+      { method: 'POST' }
+    )
+  }
+
   async revokeCaptureConnection(id: string) {
     return this.request<{ revoked: true }>(
       `v1/capture/connections/${encodeURIComponent(id)}/revoke`,
@@ -5489,6 +5497,11 @@ export class ScreenshotStudioBackendSDK {
       `v1/capture/recipes/${encodeURIComponent(recipeId)}/jobs`,
       { body: input, method: 'POST' }
     )
+  }
+
+  /** Returns the current status of a capture job in this workspace. */
+  async getCaptureJob(id: string) {
+    return this.request<{ job: CaptureJob }>(`v1/capture/jobs/${encodeURIComponent(id)}`)
   }
 
   async cancelCaptureJob(id: string) {

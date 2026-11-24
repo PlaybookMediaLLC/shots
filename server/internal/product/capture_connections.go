@@ -1,26 +1,38 @@
 package product
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
@@ -61,7 +73,7 @@ type CaptureRunner interface {
 	LiveView(ctx context.Context, sessionID string, connectWithin time.Duration) (string, error)
 	Close(ctx context.Context, sessionID string) error
 	OpenLogin(ctx context.Context, sessionID string, target browser.Target) error
-	Export(ctx context.Context, sessionID string, target browser.Target) (*browser.State, error)
+	ExportWithRoutes(ctx context.Context, sessionID string, target browser.Target) (*browser.State, []browser.DiscoveredRoute, error)
 	Verify(ctx context.Context, sessionID string, target browser.Target, state *browser.State) error
 	Run(ctx context.Context, sessionID string, input browser.RunInput) (*browser.RunResult, error)
 }
@@ -70,7 +82,20 @@ type CaptureRunner interface {
 type CaptureDispatcher interface {
 	StartCaptureJob(ctx context.Context, org, jobID string, resume int) error
 	StartCaptureConnection(ctx context.Context, org, connectionID string) error
+	StartDeploymentCapture(ctx context.Context, org, deploymentID string) error
 }
+
+// Shared SSRF-guarded HTTP client for customer session bootstrap calls so we
+// reuse connection pools rather than leaking a fresh transport per request.
+var bootstrapHTTPClient = &http.Client{
+	Timeout:   15 * time.Second,
+	Transport: publicnet.Transport(),
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
+
+const maxBootstrapBodyBytes = 256 << 10
 
 // WithAuthenticatedCapture enables authenticated capture on this process.
 func (c *Configuration) WithAuthenticatedCapture(runner CaptureRunner, keys *sessionstate.Keys) *Configuration {
@@ -98,31 +123,36 @@ var ErrAuthenticatedCaptureUnavailable = errors.New("authenticated capture is no
 
 // CaptureConnectionRecord is a connection without any session material.
 type CaptureConnectionRecord struct {
-	ID               string     `json:"id"`
-	Name             string     `json:"name"`
-	SourceAppID      *string    `json:"sourceAppId"`
-	Environment      string     `json:"environment"`
-	Origin           string     `json:"origin"`
-	Hosts            []string   `json:"hosts"`
-	LoginHosts       []string   `json:"loginHosts"`
-	ProtectedPath    string     `json:"protectedPath"`
-	IdentitySelector string     `json:"identitySelector"`
-	ExpectedAccount  string     `json:"expectedAccount"`
-	Status           string     `json:"status"`
-	Generation       int        `json:"generation"`
-	ValidatedAt      *time.Time `json:"validatedAt"`
-	StateExpiresAt   *time.Time `json:"stateExpiresAt"`
-	ConnectPhase     *string    `json:"connectPhase"`
-	FailureCode      *string    `json:"failureCode"`
-	RevokedAt        *time.Time `json:"revokedAt"`
-	CreatedAt        time.Time  `json:"createdAt"`
-	UpdatedAt        time.Time  `json:"updatedAt"`
+	ID               string              `json:"id"`
+	Name             string              `json:"name"`
+	SourceAppID      *string             `json:"sourceAppId"`
+	Environment      string              `json:"environment"`
+	Origin           string              `json:"origin"`
+	Hosts            []string            `json:"hosts"`
+	LoginHosts       []string            `json:"loginHosts"`
+	ProtectedPath    string              `json:"protectedPath"`
+	IdentitySelector string              `json:"identitySelector"`
+	ExpectedAccount  string              `json:"expectedAccount"`
+	Status           string              `json:"status"`
+	Generation       int                 `json:"generation"`
+	ValidatedAt      *time.Time          `json:"validatedAt"`
+	StateExpiresAt   *time.Time          `json:"stateExpiresAt"`
+	ConnectPhase     *string             `json:"connectPhase"`
+	FailureCode      *string             `json:"failureCode"`
+	DiscoveredRoutes []map[string]string `json:"discoveredRoutes,omitempty"`
+	BootstrapURL     *string             `json:"bootstrapUrl,omitempty"`
+	HasBootstrap     bool                `json:"hasBootstrap,omitempty"`
+	RevokedAt        *time.Time          `json:"revokedAt"`
+	CreatedAt        time.Time           `json:"createdAt"`
+	UpdatedAt        time.Time           `json:"updatedAt"`
 }
 
 func captureConnectionRecord(row *ent.PlatformAppConnection) CaptureConnectionRecord {
 	return CaptureConnectionRecord{ID: row.ID, Name: row.Name, SourceAppID: row.SourceAppID, Environment: row.Environment, Origin: row.Origin, Hosts: row.Hosts, LoginHosts: row.LoginHosts,
 		ProtectedPath: row.ProtectedPath, IdentitySelector: row.IdentitySelector, ExpectedAccount: row.ExpectedAccount, Status: string(row.Status), Generation: row.Generation,
-		ValidatedAt: row.ValidatedAt, StateExpiresAt: row.StateExpiresAt, ConnectPhase: row.ConnectPhase, FailureCode: row.FailureCode, RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+		ValidatedAt: row.ValidatedAt, StateExpiresAt: row.StateExpiresAt, ConnectPhase: row.ConnectPhase, FailureCode: row.FailureCode,
+		DiscoveredRoutes: row.DiscoveredRoutes, BootstrapURL: row.BootstrapURL, HasBootstrap: row.BootstrapURL != nil && row.BootstrapSecretCiphertext != nil,
+		RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func captureTarget(row *ent.PlatformAppConnection) browser.Target {
@@ -145,6 +175,8 @@ type CreateCaptureConnectionInput struct {
 	ProtectedPath    string   `json:"protectedPath"`
 	IdentitySelector string   `json:"identitySelector"`
 	ExpectedAccount  string   `json:"expectedAccount"`
+	BootstrapURL     *string  `json:"bootstrapUrl,omitempty"`
+	BootstrapSecret  *string  `json:"bootstrapSecret,omitempty"`
 }
 
 // CreateCaptureConnection registers an app; signing in comes next.
@@ -174,6 +206,13 @@ func (c *Configuration) CreateCaptureConnection(ctx context.Context, actor Actor
 			return nil, invalid("Sign-in hosts must be public host names, such as accounts.example.com.")
 		}
 	}
+	bootstrapURL, bootstrapSecret, err := validateBootstrapConfig(input.BootstrapURL, input.BootstrapSecret, input.Hosts)
+	if err != nil {
+		return nil, err
+	}
+	if bootstrapURL != nil && c.captureKeys == nil {
+		return nil, ErrAuthenticatedCaptureUnavailable
+	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -188,9 +227,18 @@ func (c *Configuration) CreateCaptureConnection(ctx context.Context, actor Actor
 			return nil, publishing.ErrNotFound
 		}
 	}
-	row, err := tx.PlatformAppConnection.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).SetNillableSourceAppID(input.SourceAppID).SetName(input.Name).
+	connID := cuid.New()
+	create := tx.PlatformAppConnection.Create().SetID(connID).SetOrganizationID(actor.OrganizationID).SetNillableSourceAppID(input.SourceAppID).SetName(input.Name).
 		SetEnvironment(input.Environment).SetOrigin(target.Origin).SetHosts(input.Hosts).SetLoginHosts(input.LoginHosts).SetProtectedPath(input.ProtectedPath).
-		SetIdentitySelector(input.IdentitySelector).SetExpectedAccount(input.ExpectedAccount).SetCreatedByUserID(actor.UserID).Save(ctx)
+		SetIdentitySelector(input.IdentitySelector).SetExpectedAccount(input.ExpectedAccount).SetCreatedByUserID(actor.UserID)
+	if bootstrapURL != nil {
+		sealed, err := c.captureKeys.SealBootstrap([]byte(bootstrapSecret), sessionstate.Binding{Organization: actor.OrganizationID, Connection: connID, Environment: input.Environment})
+		if err != nil {
+			return nil, err
+		}
+		create.SetBootstrapURL(*bootstrapURL).SetBootstrapSecretCiphertext(sealed)
+	}
+	row, err := create.Save(ctx)
 	if ent.IsConstraintError(err) {
 		return nil, publishing.ErrConflict
 	}
@@ -421,7 +469,7 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	intent, session := *row.ConnectIntentID, *row.ConnectSessionID
 	target := captureTarget(row)
 	cleanup := context.WithoutCancel(ctx)
-	state, err := c.captureRunner.Export(ctx, session, target)
+	state, discovered, err := c.captureRunner.ExportWithRoutes(ctx, session, target)
 	_ = c.captureRunner.Close(cleanup, session)
 	if err != nil {
 		return c.failCaptureConnection(cleanup, org, id, intent, captureSignInFailure(err, browser.SignInIncomplete))
@@ -435,22 +483,53 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	if err != nil {
 		return c.failCaptureConnection(cleanup, org, id, intent, captureSignInFailure(err, browser.SessionRestoreFailed))
 	}
+	actor := Actor{OrganizationID: org, Kind: "service", Display: "capture", RequestID: id}
+	_, _, err = c.commitVerifiedConnectionState(ctx, actor, org, id, state, commitConnectionOptions{
+		auditAction:    "product.capture_connection_ready",
+		discovered:     discovered,
+		expectedIntent: &intent,
+	})
+	return err
+}
+
+type commitConnectionOptions struct {
+	auditAction       string
+	discovered        []browser.DiscoveredRoute
+	expectedIntent    *string
+	rejectActiveLease bool
+	resealedBootstrap *string
+}
+
+func (c *Configuration) commitVerifiedConnectionState(ctx context.Context, actor Actor, org, id string, state *browser.State, opts commitConnectionOptions) (*ent.PlatformAppConnection, *string, error) {
 	body, err := state.Marshal()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	defer tx.Rollback()
 	locked, err := lockCaptureConnection(ctx, tx, org, id)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	// Revoked or replaced while verifying: this sign-in no longer counts.
-	if locked.Status == platformappconnection.StatusREVOKED || locked.ConnectIntentID == nil || *locked.ConnectIntentID != intent || locked.ConnectPhase == nil || *locked.ConnectPhase != "FINISHING" {
-		return tx.Commit()
+	if opts.expectedIntent != nil {
+		// Revoked or replaced while verifying: this sign-in no longer counts.
+		if locked.Status == platformappconnection.StatusREVOKED || locked.ConnectIntentID == nil || *locked.ConnectIntentID != *opts.expectedIntent || locked.ConnectPhase == nil || *locked.ConnectPhase != "FINISHING" {
+			return nil, nil, tx.Commit()
+		}
+	} else if locked.Status == platformappconnection.StatusREVOKED {
+		return nil, nil, publishing.ErrInvalidState
+	}
+	now := time.Now().UTC()
+	if opts.rejectActiveLease && locked.LeaseJobID != nil && locked.LeaseExpiresAt != nil && locked.LeaseExpiresAt.After(now) {
+		return nil, nil, conflict("A capture job is currently using this connection. Try again when it finishes.")
+	}
+	var oldSession *string
+	if opts.expectedIntent == nil && locked.ConnectSessionID != nil && *locked.ConnectSessionID != "" {
+		s := *locked.ConnectSessionID
+		oldSession = &s
 	}
 	generation := locked.Generation
 	if locked.ValidatedAt != nil {
@@ -460,23 +539,206 @@ func (c *Configuration) CompleteCaptureConnection(ctx context.Context, org, id s
 	binding.Generation = generation
 	sealed, err := c.captureKeys.Seal(body, binding)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	now := time.Now().UTC()
-	err = locked.Update().SetStatus(platformappconnection.StatusREADY).SetStateCiphertext(sealed).SetGeneration(generation).AddStateRevision(1).SetValidatedAt(now).
+	update := locked.Update().SetStatus(platformappconnection.StatusREADY).SetStateCiphertext(sealed).SetGeneration(generation).AddStateRevision(1).SetValidatedAt(now).
 		SetStateExpiresAt(now.Add(c.captureStateAge)).ClearConnectIntentID().ClearConnectUserID().ClearConnectSessionID().ClearConnectExpiresAt().ClearConnectPhase().ClearFailureCode().
-		ClearLeaseJobID().ClearLeaseExpiresAt().Exec(ctx)
+		ClearLeaseJobID().ClearLeaseExpiresAt()
+	if opts.resealedBootstrap != nil {
+		update.SetBootstrapSecretCiphertext(*opts.resealedBootstrap)
+	}
+	if len(opts.discovered) > 0 {
+		routes := make([]map[string]string, 0, len(opts.discovered))
+		for _, r := range opts.discovered {
+			routes = append(routes, map[string]string{"path": r.Path, "label": r.Label})
+		}
+		update.SetDiscoveredRoutes(routes)
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, opts.auditAction, "platform_app_connection", id, map[string]any{"generation": generation}); err != nil {
+		return nil, nil, err
+	}
+	if err := resumeCaptureJobs(ctx, tx, org, id, generation); err != nil {
+		return nil, nil, err
+	}
+	if err := resumeBlockedAutomationRuns(ctx, tx, org, locked.SourceAppID); err != nil {
+		return nil, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	return updated, oldSession, nil
+}
+
+// resumeBlockedAutomationRuns automatically re-queues recent release automation
+// runs for this connection's source that stopped in needs_attention/needs_auth.
+func resumeBlockedAutomationRuns(ctx context.Context, tx *ent.Tx, org string, sourceAppID *string) error {
+	if sourceAppID == nil || *sourceAppID == "" {
+		return nil
+	}
+	cutoff := time.Now().UTC().Add(-captureAuthDeadline)
+	blocked, err := tx.ReleaseAutomationRun.Query().Where(
+		releaseautomationrun.OrganizationID(org),
+		releaseautomationrun.StatusEQ("needs_attention"),
+		releaseautomationrun.FailureCodeEQ("needs_auth"),
+		releaseautomationrun.CancelRequested(false),
+		releaseautomationrun.CreatedAtGTE(cutoff),
+		func(s *sql.Selector) {
+			events := sql.Table(releasesourceevent.Table)
+			matching := sql.Select(events.C(releasesourceevent.FieldID)).From(events).Where(sql.And(
+				sql.EQ(events.C(releasesourceevent.FieldOrganizationID), org),
+				sql.EQ(events.C(releasesourceevent.FieldSourceAppID), *sourceAppID),
+			))
+			s.Where(sql.In(s.C(releaseautomationrun.FieldEventID), matching))
+		},
+	).Order(ent.Desc(releaseautomationrun.FieldCreatedAt)).Limit(25).All(ctx)
 	if err != nil {
 		return err
 	}
-	actor := Actor{OrganizationID: org, Kind: "service", Display: "capture", RequestID: id}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_connection_ready", "platform_app_connection", id, map[string]any{"generation": generation}); err != nil {
-		return err
+	for _, run := range blocked {
+		n, err := tx.ReleaseAutomationRun.Update().Where(releaseautomationrun.ID(run.ID), releaseautomationrun.OrganizationID(org), releaseautomationrun.StatusEQ("needs_attention"), releaseautomationrun.CancelRequested(false), releaseautomationrun.RecoveryAttempt(run.RecoveryAttempt)).
+			SetStatus("queued").ClearCompletedAt().SetFailureCode("").AddRecoveryAttempt(1).Save(ctx)
+		if err != nil {
+			return err
+		}
+		if n == 1 {
+			if err := automationOutbox(ctx, tx, org, run.ID, EventReleaseAutomationDispatch, run.RecoveryAttempt+1); err != nil {
+				return err
+			}
+		}
 	}
-	if err := resumeCaptureJobs(ctx, tx, org, id, generation); err != nil {
-		return err
+	return nil
+}
+
+func validateBootstrapConfig(rawURL, rawSecret *string, hosts []string) (*string, string, error) {
+	if rawURL == nil || strings.TrimSpace(*rawURL) == "" {
+		return nil, "", nil
 	}
-	return tx.Commit()
+	cleaned := strings.TrimSpace(*rawURL)
+	parsed, err := url.Parse(cleaned)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || !capture.PublicPageURL(cleaned) || !browser.HostApproved(parsed.Hostname(), hosts) {
+		return nil, "", invalid("Bootstrap URL must be an https endpoint on one of the connection's approved hosts.")
+	}
+	if rawSecret == nil || len(strings.TrimSpace(*rawSecret)) < 16 {
+		return nil, "", invalid("Bootstrap signing secret must be at least 16 characters.")
+	}
+	return &cleaned, strings.TrimSpace(*rawSecret), nil
+}
+
+func signBootstrapPayload(secret []byte, now time.Time, reqBody []byte) string {
+	stamp := strconv.FormatInt(now.Unix(), 10)
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(stamp + "."))
+	mac.Write(reqBody)
+	return "t=" + stamp + ",v1=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+func fetchBootstrapState(ctx context.Context, client *http.Client, endpoint string, secret []byte, reqBody []byte, target browser.Target) (*browser.State, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-shots-signature", signBootstrapPayload(secret, time.Now().UTC(), reqBody))
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, &browser.Failure{Code: browser.SessionRestoreFailed}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, &browser.Failure{Code: browser.SessionRestoreFailed}
+	}
+	rawBody, err := io.ReadAll(io.LimitReader(resp.Body, maxBootstrapBodyBytes+1))
+	if err != nil || len(rawBody) > maxBootstrapBodyBytes {
+		return nil, &browser.Failure{Code: browser.SessionRestoreFailed}
+	}
+	parsedState, err := browser.UnmarshalState(rawBody)
+	if err != nil {
+		return nil, &browser.Failure{Code: browser.SessionRestoreFailed}
+	}
+	return browser.FilterBootstrapState(parsedState, target)
+}
+
+// BootstrapCaptureConnection exchanges a signed request to the customer's
+// approved BootstrapURL for short-lived demo session cookies/localStorage,
+// verifies them in a fresh isolated browser, seals them, and resumes parked work.
+func (c *Configuration) BootstrapCaptureConnection(ctx context.Context, actor Actor, id string) (*CaptureConnectionRecord, error) {
+	if err := c.authorizeAutomationAdmin(ctx, actor); err != nil {
+		return nil, err
+	}
+	if !c.CaptureAvailable() {
+		return nil, ErrAuthenticatedCaptureUnavailable
+	}
+	row, err := c.client.PlatformAppConnection.Query().Where(platformappconnection.ID(id), platformappconnection.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if row.Status == platformappconnection.StatusREVOKED {
+		return nil, publishing.ErrInvalidState
+	}
+	if row.LeaseJobID != nil && row.LeaseExpiresAt != nil && row.LeaseExpiresAt.After(time.Now().UTC()) {
+		return nil, conflict("A capture job is currently using this connection. Try again when it finishes.")
+	}
+	if row.BootstrapURL == nil || row.BootstrapSecretCiphertext == nil {
+		return nil, invalid("This connection has no session bootstrap endpoint configured.")
+	}
+	bootstrapBinding := sessionstate.Binding{Organization: row.OrganizationID, Connection: row.ID, Environment: row.Environment}
+	secretBytes, staleSecret, err := c.captureKeys.OpenBootstrap(*row.BootstrapSecretCiphertext, bootstrapBinding)
+	if err != nil {
+		return nil, err
+	}
+	reqBody, err := json.Marshal(map[string]string{
+		"connectionId":    row.ID,
+		"environment":     row.Environment,
+		"expectedAccount": row.ExpectedAccount,
+		"organizationId":  row.OrganizationID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	target := captureTarget(row)
+	state, err := fetchBootstrapState(ctx, bootstrapHTTPClient, *row.BootstrapURL, secretBytes, reqBody, target)
+	if err != nil {
+		return nil, err
+	}
+	verifyCtx, cancelVerify := context.WithTimeout(ctx, 55*time.Second)
+	defer cancelVerify()
+	fresh, err := c.captureRunner.Allocate(verifyCtx, row.Hosts, 2*time.Minute)
+	if err != nil {
+		return nil, captureProviderError(err)
+	}
+	verifyErr := c.captureRunner.Verify(verifyCtx, fresh, target, state)
+	_ = c.captureRunner.Close(context.WithoutCancel(ctx), fresh)
+	if verifyErr != nil {
+		return nil, captureSignInFailure(verifyErr, browser.SessionRestoreFailed)
+	}
+	var resealed *string
+	if staleSecret {
+		nextSealed, err := c.captureKeys.SealBootstrap(secretBytes, bootstrapBinding)
+		if err != nil {
+			return nil, err
+		}
+		resealed = &nextSealed
+	}
+	updated, oldSession, err := c.commitVerifiedConnectionState(ctx, actor, actor.OrganizationID, id, state, commitConnectionOptions{
+		auditAction:       "product.capture_connection_bootstrapped",
+		rejectActiveLease: true,
+		resealedBootstrap: resealed,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if oldSession != nil {
+		_ = c.captureRunner.Close(context.WithoutCancel(ctx), *oldSession)
+	}
+	record := captureConnectionRecord(updated)
+	return &record, nil
 }
 
 func captureSignInFailure(err error, stage browser.Code) error {
@@ -545,7 +807,7 @@ func (c *Configuration) RevokeCaptureConnection(ctx context.Context, actor Actor
 	sessions = append(sessions, open...)
 	if row.Status != platformappconnection.StatusREVOKED {
 		now := time.Now().UTC()
-		if err := row.Update().SetStatus(platformappconnection.StatusREVOKED).AddGeneration(1).ClearStateCiphertext().ClearValidatedAt().ClearStateExpiresAt().ClearConnectIntentID().
+		if err := row.Update().SetStatus(platformappconnection.StatusREVOKED).AddGeneration(1).ClearStateCiphertext().ClearBootstrapSecretCiphertext().ClearValidatedAt().ClearStateExpiresAt().ClearConnectIntentID().
 			ClearConnectUserID().ClearConnectSessionID().ClearConnectExpiresAt().ClearConnectPhase().ClearLeaseJobID().ClearLeaseExpiresAt().AddLeaseToken(1).SetRevokedAt(now).Exec(ctx); err != nil {
 			return err
 		}

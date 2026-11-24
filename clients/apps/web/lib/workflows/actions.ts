@@ -18,8 +18,10 @@ export const workflowActionSpecSchema = z.strictObject({
   type: automationActionTypeSchema,
   label: z.string(),
   description: z.string(),
-  /** The output this action consumes, from an earlier action on every path. */
+  /** The default output this action consumes, from an earlier action on every path. */
   input: workflowOutputSchema.nullable(),
+  /** All output kinds this action can consume when more than one is valid (e.g. create_canvas). */
+  acceptedInputs: z.array(workflowOutputSchema).optional(),
   output: workflowOutputSchema,
   /** The lowest workflow language version that can contain this action. */
   minSchemaVersion: z.number().int().positive(),
@@ -143,6 +145,7 @@ export const WORKFLOW_ACTIONS = {
     description:
       'Lays out a canvas from the release with 1–3 canvas templates, using its screenshots or your latest product capture. Every claim quotes the release; the canvas opens for your team to refine and export.',
     input: 'releaseId',
+    acceptedInputs: ['releaseId', 'campaignId'],
     output: 'canvasId',
     minSchemaVersion: 2,
     permission: ADMIN,
@@ -174,8 +177,14 @@ export const workflowActionTypes = automationActionTypeSchema.options
 
 /** Actions whose recorded output another action can consume. */
 export function producersOf(type: AutomationActionType): AutomationActionType[] {
-  const input = WORKFLOW_ACTIONS[type].input
-  return workflowActionTypes.filter((candidate) => WORKFLOW_ACTIONS[candidate].output === input)
+  const spec = WORKFLOW_ACTIONS[type]
+  const accepted: readonly string[] =
+    'acceptedInputs' in spec && spec.acceptedInputs
+      ? spec.acceptedInputs
+      : spec.input
+        ? [spec.input]
+        : []
+  return workflowActionTypes.filter((candidate) => accepted.includes(WORKFLOW_ACTIONS[candidate].output))
 }
 
 /** Static facts about the AI relevance check node, shown beside its editor. */

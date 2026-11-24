@@ -24,9 +24,16 @@ export function customScheduleTime(day: string, time: string, zone: string): str
  * other channels cannot be scheduled.
  */
 const CHANNEL_PLATFORMS: Partial<Record<string, readonly string[]>> = {
+  bluesky: ['bluesky'],
+  facebook: ['facebook'],
   instagram: ['instagram', 'instagram-standalone'],
-  linkedin: ['linkedin'],
-  x: ['x'],
+  linkedin: ['linkedin', 'linkedin-page'],
+  mastodon: ['mastodon'],
+  pinterest: ['pinterest'],
+  threads: ['threads'],
+  tiktok: ['tiktok'],
+  x: ['x', 'twitter'],
+  youtube: ['youtube'],
 }
 
 /**

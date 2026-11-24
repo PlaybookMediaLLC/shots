@@ -454,6 +454,64 @@ func (_u *PlatformAppConnectionUpdate) ClearLeaseExpiresAt() *PlatformAppConnect
 	return _u
 }
 
+// SetDiscoveredRoutes sets the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdate) SetDiscoveredRoutes(v []map[string]string) *PlatformAppConnectionUpdate {
+	_u.mutation.SetDiscoveredRoutes(v)
+	return _u
+}
+
+// AppendDiscoveredRoutes appends value to the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdate) AppendDiscoveredRoutes(v []map[string]string) *PlatformAppConnectionUpdate {
+	_u.mutation.AppendDiscoveredRoutes(v)
+	return _u
+}
+
+// ClearDiscoveredRoutes clears the value of the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdate) ClearDiscoveredRoutes() *PlatformAppConnectionUpdate {
+	_u.mutation.ClearDiscoveredRoutes()
+	return _u
+}
+
+// SetBootstrapURL sets the "bootstrap_url" field.
+func (_u *PlatformAppConnectionUpdate) SetBootstrapURL(v string) *PlatformAppConnectionUpdate {
+	_u.mutation.SetBootstrapURL(v)
+	return _u
+}
+
+// SetNillableBootstrapURL sets the "bootstrap_url" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdate) SetNillableBootstrapURL(v *string) *PlatformAppConnectionUpdate {
+	if v != nil {
+		_u.SetBootstrapURL(*v)
+	}
+	return _u
+}
+
+// ClearBootstrapURL clears the value of the "bootstrap_url" field.
+func (_u *PlatformAppConnectionUpdate) ClearBootstrapURL() *PlatformAppConnectionUpdate {
+	_u.mutation.ClearBootstrapURL()
+	return _u
+}
+
+// SetBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field.
+func (_u *PlatformAppConnectionUpdate) SetBootstrapSecretCiphertext(v string) *PlatformAppConnectionUpdate {
+	_u.mutation.SetBootstrapSecretCiphertext(v)
+	return _u
+}
+
+// SetNillableBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdate) SetNillableBootstrapSecretCiphertext(v *string) *PlatformAppConnectionUpdate {
+	if v != nil {
+		_u.SetBootstrapSecretCiphertext(*v)
+	}
+	return _u
+}
+
+// ClearBootstrapSecretCiphertext clears the value of the "bootstrap_secret_ciphertext" field.
+func (_u *PlatformAppConnectionUpdate) ClearBootstrapSecretCiphertext() *PlatformAppConnectionUpdate {
+	_u.mutation.ClearBootstrapSecretCiphertext()
+	return _u
+}
+
 // SetRevokedAt sets the "revoked_at" field.
 func (_u *PlatformAppConnectionUpdate) SetRevokedAt(v time.Time) *PlatformAppConnectionUpdate {
 	_u.mutation.SetRevokedAt(v)
@@ -669,6 +727,29 @@ func (_u *PlatformAppConnectionUpdate) sqlSave(ctx context.Context) (_node int, 
 	}
 	if _u.mutation.LeaseExpiresAtCleared() {
 		_spec.ClearField(platformappconnection.FieldLeaseExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.DiscoveredRoutes(); ok {
+		_spec.SetField(platformappconnection.FieldDiscoveredRoutes, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedDiscoveredRoutes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, platformappconnection.FieldDiscoveredRoutes, value)
+		})
+	}
+	if _u.mutation.DiscoveredRoutesCleared() {
+		_spec.ClearField(platformappconnection.FieldDiscoveredRoutes, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.BootstrapURL(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapURL, field.TypeString, value)
+	}
+	if _u.mutation.BootstrapURLCleared() {
+		_spec.ClearField(platformappconnection.FieldBootstrapURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.BootstrapSecretCiphertext(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapSecretCiphertext, field.TypeString, value)
+	}
+	if _u.mutation.BootstrapSecretCiphertextCleared() {
+		_spec.ClearField(platformappconnection.FieldBootstrapSecretCiphertext, field.TypeString)
 	}
 	if value, ok := _u.mutation.RevokedAt(); ok {
 		_spec.SetField(platformappconnection.FieldRevokedAt, field.TypeTime, value)
@@ -1124,6 +1205,64 @@ func (_u *PlatformAppConnectionUpdateOne) ClearLeaseExpiresAt() *PlatformAppConn
 	return _u
 }
 
+// SetDiscoveredRoutes sets the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdateOne) SetDiscoveredRoutes(v []map[string]string) *PlatformAppConnectionUpdateOne {
+	_u.mutation.SetDiscoveredRoutes(v)
+	return _u
+}
+
+// AppendDiscoveredRoutes appends value to the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdateOne) AppendDiscoveredRoutes(v []map[string]string) *PlatformAppConnectionUpdateOne {
+	_u.mutation.AppendDiscoveredRoutes(v)
+	return _u
+}
+
+// ClearDiscoveredRoutes clears the value of the "discovered_routes" field.
+func (_u *PlatformAppConnectionUpdateOne) ClearDiscoveredRoutes() *PlatformAppConnectionUpdateOne {
+	_u.mutation.ClearDiscoveredRoutes()
+	return _u
+}
+
+// SetBootstrapURL sets the "bootstrap_url" field.
+func (_u *PlatformAppConnectionUpdateOne) SetBootstrapURL(v string) *PlatformAppConnectionUpdateOne {
+	_u.mutation.SetBootstrapURL(v)
+	return _u
+}
+
+// SetNillableBootstrapURL sets the "bootstrap_url" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdateOne) SetNillableBootstrapURL(v *string) *PlatformAppConnectionUpdateOne {
+	if v != nil {
+		_u.SetBootstrapURL(*v)
+	}
+	return _u
+}
+
+// ClearBootstrapURL clears the value of the "bootstrap_url" field.
+func (_u *PlatformAppConnectionUpdateOne) ClearBootstrapURL() *PlatformAppConnectionUpdateOne {
+	_u.mutation.ClearBootstrapURL()
+	return _u
+}
+
+// SetBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field.
+func (_u *PlatformAppConnectionUpdateOne) SetBootstrapSecretCiphertext(v string) *PlatformAppConnectionUpdateOne {
+	_u.mutation.SetBootstrapSecretCiphertext(v)
+	return _u
+}
+
+// SetNillableBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdateOne) SetNillableBootstrapSecretCiphertext(v *string) *PlatformAppConnectionUpdateOne {
+	if v != nil {
+		_u.SetBootstrapSecretCiphertext(*v)
+	}
+	return _u
+}
+
+// ClearBootstrapSecretCiphertext clears the value of the "bootstrap_secret_ciphertext" field.
+func (_u *PlatformAppConnectionUpdateOne) ClearBootstrapSecretCiphertext() *PlatformAppConnectionUpdateOne {
+	_u.mutation.ClearBootstrapSecretCiphertext()
+	return _u
+}
+
 // SetRevokedAt sets the "revoked_at" field.
 func (_u *PlatformAppConnectionUpdateOne) SetRevokedAt(v time.Time) *PlatformAppConnectionUpdateOne {
 	_u.mutation.SetRevokedAt(v)
@@ -1369,6 +1508,29 @@ func (_u *PlatformAppConnectionUpdateOne) sqlSave(ctx context.Context) (_node *P
 	}
 	if _u.mutation.LeaseExpiresAtCleared() {
 		_spec.ClearField(platformappconnection.FieldLeaseExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.DiscoveredRoutes(); ok {
+		_spec.SetField(platformappconnection.FieldDiscoveredRoutes, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedDiscoveredRoutes(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, platformappconnection.FieldDiscoveredRoutes, value)
+		})
+	}
+	if _u.mutation.DiscoveredRoutesCleared() {
+		_spec.ClearField(platformappconnection.FieldDiscoveredRoutes, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.BootstrapURL(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapURL, field.TypeString, value)
+	}
+	if _u.mutation.BootstrapURLCleared() {
+		_spec.ClearField(platformappconnection.FieldBootstrapURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.BootstrapSecretCiphertext(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapSecretCiphertext, field.TypeString, value)
+	}
+	if _u.mutation.BootstrapSecretCiphertextCleared() {
+		_spec.ClearField(platformappconnection.FieldBootstrapSecretCiphertext, field.TypeString)
 	}
 	if value, ok := _u.mutation.RevokedAt(); ok {
 		_spec.SetField(platformappconnection.FieldRevokedAt, field.TypeTime, value)

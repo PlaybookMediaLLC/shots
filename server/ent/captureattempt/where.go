@@ -1199,6 +1199,16 @@ func NavigationActionsNotNil() predicate.CaptureAttempt {
 	return predicate.CaptureAttempt(sql.FieldNotNull(FieldNavigationActions))
 }
 
+// FocusBoxIsNil applies the IsNil predicate on the "focus_box" field.
+func FocusBoxIsNil() predicate.CaptureAttempt {
+	return predicate.CaptureAttempt(sql.FieldIsNull(FieldFocusBox))
+}
+
+// FocusBoxNotNil applies the NotNil predicate on the "focus_box" field.
+func FocusBoxNotNil() predicate.CaptureAttempt {
+	return predicate.CaptureAttempt(sql.FieldNotNull(FieldFocusBox))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.CaptureAttempt {
 	return predicate.CaptureAttempt(sql.FieldEQ(FieldCreatedAt, v))

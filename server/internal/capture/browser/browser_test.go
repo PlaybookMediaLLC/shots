@@ -114,6 +114,9 @@ func TestRecipeAcceptsOnlyTheTypedLanguage(t *testing.T) {
 		"unbounded model budget": func(r *Recipe) { r.Navigation = &Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 100} },
 		"triple scale":           func(r *Recipe) { r.Viewport.Scale = 3 },
 		"unknown crop":           func(r *Recipe) { r.Crop = "element" },
+		"unknown color scheme":   func(r *Recipe) { r.ColorScheme = "sepia" },
+		"unknown mask style":     func(r *Recipe) { r.MaskStyle = "pixelate" },
+		"script optional mask":   func(r *Recipe) { r.OptionalMasks = []string{"a;alert(1)"} },
 	} {
 		recipe := validRecipe()
 		recipe.Steps = append([]Step{}, recipe.Steps...)
@@ -121,6 +124,14 @@ func TestRecipeAcceptsOnlyTheTypedLanguage(t *testing.T) {
 		if recipe.Validate() == nil {
 			t.Errorf("%s was accepted", name)
 		}
+	}
+	phase2 := validRecipe()
+	phase2.ColorScheme = ColorSchemeDark
+	phase2.MaskStyle = MaskStyleBlur
+	phase2.OptionalMasks = []string{".toast"}
+	phase2.VerifyWithVision = true
+	if err := phase2.Validate(); err != nil {
+		t.Fatalf("valid phase-2 recipe rejected: %v", err)
 	}
 	first, _ := validRecipe().Hash()
 	changed := validRecipe()
@@ -1085,5 +1096,90 @@ func TestProviderRefusalIsARetryableOutage(t *testing.T) {
 	}
 	if _, err := provider.Allocate(context.Background(), nil, time.Minute); err == nil {
 		t.Error("a session with no approved hosts was allocated")
+	}
+}
+
+func TestNavigationPathAllowsSafeQueriesAndBlocksSecrets(t *testing.T) {
+	origin := "https://app.example.com"
+	for _, tc := range []struct {
+		raw  string
+		want string
+		ok   bool
+	}{
+		{"https://app.example.com/analytics?tab=cohorts&view=weekly", "/analytics?tab=cohorts&view=weekly", true},
+		{"https://app.example.com/reports", "/reports", true},
+		{"https://app.example.com/analytics?token=secret", "", false},
+		{"https://app.example.com/analytics?access_token=abc", "", false},
+		{"https://app.example.com/analytics?state=xyz", "", false},
+		{"https://app.example.com/analytics?user=alice@example.com", "", false},
+		{"https://app.example.com/analytics?q=" + strings.Repeat("a", 65), "", false},
+		{"https://app.example.com/analytics?a=1&b=2&c=3&d=4&e=5&f=6&g=7", "", false},
+		{"https://app.example.com/analytics#section", "", false},
+		{"https://app.example.com/logout?next=/", "", false},
+		{"https://evil.example.com/analytics?tab=cohorts", "", false},
+	} {
+		got, ok := navigationPath(tc.raw, origin)
+		if ok != tc.ok || got != tc.want {
+			t.Errorf("navigationPath(%q) = (%q, %v), want (%q, %v)", tc.raw, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestStateMergePreviousAndBootstrapFilter(t *testing.T) {
+	hosts := []string{"app.example.com", "api.example.com"}
+	prev := &State{
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"a": "old"},
+			"https://api.example.com": {"b": "keep"},
+			"https://evil.example":    {"c": "drop"},
+		},
+	}
+	cur := &State{
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"a": "new"},
+		},
+	}
+	cur.MergePrevious(prev, hosts)
+	if cur.LocalStorage["https://app.example.com"]["a"] != "new" {
+		t.Fatalf("current origin overwritten: %+v", cur.LocalStorage)
+	}
+	if cur.LocalStorage["https://api.example.com"]["b"] != "keep" {
+		t.Fatalf("sibling approved origin lost: %+v", cur.LocalStorage)
+	}
+	if _, exists := cur.LocalStorage["https://evil.example"]; exists {
+		t.Fatal("unapproved origin leaked during MergePrevious")
+	}
+
+	target := Target{Origin: "https://app.example.com", Hosts: hosts, ProtectedPath: "/dashboard", ExpectedAccount: "demo@example.com"}
+	filtered, err := FilterBootstrapState(&State{
+		Cookies: []*proto.NetworkCookieParam{
+			{Name: "session", Value: "ok", Domain: "app.example.com"},
+			{Name: "idp", Value: "nope", Domain: "accounts.other.com"},
+		},
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"k": "v"},
+			"https://evil.example":    {"x": "y"},
+		},
+	}, target)
+	if err != nil {
+		t.Fatalf("FilterBootstrapState: %v", err)
+	}
+	if len(filtered.Cookies) != 1 || filtered.Cookies[0].Name != "session" {
+		t.Fatalf("unexpected cookies: %+v", filtered.Cookies)
+	}
+	if len(filtered.LocalStorage) != 1 || filtered.LocalStorage["https://app.example.com"]["k"] != "v" {
+		t.Fatalf("unexpected localStorage: %+v", filtered.LocalStorage)
+	}
+	// Error & empty cases must fail with SessionRestoreFailed.
+	for name, raw := range map[string]*State{
+		"nil":           nil,
+		"empty name":    {Cookies: []*proto.NetworkCookieParam{{Name: "", Value: "v", Domain: "app.example.com"}}},
+		"http storage":  {LocalStorage: map[string]map[string]string{"http://app.example.com": {"k": "v"}}},
+		"all untrusted": {Cookies: []*proto.NetworkCookieParam{{Name: "s", Value: "v", Domain: "evil.example"}}},
+	} {
+		var failure *Failure
+		if _, err := FilterBootstrapState(raw, target); !errors.As(err, &failure) || failure.Code != SessionRestoreFailed {
+			t.Errorf("%s: got %v, want %s", name, err, SessionRestoreFailed)
+		}
 	}
 }

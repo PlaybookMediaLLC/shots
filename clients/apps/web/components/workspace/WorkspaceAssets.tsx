@@ -171,7 +171,10 @@ export function WorkspaceAssets({
   const search = searchParams.get('search') ?? ''
   const classificationParam = searchParams.get('classification')
   const classification =
-    classificationParam === 'input' || classificationParam === 'export'
+    classificationParam === 'input' ||
+    classificationParam === 'export' ||
+    classificationParam === 'capture' ||
+    classificationParam === 'derived'
       ? classificationParam
       : undefined
   const typeParam = searchParams.get('type')
@@ -360,6 +363,8 @@ export function WorkspaceAssets({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All sources</SelectItem>
+            <SelectItem value="capture">Captured screenshots</SelectItem>
+            <SelectItem value="derived">Derived visuals</SelectItem>
             <SelectItem value="export">Saved exports</SelectItem>
             <SelectItem value="input">Uploaded originals</SelectItem>
           </SelectContent>
@@ -509,7 +514,11 @@ export function WorkspaceAssets({
                         ? 'Saved export'
                         : asset.classification === 'input'
                           ? 'Uploaded original'
-                          : 'Workspace asset'}
+                          : asset.classification === 'capture'
+                            ? 'Captured screenshot'
+                            : asset.classification === 'derived'
+                              ? 'Derived visual'
+                              : 'Workspace asset'}
                       {asset.uploadedBy ? ` · ${asset.uploadedBy}` : ''}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">

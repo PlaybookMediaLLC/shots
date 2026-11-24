@@ -65,6 +65,19 @@ func (v Viewport) DeviceScale() int {
 // so a creative shows the change instead of the whole screen.
 const CropMarker = "marker"
 
+// ColorSchemeLight and ColorSchemeDark emulate prefers-color-scheme on the page.
+const (
+	ColorSchemeLight = "light"
+	ColorSchemeDark  = "dark"
+)
+
+// MaskStyleSolid paints opaque black boxes over masked regions (default);
+// MaskStyleBlur applies heavy CSS blur for cleaner marketing visuals.
+const (
+	MaskStyleSolid = "solid"
+	MaskStyleBlur  = "blur"
+)
+
 // VersionCheck says where the signed-in app reports its deployed commit: a
 // same-origin path, or an element whose text or content attribute holds it.
 type VersionCheck struct {
@@ -84,6 +97,16 @@ type Recipe struct {
 	// Masks are painted over before the screenshot. A missing mask target
 	// blocks the capture, because the private field may just have moved.
 	Masks []string `json:"masks,omitempty"`
+	// OptionalMasks are masked whenever present on the reached page without
+	// failing if the selector does not appear on that route.
+	OptionalMasks []string `json:"optionalMasks,omitempty"`
+	// MaskStyle selects how masks are rendered ("solid" default, or "blur").
+	MaskStyle string `json:"maskStyle,omitempty"`
+	// ColorScheme emulates prefers-color-scheme ("light", "dark", or unset).
+	ColorScheme string `json:"colorScheme,omitempty"`
+	// VerifyWithVision runs a fast multimodal check after capture to reject
+	// blank states, error banners, or unrelated views before committing.
+	VerifyWithVision bool `json:"verifyWithVision,omitempty"`
 	// Version is the proof a release capture requires. Without it the capture
 	// is only ever labeled as the current state.
 	Version *VersionCheck `json:"version,omitempty"`
@@ -142,6 +165,12 @@ func (r Recipe) Validate() error {
 	if r.Crop != "" && r.Crop != CropMarker {
 		return errors.New("Crop to the first marker, or capture the whole viewport.")
 	}
+	if r.ColorScheme != "" && r.ColorScheme != ColorSchemeLight && r.ColorScheme != ColorSchemeDark {
+		return errors.New("Color scheme must be light or dark.")
+	}
+	if r.MaskStyle != "" && r.MaskStyle != MaskStyleSolid && r.MaskStyle != MaskStyleBlur {
+		return errors.New("Mask style must be solid or blur.")
+	}
 	if len(r.Steps) == 0 || len(r.Steps) > MaxSteps {
 		return errors.New("Use 1–10 steps.")
 	}
@@ -168,10 +197,10 @@ func (r Recipe) Validate() error {
 	if len(r.Markers) == 0 {
 		return errors.New("Name at least one element that proves the expected screen is showing.")
 	}
-	if len(r.Markers)+len(r.Forbidden)+len(r.Masks) > MaxSelectors {
+	if len(r.Markers)+len(r.Forbidden)+len(r.Masks)+len(r.OptionalMasks) > MaxSelectors {
 		return errors.New("Use at most 20 markers and masks.")
 	}
-	for _, selectors := range [][]string{r.Markers, r.Forbidden, r.Masks} {
+	for _, selectors := range [][]string{r.Markers, r.Forbidden, r.Masks, r.OptionalMasks} {
 		for _, selector := range selectors {
 			if !ValidSelector(selector) {
 				return errors.New("Markers and masks must be CSS selectors.")

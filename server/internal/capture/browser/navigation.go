@@ -19,15 +19,18 @@ type NavigationControl struct {
 }
 
 // NavigationObservation contains paths, headings and navigation labels. Input
-// values, account elements, masked content and URL queries never reach a model.
+// values, account elements, masked content and sensitive URL queries never reach a model.
 // Current names the selected tabs and open controls, which are not choices.
 type NavigationObservation struct {
-	Path     string              `json:"path"`
-	Headings []string            `json:"headings"`
-	Current  []string            `json:"current"`
-	Controls []NavigationControl `json:"controls"`
-	Ready    bool                `json:"ready"`
-	loading  bool
+	Path        string              `json:"path"`
+	Headings    []string            `json:"headings"`
+	Current     []string            `json:"current"`
+	Controls    []NavigationControl `json:"controls"`
+	Ready       bool                `json:"ready"`
+	CanScroll   bool                `json:"canScroll,omitempty"`
+	loading     bool
+	contentHash string
+	scrollY     int
 }
 
 // NavigationChoice must select an ID from the latest observation, capture a
@@ -82,27 +85,72 @@ const navigationChecks = `
 
 // observeNavigation offers navigation links, explicit tabs and, when allowed,
 // pressable controls, stopping at 60. Links navigate directly, so their click
-// handlers cannot submit forms or open other windows.
+// handlers cannot submit forms or open other windows. All DOM reads happen
+// before tagging elements with transient data-shots-nav attributes to avoid
+// interleaved layout thrashing during waitNavigation polling.
 const observeNavigation = `(identity, masks, markers, account, buttons) => {` + navigationChecks + `
- const selector = e => { const parts=[]; while(e && e.tagName!=='HTML' && parts.length<12) {
-   const siblings=Array.from(e.parentElement.children);
-   parts.unshift(':nth-child('+(siblings.indexOf(e)+1)+')'); e=e.parentElement;
- } const path=parts.join('>'); return document.querySelectorAll(path).length===1?path:''; };
  const usable = e => visible(e) && !excluded(e) && !mentionsAccount(e) && !e.hasAttribute('download') && e.getAttribute('aria-disabled')!=='true' && !e.disabled && e.getAttribute('aria-selected')!=='true';
- const links = new Set(document.querySelectorAll('nav a[href],[role=navigation] a[href],[role=tab]'));
+ const links = new Set(document.querySelectorAll('nav a[href],[role=navigation] a[href],aside a[href],[role=tab]'));
  const chosen = [];
  for (const e of links) { if (chosen.length >= 60) break; if (usable(e)) chosen.push(e); }
  if (buttons) for (const e of document.querySelectorAll(pressableSelector)) { if (chosen.length >= 60) break; if (!links.has(e) && pressable(e) && usable(e)) chosen.push(e); }
- const controls = chosen.map(e => ({kind:e.getAttribute('role')==='tab'?'tab':links.has(e)?'link':'button',label:text(e),href:e.href || '',selector:selector(e)}));
- return {headings:Array.from(document.querySelectorAll('h1,h2,[role=heading]')).filter(e=>visible(e)&&!excluded(e)).slice(0,12).map(text),controls,
-   current:Array.from(document.querySelectorAll('[role=tab][aria-selected=true],[aria-expanded=true],details[open]>summary')).filter(e=>e.matches('[role=tab],'+pressableSelector)&&!e.closest('table,[role=grid],[role=treegrid],[role=row]')&&visible(e)&&!excluded(e)&&!mentionsAccount(e)).slice(0,12).map(text).filter(Boolean),
-   loading:Array.from(document.querySelectorAll('[aria-busy=true],[role=progressbar]')).some(visible),
-   ready:markers.every(s=>Array.from(document.querySelectorAll(s)).some(visible))};
+ const headings = Array.from(document.querySelectorAll('h1,h2,[role=heading]')).filter(e=>visible(e)&&!excluded(e)).slice(0,12).map(text);
+ const current = Array.from(document.querySelectorAll('[role=tab][aria-selected=true],[aria-expanded=true],details[open]>summary')).filter(e=>e.matches('[role=tab],'+pressableSelector)&&!e.closest('table,[role=grid],[role=treegrid],[role=row]')&&visible(e)&&!excluded(e)&&!mentionsAccount(e)).slice(0,12).map(text).filter(Boolean);
+ const loading = Array.from(document.querySelectorAll('[aria-busy=true],[role=progressbar]')).some(visible);
+ const ready = markers.every(s=>Array.from(document.querySelectorAll(s)).some(visible));
+ const main = document.querySelector('main,[role=main]') || document.body;
+ let hash = 0;
+ if (main) {
+   const sample = (main.textContent || '').replace(/\s+/g, ' ').slice(0, 8000);
+   for (let i = 0; i < sample.length; i++) { hash = ((hash << 5) - hash + sample.charCodeAt(i)) | 0; }
+ }
+ const scrollY = Math.round(window.scrollY || 0);
+ const canScroll = (document.documentElement.scrollHeight - (scrollY + window.innerHeight)) > 120;
+ const controls = chosen.map(e => ({kind:e.getAttribute('role')==='tab'?'tab':links.has(e)?'link':'button',label:text(e),href:e.href || '',selector:''}));
+ document.querySelectorAll('[data-shots-nav]').forEach(el => el.removeAttribute('data-shots-nav'));
+ for (let i = 0; i < chosen.length; i++) {
+   const id = 'c' + (i + 1);
+   chosen[i].setAttribute('data-shots-nav', id);
+   controls[i].selector = '[data-shots-nav="' + id + '"]';
+ }
+ return {headings,controls,current,loading,ready,contentHash:String(hash),scrollY,canScroll};
 }`
+
+// sensitiveQueryParam blocks query keys that may carry secrets or auth tokens.
+func sensitiveQueryParam(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	for _, blocked := range []string{"token", "code", "auth", "key", "secret", "password", "passwd", "session", "jwt", "ticket", "sig", "cookie", "nonce", "state", "email"} {
+		if strings.Contains(lower, blocked) {
+			return true
+		}
+	}
+	return false
+}
 
 func navigationPath(raw, origin string) (string, bool) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme+"://"+u.Host != origin || u.User != nil || u.RawQuery != "" || u.Fragment != "" || !ValidPath(u.EscapedPath()) {
+	if err != nil || u.Scheme+"://"+u.Host != origin || u.User != nil || u.Fragment != "" {
+		return "", false
+	}
+	target := u.EscapedPath()
+	if u.RawQuery != "" {
+		q, err := url.ParseQuery(u.RawQuery)
+		if err != nil || len(q) > 6 {
+			return "", false
+		}
+		for k, vals := range q {
+			if sensitiveQueryParam(k) {
+				return "", false
+			}
+			for _, v := range vals {
+				if strings.Contains(v, "@") || len(v) > 64 {
+					return "", false
+				}
+			}
+		}
+		target += "?" + u.RawQuery
+	}
+	if !ValidPath(target) {
 		return "", false
 	}
 	for _, segment := range strings.FieldsFunc(strings.ToLower(u.Path), func(r rune) bool { return r == '/' || r == '-' || r == '_' || r == '.' }) {
@@ -111,7 +159,7 @@ func navigationPath(raw, origin string) (string, bool) {
 			return "", false
 		}
 	}
-	return u.EscapedPath(), true
+	return target, true
 }
 
 func (s *scope) observeNavigation(ctx context.Context, input RunInput) (NavigationObservation, error) {
@@ -124,18 +172,25 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 	if err := s.checkIdentity(ctx, input.Target, view.Path); err != nil {
 		return view, err
 	}
+	if safeWithQuery, ok := navigationPath(here.String(), input.Target.Origin); ok {
+		view.Path = safeWithQuery
+	}
+	allMasks := append(slices.Clone(input.Recipe.Masks), input.Recipe.OptionalMasks...)
 	// A recipe that allows POST paths may expose a write behind any control, so it navigates by links and tabs only.
-	result, err := s.page.Context(ctx).Eval(observeNavigation, input.Target.IdentitySelector, input.Recipe.Masks, input.Recipe.Markers, input.Target.ExpectedAccount,
+	result, err := s.page.Context(ctx).Eval(observeNavigation, input.Target.IdentitySelector, allMasks, input.Recipe.Markers, input.Target.ExpectedAccount,
 		len(input.Recipe.AllowedPostPaths) == 0)
 	if err != nil {
 		return view, &Failure{Code: PageFailed}
 	}
 	var snapshot struct {
-		Headings []string `json:"headings"`
-		Current  []string `json:"current"`
-		Ready    bool     `json:"ready"`
-		Loading  bool     `json:"loading"`
-		Controls []struct {
+		Headings    []string `json:"headings"`
+		Current     []string `json:"current"`
+		Ready       bool     `json:"ready"`
+		Loading     bool     `json:"loading"`
+		ContentHash string   `json:"contentHash"`
+		ScrollY     int      `json:"scrollY"`
+		CanScroll   bool     `json:"canScroll"`
+		Controls    []struct {
 			Kind, Label, Href, Selector string
 		} `json:"controls"`
 	}
@@ -143,8 +198,12 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 		return view, &Failure{Code: PageFailed}
 	}
 	view.Headings, view.Current, view.Ready = snapshot.Headings, snapshot.Current, snapshot.Ready
-	view.loading = snapshot.Loading
+	view.loading, view.contentHash, view.scrollY, view.CanScroll = snapshot.Loading, snapshot.ContentHash, snapshot.ScrollY, snapshot.CanScroll
 	view.Ready = view.Ready && !view.loading
+	currentFullPath := view.Path
+	if here.RawQuery != "" {
+		currentFullPath += "?" + here.RawQuery
+	}
 	for _, control := range snapshot.Controls {
 		if control.Label == "" || (control.Kind != "link" && !ValidSelector(control.Selector)) {
 			continue
@@ -153,7 +212,7 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 		if control.Kind == "link" {
 			var allowed bool
 			path, allowed = navigationPath(control.Href, input.Target.Origin)
-			if !allowed || path == view.Path {
+			if !allowed || path == currentFullPath {
 				continue
 			}
 		}
@@ -162,7 +221,7 @@ func (s *scope) observeNavigation(ctx context.Context, input RunInput) (Navigati
 	return view, nil
 }
 
-// Wait for feature evidence or new navigation, not just a selected tab attribute.
+// Wait for feature evidence, content update, or new navigation, not just a selected tab attribute.
 func (s *scope) waitNavigation(ctx context.Context, input RunInput, before NavigationObservation) error {
 	waitCtx, cancel := context.WithTimeout(ctx, defaultStepTimeout)
 	defer cancel()
@@ -171,7 +230,9 @@ func (s *scope) waitNavigation(ctx context.Context, input RunInput, before Navig
 		if err != nil {
 			return err
 		}
-		changed := view.Path != before.Path || (!before.Ready && view.Ready) || !slices.Equal(view.Headings, before.Headings)
+		changed := view.Path != before.Path || (!before.Ready && view.Ready) || !slices.Equal(view.Headings, before.Headings) ||
+			(before.contentHash != "" && view.contentHash != "" && view.contentHash != before.contentHash) ||
+			view.scrollY != before.scrollY
 		for _, control := range view.Controls {
 			if !slices.ContainsFunc(before.Controls, func(old NavigationControl) bool {
 				return old.Kind == control.Kind && old.Label == control.Label && old.Path == control.Path
@@ -194,11 +255,12 @@ func (s *scope) waitNavigation(ctx context.Context, input RunInput, before Navig
 // the observation applied and has the same label; the page may change while the
 // model chooses.
 func (s *scope) pressButton(ctx context.Context, input RunInput, selector, label string) error {
+	allMasks := append(slices.Clone(input.Recipe.Masks), input.Recipe.OptionalMasks...)
 	pressed, err := s.evalBool(ctx, `(selector, expected, identity, masks, account) => {`+navigationChecks+`
 		const e = document.querySelector(selector);
 		if (!e || !pressable(e) || excluded(e) || mentionsAccount(e) || !visible(e) || e.disabled || e.getAttribute('aria-disabled')==='true' || text(e) !== expected) return false;
 		e.click(); return true;
-	}`, selector, label, input.Target.IdentitySelector, input.Recipe.Masks, input.Target.ExpectedAccount)
+	}`, selector, label, input.Target.IdentitySelector, allMasks, input.Target.ExpectedAccount)
 	if err != nil {
 		return &Failure{Code: PageFailed}
 	}
@@ -254,6 +316,24 @@ func (s *scope) navigateFeature(ctx context.Context, input RunInput) ([]Navigati
 			return actions, nil
 		case "stop":
 			return actions, &Failure{Code: NavigationFailed}
+		case "scroll":
+			if *choice.ControlID != -1 || !view.CanScroll {
+				return actions, &Failure{Code: NavigationInvalid}
+			}
+			if step == input.Recipe.Navigation.MaxSteps {
+				return actions, &Failure{Code: NavigationLimit}
+			}
+			scrolled, err := s.evalBool(ctx, `() => {
+				const before = window.scrollY || 0;
+				window.scrollBy({top: Math.max(200, Math.round(window.innerHeight * 0.7)), behavior: 'instant'});
+				return (window.scrollY || 0) > before;
+			}`)
+			if err != nil || !scrolled {
+				return actions, &Failure{Code: NavigationFailed}
+			}
+			s.settle(ctx)
+			actions = append(actions, NavigationAction{Kind: "scroll", Path: view.Path})
+			continue
 		case "select":
 			if *choice.ControlID < 0 || *choice.ControlID >= len(view.Controls) {
 				return actions, &Failure{Code: NavigationInvalid}
@@ -265,7 +345,7 @@ func (s *scope) navigateFeature(ctx context.Context, input RunInput) ([]Navigati
 			return actions, &Failure{Code: NavigationLimit}
 		}
 		control := view.Controls[*choice.ControlID]
-		key := view.Path + ":" + control.Kind + ":" + control.Path + ":" + control.selector
+		key := view.Path + ":" + control.Kind + ":" + control.Path + ":" + control.Label
 		if seen[key] {
 			return actions, &Failure{Code: NavigationLimit}
 		}

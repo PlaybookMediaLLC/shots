@@ -181,7 +181,7 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 			return automation.Outputs{}, err
 		}
 	} else {
-		if err := prior.Update().SetStatus("running").AddAttempts(1).Exec(ctx); err != nil {
+		if err := prior.Update().SetStatus("running").SetFailureCode("").AddAttempts(1).Exec(ctx); err != nil {
 			return automation.Outputs{}, err
 		}
 	}
@@ -453,6 +453,20 @@ func (c *Configuration) automationCreateCampaign(ctx context.Context, actor Acto
 	style, _ := json.Marshal(map[string]any{"colors": brand.Definition["colors"], "typography": brand.Definition["typography"]})
 	messaging := releasenotes.Clean(fmt.Sprintf("Brand kit: %s (version %d).\nVisual guidance: %s\n%s\nDestination connections: %s\nSource text requires human review; no generated claims.", brand.Name, brand.Version, style, contextNotes, strings.Join(action.DestinationIDs, ", ")), 2000)
 	result, err := c.CreateCampaign(ctx, actor, CreateCampaignInput{Name: event.Snapshot.Title, Objective: "Review and communicate this release.", ReleaseID: &input.ReleaseID, Audience: &audience, Messaging: &messaging, IdempotencyKey: &key, Posts: posts})
+	var prohibited *ProhibitedTermsError
+	if errors.As(err, &prohibited) {
+		// Raw repository notes may mention a prohibited term before generate_copy
+		// rewrites them into brand-compliant copy. Seed safe placeholder drafts so
+		// downstream copy generation and human review can still run.
+		safeCopy := releasenotes.Clean(event.Snapshot.Title, 200)
+		if err := requireAllowedCopy(ctx, c.client, actor.OrganizationID, nil, safeCopy); err != nil {
+			safeCopy = "Release draft awaiting copy generation and review."
+		}
+		for i := range posts {
+			posts[i].Copy = safeCopy
+		}
+		result, err = c.CreateCampaign(ctx, actor, CreateCampaignInput{Name: event.Snapshot.Title, Objective: "Review and communicate this release.", ReleaseID: &input.ReleaseID, Audience: &audience, Messaging: &messaging, IdempotencyKey: &key, Posts: posts})
+	}
 	if err != nil {
 		return automation.Outputs{}, err
 	}

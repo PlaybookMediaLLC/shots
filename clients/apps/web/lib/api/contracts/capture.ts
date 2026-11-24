@@ -24,22 +24,31 @@ export const captureConnectionInputSchema = z.object({
   /** Empty proves the account from its text in the app's header or navigation. */
   identitySelector: z.union([z.literal(''), selectorSchema]),
   expectedAccount: z.string().trim().min(1).max(200),
+  /** Optional customer-hosted HTTPS endpoint that returns short-lived demo session state. */
+  bootstrapUrl: z.string().trim().max(2048).optional(),
+  /** Optional HMAC signing secret (>=16 chars) paired with `bootstrapUrl`. */
+  bootstrapSecret: z.string().trim().max(512).optional(),
 })
 
 /** A connection and whether its stored session can still be used; no session material. */
-export const captureConnectionSchema = captureConnectionInputSchema.extend({
-  id: idSchema,
-  sourceAppId: z.string().nullable(),
-  status: z.enum(['CONNECTING', 'READY', 'NEEDS_AUTH', 'REVOKED']),
-  generation: z.number().int(),
-  validatedAt: z.string().nullable(),
-  stateExpiresAt: z.string().nullable(),
-  connectPhase: z.string().nullable(),
-  failureCode: z.string().nullable(),
-  revokedAt: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-})
+export const captureConnectionSchema = captureConnectionInputSchema
+  .omit({ bootstrapSecret: true })
+  .extend({
+    id: idSchema,
+    sourceAppId: z.string().nullable(),
+    status: z.enum(['CONNECTING', 'READY', 'NEEDS_AUTH', 'REVOKED']),
+    generation: z.number().int(),
+    validatedAt: z.string().nullable(),
+    stateExpiresAt: z.string().nullable(),
+    connectPhase: z.string().nullable(),
+    failureCode: z.string().nullable(),
+    discoveredRoutes: z.array(z.object({ path: z.string(), label: z.string() })).optional(),
+    bootstrapUrl: z.string().nullable().optional(),
+    hasBootstrap: z.boolean().optional(),
+    revokedAt: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
 
 /**
  * The sign-in browser's one-time link. It is a bearer credential, so https only
@@ -80,6 +89,14 @@ export const captureRecipeDefinitionSchema = z.object({
   markers: z.array(selectorSchema).min(1).max(20),
   forbidden: z.array(selectorSchema).max(20).optional(),
   masks: z.array(selectorSchema).max(20, 'Use at most 20 masks.').optional(),
+  /** Selectors masked when present without failing if absent on a navigated route. */
+  optionalMasks: z.array(selectorSchema).max(20).optional(),
+  /** Mask appearance: solid black boxes (default) or CSS blur. */
+  maskStyle: z.enum(['solid', 'blur']).optional(),
+  /** Emulate light or dark prefers-color-scheme on the captured page. */
+  colorScheme: z.enum(['light', 'dark']).optional(),
+  /** Verify the captured screenshot visually before committing it to campaigns. */
+  verifyWithVision: z.boolean().optional(),
   version: z
     .object({ path: pathSchema.optional(), selector: selectorSchema.optional() })
     .optional(),
@@ -146,6 +163,8 @@ export const captureJobSchema = z.object({
   releaseChange: z.string().nullable().optional(),
   /** The newest attempt's AI path: control kinds and paths only. */
   navigationActions: z.array(z.object({ kind: z.string(), path: z.string() })).optional(),
+  /** Normalized bounding box (0-1 fractions) of the captured marker element. */
+  focusBox: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(),
 })
 
 /** Everything a member may read about this workspace's authenticated capture. */

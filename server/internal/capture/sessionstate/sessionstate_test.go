@@ -84,3 +84,42 @@ func TestFromEnvironment(t *testing.T) {
 		t.Fatalf("key: %v %v", keys, err)
 	}
 }
+
+func TestBootstrapSecretSealingAndIsolation(t *testing.T) {
+	key, nextKey := bytes.Repeat([]byte{4}, 32), bytes.Repeat([]byte{5}, 32)
+	keys, err := NewKeys(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := Binding{Organization: "org-a", Connection: "conn-a", Environment: "production"}
+	secret := []byte("super-secret-hmac-key-for-bootstrap")
+	sealed, err := keys.SealBootstrap(secret, binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, stale, err := keys.OpenBootstrap(sealed, binding)
+	if err != nil || stale || !bytes.Equal(opened, secret) {
+		t.Fatalf("open bootstrap=%q stale=%v err=%v", opened, stale, err)
+	}
+	// Cross-purpose isolation: a bootstrap envelope must never open as session state.
+	sessionBinding := Binding{Organization: "org-a", Connection: "conn-a", Environment: "production", Generation: 1}
+	if _, _, err := keys.Open(sealed, sessionBinding); !errors.Is(err, ErrRefused) {
+		t.Fatalf("expected session Open to refuse bootstrap envelope, got %v", err)
+	}
+	sessionSealed, err := keys.Seal([]byte(`{"cookies":[]}`), sessionBinding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := keys.OpenBootstrap(sessionSealed, binding); !errors.Is(err, ErrRefused) {
+		t.Fatalf("expected OpenBootstrap to refuse session envelope, got %v", err)
+	}
+	// Key rotation marks the envelope stale so callers can re-seal it.
+	rotated, err := NewKeys(nextKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, stale, err = rotated.OpenBootstrap(sealed, binding)
+	if err != nil || !stale || !bytes.Equal(opened, secret) {
+		t.Fatalf("rotated open=%q stale=%v err=%v", opened, stale, err)
+	}
+}

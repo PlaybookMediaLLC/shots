@@ -774,6 +774,7 @@ var (
 		{Name: "refusedRequests", Type: field.TypeInt, Default: 0},
 		{Name: "assetId", Type: field.TypeString, Nullable: true},
 		{Name: "navigationActions", Type: field.TypeJSON, Nullable: true},
+		{Name: "focusBox", Type: field.TypeJSON, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -2770,6 +2771,9 @@ var (
 		{Name: "leaseToken", Type: field.TypeInt64, Default: 0},
 		{Name: "leaseExpiresAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "discoveredRoutes", Type: field.TypeJSON, Nullable: true},
+		{Name: "bootstrapUrl", Type: field.TypeString, Nullable: true},
+		{Name: "bootstrapSecretCiphertext", Type: field.TypeString, Nullable: true},
 		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},

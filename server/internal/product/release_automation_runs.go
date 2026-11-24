@@ -564,7 +564,8 @@ func (c *Configuration) RetryReleaseAutomationRun(ctx context.Context, actor Act
 	if err != nil {
 		return err
 	}
-	if run.Status != "failed" || run.FailureCode != "activity_failed" || run.CancelRequested {
+	retryable := (run.Status == "failed" && run.FailureCode == "activity_failed") || run.Status == "needs_attention"
+	if !retryable || run.CancelRequested {
 		return publishing.ErrConflict
 	}
 	if _, err := c.automationCheckpoint(ctx, run, event); err != nil {
@@ -575,7 +576,7 @@ func (c *Configuration) RetryReleaseAutomationRun(ctx context.Context, actor Act
 		return err
 	}
 	defer tx.Rollback()
-	n, err := tx.ReleaseAutomationRun.Update().Where(releaseautomationrun.ID(id), releaseautomationrun.OrganizationID(actor.OrganizationID), releaseautomationrun.Status("failed"), releaseautomationrun.CancelRequested(false), releaseautomationrun.RecoveryAttempt(run.RecoveryAttempt)).SetStatus("queued").ClearCompletedAt().SetFailureCode("").AddRecoveryAttempt(1).Save(ctx)
+	n, err := tx.ReleaseAutomationRun.Update().Where(releaseautomationrun.ID(id), releaseautomationrun.OrganizationID(actor.OrganizationID), releaseautomationrun.StatusIn("failed", "needs_attention"), releaseautomationrun.CancelRequested(false), releaseautomationrun.RecoveryAttempt(run.RecoveryAttempt)).SetStatus("queued").ClearCompletedAt().SetFailureCode("").AddRecoveryAttempt(1).Save(ctx)
 	if err != nil {
 		return err
 	}
@@ -692,6 +693,14 @@ func (c *Configuration) FinishReleaseAutomation(ctx context.Context, org, id, st
 	}
 	if run.VersionID != nil && strings.HasPrefix(run.Reason, "First matching definition") {
 		reason = run.Reason + " " + reason
+	}
+	// Preserve a more specific node failure code (e.g. needs_auth,
+	// destination_set_required, insufficient_credits) over the generic wrapper.
+	if status == "needs_attention" && code == "configuration_invalid" {
+		if failedNode, err := tx.ReleaseAutomationNode.Query().Where(releaseautomationnode.OrganizationID(org), releaseautomationnode.RunID(id), releaseautomationnode.StatusEQ("failed"), releaseautomationnode.FailureCodeNEQ("")).
+			Order(ent.Desc(releaseautomationnode.FieldStartedAt), ent.Desc(releaseautomationnode.FieldID)).First(ctx); err == nil && failedNode.FailureCode != "" {
+			code = failedNode.FailureCode
+		}
 	}
 	if err := tx.ReleaseAutomationRun.UpdateOneID(id).SetStatus(status).SetFailureCode(code).SetReason(reason).SetCompletedAt(time.Now()).Exec(ctx); err != nil {
 		return err

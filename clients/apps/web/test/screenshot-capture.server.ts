@@ -2,8 +2,15 @@ import assert from 'node:assert/strict'
 import { test, type TestContext } from 'node:test'
 import sharp from 'sharp'
 import type { OrganizationAccess } from '../lib/auth/access'
+import { getDesignTemplate } from '../lib/design/templates'
 import { captureScreenshot, getScreenshotFailure } from '../lib/screenshot-service'
-import { captureProductSurface, queueSignedInCaptureAt } from '../lib/tenant/product-surfaces'
+import {
+  captureProductSurface,
+  isCaptureAssetKey,
+  queueSignedInCaptureAt,
+  resolveSignedInCaptureAt,
+} from '../lib/tenant/product-surfaces'
+import { buildFocusAnnotation } from '../lib/workflows/render'
 
 const input = {
   colorScheme: 'light',
@@ -184,4 +191,135 @@ test('a surface from another workspace is not captured at all', async (t) => {
   const requests = stubSignedInSurface(t, true, () => Response.json({}))
   assert.equal(await captureProductSurface(access, 'surface_other'), null)
   assert.equal(requests.length, 1)
+})
+
+test('resolveSignedInCaptureAt reuses fresh captures, attaches to open jobs, and honors AbortSignal', async (t) => {
+  process.env.PUBLISHING_API_URL = 'http://backend.test'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'private-test-token'
+  t.after(() => {
+    delete process.env.PUBLISHING_API_URL
+    delete process.env.PUBLISHING_SERVICE_TOKEN
+  })
+  const surface = { id: 'surface_1', url: 'https://app.example.com/dashboard' }
+  const recipe = { id: 'recipe_1', status: 'ACTIVE', surfaceId: 'surface_1' }
+
+  // 1. Fresh (< 24h) capture reused even when URL has trailing slash and hash fragment.
+  t.mock.method(globalThis, 'fetch', async (target: string | URL | Request) => {
+    const { pathname } = new URL(
+      typeof target === 'string' ? target : target instanceof URL ? target.href : target.url
+    )
+    if (pathname === '/v1/capture') {
+      return Response.json({ available: true, connections: [], jobs: [], recipes: [recipe] })
+    }
+    if (pathname === '/v1/product-surfaces') {
+      return Response.json({ productSurfaces: [surface] })
+    }
+    if (pathname === '/v1/product-surfaces/surface_1/captures') {
+      return Response.json({
+        captures: [
+          { assetId: 'asset_fresh', capturedAt: new Date().toISOString(), supersededAt: null },
+        ],
+      })
+    }
+    throw new Error(`Unexpected ${pathname}`)
+  })
+  assert.deepEqual(
+    await resolveSignedInCaptureAt(access, 'https://app.example.com/dashboard/#top', 'run_1'),
+    { assetId: 'asset_fresh', kind: 'existing' }
+  )
+  t.mock.restoreAll()
+
+  // 2. Existing open RUNNING job is polled without queuing a duplicate job.
+  const requests: string[] = []
+  t.mock.method(globalThis, 'fetch', async (target: string | URL | Request, init?: RequestInit) => {
+    const { pathname } = new URL(
+      typeof target === 'string' ? target : target instanceof URL ? target.href : target.url
+    )
+    requests.push(`${init?.method ?? 'GET'} ${pathname}`)
+    if (pathname === '/v1/capture') {
+      return Response.json({
+        available: true,
+        connections: [],
+        jobs: [{ id: 'job_open', phase: 'RUNNING', recipeId: 'recipe_1' }],
+        recipes: [recipe],
+      })
+    }
+    if (pathname === '/v1/product-surfaces') {
+      return Response.json({ productSurfaces: [surface] })
+    }
+    if (pathname === '/v1/product-surfaces/surface_1/captures') {
+      return Response.json({ captures: [] })
+    }
+    if (pathname === '/v1/capture/jobs/job_open') {
+      return Response.json({ job: { assetId: 'asset_done', id: 'job_open', phase: 'SUCCEEDED' } })
+    }
+    throw new Error(`Unexpected ${pathname}`)
+  })
+  assert.deepEqual(
+    await resolveSignedInCaptureAt(access, 'https://app.example.com/dashboard', 'run_1', {
+      pollMs: 5_000,
+    }),
+    { assetId: 'asset_done', kind: 'captured' }
+  )
+  assert.ok(!requests.some((req) => req.startsWith('POST ')), `unexpected POST: ${requests}`)
+  t.mock.restoreAll()
+
+  // 3. AbortSignal throws AbortError rather than silently returning queued.
+  t.mock.method(globalThis, 'fetch', async (target: string | URL | Request) => {
+    const { pathname } = new URL(
+      typeof target === 'string' ? target : target instanceof URL ? target.href : target.url
+    )
+    if (pathname === '/v1/capture') {
+      return Response.json({
+        available: true,
+        connections: [],
+        jobs: [{ id: 'job_open', phase: 'RUNNING', recipeId: 'recipe_1' }],
+        recipes: [recipe],
+      })
+    }
+    if (pathname === '/v1/product-surfaces') return Response.json({ productSurfaces: [surface] })
+    if (pathname === '/v1/product-surfaces/surface_1/captures')
+      return Response.json({ captures: [] })
+    return Response.json({ job: { id: 'job_open', phase: 'RUNNING' } })
+  })
+  const controller = new AbortController()
+  controller.abort(new Error('cancelled'))
+  await assert.rejects(() =>
+    resolveSignedInCaptureAt(access, 'https://app.example.com/dashboard', 'run_1', {
+      pollMs: 5_000,
+      signal: controller.signal,
+    })
+  )
+})
+
+test('buildFocusAnnotation transforms viewport boxes into screenshot canvas geometry and skips device templates', () => {
+  const screenshot = 'asset:11111111-1111-4111-8111-111111111111'
+  const spotlight = getDesignTemplate('layout-headline-spotlight')!
+  const flatDoc = spotlight.build({ headline: 'New Analytics', screenshot })
+  const focus = { h: 0.2, w: 0.3, x: 0.1, y: 0.1 }
+  const rect = buildFocusAnnotation(flatDoc, focus, 16 / 9, '#10b981')
+  assert.ok(rect)
+  assert.equal(rect.type, 'rectangle')
+  assert.equal(rect.strokeColor, '#10b981')
+  // layout-headline-spotlight shifts the screenshot downward (offset.y: 0.1, scale: 86) under the headline,
+  // so the transformed start.y must sit below the raw viewport y (0.1).
+  assert.ok(rect.start.y > focus.y + 0.05, `expected transformed y > 0.15, got ${rect.start.y}`)
+  assert.ok(rect.end.x - rect.start.x < focus.w, 'scaled screenshot shrinks box width on canvas')
+
+  // Device mockups must not receive a flat canvas rectangle.
+  const laptop = getDesignTemplate('layout-laptop-launch')!
+  const deviceDoc = laptop.build({ headline: 'New Analytics', screenshot })
+  assert.equal(buildFocusAnnotation(deviceDoc, focus, 16 / 9, '#10b981'), null)
+
+  // Oversized / tiny focus boxes are skipped.
+  assert.equal(
+    buildFocusAnnotation(flatDoc, { h: 0.9, w: 0.9, x: 0.05, y: 0.05 }, 16 / 9, '#000'),
+    null
+  )
+  assert.equal(
+    buildFocusAnnotation(flatDoc, { h: 0.01, w: 0.01, x: 0.5, y: 0.5 }, 16 / 9, '#000'),
+    null
+  )
+  assert.equal(isCaptureAssetKey('org/o1/capture/a1.png'), true)
+  assert.equal(isCaptureAssetKey('org/o1/derived/a1.png'), false)
 })

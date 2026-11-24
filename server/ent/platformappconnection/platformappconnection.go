@@ -66,6 +66,12 @@ const (
 	FieldLeaseExpiresAt = "leaseExpiresAt"
 	// FieldCreatedByUserID holds the string denoting the created_by_user_id field in the database.
 	FieldCreatedByUserID = "createdByUserId"
+	// FieldDiscoveredRoutes holds the string denoting the discovered_routes field in the database.
+	FieldDiscoveredRoutes = "discoveredRoutes"
+	// FieldBootstrapURL holds the string denoting the bootstrap_url field in the database.
+	FieldBootstrapURL = "bootstrapUrl"
+	// FieldBootstrapSecretCiphertext holds the string denoting the bootstrap_secret_ciphertext field in the database.
+	FieldBootstrapSecretCiphertext = "bootstrapSecretCiphertext"
 	// FieldRevokedAt holds the string denoting the revoked_at field in the database.
 	FieldRevokedAt = "revokedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -105,6 +111,9 @@ var Columns = []string{
 	FieldLeaseToken,
 	FieldLeaseExpiresAt,
 	FieldCreatedByUserID,
+	FieldDiscoveredRoutes,
+	FieldBootstrapURL,
+	FieldBootstrapSecretCiphertext,
 	FieldRevokedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -289,6 +298,16 @@ func ByLeaseExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 // ByCreatedByUserID orders the results by the created_by_user_id field.
 func ByCreatedByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedByUserID, opts...).ToFunc()
+}
+
+// ByBootstrapURL orders the results by the bootstrap_url field.
+func ByBootstrapURL(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBootstrapURL, opts...).ToFunc()
+}
+
+// ByBootstrapSecretCiphertext orders the results by the bootstrap_secret_ciphertext field.
+func ByBootstrapSecretCiphertext(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBootstrapSecretCiphertext, opts...).ToFunc()
 }
 
 // ByRevokedAt orders the results by the revoked_at field.

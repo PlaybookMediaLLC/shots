@@ -37,6 +37,8 @@ const (
 	OriginRefused        Code = "origin_refused"
 	RecipeInvalid        Code = "recipe_invalid"
 	ImageInvalid         Code = "image_invalid"
+	StorageLimit         Code = "storage_limit"
+	CaptureUnverified    Code = "capture_unverified"
 	PageFailed           Code = "page_failed"
 	ProviderUnavailable  Code = "provider_unavailable"
 )
@@ -499,14 +501,25 @@ func (s *scope) settle(ctx context.Context) {
 		...Array.from(document.images).filter((i) => !i.complete).map((i) => new Promise((done) => { i.onload = i.onerror = done }))]).then(() => true)`)
 }
 
-func (s *scope) applyMasks(ctx context.Context, masks []string) error {
-	for _, selector := range masks {
-		painted, err := s.evalBool(ctx, `(selector) => {
+func (s *scope) applyMasks(ctx context.Context, masks []string, style string, required bool) error {
+	script := `(selector) => {
+		const found = Array.from(document.querySelectorAll(selector));
+		found.forEach((e) => { e.style.setProperty('background', '#000', 'important'); e.style.setProperty('color', '#000', 'important');
+			e.style.setProperty('filter', 'brightness(0)', 'important'); e.style.setProperty('border-color', '#000', 'important') });
+		return found.length > 0 }`
+	if style == MaskStyleBlur {
+		script = `(selector) => {
 			const found = Array.from(document.querySelectorAll(selector));
-			found.forEach((e) => { e.style.setProperty('background', '#000', 'important'); e.style.setProperty('color', '#000', 'important');
-				e.style.setProperty('filter', 'brightness(0)', 'important'); e.style.setProperty('border-color', '#000', 'important') });
-			return found.length > 0 }`, selector)
-		if err != nil || !painted {
+			found.forEach((e) => { e.style.setProperty('filter', 'blur(12px)', 'important');
+				e.style.setProperty('user-select', 'none', 'important') });
+			return found.length > 0 }`
+	}
+	for _, selector := range masks {
+		painted, err := s.evalBool(ctx, script, selector)
+		if err != nil {
+			return &Failure{Code: MaskMissing}
+		}
+		if required && !painted {
 			return &Failure{Code: MaskMissing}
 		}
 	}
@@ -567,6 +580,13 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	scale := input.Recipe.Viewport.DeviceScale()
 	if err := s.page.Context(ctx).SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: input.Recipe.Viewport.Width, Height: input.Recipe.Viewport.Height, DeviceScaleFactor: float64(scale)}); err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
+	}
+	if input.Recipe.ColorScheme != "" {
+		if err := (proto.EmulationSetEmulatedMedia{
+			Features: []*proto.EmulationMediaFeature{{Name: "prefers-color-scheme", Value: input.Recipe.ColorScheme}},
+		}).Call(s.page.Context(ctx)); err != nil {
+			return nil, &Failure{Code: ProviderUnavailable}
+		}
 	}
 	if err := s.restore(input.State); err != nil {
 		return nil, err
@@ -638,8 +658,13 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	if s.privateResponse.Load() {
 		return nil, &Failure{Code: OriginRefused}
 	}
-	if err := s.applyMasks(ctx, input.Recipe.Masks); err != nil {
+	if err := s.applyMasks(ctx, input.Recipe.Masks, input.Recipe.MaskStyle, true); err != nil {
 		return nil, err
+	}
+	if len(input.Recipe.OptionalMasks) > 0 {
+		if err := s.applyMasks(ctx, input.Recipe.OptionalMasks, input.Recipe.MaskStyle, false); err != nil {
+			return nil, err
+		}
 	}
 	here, err := s.location()
 	if err != nil || here.Scheme+"://"+here.Host != input.Target.Origin {
@@ -650,7 +675,9 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	if err != nil {
 		return nil, &Failure{Code: PageFailed}
 	}
-	result.Focus = box.focus()
+	if !crop {
+		result.Focus = box.focus()
+	}
 	request := &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng}
 	width, height := float64(input.Recipe.Viewport.Width), float64(input.Recipe.Viewport.Height)
 	if crop {
@@ -671,8 +698,11 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	result.Image, result.Width, result.Height = shot, config.Width, config.Height
 	result.RefusedRequests = int(s.refused.Load())
 	// A failed export keeps the state already stored; the capture still stands.
-	if rotated, err := exportState(ctx, s.context, s.page, input.Target); err == nil && !rotated.Same(input.State) {
-		result.State = rotated
+	if rotated, err := exportState(ctx, s.context, s.page, input.Target); err == nil {
+		rotated.MergePrevious(input.State, input.Target.Hosts)
+		if !rotated.Same(input.State) {
+			result.State = rotated
+		}
 	}
 	return result, nil
 }

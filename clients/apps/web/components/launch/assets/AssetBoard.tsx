@@ -63,6 +63,7 @@ export type BoardVisual = {
 export type BoardCapture = BoardImage & {
   caption: string | null
   device: 'Desktop' | 'Mobile'
+  editHref?: string
   id: string
 }
 
@@ -430,6 +431,13 @@ function Captures({ captures }: { captures: BoardCapture[] }) {
                   <Pill>{capture.device}</Pill>
                   <span className="truncate text-muted-foreground">{capture.caption}</span>
                 </p>
+                {capture.editHref ? (
+                  <div>
+                    <ButtonLink href={capture.editHref} size="sm" variant="outline">
+                      Open in editor
+                    </ButtonLink>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

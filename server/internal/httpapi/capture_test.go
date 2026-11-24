@@ -15,12 +15,13 @@ import (
 
 type captureConfiguration struct {
 	fakeConfiguration
-	startErr   error
-	actor      product.Actor
-	connection product.CreateCaptureConnectionInput
-	recipe     product.CreateCaptureRecipeInput
-	intent     string
-	test       bool
+	startErr     error
+	bootstrapErr error
+	actor        product.Actor
+	connection   product.CreateCaptureConnectionInput
+	recipe       product.CreateCaptureRecipeInput
+	intent       string
+	test         bool
 }
 
 func (c *captureConfiguration) CaptureAvailable() bool { return true }
@@ -47,6 +48,13 @@ func (c *captureConfiguration) FinishCaptureConnect(_ context.Context, _ product
 }
 func (c *captureConfiguration) RefreshCaptureConnect(ctx context.Context, actor product.Actor, id string) (*product.CaptureConnectStart, error) {
 	return c.StartCaptureConnect(ctx, actor, id)
+}
+func (c *captureConfiguration) BootstrapCaptureConnection(_ context.Context, actor product.Actor, id string) (*product.CaptureConnectionRecord, error) {
+	c.actor = actor
+	if c.bootstrapErr != nil {
+		return nil, c.bootstrapErr
+	}
+	return &product.CaptureConnectionRecord{ID: id, Status: "READY", HasBootstrap: true}, nil
 }
 func (c *captureConfiguration) RevokeCaptureConnection(context.Context, product.Actor, string) error {
 	return nil
@@ -104,6 +112,14 @@ func TestCaptureRoutesAdaptTransportOntoTheDomain(t *testing.T) {
 	if finish := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/connect/finish", `{"intentId":"intent-1"}`); finish.Code != http.StatusAccepted || config.intent != "intent-1" {
 		t.Fatalf("finish=%d", finish.Code)
 	}
+	if boot := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/bootstrap", ""); boot.Code != http.StatusOK || !strings.Contains(boot.Body.String(), `"hasBootstrap":true`) {
+		t.Fatalf("bootstrap=%d %s", boot.Code, boot.Body)
+	}
+	config.bootstrapErr = &browser.Failure{Code: browser.SessionRestoreFailed}
+	if bootFail := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/bootstrap", ""); bootFail.Code != http.StatusUnprocessableEntity || !strings.Contains(bootFail.Body.String(), `"session_restore_failed"`) {
+		t.Fatalf("bootstrap fail=%d %s", bootFail.Code, bootFail.Body)
+	}
+	config.bootstrapErr = nil
 	if replay := configurationRequest(handler, http.MethodPost, "/v1/capture/connections/connection-1/connect/finish", `{"intentId":"stale"}`); replay.Code != http.StatusConflict {
 		t.Fatalf("replay=%d", replay.Code)
 	}

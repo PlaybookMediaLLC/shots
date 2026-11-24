@@ -92,6 +92,8 @@ type CaptureJobRecord struct {
 	ReleaseChange *string `json:"releaseChange"`
 	// NavigationActions is the newest attempt's AI path: control kinds and paths.
 	NavigationActions []map[string]string `json:"navigationActions,omitempty"`
+	// FocusBox is where the first marker sat in the captured viewport (0-1 fractions).
+	FocusBox map[string]float64 `json:"focusBox,omitempty"`
 }
 
 func captureJobRecord(row *ent.CaptureJob) CaptureJobRecord {
@@ -100,23 +102,41 @@ func captureJobRecord(row *ent.CaptureJob) CaptureJobRecord {
 		ReleaseChange: row.ObjectiveEvidence}
 }
 
-// withNavigation adds each job's newest recorded AI navigation path.
+// withNavigation adds each job's newest recorded AI navigation path and focus box.
 func (c *Configuration) withNavigation(ctx context.Context, org string, records []CaptureJobRecord) error {
 	ids := make([]string, 0, len(records))
 	for _, record := range records {
 		ids = append(ids, record.ID)
 	}
-	attempts, err := c.client.CaptureAttempt.Query().Where(captureattempt.OrganizationID(org), captureattempt.CaptureJobIDIn(ids...), captureattempt.NavigationActionsNotNil()).
-		Order(ent.Asc(captureattempt.FieldAttemptNumber)).All(ctx)
+	if len(ids) == 0 {
+		return nil
+	}
+	attempts, err := c.client.CaptureAttempt.Query().Where(
+		captureattempt.OrganizationID(org),
+		captureattempt.CaptureJobIDIn(ids...),
+		captureattempt.Or(captureattempt.NavigationActionsNotNil(), captureattempt.FocusBoxNotNil()),
+	).Select(
+		captureattempt.FieldCaptureJobID,
+		captureattempt.FieldAttemptNumber,
+		captureattempt.FieldNavigationActions,
+		captureattempt.FieldFocusBox,
+	).Order(ent.Asc(captureattempt.FieldAttemptNumber)).All(ctx)
 	if err != nil {
 		return err
 	}
 	paths := map[string][]map[string]string{}
+	focuses := map[string]map[string]float64{}
 	for _, attempt := range attempts {
-		paths[attempt.CaptureJobID] = attempt.NavigationActions
+		if len(attempt.NavigationActions) > 0 {
+			paths[attempt.CaptureJobID] = attempt.NavigationActions
+		}
+		if len(attempt.FocusBox) > 0 {
+			focuses[attempt.CaptureJobID] = attempt.FocusBox
+		}
 	}
 	for i := range records {
 		records[i].NavigationActions = paths[records[i].ID]
+		records[i].FocusBox = focuses[records[i].ID]
 	}
 	return nil
 }
@@ -735,12 +755,21 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if runErr != nil {
 		return c.failCapture(ctx, claim, runErr)
 	}
+	if err := c.verifyCaptureWithVision(ctx, claim, recipe, result.Image); err != nil {
+		return c.failCapture(ctx, claim, err)
+	}
 	actor := Actor{OrganizationID: org, Kind: "service", Display: "capture", RequestID: claim.job.ID}
 	if claim.job.RequestedByUserID != nil {
 		actor.UserID = *claim.job.RequestedByUserID
 	}
 	stored, err := c.storeImage(ctx, actor, result.Image, http.DetectContentType(result.Image), "capture-"+claim.job.ID)
 	if err != nil {
+		// Classify permanent quota, size, or entitlement failures as non-retryable
+		// so a worker never loops for 30 minutes burning browsers and AI credits.
+		var entitlement *FeatureNotEntitledError
+		if errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrStorageQuota) || errors.Is(err, ErrQuotaExceeded) || errors.Is(err, publishing.ErrForbidden) || errors.As(err, &entitlement) {
+			return c.failCapture(ctx, claim, &browser.Failure{Code: browser.StorageLimit})
+		}
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.ProviderUnavailable})
 	}
 	tx, err := c.client.Tx(ctx)
@@ -749,6 +778,9 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	}
 	defer tx.Rollback()
 	update := tx.CaptureAttempt.UpdateOneID(claim.attempt.ID).SetAssetID(stored).SetRefusedRequests(result.RefusedRequests)
+	if result.Focus != nil {
+		update.SetFocusBox(map[string]float64{"x": result.Focus.X, "y": result.Focus.Y, "w": result.Focus.W, "h": result.Focus.H})
+	}
 	if len(result.NavigationActions) > 0 {
 		trace := make([]map[string]string, 0, len(result.NavigationActions))
 		for _, action := range result.NavigationActions {
@@ -1074,6 +1106,35 @@ func (c *Configuration) ReclaimCaptureResources(ctx context.Context) error {
 			}
 		}
 	}
-	return c.client.CaptureJob.Update().Where(capturejob.DeadlineAtLT(now), capturejob.AppConnectionIDNotNil(), capturejob.PhaseNotIn(capturejob.PhaseSUCCEEDED, capturejob.PhaseFAILED, capturejob.PhaseCANCELLED)).
-		SetPhase(capturejob.PhaseFAILED).SetStatus(capturejob.StatusFAILED).SetFailureCode("deadline_exceeded").Exec(ctx)
+	// Mark any remaining stale RUNNING attempts failed and clear expired leases
+	// so crashed workers never stall an organization's capture concurrency slot.
+	if err := c.client.CaptureAttempt.Update().Where(captureattempt.StatusEQ(captureattempt.StatusRUNNING), captureattempt.StartedAtLT(now.Add(-captureLease))).
+		SetStatus(captureattempt.StatusFAILED).SetFailureCode("lease_expired").SetCompletedAt(now).Exec(ctx); err != nil {
+		return err
+	}
+	if err := c.client.PlatformAppConnection.Update().Where(platformappconnection.LeaseJobIDNotNil(), platformappconnection.LeaseExpiresAtLT(now)).
+		ClearLeaseJobID().ClearLeaseExpiresAt().Exec(ctx); err != nil {
+		return err
+	}
+	expiredJobs, err := c.client.CaptureJob.Query().Where(
+		capturejob.DeadlineAtLT(now),
+		capturejob.AppConnectionIDNotNil(),
+		capturejob.PhaseNotIn(capturejob.PhaseSUCCEEDED, capturejob.PhaseFAILED, capturejob.PhaseCANCELLED),
+	).Select(capturejob.FieldID, capturejob.FieldSurfaceID, capturejob.FieldObjectiveEvidence).Limit(100).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, job := range expiredJobs {
+		n, err := c.client.CaptureJob.Update().Where(
+			capturejob.ID(job.ID),
+			capturejob.PhaseNotIn(capturejob.PhaseSUCCEEDED, capturejob.PhaseFAILED, capturejob.PhaseCANCELLED),
+		).SetPhase(capturejob.PhaseFAILED).SetStatus(capturejob.StatusFAILED).SetFailureCode("deadline_exceeded").Save(ctx)
+		if err != nil {
+			return err
+		}
+		if n == 1 && job.SurfaceID != nil && job.ObjectiveEvidence == nil {
+			_ = c.client.ProductSurface.UpdateOneID(*job.SurfaceID).SetLastCaptureFailureCode("deadline_exceeded").Exec(ctx)
+		}
+	}
+	return nil
 }

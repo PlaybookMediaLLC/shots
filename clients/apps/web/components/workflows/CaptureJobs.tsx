@@ -1,8 +1,10 @@
 'use client'
 
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import type { CaptureJob, CaptureRecipe } from '@/lib/api/contracts/capture'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import { captureFailureMessage } from '@/lib/tenant/surface-freshness'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
@@ -62,6 +64,27 @@ function JobRow({
             <p className="text-sm text-muted-foreground">Steered to show: {job.releaseChange}</p>
           ) : null}
           {navigation ? <p className="text-sm text-muted-foreground">{navigation}</p> : null}
+          {job.assetId ? (
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <a
+                aria-label={`Open capture of ${recipe?.name ?? 'screen'} at full size`}
+                className="block w-40 overflow-hidden rounded-lg ring-1 ring-foreground/[0.08] focus-visible:ring-2"
+                href={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content`}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <img
+                  alt={`Capture of ${recipe?.name ?? 'screen'}`}
+                  className="aspect-[16/10] w-full object-cover object-top"
+                  loading="lazy"
+                  src={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content?variant=thumbnail`}
+                />
+              </a>
+              <ButtonLink href={editorHref({ assetId: job.assetId })} size="sm" variant="outline">
+                Open in editor
+              </ButtonLink>
+            </div>
+          ) : null}
           <CaptureError message={error} />
         </div>
         {canManage && captureJobOpen(job.phase) ? (

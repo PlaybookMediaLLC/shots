@@ -179,6 +179,16 @@ func CreatedByUserID(v string) predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldEQ(FieldCreatedByUserID, v))
 }
 
+// BootstrapURL applies equality check predicate on the "bootstrap_url" field. It's identical to BootstrapURLEQ.
+func BootstrapURL(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldBootstrapURL, v))
+}
+
+// BootstrapSecretCiphertext applies equality check predicate on the "bootstrap_secret_ciphertext" field. It's identical to BootstrapSecretCiphertextEQ.
+func BootstrapSecretCiphertext(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldBootstrapSecretCiphertext, v))
+}
+
 // RevokedAt applies equality check predicate on the "revoked_at" field. It's identical to RevokedAtEQ.
 func RevokedAt(v time.Time) predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldEQ(FieldRevokedAt, v))
@@ -1652,6 +1662,166 @@ func CreatedByUserIDEqualFold(v string) predicate.PlatformAppConnection {
 // CreatedByUserIDContainsFold applies the ContainsFold predicate on the "created_by_user_id" field.
 func CreatedByUserIDContainsFold(v string) predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldContainsFold(FieldCreatedByUserID, v))
+}
+
+// DiscoveredRoutesIsNil applies the IsNil predicate on the "discovered_routes" field.
+func DiscoveredRoutesIsNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIsNull(FieldDiscoveredRoutes))
+}
+
+// DiscoveredRoutesNotNil applies the NotNil predicate on the "discovered_routes" field.
+func DiscoveredRoutesNotNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotNull(FieldDiscoveredRoutes))
+}
+
+// BootstrapURLEQ applies the EQ predicate on the "bootstrap_url" field.
+func BootstrapURLEQ(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldBootstrapURL, v))
+}
+
+// BootstrapURLNEQ applies the NEQ predicate on the "bootstrap_url" field.
+func BootstrapURLNEQ(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNEQ(FieldBootstrapURL, v))
+}
+
+// BootstrapURLIn applies the In predicate on the "bootstrap_url" field.
+func BootstrapURLIn(vs ...string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIn(FieldBootstrapURL, vs...))
+}
+
+// BootstrapURLNotIn applies the NotIn predicate on the "bootstrap_url" field.
+func BootstrapURLNotIn(vs ...string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotIn(FieldBootstrapURL, vs...))
+}
+
+// BootstrapURLGT applies the GT predicate on the "bootstrap_url" field.
+func BootstrapURLGT(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGT(FieldBootstrapURL, v))
+}
+
+// BootstrapURLGTE applies the GTE predicate on the "bootstrap_url" field.
+func BootstrapURLGTE(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGTE(FieldBootstrapURL, v))
+}
+
+// BootstrapURLLT applies the LT predicate on the "bootstrap_url" field.
+func BootstrapURLLT(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLT(FieldBootstrapURL, v))
+}
+
+// BootstrapURLLTE applies the LTE predicate on the "bootstrap_url" field.
+func BootstrapURLLTE(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLTE(FieldBootstrapURL, v))
+}
+
+// BootstrapURLContains applies the Contains predicate on the "bootstrap_url" field.
+func BootstrapURLContains(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldContains(FieldBootstrapURL, v))
+}
+
+// BootstrapURLHasPrefix applies the HasPrefix predicate on the "bootstrap_url" field.
+func BootstrapURLHasPrefix(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldHasPrefix(FieldBootstrapURL, v))
+}
+
+// BootstrapURLHasSuffix applies the HasSuffix predicate on the "bootstrap_url" field.
+func BootstrapURLHasSuffix(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldHasSuffix(FieldBootstrapURL, v))
+}
+
+// BootstrapURLIsNil applies the IsNil predicate on the "bootstrap_url" field.
+func BootstrapURLIsNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIsNull(FieldBootstrapURL))
+}
+
+// BootstrapURLNotNil applies the NotNil predicate on the "bootstrap_url" field.
+func BootstrapURLNotNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotNull(FieldBootstrapURL))
+}
+
+// BootstrapURLEqualFold applies the EqualFold predicate on the "bootstrap_url" field.
+func BootstrapURLEqualFold(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEqualFold(FieldBootstrapURL, v))
+}
+
+// BootstrapURLContainsFold applies the ContainsFold predicate on the "bootstrap_url" field.
+func BootstrapURLContainsFold(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldContainsFold(FieldBootstrapURL, v))
+}
+
+// BootstrapSecretCiphertextEQ applies the EQ predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextEQ(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextNEQ applies the NEQ predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextNEQ(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNEQ(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextIn applies the In predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextIn(vs ...string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIn(FieldBootstrapSecretCiphertext, vs...))
+}
+
+// BootstrapSecretCiphertextNotIn applies the NotIn predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextNotIn(vs ...string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotIn(FieldBootstrapSecretCiphertext, vs...))
+}
+
+// BootstrapSecretCiphertextGT applies the GT predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextGT(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGT(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextGTE applies the GTE predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextGTE(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGTE(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextLT applies the LT predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextLT(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLT(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextLTE applies the LTE predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextLTE(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLTE(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextContains applies the Contains predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextContains(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldContains(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextHasPrefix applies the HasPrefix predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextHasPrefix(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldHasPrefix(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextHasSuffix applies the HasSuffix predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextHasSuffix(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldHasSuffix(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextIsNil applies the IsNil predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextIsNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIsNull(FieldBootstrapSecretCiphertext))
+}
+
+// BootstrapSecretCiphertextNotNil applies the NotNil predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextNotNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotNull(FieldBootstrapSecretCiphertext))
+}
+
+// BootstrapSecretCiphertextEqualFold applies the EqualFold predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextEqualFold(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEqualFold(FieldBootstrapSecretCiphertext, v))
+}
+
+// BootstrapSecretCiphertextContainsFold applies the ContainsFold predicate on the "bootstrap_secret_ciphertext" field.
+func BootstrapSecretCiphertextContainsFold(v string) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldContainsFold(FieldBootstrapSecretCiphertext, v))
 }
 
 // RevokedAtEQ applies the EQ predicate on the "revoked_at" field.

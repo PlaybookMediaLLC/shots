@@ -124,7 +124,9 @@ export function WorkflowRunDetail({
   const canCancel =
     ['queued', 'running', 'failed', 'needs_attention'].includes(run.status) && !run.cancelRequested
   const canRetry =
-    run.status === 'failed' && run.failureCode === 'activity_failed' && !run.cancelRequested
+    ((run.status === 'failed' && run.failureCode === 'activity_failed') ||
+      run.status === 'needs_attention') &&
+    !run.cancelRequested
 
   function recover(kind: 'cancel' | 'retry') {
     setBusy(true)
@@ -150,7 +152,7 @@ export function WorkflowRunDetail({
           ) : null}
           {canManage && canRetry ? (
             <Button disabled={busy} onClick={() => recover('retry')}>
-              Retry failed run
+              {run.status === 'needs_attention' ? 'Retry run' : 'Retry failed run'}
             </Button>
           ) : null}
         </>
@@ -176,7 +178,7 @@ export function WorkflowRunDetail({
           <AlertDescription>
             {FAILURE_CODES[run.failureCode] ?? run.failureCode}{' '}
             {run.status === 'needs_attention'
-              ? 'Fix the configuration or evidence, then let the next event run. There is no blind retry for this state.'
+              ? 'Resolve the configuration, sign-in, or evidence issue, then select Retry run.'
               : ''}
           </AlertDescription>
         </Alert>
@@ -289,33 +291,67 @@ export function WorkflowRunDetail({
               </ButtonLink>
             </Row>
           ) : null}
-          {run.outputs.captureAssetId ? (
-            <Row
-              description="The product screenshot this run captured. It opens in the editor with the active brand kit; its export becomes a draft."
-              label="Screenshot · captured"
-              layout="inline"
-            >
-              <Suspense
-                fallback={
-                  <Button disabled size="sm" variant="outline">
-                    Open screenshot in the editor
-                  </Button>
+          {(() => {
+            const captureIds = run.outputs.captureAssetIds?.length
+              ? run.outputs.captureAssetIds
+              : run.outputs.captureAssetId
+                ? [run.outputs.captureAssetId]
+                : []
+            if (captureIds.length === 0) return null
+            const from = run.outputs.campaignId
+              ? { campaignId: run.outputs.campaignId }
+              : run.outputs.releaseId
+                ? { releaseId: run.outputs.releaseId }
+                : {}
+            return (
+              <Row
+                description="Product screenshots this run captured. Each opens in the editor with the active brand kit; its export becomes a draft."
+                label={
+                  captureIds.length === 1
+                    ? 'Screenshot · captured'
+                    : `Screenshots · ${captureIds.length} captured`
                 }
+                layout="stacked"
               >
-                <CaptureEditorLink
-                  assetId={run.outputs.captureAssetId}
-                  brandKit={brandKit}
-                  from={
-                    run.outputs.campaignId
-                      ? { campaignId: run.outputs.campaignId }
-                      : run.outputs.releaseId
-                        ? { releaseId: run.outputs.releaseId }
-                        : {}
-                  }
-                />
-              </Suspense>
-            </Row>
-          ) : null}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {captureIds.map((assetId, index) => (
+                    <div className="space-y-2 rounded-lg border p-2.5" key={assetId}>
+                      <a
+                        className="block overflow-hidden rounded-md ring-1 ring-foreground/[0.08]"
+                        href={`/api/v1/assets/${encodeURIComponent(assetId)}/content`}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        <img
+                          alt={
+                            run.outputs.captureFeatures?.[index] ??
+                            `Captured screenshot ${index + 1}`
+                          }
+                          className="aspect-[16/10] w-full object-cover object-top"
+                          loading="lazy"
+                          src={`/api/v1/assets/${encodeURIComponent(assetId)}/content?variant=thumbnail`}
+                        />
+                      </a>
+                      {run.outputs.captureFeatures?.[index] ? (
+                        <p className="text-xs text-muted-foreground">
+                          {run.outputs.captureFeatures[index]}
+                        </p>
+                      ) : null}
+                      <Suspense
+                        fallback={
+                          <Button disabled size="sm" variant="outline">
+                            Open screenshot in the editor
+                          </Button>
+                        }
+                      >
+                        <CaptureEditorLink assetId={assetId} brandKit={brandKit} from={from} />
+                      </Suspense>
+                    </div>
+                  ))}
+                </div>
+              </Row>
+            )
+          })()}
           {run.outputs.captureFeatures?.length ? (
             <Row
               description="AI chose these signed-in screens from the release and steered each capture toward the change. Check each one shows what it names before approving."

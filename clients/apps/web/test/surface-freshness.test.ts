@@ -53,6 +53,8 @@ test('every safe code from signed-in capture has its own sentence', () => {
     'surface_missing',
     'deployment_missing',
     'workspace_unavailable',
+    'storage_limit',
+    'capture_unverified',
   ]) {
     assert.doesNotMatch(captureFailureMessage(code), /last capture failed|_/, code)
   }
