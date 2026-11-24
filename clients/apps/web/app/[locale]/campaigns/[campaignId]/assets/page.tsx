@@ -126,6 +126,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
         .map(async (link): Promise<BoardCapture> => ({
           caption: link.caption,
           device: link.kind === 'capture-mobile' ? 'Mobile' : 'Desktop',
+          editHref: editorHref({ assetId: link.asset.id }, { campaignId: campaign.id }),
           height: link.asset.height,
           id: link.id,
           url: await sign(link.asset.id),

@@ -75,6 +75,16 @@ export const captureRouter = router({
         'This sign-in expired or was replaced. Start the sign-in again.'
       )
     ),
+  /** Refreshes the connection's session via its configured signed bootstrap endpoint. */
+  bootstrapConnection: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ connection: captureConnectionSchema }))
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).bootstrapCaptureConnection(input.id),
+        'This connection was revoked and cannot bootstrap a new session.'
+      )
+    ),
   revokeConnection: organizationProcedure('workspace:update')
     .input(captureIdentitySchema)
     .mutation(({ ctx, input }) => backendSDK(ctx.access).revokeCaptureConnection(input.id)),

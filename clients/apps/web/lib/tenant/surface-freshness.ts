@@ -44,6 +44,10 @@ const CAPTURE_FAILURES: Record<string, string> = {
   origin_refused: 'The app sent the browser to a host that is not approved.',
   recipe_invalid: 'This recipe or its connection is no longer valid. Save a new version.',
   image_invalid: 'The screenshot came back empty or at the wrong size.',
+  storage_limit:
+    'The screenshot exceeded the workspace image size or storage limit. Use scale 1 or free up storage, then retry.',
+  capture_unverified:
+    'Visual verification rejected this capture (blank state, error banner, or off-target view). Check the screen and test again.',
   page_failed: 'The page failed to load.',
   provider_unavailable: 'The browser provider is unavailable. Try again shortly.',
   navigation_unavailable:

@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 )
@@ -38,27 +40,100 @@ func (c *Configuration) automationDraftDestinations(ctx context.Context, client 
 	return connections, nil
 }
 
-// automationDraftMedia is what a draft shows: the branded render of each
-// captured change when the run rendered them, otherwise the captures. One
-// capture rendered with several templates shows its first render.
-func automationDraftMedia(input automation.Outputs) []string {
-	captures := input.CaptureAssetIDs
-	if len(captures) == 0 {
-		captures = []string{input.CaptureAssetID}
+// assetAspectClass classifies an image's orientation from its pixel dimensions.
+func assetAspectClass(width, height *int) string {
+	if width == nil || height == nil || *width <= 0 || *height <= 0 {
+		return ""
 	}
+	w, h := *width, *height
 	switch {
-	case len(input.RenderedAssetIDs) == 0:
+	case h*10 > w*11:
+		return "portrait"
+	case w*10 > h*11:
+		return "landscape"
+	default:
+		return "square"
+	}
+}
+
+// templateAspectClass maps known design templates to an aspect orientation as a
+// fallback when rendered asset dimensions are absent.
+func templateAspectClass(templateID string) string {
+	switch templateID {
+	case "layout-story-phone", "story-phone":
+		return "portrait"
+	case "layout-social-phone", "social-phone-card":
+		return "square"
+	default:
+		return "landscape"
+	}
+}
+
+// channelPreferredAspects orders aspect orientations for a Publish channel.
+func channelPreferredAspects(channel string) []string {
+	switch channel {
+	case "instagram", "threads":
+		return []string{"square", "portrait", "landscape"}
+	case "tiktok", "pinterest":
+		return []string{"portrait", "square", "landscape"}
+	default:
+		return []string{"landscape", "square", "portrait"}
+	}
+}
+
+func automationCaptures(input automation.Outputs) []string {
+	if len(input.CaptureAssetIDs) > 0 {
+		return input.CaptureAssetIDs
+	}
+	if input.CaptureAssetID != "" {
+		return []string{input.CaptureAssetID}
+	}
+	return nil
+}
+
+// pickDraftMediaForChannel returns the media IDs for one channel's draft:
+// multi-capture runs attach one render per captured change; single-capture or
+// render-only multi-template runs pick the render whose aspect fits the channel.
+func pickDraftMediaForChannel(input automation.Outputs, channel string, aspectByAsset map[string]string) []string {
+	captures := automationCaptures(input)
+	if len(input.RenderedAssetIDs) == 0 {
 		return captures
-	case len(captures) > 1:
+	}
+	if len(captures) > 1 {
 		return input.RenderedAssetIDs
 	}
+	if len(input.RenderedAssetIDs) == 1 {
+		return input.RenderedAssetIDs
+	}
+	for _, want := range channelPreferredAspects(channel) {
+		for _, id := range input.RenderedAssetIDs {
+			if aspectByAsset[id] == want {
+				return []string{id}
+			}
+		}
+	}
 	return input.RenderedAssetIDs[:1]
+}
+
+// automationDraftMedia returns default draft media without channel preferences
+// (one render per captured change, or the first render for a single capture).
+func automationDraftMedia(input automation.Outputs) []string {
+	return pickDraftMediaForChannel(input, "", nil)
+}
+
+// automationDraftCandidateMedia is the full set of candidate assets that any
+// channel's draft may attach (every rendered variant or capture).
+func automationDraftCandidateMedia(input automation.Outputs) []string {
+	if len(input.RenderedAssetIDs) > 0 {
+		return input.RenderedAssetIDs
+	}
+	return automationCaptures(input)
 }
 
 // A captured campaign reaches Publish through the same draft owner as an
 // editor export. The session-only editor handoff keeps its authorization.
 func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Actor, input automation.Outputs) (automation.Outputs, error) {
-	if input.CaptureAssetID == "" {
+	if input.CaptureAssetID == "" && len(input.CaptureAssetIDs) == 0 && len(input.RenderedAssetIDs) == 0 {
 		return input, nil
 	}
 	if input.CampaignID == "" || len(input.PostIDs) == 0 {
@@ -83,7 +158,7 @@ func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Acto
 	if err != nil {
 		return automation.Outputs{}, err
 	}
-	media := automationDraftMedia(input)
+	media := automationDraftCandidateMedia(input)
 	linked, err := tx.CampaignAsset.Query().Where(campaignasset.OrganizationID(actor.OrganizationID), campaignasset.CampaignID(owner.ID), campaignasset.AssetIDIn(media...)).
 		Select(campaignasset.FieldAssetID).Strings(ctx)
 	if err != nil {
@@ -96,6 +171,31 @@ func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Acto
 	for _, id := range media {
 		if !slices.Contains(linked, id) || kinds[id] != "img" {
 			return automation.Outputs{}, ErrCaptureRefused
+		}
+	}
+	aspectByAsset := map[string]string{}
+	if len(input.RenderedAssetIDs) > 1 {
+		renderedAssets, err := tx.Asset.Query().Where(asset.OrganizationID(actor.OrganizationID), asset.IDIn(input.RenderedAssetIDs...)).
+			Select(asset.FieldID, asset.FieldWidth, asset.FieldHeight).All(ctx)
+		if err != nil {
+			return automation.Outputs{}, err
+		}
+		for _, a := range renderedAssets {
+			if cls := assetAspectClass(a.Width, a.Height); cls != "" {
+				aspectByAsset[a.ID] = cls
+			}
+		}
+		if len(aspectByAsset) < len(input.RenderedAssetIDs) {
+			designs, err := tx.Design.Query().Where(design.OrganizationID(actor.OrganizationID), design.CampaignID(owner.ID), design.RenderedAssetIDIn(input.RenderedAssetIDs...)).
+				Select(design.FieldRenderedAssetID, design.FieldTemplateID).All(ctx)
+			if err != nil {
+				return automation.Outputs{}, err
+			}
+			for _, d := range designs {
+				if d.RenderedAssetID != nil && d.TemplateID != nil && aspectByAsset[*d.RenderedAssetID] == "" {
+					aspectByAsset[*d.RenderedAssetID] = templateAspectClass(*d.TemplateID)
+				}
+			}
 		}
 	}
 	connections, err := c.automationDraftDestinations(ctx, tx.Client(), actor.OrganizationID, input.DestinationIDs)
@@ -145,7 +245,8 @@ func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Acto
 			return automation.Outputs{}, conflict("Only campaign posts awaiting review can become new drafts.")
 		}
 		copy := strings.TrimSpace(post.Copy + "\n\n" + optionalText(post.CallToAction))
-		attached := media[:min(len(media), max(1, draftMediaLimit(channel)))]
+		channelMedia := pickDraftMediaForChannel(input, channel, aspectByAsset)
+		attached := channelMedia[:min(len(channelMedia), max(1, draftMediaLimit(channel)))]
 		draft, err := c.createContentDraft(ctx, tx, actor, ContentDraftInput{
 			RequestKey: key, Title: owner.Name, PlainText: copy, PrimaryPlatform: channel,
 			Body:     postBody([]PostPart{{Text: copy, AssetIDs: attached}}, kinds),

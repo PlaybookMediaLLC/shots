@@ -36,9 +36,19 @@ import {
 
 type Surface = { environment: string; id: string; name: string; url: string }
 
+type ExistingRelease = {
+  audience: string
+  benefitStatement: string
+  id: string
+  productSurfaceId: string
+  sourceUrls: string[]
+  title: string
+}
+
 type CampaignSetupFormProps = {
   canCreate: boolean
   canManageProducts: boolean
+  initialRelease?: ExistingRelease
   surfaces: Surface[]
 }
 
@@ -81,6 +91,7 @@ function parseSourceUrls(value: string): string[] {
 export function CampaignSetupForm({
   canCreate,
   canManageProducts,
+  initialRelease,
   surfaces: initialSurfaces,
 }: CampaignSetupFormProps) {
   const router = useRouter()
@@ -89,7 +100,9 @@ export function CampaignSetupForm({
   const [idempotencyKey] = useState(() => crypto.randomUUID())
   const [surfaces, setSurfaces] = useState(initialSurfaces)
   // A campaign needs what shipped, not a product: one can be added here or later.
-  const [surfaceChoice, setSurfaceChoice] = useState(initialSurfaces[0]?.id ?? '')
+  const [surfaceChoice, setSurfaceChoice] = useState(
+    initialRelease?.productSurfaceId || initialSurfaces[0]?.id || ''
+  )
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -143,7 +156,7 @@ export function CampaignSetupForm({
       if (!benefitStatement && !parsed.data.sourceUrls?.length) {
         throw new Error('Why it matters: enter a benefit or add a source link.')
       }
-      if (isNewProduct) {
+      if (!initialRelease && isNewProduct) {
         const product = productSurfaceCreateSchema.safeParse({
           name: field(data, 'productName'),
           url: normalizeProductUrl(field(data, 'appUrl')),
@@ -160,16 +173,22 @@ export function CampaignSetupForm({
             throw new Error(`Marketing site: ${briefValidationMessage(marketing.error)}`)
         }
       }
-      const productSurfaceId = isNewProduct
-        ? await createProduct(data, createdProducts)
-        : surfaceChoice || undefined
-      const { release } = await trpcClient.release.create.mutate({
-        ...parsed.data,
-        idempotencyKey,
-        productSurfaceId,
-      })
-      releaseSaved = true
-      trackEvent('release_created', { source: 'campaign_setup' })
+      let releaseId = initialRelease?.id
+      if (!releaseId) {
+        const productSurfaceId = isNewProduct
+          ? await createProduct(data, createdProducts)
+          : surfaceChoice || undefined
+        const { release } = await trpcClient.release.create.mutate({
+          ...parsed.data,
+          idempotencyKey,
+          productSurfaceId,
+        })
+        releaseId = release.id
+        releaseSaved = true
+        trackEvent('release_created', { source: 'campaign_setup' })
+      } else {
+        releaseSaved = true
+      }
       const { campaign } = await trpcClient.campaign.create.mutate({
         audience: audience || undefined,
         idempotencyKey,
@@ -177,7 +196,7 @@ export function CampaignSetupForm({
         // The release may skip why it matters when sources are linked; a
         // campaign still needs an objective, so the title stands in.
         objective: benefitStatement || title,
-        releaseId: release.id,
+        releaseId,
       })
       trackEvent('campaign_draft_created', {
         elapsedSeconds: Math.round((Date.now() - startedAt.current) / 1_000),
@@ -230,6 +249,7 @@ export function CampaignSetupForm({
             <Field htmlFor="campaign-release-title" label="Release title (required)">
               <Input
                 className={inputClassName}
+                defaultValue={initialRelease?.title}
                 id="campaign-release-title"
                 maxLength={160}
                 name="title"
@@ -240,6 +260,7 @@ export function CampaignSetupForm({
               <Input
                 aria-describedby="campaign-benefit-hint"
                 className={inputClassName}
+                defaultValue={initialRelease?.benefitStatement}
                 id="campaign-benefit"
                 maxLength={500}
                 name="benefitStatement"
@@ -252,6 +273,7 @@ export function CampaignSetupForm({
             <Field htmlFor="campaign-sources" label="Source links (optional)">
               <Textarea
                 className={textareaClassName}
+                defaultValue={initialRelease?.sourceUrls.join('\n')}
                 id="campaign-sources"
                 name="sourceUrls"
                 placeholder="Changelog, pull request, or docs URLs, one per line"
@@ -266,62 +288,95 @@ export function CampaignSetupForm({
           More details
         </DisclosureTrigger>
         <DisclosureContent className="flex flex-col gap-10 pt-4">
-          <Section
-            description="The app this campaign captures and promotes. You can add it later."
-            title="Product"
-          >
-            <Group>
-              <Row>
-                <Field htmlFor="campaign-product" label="Product">
-                  <UiSelect
-                    onValueChange={(nextValue) =>
-                      setSurfaceChoice(nextValue === '__empty_option__' ? '' : nextValue)
-                    }
-                    value={String(surfaceChoice) || '__empty_option__'}
-                  >
-                    <SelectTrigger className={selectClassName} id="campaign-product">
-                      <SelectValue>
-                        {isNewProduct
-                          ? 'Add a product…'
-                          : (surfaces.find((surface) => surface.id === surfaceChoice)?.name ??
-                            'No product')}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {surfaces.map((surface) => (
-                        <SelectItem key={surface.id} value={surface.id}>
-                          {surface.name} ({surface.environment})
-                        </SelectItem>
-                      ))}
-                      {canManageProducts ? (
-                        <SelectItem value={NEW_PRODUCT}>Add a product…</SelectItem>
-                      ) : null}
-                      <SelectItem value={'__empty_option__'}>No product</SelectItem>
-                    </SelectContent>
-                  </UiSelect>
-                </Field>
-              </Row>
-              {isNewProduct ? (
+          {!initialRelease ? (
+            <Section
+              description="The app this campaign captures and promotes. You can add it later."
+              title="Product"
+            >
+              <Group>
                 <Row>
-                  <Field htmlFor="campaign-product-name" label="Product name (required)">
-                    <Input
-                      className={inputClassName}
-                      id="campaign-product-name"
-                      maxLength={160}
-                      name="productName"
-                      defaultValue={values.productName ?? ''}
-                      required
-                    />
+                  <Field htmlFor="campaign-product" label="Product">
+                    <UiSelect
+                      onValueChange={(nextValue) =>
+                        setSurfaceChoice(nextValue === '__empty_option__' ? '' : nextValue)
+                      }
+                      value={String(surfaceChoice) || '__empty_option__'}
+                    >
+                      <SelectTrigger className={selectClassName} id="campaign-product">
+                        <SelectValue>
+                          {isNewProduct
+                            ? 'Add a product…'
+                            : (surfaces.find((surface) => surface.id === surfaceChoice)?.name ??
+                              'No product')}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {surfaces.map((surface) => (
+                          <SelectItem key={surface.id} value={surface.id}>
+                            {surface.name} ({surface.environment})
+                          </SelectItem>
+                        ))}
+                        {canManageProducts ? (
+                          <SelectItem value={NEW_PRODUCT}>Add a product…</SelectItem>
+                        ) : null}
+                        <SelectItem value={'__empty_option__'}>No product</SelectItem>
+                      </SelectContent>
+                    </UiSelect>
                   </Field>
-                  <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
-                    <Field htmlFor="campaign-app-url" label="App URL (required)">
+                </Row>
+                {isNewProduct ? (
+                  <Row>
+                    <Field htmlFor="campaign-product-name" label="Product name (required)">
                       <Input
                         className={inputClassName}
-                        id="campaign-app-url"
-                        name="appUrl"
-                        defaultValue={values.appUrl ?? ''}
-                        placeholder="https://app.example.com"
+                        id="campaign-product-name"
+                        maxLength={160}
+                        name="productName"
+                        defaultValue={values.productName ?? ''}
                         required
+                      />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+                      <Field htmlFor="campaign-app-url" label="App URL (required)">
+                        <Input
+                          className={inputClassName}
+                          id="campaign-app-url"
+                          name="appUrl"
+                          defaultValue={values.appUrl ?? ''}
+                          placeholder="https://app.example.com"
+                          required
+                          type="text"
+                          inputMode="url"
+                          onBlur={(event) => {
+                            const value = normalizeProductUrl(event.target.value)
+                            event.target.value = value
+                            const name = event.target.name
+                            setValues((current) => ({ ...current, [name]: value }))
+                          }}
+                        />
+                      </Field>
+                      <Field htmlFor="campaign-environment" label="Environment">
+                        <UiSelect defaultValue="production" name="environment">
+                          <SelectTrigger className={selectClassName} id="campaign-environment">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productEnvironments.map((environment) => (
+                              <SelectItem key={environment} value={environment}>
+                                {environment}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </UiSelect>
+                      </Field>
+                    </div>
+                    <Field htmlFor="campaign-marketing-url" label="Marketing site URL (optional)">
+                      <Input
+                        className={inputClassName}
+                        id="campaign-marketing-url"
+                        name="marketingUrl"
+                        defaultValue={values.marketingUrl ?? ''}
+                        placeholder="https://example.com"
                         type="text"
                         inputMode="url"
                         onBlur={(event) => {
@@ -332,42 +387,11 @@ export function CampaignSetupForm({
                         }}
                       />
                     </Field>
-                    <Field htmlFor="campaign-environment" label="Environment">
-                      <UiSelect defaultValue="production" name="environment">
-                        <SelectTrigger className={selectClassName} id="campaign-environment">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {productEnvironments.map((environment) => (
-                            <SelectItem key={environment} value={environment}>
-                              {environment}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </UiSelect>
-                    </Field>
-                  </div>
-                  <Field htmlFor="campaign-marketing-url" label="Marketing site URL (optional)">
-                    <Input
-                      className={inputClassName}
-                      id="campaign-marketing-url"
-                      name="marketingUrl"
-                      defaultValue={values.marketingUrl ?? ''}
-                      placeholder="https://example.com"
-                      type="text"
-                      inputMode="url"
-                      onBlur={(event) => {
-                        const value = normalizeProductUrl(event.target.value)
-                        event.target.value = value
-                        const name = event.target.name
-                        setValues((current) => ({ ...current, [name]: value }))
-                      }}
-                    />
-                  </Field>
-                </Row>
-              ) : null}
-            </Group>
-          </Section>
+                  </Row>
+                ) : null}
+              </Group>
+            </Section>
+          ) : null}
 
           <Section title="Brief">
             <Group>
@@ -384,6 +408,7 @@ export function CampaignSetupForm({
                 <Field htmlFor="campaign-audience" label="Target audience (optional)">
                   <Input
                     className={inputClassName}
+                    defaultValue={initialRelease?.audience}
                     id="campaign-audience"
                     maxLength={1_000}
                     name="audience"

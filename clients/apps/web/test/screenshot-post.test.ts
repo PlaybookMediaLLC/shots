@@ -187,6 +187,33 @@ test("X keeps both its own caption and the profile's follow-ups", () => {
   assert.ok(blocks.some((node) => node.type === 'img' && node.assetId === assetId))
 })
 
+test('platform-resized media creates a manual version even without a custom per-platform caption', () => {
+  const body = screenshotPostBody({ caption: 'Shared launch caption', media })
+  const igAssetId = '33333333-3333-4333-8333-333333333333'
+  const versions = platformVersionsSchema.parse(
+    screenshotPostVersions({
+      body,
+      media: {
+        instagram: {
+          assetId: igAssetId,
+          children: [{ text: '' }],
+          mimeType: 'image/png',
+          type: 'img',
+          url: '',
+        },
+      },
+    })
+  )
+  const ig = versions.versions.find((version) => version.channel === 'instagram')
+  assert.equal(ig?.mode, 'manual')
+  const blocks = (ig?.body ?? []) as Record<string, unknown>[]
+  assert.ok(JSON.stringify(blocks).includes('Shared launch caption'))
+  assert.ok(blocks.some((node) => node.type === 'img' && node.assetId === igAssetId))
+  assert.ok(!blocks.some((node) => node.type === 'img' && node.assetId === assetId))
+  // Original primary body must remain untouched.
+  assert.ok(body.some((node) => node.type === 'img' && node.assetId === assetId))
+})
+
 test('a screenshot carries its description to the provider', () => {
   const body = screenshotPostBody({ altText: '  A dashboard  ', caption: 'New', media })
   // The serializer reads the description from the node, not the asset.

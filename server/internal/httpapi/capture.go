@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
@@ -18,6 +19,7 @@ type captureStore interface {
 	StartCaptureConnect(context.Context, product.Actor, string) (*product.CaptureConnectStart, error)
 	RefreshCaptureConnect(context.Context, product.Actor, string) (*product.CaptureConnectStart, error)
 	FinishCaptureConnect(context.Context, product.Actor, string, string) error
+	BootstrapCaptureConnection(context.Context, product.Actor, string) (*product.CaptureConnectionRecord, error)
 	RevokeCaptureConnection(context.Context, product.Actor, string) error
 	CreateCaptureRecipe(context.Context, product.Actor, product.CreateCaptureRecipeInput) (*product.CaptureRecipeRecord, error)
 	ListCaptureRecipes(context.Context, product.Actor) ([]product.CaptureRecipeRecord, error)
@@ -42,6 +44,7 @@ func (s *Server) registerCapture(mux *http.ServeMux) {
 	authenticated("POST /v1/capture/connections/{id}/connect", startCaptureConnect)
 	authenticated("POST /v1/capture/connections/{id}/connect/refresh", refreshCaptureConnect)
 	authenticated("POST /v1/capture/connections/{id}/connect/finish", finishCaptureConnect)
+	authenticated("POST /v1/capture/connections/{id}/bootstrap", bootstrapCaptureConnection)
 	authenticated("POST /v1/capture/connections/{id}/revoke", revokeCaptureConnection)
 	authenticated("POST /v1/capture/recipes", createCaptureRecipe)
 	authenticated("POST /v1/capture/recipes/{id}/activate", activateCaptureRecipe)
@@ -57,7 +60,11 @@ func writeCaptureError(w http.ResponseWriter, err error) {
 	var failure *browser.Failure
 	switch {
 	case errors.As(err, &failure):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": string(failure.Code), "error": "The browser provider could not start this session."})
+		if failure.Code == browser.ProviderUnavailable {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": string(failure.Code), "error": "The browser provider could not start this session."})
+			return
+		}
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": string(failure.Code), "error": "Session verification failed (" + string(failure.Code) + ")."})
 	case errors.Is(err, product.ErrAuthenticatedCaptureUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "capture_unavailable", "error": err.Error()})
 	default:
@@ -136,6 +143,20 @@ func refreshCaptureConnect(w http.ResponseWriter, r *http.Request, store capture
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	writeJSON(w, http.StatusOK, start)
+}
+
+func bootstrapCaptureConnection(w http.ResponseWriter, r *http.Request, store captureStore) {
+	// Extend the per-request write deadline past product-api's 30s default so
+	// customer bootstrap fetch + remote browser verification can finish cleanly.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(95 * time.Second))
+	ctx, cancel := context.WithTimeout(r.Context(), 85*time.Second)
+	defer cancel()
+	connection, err := store.BootstrapCaptureConnection(ctx, workspaceActor(r), r.PathValue("id"))
+	if err != nil {
+		writeCaptureError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connection": connection})
 }
 
 func revokeCaptureConnection(w http.ResponseWriter, r *http.Request, store captureStore) {

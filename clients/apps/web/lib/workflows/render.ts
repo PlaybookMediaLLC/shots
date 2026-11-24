@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { TenantContext } from '@/lib/auth/access'
 import { backendSDK } from '@/lib/backend/sdk'
 import { BRAND_LOGO_ID } from '@/lib/brand/apply'
-import { patchDesignDocument } from '@/lib/design/document'
+import { type DesignDocument, patchDesignDocument } from '@/lib/design/document'
 import { renderDesignForTenant } from '@/lib/design/render-design'
 import {
   createDesignRenderer,
@@ -12,6 +12,7 @@ import {
   isDesignRendererReady,
 } from '@/lib/design/renderer'
 import { getDesignTemplate } from '@/lib/design/templates'
+import { documentCanvasSize, screenshotBox } from '@/lib/export/adapt'
 import { brandDesignChanges, parseBrandKit } from '@/lib/launch/brand'
 import { createDesign, getDesign, listCampaignDesigns } from '@/lib/tenant/designs'
 
@@ -31,6 +32,15 @@ export const workflowRenderRequestSchema = z.strictObject({
     .max(3),
   /** Which of the node's captures this is; part 0 keeps the node's original design names. */
   part: z.number().int().min(0).max(2).optional(),
+  /** Normalized bounding box (0-1 viewport fractions) of the captured marker element. */
+  focus: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      w: z.number().min(0).max(1),
+      h: z.number().min(0).max(1),
+    })
+    .optional(),
 })
 
 /** One rendered creative, linked to the campaign as a design render. */
@@ -48,6 +58,52 @@ export class WorkflowRenderUnavailableError extends Error {
   constructor() {
     super('The design renderer is not available.')
     this.name = 'WorkflowRenderUnavailableError'
+  }
+}
+
+/**
+ * Maps a normalized viewport marker box (`0..1` of the screenshot) into canvas
+ * coordinates using the stage's own screenshot geometry. Skips device mockups
+ * and 3D-tilted screenshots where a flat canvas rectangle would misalign.
+ */
+export function buildFocusAnnotation(
+  document: DesignDocument,
+  focus: NonNullable<WorkflowRenderRequest['focus']>,
+  imageAspect: number | undefined,
+  strokeColor: string
+): DesignDocument['annotations'][number] | null {
+  const area = focus.w * focus.h
+  if (area <= 0.002 || area >= 0.72) return null
+  if (document.mode === 'device') return null
+  const perspective = document.image.perspective
+  if (
+    perspective &&
+    ((perspective.rotateX ?? 0) !== 0 ||
+      (perspective.rotateY ?? 0) !== 0 ||
+      (perspective.rotateZ ?? 0) !== 0)
+  ) {
+    return null
+  }
+  const box = screenshotBox(document, documentCanvasSize(document), imageAspect)
+  if (!box) return null
+  const left = box.cx - box.width / 2
+  const top = box.cy - box.height / 2
+  const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v))
+  const sx = clamp(left + focus.x * box.width)
+  const sy = clamp(top + focus.y * box.height)
+  const ex = clamp(left + (focus.x + focus.w) * box.width)
+  const ey = clamp(top + (focus.y + focus.h) * box.height)
+  if (ex <= sx + 0.02 || ey <= sy + 0.02) return null
+  return {
+    id: 'capture-focus-box',
+    type: 'rectangle',
+    start: { x: sx, y: sy },
+    end: { x: ex, y: ey },
+    strokeColor,
+    strokeWidth: 4,
+    fillColor: 'transparent',
+    opacity: 0.9,
+    radius: 0.04,
   }
 }
 
@@ -77,12 +133,23 @@ export async function renderWorkflowCreatives(request: WorkflowRenderRequest) {
       ])
     return template
   })
-  const { brandKits } = request.brandKitId
-    ? await backendSDK(tenant).listBrandKits()
-    : { brandKits: [] }
+  const [brandKitResult, captureAssetResult, existing] = await Promise.all([
+    request.brandKitId ? backendSDK(tenant).listBrandKits() : Promise.resolve({ brandKits: [] }),
+    request.focus
+      ? backendSDK(tenant)
+          .findAssets({ ids: [request.captureAssetId] })
+          .catch(() => ({ assets: [] }))
+      : Promise.resolve({ assets: [] }),
+    listCampaignDesigns(tenant, request.campaignId),
+  ])
+  const { brandKits } = brandKitResult
+  const captureAsset = captureAssetResult.assets.find((item) => item.id === request.captureAssetId)
+  const captureAspect =
+    captureAsset?.width && captureAsset?.height
+      ? captureAsset.width / captureAsset.height
+      : undefined
   const kitRow = brandKits.find((kit) => kit.id === request.brandKitId)
   const kit = kitRow ? parseBrandKit(kitRow.name, kitRow.definition) : null
-  const existing = await listCampaignDesigns(tenant, request.campaignId)
   const lazy: { renderer?: Promise<DesignRenderer> } = {}
   const getRenderer = () => (lazy.renderer ??= createDesignRenderer())
   try {
@@ -111,6 +178,20 @@ export async function renderWorkflowCreatives(request: WorkflowRenderRequest) {
               },
             ],
           })
+        // Spotlight the changed marker region in transformed canvas coordinates.
+        if (request.focus) {
+          const focusAnnotation = buildFocusAnnotation(
+            document,
+            request.focus,
+            captureAspect,
+            kit?.accent ?? '#3b82f6'
+          )
+          if (focusAnnotation) {
+            document = patchDesignDocument(document, {
+              annotations: [...document.annotations, focusAnnotation],
+            })
+          }
+        }
         design = await createDesign(tenant, {
           campaignId: request.campaignId,
           document,

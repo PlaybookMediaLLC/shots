@@ -222,6 +222,12 @@ func (_c *CaptureAttemptCreate) SetNavigationActions(v []map[string]string) *Cap
 	return _c
 }
 
+// SetFocusBox sets the "focus_box" field.
+func (_c *CaptureAttemptCreate) SetFocusBox(v map[string]float64) *CaptureAttemptCreate {
+	_c.mutation.SetFocusBox(v)
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *CaptureAttemptCreate) SetCreatedAt(v time.Time) *CaptureAttemptCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -466,6 +472,10 @@ func (_c *CaptureAttemptCreate) createSpec() (*CaptureAttempt, *sqlgraph.CreateS
 	if value, ok := _c.mutation.NavigationActions(); ok {
 		_spec.SetField(captureattempt.FieldNavigationActions, field.TypeJSON, value)
 		_node.NavigationActions = value
+	}
+	if value, ok := _c.mutation.FocusBox(); ok {
+		_spec.SetField(captureattempt.FieldFocusBox, field.TypeJSON, value)
+		_node.FocusBox = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(captureattempt.FieldCreatedAt, field.TypeTime, value)

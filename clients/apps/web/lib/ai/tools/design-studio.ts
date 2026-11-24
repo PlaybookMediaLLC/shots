@@ -16,6 +16,7 @@ import { DesignRenderLimitError, renderDesignForTenant } from '@/lib/design/rend
 import type { DesignRenderer } from '@/lib/design/renderer'
 import { designTemplates, getDesignTemplate } from '@/lib/design/templates'
 import { createDesign, getDesign } from '@/lib/tenant/designs'
+import { isCaptureAssetKey } from '@/lib/tenant/product-surfaces'
 import { type BrandKitValues, brandDesignChanges } from '@/lib/launch/brand'
 import type { RenderCritique } from '../launch/critique'
 import type { CampaignStudioRecord, CampaignStudioScope } from './campaign-studio'
@@ -83,7 +84,7 @@ export function createDesignStudioTools(
     // Release automation links its original captures as product shots; a
     // mockup made from one is derived, not a capture (org/<org>/<class>/…).
     const { assets } = await backendSDK(scope.tenant).findAssets({ ids: [assetId] })
-    return assets.find((asset) => asset.id === assetId)?.objectKey.split('/')[2] === 'capture'
+    return isCaptureAssetKey(assets.find((asset) => asset.id === assetId)?.objectKey)
   }
 
   async function requireCampaignDesign(designId: string) {

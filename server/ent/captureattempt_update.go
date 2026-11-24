@@ -291,6 +291,18 @@ func (_u *CaptureAttemptUpdate) ClearNavigationActions() *CaptureAttemptUpdate {
 	return _u
 }
 
+// SetFocusBox sets the "focus_box" field.
+func (_u *CaptureAttemptUpdate) SetFocusBox(v map[string]float64) *CaptureAttemptUpdate {
+	_u.mutation.SetFocusBox(v)
+	return _u
+}
+
+// ClearFocusBox clears the value of the "focus_box" field.
+func (_u *CaptureAttemptUpdate) ClearFocusBox() *CaptureAttemptUpdate {
+	_u.mutation.ClearFocusBox()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *CaptureAttemptUpdate) SetUpdatedAt(v time.Time) *CaptureAttemptUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -439,6 +451,12 @@ func (_u *CaptureAttemptUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.NavigationActionsCleared() {
 		_spec.ClearField(captureattempt.FieldNavigationActions, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.FocusBox(); ok {
+		_spec.SetField(captureattempt.FieldFocusBox, field.TypeJSON, value)
+	}
+	if _u.mutation.FocusBoxCleared() {
+		_spec.ClearField(captureattempt.FieldFocusBox, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(captureattempt.FieldUpdatedAt, field.TypeTime, value)
@@ -725,6 +743,18 @@ func (_u *CaptureAttemptUpdateOne) ClearNavigationActions() *CaptureAttemptUpdat
 	return _u
 }
 
+// SetFocusBox sets the "focus_box" field.
+func (_u *CaptureAttemptUpdateOne) SetFocusBox(v map[string]float64) *CaptureAttemptUpdateOne {
+	_u.mutation.SetFocusBox(v)
+	return _u
+}
+
+// ClearFocusBox clears the value of the "focus_box" field.
+func (_u *CaptureAttemptUpdateOne) ClearFocusBox() *CaptureAttemptUpdateOne {
+	_u.mutation.ClearFocusBox()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *CaptureAttemptUpdateOne) SetUpdatedAt(v time.Time) *CaptureAttemptUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -903,6 +933,12 @@ func (_u *CaptureAttemptUpdateOne) sqlSave(ctx context.Context) (_node *CaptureA
 	}
 	if _u.mutation.NavigationActionsCleared() {
 		_spec.ClearField(captureattempt.FieldNavigationActions, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.FocusBox(); ok {
+		_spec.SetField(captureattempt.FieldFocusBox, field.TypeJSON, value)
+	}
+	if _u.mutation.FocusBoxCleared() {
+		_spec.ClearField(captureattempt.FieldFocusBox, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(captureattempt.FieldUpdatedAt, field.TypeTime, value)

@@ -36,6 +36,8 @@ import { relativeTime } from './workflow-ui'
 const EMPTY_OPTION = '__empty_option__'
 
 const blankConnection: CaptureConnectionForm = {
+  bootstrapSecret: '',
+  bootstrapUrl: '',
   environment: 'production',
   expectedAccount: '',
   hosts: '',
@@ -81,6 +83,11 @@ function ConnectionRow({
       setStart(null)
       await onChanged()
     })
+  const bootstrap = () =>
+    run(async () => {
+      await client.capture.bootstrapConnection.mutate({ id: connection.id })
+      await onChanged()
+    })
   return (
     <Row>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -119,6 +126,16 @@ function ConnectionRow({
             >
               {open ? 'Start over' : connection.status === 'CONNECTING' ? 'Connect' : 'Reconnect'}
             </Button>
+            {connection.hasBootstrap ? (
+              <Button
+                disabled={busy || finishing}
+                onClick={() => void bootstrap()}
+                type="button"
+                variant="outline"
+              >
+                Refresh via bootstrap
+              </Button>
+            ) : null}
             <ConfirmDialog
               confirmLabel="Revoke"
               description="Deletes the stored session and cancels this connection's waiting captures. Signing in again needs a new connection."
@@ -153,6 +170,20 @@ function ConnectionRow({
           restore the sign-in. This updates on its own.
         </p>
       ) : null}
+      {connection.discoveredRoutes?.length ? (
+        <div className="space-y-1 pt-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            Discovered routes from sign-in ({connection.discoveredRoutes.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {connection.discoveredRoutes.slice(0, 12).map((route) => (
+              <Pill key={route.path}>
+                {route.label} ({route.path})
+              </Pill>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {connection.failureCode && !finishing ? (
         <p className="text-sm text-destructive">{captureFailureMessage(connection.failureCode)}</p>
       ) : null}
@@ -178,7 +209,7 @@ function ConnectionForm({
       <Input
         onChange={(event) => set(key, event.target.value)}
         required={required}
-        value={form[key]}
+        value={form[key] ?? ''}
       />
     </CaptureField>
   )
@@ -271,6 +302,25 @@ function ConnectionForm({
           'Leave empty and Shots looks for the account’s email in the app’s header or navigation; the expected account must then be that email. Or give the CSS selector of what shows it: [data-testid=account-email].',
           false
         )}
+        {text(
+          'bootstrapUrl',
+          'Session bootstrap URL (optional)',
+          'An https endpoint on an approved host that returns short-lived demo session cookies/localStorage for unattended renewal.',
+          false
+        )}
+        {form.bootstrapUrl?.trim() ? (
+          <CaptureField
+            hint="HMAC-SHA256 signing secret (at least 16 characters), encrypted at rest and never shown again."
+            label="Bootstrap signing secret"
+          >
+            <Input
+              onChange={(event) => set('bootstrapSecret', event.target.value)}
+              required
+              type="password"
+              value={form.bootstrapSecret ?? ''}
+            />
+          </CaptureField>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">
         A connection&apos;s address and account never change: new access needs a new connection.

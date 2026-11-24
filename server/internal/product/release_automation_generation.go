@@ -232,6 +232,10 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 	if err != nil {
 		return nil, err
 	}
+	releaseContext, err := c.releaseEvidence(ctx, org, source, input.ReleaseID)
+	if err != nil {
+		return nil, err
+	}
 	profile, err := c.client.BrandProfile.Query().Where(brandprofile.OrganizationID(org)).Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
@@ -245,7 +249,7 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 	// Fence delimiters inside untrusted text cannot close the fence.
 	fence := strings.NewReplacer("<source", "‹source", "</source", "‹/source")
 	prompt := fmt.Sprintf("<workspace trust=\"trusted\">\n%s\n</workspace>\n\nPosts to write:\n%s\n\n<source trust=\"untrusted\">\n%s\n\n%s\n\n%s\n</source>",
-		releasenotes.Clean(workspace, 32000), strings.Join(requests, "\n"), fence.Replace(source.Title), fence.Replace(releasenotes.Clean(source.Notes, 12000)), fence.Replace(evidence))
+		releasenotes.Clean(workspace, 32000), strings.Join(requests, "\n"), fence.Replace(source.Title), fence.Replace(releaseContext), fence.Replace(evidence))
 	var reply struct {
 		Posts []automation.GeneratedPost `json:"posts"`
 	}

@@ -52,6 +52,8 @@ const (
 	FieldAssetID = "assetId"
 	// FieldNavigationActions holds the string denoting the navigation_actions field in the database.
 	FieldNavigationActions = "navigationActions"
+	// FieldFocusBox holds the string denoting the focus_box field in the database.
+	FieldFocusBox = "focusBox"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -82,6 +84,7 @@ var Columns = []string{
 	FieldRefusedRequests,
 	FieldAssetID,
 	FieldNavigationActions,
+	FieldFocusBox,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }

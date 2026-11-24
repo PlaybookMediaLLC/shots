@@ -22288,6 +22288,7 @@ type CaptureAttemptMutation struct {
 	asset_id                 *string
 	navigation_actions       *[]map[string]string
 	appendnavigation_actions []map[string]string
+	focus_box                *map[string]float64
 	created_at               *time.Time
 	updated_at               *time.Time
 	clearedFields            map[string]struct{}
@@ -23297,6 +23298,55 @@ func (m *CaptureAttemptMutation) ResetNavigationActions() {
 	delete(m.clearedFields, captureattempt.FieldNavigationActions)
 }
 
+// SetFocusBox sets the "focus_box" field.
+func (m *CaptureAttemptMutation) SetFocusBox(value map[string]float64) {
+	m.focus_box = &value
+}
+
+// FocusBox returns the value of the "focus_box" field in the mutation.
+func (m *CaptureAttemptMutation) FocusBox() (r map[string]float64, exists bool) {
+	v := m.focus_box
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFocusBox returns the old "focus_box" field's value of the CaptureAttempt entity.
+// If the CaptureAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAttemptMutation) OldFocusBox(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFocusBox is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFocusBox requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFocusBox: %w", err)
+	}
+	return oldValue.FocusBox, nil
+}
+
+// ClearFocusBox clears the value of the "focus_box" field.
+func (m *CaptureAttemptMutation) ClearFocusBox() {
+	m.focus_box = nil
+	m.clearedFields[captureattempt.FieldFocusBox] = struct{}{}
+}
+
+// FocusBoxCleared returns if the "focus_box" field was cleared in this mutation.
+func (m *CaptureAttemptMutation) FocusBoxCleared() bool {
+	_, ok := m.clearedFields[captureattempt.FieldFocusBox]
+	return ok
+}
+
+// ResetFocusBox resets all changes to the "focus_box" field.
+func (m *CaptureAttemptMutation) ResetFocusBox() {
+	m.focus_box = nil
+	delete(m.clearedFields, captureattempt.FieldFocusBox)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *CaptureAttemptMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -23403,7 +23453,7 @@ func (m *CaptureAttemptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CaptureAttemptMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.organization_id != nil {
 		fields = append(fields, captureattempt.FieldOrganizationID)
 	}
@@ -23461,6 +23511,9 @@ func (m *CaptureAttemptMutation) Fields() []string {
 	if m.navigation_actions != nil {
 		fields = append(fields, captureattempt.FieldNavigationActions)
 	}
+	if m.focus_box != nil {
+		fields = append(fields, captureattempt.FieldFocusBox)
+	}
 	if m.created_at != nil {
 		fields = append(fields, captureattempt.FieldCreatedAt)
 	}
@@ -23513,6 +23566,8 @@ func (m *CaptureAttemptMutation) Field(name string) (ent.Value, bool) {
 		return m.AssetID()
 	case captureattempt.FieldNavigationActions:
 		return m.NavigationActions()
+	case captureattempt.FieldFocusBox:
+		return m.FocusBox()
 	case captureattempt.FieldCreatedAt:
 		return m.CreatedAt()
 	case captureattempt.FieldUpdatedAt:
@@ -23564,6 +23619,8 @@ func (m *CaptureAttemptMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldAssetID(ctx)
 	case captureattempt.FieldNavigationActions:
 		return m.OldNavigationActions(ctx)
+	case captureattempt.FieldFocusBox:
+		return m.OldFocusBox(ctx)
 	case captureattempt.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case captureattempt.FieldUpdatedAt:
@@ -23710,6 +23767,13 @@ func (m *CaptureAttemptMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNavigationActions(v)
 		return nil
+	case captureattempt.FieldFocusBox:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFocusBox(v)
+		return nil
 	case captureattempt.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -23832,6 +23896,9 @@ func (m *CaptureAttemptMutation) ClearedFields() []string {
 	if m.FieldCleared(captureattempt.FieldNavigationActions) {
 		fields = append(fields, captureattempt.FieldNavigationActions)
 	}
+	if m.FieldCleared(captureattempt.FieldFocusBox) {
+		fields = append(fields, captureattempt.FieldFocusBox)
+	}
 	return fields
 }
 
@@ -23872,6 +23939,9 @@ func (m *CaptureAttemptMutation) ClearField(name string) error {
 		return nil
 	case captureattempt.FieldNavigationActions:
 		m.ClearNavigationActions()
+		return nil
+	case captureattempt.FieldFocusBox:
+		m.ClearFocusBox()
 		return nil
 	}
 	return fmt.Errorf("unknown CaptureAttempt nullable field %s", name)
@@ -23937,6 +24007,9 @@ func (m *CaptureAttemptMutation) ResetField(name string) error {
 		return nil
 	case captureattempt.FieldNavigationActions:
 		m.ResetNavigationActions()
+		return nil
+	case captureattempt.FieldFocusBox:
+		m.ResetFocusBox()
 		return nil
 	case captureattempt.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -67593,47 +67666,51 @@ func (m *PermissionGroupMemberMutation) ResetEdge(name string) error {
 // PlatformAppConnectionMutation represents an operation that mutates the PlatformAppConnection nodes in the graph.
 type PlatformAppConnectionMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *string
-	organization_id    *string
-	source_app_id      *string
-	name               *string
-	environment        *string
-	origin             *string
-	hosts              *[]string
-	appendhosts        []string
-	login_hosts        *[]string
-	appendlogin_hosts  []string
-	protected_path     *string
-	identity_selector  *string
-	expected_account   *string
-	status             *platformappconnection.Status
-	state_ciphertext   *string
-	generation         *int
-	addgeneration      *int
-	state_revision     *int
-	addstate_revision  *int
-	validated_at       *time.Time
-	state_expires_at   *time.Time
-	connect_intent_id  *string
-	connect_user_id    *string
-	connect_session_id *string
-	connect_expires_at *time.Time
-	connect_phase      *string
-	failure_code       *string
-	lease_job_id       *string
-	lease_token        *int64
-	addlease_token     *int64
-	lease_expires_at   *time.Time
-	created_by_user_id *string
-	revoked_at         *time.Time
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	done               bool
-	oldValue           func(context.Context) (*PlatformAppConnection, error)
-	predicates         []predicate.PlatformAppConnection
+	op                          Op
+	typ                         string
+	id                          *string
+	organization_id             *string
+	source_app_id               *string
+	name                        *string
+	environment                 *string
+	origin                      *string
+	hosts                       *[]string
+	appendhosts                 []string
+	login_hosts                 *[]string
+	appendlogin_hosts           []string
+	protected_path              *string
+	identity_selector           *string
+	expected_account            *string
+	status                      *platformappconnection.Status
+	state_ciphertext            *string
+	generation                  *int
+	addgeneration               *int
+	state_revision              *int
+	addstate_revision           *int
+	validated_at                *time.Time
+	state_expires_at            *time.Time
+	connect_intent_id           *string
+	connect_user_id             *string
+	connect_session_id          *string
+	connect_expires_at          *time.Time
+	connect_phase               *string
+	failure_code                *string
+	lease_job_id                *string
+	lease_token                 *int64
+	addlease_token              *int64
+	lease_expires_at            *time.Time
+	created_by_user_id          *string
+	discovered_routes           *[]map[string]string
+	appenddiscovered_routes     []map[string]string
+	bootstrap_url               *string
+	bootstrap_secret_ciphertext *string
+	revoked_at                  *time.Time
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*PlatformAppConnection, error)
+	predicates                  []predicate.PlatformAppConnection
 }
 
 var _ ent.Mutation = (*PlatformAppConnectionMutation)(nil)
@@ -68922,6 +68999,169 @@ func (m *PlatformAppConnectionMutation) ResetCreatedByUserID() {
 	m.created_by_user_id = nil
 }
 
+// SetDiscoveredRoutes sets the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) SetDiscoveredRoutes(value []map[string]string) {
+	m.discovered_routes = &value
+	m.appenddiscovered_routes = nil
+}
+
+// DiscoveredRoutes returns the value of the "discovered_routes" field in the mutation.
+func (m *PlatformAppConnectionMutation) DiscoveredRoutes() (r []map[string]string, exists bool) {
+	v := m.discovered_routes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiscoveredRoutes returns the old "discovered_routes" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldDiscoveredRoutes(ctx context.Context) (v []map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiscoveredRoutes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiscoveredRoutes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiscoveredRoutes: %w", err)
+	}
+	return oldValue.DiscoveredRoutes, nil
+}
+
+// AppendDiscoveredRoutes adds value to the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) AppendDiscoveredRoutes(value []map[string]string) {
+	m.appenddiscovered_routes = append(m.appenddiscovered_routes, value...)
+}
+
+// AppendedDiscoveredRoutes returns the list of values that were appended to the "discovered_routes" field in this mutation.
+func (m *PlatformAppConnectionMutation) AppendedDiscoveredRoutes() ([]map[string]string, bool) {
+	if len(m.appenddiscovered_routes) == 0 {
+		return nil, false
+	}
+	return m.appenddiscovered_routes, true
+}
+
+// ClearDiscoveredRoutes clears the value of the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) ClearDiscoveredRoutes() {
+	m.discovered_routes = nil
+	m.appenddiscovered_routes = nil
+	m.clearedFields[platformappconnection.FieldDiscoveredRoutes] = struct{}{}
+}
+
+// DiscoveredRoutesCleared returns if the "discovered_routes" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) DiscoveredRoutesCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldDiscoveredRoutes]
+	return ok
+}
+
+// ResetDiscoveredRoutes resets all changes to the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) ResetDiscoveredRoutes() {
+	m.discovered_routes = nil
+	m.appenddiscovered_routes = nil
+	delete(m.clearedFields, platformappconnection.FieldDiscoveredRoutes)
+}
+
+// SetBootstrapURL sets the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) SetBootstrapURL(s string) {
+	m.bootstrap_url = &s
+}
+
+// BootstrapURL returns the value of the "bootstrap_url" field in the mutation.
+func (m *PlatformAppConnectionMutation) BootstrapURL() (r string, exists bool) {
+	v := m.bootstrap_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBootstrapURL returns the old "bootstrap_url" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldBootstrapURL(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBootstrapURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBootstrapURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBootstrapURL: %w", err)
+	}
+	return oldValue.BootstrapURL, nil
+}
+
+// ClearBootstrapURL clears the value of the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) ClearBootstrapURL() {
+	m.bootstrap_url = nil
+	m.clearedFields[platformappconnection.FieldBootstrapURL] = struct{}{}
+}
+
+// BootstrapURLCleared returns if the "bootstrap_url" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) BootstrapURLCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldBootstrapURL]
+	return ok
+}
+
+// ResetBootstrapURL resets all changes to the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) ResetBootstrapURL() {
+	m.bootstrap_url = nil
+	delete(m.clearedFields, platformappconnection.FieldBootstrapURL)
+}
+
+// SetBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) SetBootstrapSecretCiphertext(s string) {
+	m.bootstrap_secret_ciphertext = &s
+}
+
+// BootstrapSecretCiphertext returns the value of the "bootstrap_secret_ciphertext" field in the mutation.
+func (m *PlatformAppConnectionMutation) BootstrapSecretCiphertext() (r string, exists bool) {
+	v := m.bootstrap_secret_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBootstrapSecretCiphertext returns the old "bootstrap_secret_ciphertext" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldBootstrapSecretCiphertext(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBootstrapSecretCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBootstrapSecretCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBootstrapSecretCiphertext: %w", err)
+	}
+	return oldValue.BootstrapSecretCiphertext, nil
+}
+
+// ClearBootstrapSecretCiphertext clears the value of the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) ClearBootstrapSecretCiphertext() {
+	m.bootstrap_secret_ciphertext = nil
+	m.clearedFields[platformappconnection.FieldBootstrapSecretCiphertext] = struct{}{}
+}
+
+// BootstrapSecretCiphertextCleared returns if the "bootstrap_secret_ciphertext" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) BootstrapSecretCiphertextCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldBootstrapSecretCiphertext]
+	return ok
+}
+
+// ResetBootstrapSecretCiphertext resets all changes to the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) ResetBootstrapSecretCiphertext() {
+	m.bootstrap_secret_ciphertext = nil
+	delete(m.clearedFields, platformappconnection.FieldBootstrapSecretCiphertext)
+}
+
 // SetRevokedAt sets the "revoked_at" field.
 func (m *PlatformAppConnectionMutation) SetRevokedAt(t time.Time) {
 	m.revoked_at = &t
@@ -69077,7 +69317,7 @@ func (m *PlatformAppConnectionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PlatformAppConnectionMutation) Fields() []string {
-	fields := make([]string, 0, 29)
+	fields := make([]string, 0, 32)
 	if m.organization_id != nil {
 		fields = append(fields, platformappconnection.FieldOrganizationID)
 	}
@@ -69156,6 +69396,15 @@ func (m *PlatformAppConnectionMutation) Fields() []string {
 	if m.created_by_user_id != nil {
 		fields = append(fields, platformappconnection.FieldCreatedByUserID)
 	}
+	if m.discovered_routes != nil {
+		fields = append(fields, platformappconnection.FieldDiscoveredRoutes)
+	}
+	if m.bootstrap_url != nil {
+		fields = append(fields, platformappconnection.FieldBootstrapURL)
+	}
+	if m.bootstrap_secret_ciphertext != nil {
+		fields = append(fields, platformappconnection.FieldBootstrapSecretCiphertext)
+	}
 	if m.revoked_at != nil {
 		fields = append(fields, platformappconnection.FieldRevokedAt)
 	}
@@ -69225,6 +69474,12 @@ func (m *PlatformAppConnectionMutation) Field(name string) (ent.Value, bool) {
 		return m.LeaseExpiresAt()
 	case platformappconnection.FieldCreatedByUserID:
 		return m.CreatedByUserID()
+	case platformappconnection.FieldDiscoveredRoutes:
+		return m.DiscoveredRoutes()
+	case platformappconnection.FieldBootstrapURL:
+		return m.BootstrapURL()
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		return m.BootstrapSecretCiphertext()
 	case platformappconnection.FieldRevokedAt:
 		return m.RevokedAt()
 	case platformappconnection.FieldCreatedAt:
@@ -69292,6 +69547,12 @@ func (m *PlatformAppConnectionMutation) OldField(ctx context.Context, name strin
 		return m.OldLeaseExpiresAt(ctx)
 	case platformappconnection.FieldCreatedByUserID:
 		return m.OldCreatedByUserID(ctx)
+	case platformappconnection.FieldDiscoveredRoutes:
+		return m.OldDiscoveredRoutes(ctx)
+	case platformappconnection.FieldBootstrapURL:
+		return m.OldBootstrapURL(ctx)
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		return m.OldBootstrapSecretCiphertext(ctx)
 	case platformappconnection.FieldRevokedAt:
 		return m.OldRevokedAt(ctx)
 	case platformappconnection.FieldCreatedAt:
@@ -69489,6 +69750,27 @@ func (m *PlatformAppConnectionMutation) SetField(name string, value ent.Value) e
 		}
 		m.SetCreatedByUserID(v)
 		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		v, ok := value.([]map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiscoveredRoutes(v)
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBootstrapURL(v)
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBootstrapSecretCiphertext(v)
+		return nil
 	case platformappconnection.FieldRevokedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -69615,6 +69897,15 @@ func (m *PlatformAppConnectionMutation) ClearedFields() []string {
 	if m.FieldCleared(platformappconnection.FieldLeaseExpiresAt) {
 		fields = append(fields, platformappconnection.FieldLeaseExpiresAt)
 	}
+	if m.FieldCleared(platformappconnection.FieldDiscoveredRoutes) {
+		fields = append(fields, platformappconnection.FieldDiscoveredRoutes)
+	}
+	if m.FieldCleared(platformappconnection.FieldBootstrapURL) {
+		fields = append(fields, platformappconnection.FieldBootstrapURL)
+	}
+	if m.FieldCleared(platformappconnection.FieldBootstrapSecretCiphertext) {
+		fields = append(fields, platformappconnection.FieldBootstrapSecretCiphertext)
+	}
 	if m.FieldCleared(platformappconnection.FieldRevokedAt) {
 		fields = append(fields, platformappconnection.FieldRevokedAt)
 	}
@@ -69667,6 +69958,15 @@ func (m *PlatformAppConnectionMutation) ClearField(name string) error {
 		return nil
 	case platformappconnection.FieldLeaseExpiresAt:
 		m.ClearLeaseExpiresAt()
+		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		m.ClearDiscoveredRoutes()
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		m.ClearBootstrapURL()
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		m.ClearBootstrapSecretCiphertext()
 		return nil
 	case platformappconnection.FieldRevokedAt:
 		m.ClearRevokedAt()
@@ -69756,6 +70056,15 @@ func (m *PlatformAppConnectionMutation) ResetField(name string) error {
 		return nil
 	case platformappconnection.FieldCreatedByUserID:
 		m.ResetCreatedByUserID()
+		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		m.ResetDiscoveredRoutes()
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		m.ResetBootstrapURL()
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		m.ResetBootstrapSecretCiphertext()
 		return nil
 	case platformappconnection.FieldRevokedAt:
 		m.ResetRevokedAt()

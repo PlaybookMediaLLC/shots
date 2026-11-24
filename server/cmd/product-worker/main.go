@@ -229,7 +229,8 @@ func main() {
 		}
 		defer batchWorker.Stop()
 	}
-	if automationStore.CaptureAvailable() && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
+	deploymentCaptureEnabled := capture.FromEnvironment() != nil || automationStore.CaptureAvailable()
+	if deploymentCaptureEnabled && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
 		captureWorker := worker.New(temporalClient, temporalcapture.TaskQueue, worker.Options{
 			// Shared with design rendering's provider account: a low ceiling keeps
 			// capacity for renders, and a stalled page holds one slot, not the queue.
@@ -242,22 +243,24 @@ func main() {
 			os.Exit(1)
 		}
 		defer captureWorker.Stop()
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
+		if automationStore.CaptureAvailable() {
+			go func() {
+				ticker := time.NewTicker(time.Minute)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+					}
+					reclaimCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+					if err := automationStore.ReclaimCaptureResources(reclaimCtx); err != nil {
+						slog.Warn("capture cleanup did not finish")
+					}
+					cancel()
 				}
-				reclaimCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
-				if err := automationStore.ReclaimCaptureResources(reclaimCtx); err != nil {
-					slog.Warn("capture cleanup did not finish")
-				}
-				cancel()
-			}
-		}()
+			}()
+		}
 	}
 
 	if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
@@ -304,7 +307,9 @@ func main() {
 			events.WithObjectStore(objectStore)
 		}
 		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
-		events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
+		if deploymentCaptureEnabled {
+			events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
+		}
 		if github != nil {
 			events.WithGitHubApp(github)
 		}

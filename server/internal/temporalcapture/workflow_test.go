@@ -96,3 +96,57 @@ func TestWorkflowPayloadsCarryNoSessionMaterial(t *testing.T) {
 		t.Fatal("an activity error carried provider text")
 	}
 }
+
+func TestDeploymentWorkflowRetriesTransientAndFinalizesOnLastAttempt(t *testing.T) {
+	t.Run("recovers on retry", func(t *testing.T) {
+		suite := &testsuite.WorkflowTestSuite{}
+		env := suite.NewTestWorkflowEnvironment()
+		calls := 0
+		env.RegisterActivityWithOptions(func(ctx context.Context, input Input) error {
+			calls++
+			if calls < 3 {
+				return safeError(errors.New("temporary screenshot timeout"))
+			}
+			return nil
+		}, activity.RegisterOptions{Name: DeploymentCaptureActivity})
+		env.ExecuteWorkflow(DeploymentWorkflow, Input{OrganizationID: "org", ID: "dep-1"})
+		if !env.IsWorkflowCompleted() || env.GetWorkflowError() != nil || calls != 3 {
+			t.Fatalf("completed=%v err=%v calls=%d", env.IsWorkflowCompleted(), env.GetWorkflowError(), calls)
+		}
+	})
+
+	t.Run("final attempt disables retryTransient so deployment finalizes", func(t *testing.T) {
+		suite := &testsuite.WorkflowTestSuite{}
+		env := suite.NewTestWorkflowEnvironment()
+		var flags []bool
+		env.RegisterActivityWithOptions(func(ctx context.Context, input Input) error {
+			retryTransient := int(activity.GetInfo(ctx).Attempt) < deploymentCaptureMaxAttempts
+			flags = append(flags, retryTransient)
+			if retryTransient {
+				return safeError(errors.New("transient capture_failed"))
+			}
+			return nil
+		}, activity.RegisterOptions{Name: DeploymentCaptureActivity})
+		env.ExecuteWorkflow(DeploymentWorkflow, Input{OrganizationID: "org", ID: "dep-2"})
+		if !env.IsWorkflowCompleted() || env.GetWorkflowError() != nil || len(flags) != deploymentCaptureMaxAttempts {
+			t.Fatalf("completed=%v err=%v flags=%v", env.IsWorkflowCompleted(), env.GetWorkflowError(), flags)
+		}
+		if !flags[0] || !flags[1] || !flags[2] || flags[3] {
+			t.Fatalf("expected retryTransient true,true,true,false; got %v", flags)
+		}
+	})
+
+	t.Run("not eligible does not retry", func(t *testing.T) {
+		suite := &testsuite.WorkflowTestSuite{}
+		env := suite.NewTestWorkflowEnvironment()
+		calls := 0
+		env.RegisterActivityWithOptions(func(ctx context.Context, input Input) error {
+			calls++
+			return safeError(product.ErrNotEligible)
+		}, activity.RegisterOptions{Name: DeploymentCaptureActivity})
+		env.ExecuteWorkflow(DeploymentWorkflow, Input{OrganizationID: "org", ID: "dep-3"})
+		if env.GetWorkflowError() == nil || calls != 1 {
+			t.Fatalf("expected 1 non-retryable attempt, got calls=%d err=%v", calls, env.GetWorkflowError())
+		}
+	})
+}

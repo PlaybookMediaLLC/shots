@@ -7,9 +7,18 @@ import type { CampaignPlanContent } from '../lib/launch/spec-schema'
 const connections = [
   { id: 'x1', platform: 'x', status: 'ACTIVE' },
   { id: 'x2', platform: 'x', status: 'REVOKED' },
+  { id: 'tw', platform: 'twitter', status: 'ACTIVE' },
   { id: 'li', platform: 'linkedin', status: 'ACTIVE' },
+  { id: 'lip', platform: 'linkedin-page', status: 'ACTIVE' },
   { id: 'ig', platform: 'instagram', status: 'ACTIVE' },
   { id: 'igs', platform: 'instagram-standalone', status: 'ACTIVE' },
+  { id: 'th', platform: 'threads', status: 'ACTIVE' },
+  { id: 'bsky', platform: 'bluesky', status: 'ACTIVE' },
+  { id: 'masto', platform: 'mastodon', status: 'ACTIVE' },
+  { id: 'tt', platform: 'tiktok', status: 'ACTIVE' },
+  { id: 'yt', platform: 'youtube', status: 'ACTIVE' },
+  { id: 'fb', platform: 'facebook', status: 'ACTIVE' },
+  { id: 'pin', platform: 'pinterest', status: 'ACTIVE' },
 ]
 
 test('custom scheduling accepts only empty or complete, unambiguous choices in the displayed zone', () => {
@@ -34,16 +43,31 @@ test('custom scheduling accepts only empty or complete, unambiguous choices in t
 test('a post channel offers only active connections on its platforms', () => {
   assert.deepEqual(
     connectionsForChannel('x', connections)?.map((entry) => entry.id),
-    ['x1']
+    ['x1', 'tw']
   )
   assert.deepEqual(
     connectionsForChannel('linkedin', connections)?.map((entry) => entry.id),
-    ['li']
+    ['li', 'lip']
   )
   assert.deepEqual(
     connectionsForChannel('instagram', connections)?.map((entry) => entry.id),
     ['ig', 'igs']
   )
+  for (const [channel, expectedId] of [
+    ['threads', 'th'],
+    ['bluesky', 'bsky'],
+    ['mastodon', 'masto'],
+    ['tiktok', 'tt'],
+    ['youtube', 'yt'],
+    ['facebook', 'fb'],
+    ['pinterest', 'pin'],
+  ] as const) {
+    assert.deepEqual(
+      connectionsForChannel(channel, connections)?.map((entry) => entry.id),
+      [expectedId],
+      channel
+    )
+  }
 })
 
 test('channels without a publishing platform cannot be scheduled', () => {

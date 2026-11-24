@@ -56,6 +56,8 @@ type CaptureAttempt struct {
 	AssetID *string `json:"asset_id,omitempty"`
 	// NavigationActions holds the value of the "navigation_actions" field.
 	NavigationActions []map[string]string `json:"navigation_actions,omitempty"`
+	// FocusBox holds the value of the "focus_box" field.
+	FocusBox map[string]float64 `json:"focus_box,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -68,7 +70,7 @@ func (*CaptureAttempt) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case captureattempt.FieldNavigationActions:
+		case captureattempt.FieldNavigationActions, captureattempt.FieldFocusBox:
 			values[i] = new([]byte)
 		case captureattempt.FieldRecipeVersion, captureattempt.FieldAttemptNumber, captureattempt.FieldFencingToken, captureattempt.FieldRefusedRequests:
 			values[i] = new(sql.NullInt64)
@@ -221,6 +223,14 @@ func (_m *CaptureAttempt) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field navigation_actions: %w", err)
 				}
 			}
+		case captureattempt.FieldFocusBox:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field focus_box", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.FocusBox); err != nil {
+					return fmt.Errorf("unmarshal field focus_box: %w", err)
+				}
+			}
 		case captureattempt.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -341,6 +351,9 @@ func (_m *CaptureAttempt) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("navigation_actions=")
 	builder.WriteString(fmt.Sprintf("%v", _m.NavigationActions))
+	builder.WriteString(", ")
+	builder.WriteString("focus_box=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FocusBox))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

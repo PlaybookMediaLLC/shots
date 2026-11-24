@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { generateText, stepCountIs } from 'ai'
+import { generateText, stepCountIs, type ToolSet } from 'ai'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { backendSDK } from '@/lib/backend/sdk'
 import {
@@ -20,6 +20,7 @@ import {
   loadPreferenceExamples,
 } from '@/lib/launch/store'
 import { listCampaignDesigns } from '@/lib/tenant/designs'
+import { isCaptureAssetKey } from '@/lib/tenant/product-surfaces'
 import { models, normalizeTokenUsage } from '../models'
 import { type CampaignStudioRecord, createCampaignStudioTools } from '../tools/campaign-studio'
 import { createDesignStudioTools } from '../tools/design-studio'
@@ -53,8 +54,48 @@ export async function produceCampaign(
   if (!spec) throw new LaunchError('Draft the spec first.', 409)
   if (!plan) throw new LaunchError('Plan the campaign first.', 409)
   const captureUrls = await planCaptureUrls(tenant, campaign, spec.content)
-  if (captureUrls.length === 0) {
-    throw new LaunchError('Connect a public product URL before producing visuals.', 409)
+  // Collect already-captured screenshots (from automation runs, signed-in surface
+  // captures, or release uploads) so Launch can design directly on authenticated
+  // evidence without requiring a public URL.
+  const existingCaptureIds = new Set<string>()
+  const [existingCampaign, fullRelease] = await Promise.all([
+    backendSDK(tenant)
+      .getCampaign(campaignId)
+      .catch(() => null),
+    backendSDK(tenant)
+      .getRelease(campaign.release.id)
+      .catch(() => null),
+  ])
+  for (const link of existingCampaign?.assets ?? []) {
+    if (
+      link.kind.startsWith('capture-') ||
+      (link.kind === 'product-shot' && isCaptureAssetKey(link.asset.objectKey))
+    ) {
+      existingCaptureIds.add(link.assetId)
+    }
+  }
+  const missingReleaseScreenshots = (fullRelease?.screenshotAssetIds ?? []).filter(
+    (screenshotId) => !existingCaptureIds.has(screenshotId)
+  )
+  await Promise.all(
+    missingReleaseScreenshots.map(async (screenshotId) => {
+      try {
+        await backendSDK(tenant).linkCampaignAsset(campaignId, screenshotId, {
+          caption: campaign.release!.title,
+          kind: 'capture-desktop',
+          planVersion: plan.version,
+        })
+        existingCaptureIds.add(screenshotId)
+      } catch {
+        // Leave unlinked assets out of existingCaptureIds so tools do not reject them.
+      }
+    })
+  )
+  if (captureUrls.length === 0 && existingCaptureIds.size === 0) {
+    throw new LaunchError(
+      'Connect a public product URL or attach a product capture before producing visuals.',
+      409
+    )
   }
   const [brand, examples] = await Promise.all([
     getActiveBrand(tenant),
@@ -70,8 +111,14 @@ export async function produceCampaign(
     recordStep: runId ? (step) => backendSDK(tenant).appendLaunchRunStep(runId, step) : undefined,
     signal,
   })
+  // Never inject an unvalidated productSurface.url into allowedUrls; when no
+  // validated public captureUrls exist, omit captureProductPage from tools so
+  // the agent works strictly from verified <existing_captures>.
   const scope = {
-    allowedUrls: captureUrls as [string, ...string[]],
+    allowedUrls: (captureUrls.length > 0 ? captureUrls : ['https://invalid.local']) as [
+      string,
+      ...string[],
+    ],
     campaignId,
     planVersion: plan.version,
     run,
@@ -91,9 +138,8 @@ export async function produceCampaign(
   let renderer: Promise<DesignRenderer> | null = null
   const getRenderer = () => (renderer ??= createDesignRenderer())
   const claims = listSpecClaims(spec.content).map((claim) => claim.text)
-  const tools = designMode
+  const tools: ToolSet = designMode
     ? {
-        captureProductPage: baseTools.captureProductPage,
         createProductShot: baseTools.createProductShot,
         ...createDesignStudioTools(scope, record, getRenderer, {
           brand: brand.kit,
@@ -103,9 +149,11 @@ export async function produceCampaign(
         }),
       }
     : {
-        captureProductPage: baseTools.captureProductPage,
         createProductShot: baseTools.createProductShot,
       }
+  if (captureUrls.length > 0) {
+    tools.captureProductPage = baseTools.captureProductPage
+  }
 
   const prompt = [
     formatSpecForStages(spec.content, spec.version),
@@ -117,7 +165,10 @@ export async function produceCampaign(
     !designMode && brand.kit
       ? `Product shot colors: background gradient from ${brand.kit.background} to ${brand.kit.accent} (${brandGradient(brand.kit)}), text ${brand.kit.foreground}.`
       : null,
-    `<capture_urls>\n${captureUrls.join('\n')}\n</capture_urls>`,
+    captureUrls.length > 0 ? `<capture_urls>\n${captureUrls.join('\n')}\n</capture_urls>` : null,
+    existingCaptureIds.size > 0
+      ? `<existing_captures>\nReuse these already-captured screenshot assetIds directly with createDesignFromTemplate or createProductShot before capturing again:\n${[...existingCaptureIds].join('\n')}\n</existing_captures>`
+      : null,
     finished.length === 0
       ? 'Produce every asset in the plan.'
       : `Plan assets ${finished.map((asset) => asset.key).join(', ')} are already produced and rendered; leave them. Produce only ${remaining.map((asset) => asset.key).join(', ')}.`,

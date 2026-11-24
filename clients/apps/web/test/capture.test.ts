@@ -210,6 +210,25 @@ test('a recipe may capture at double resolution and crop to its element', () => 
   assert.deepEqual(sharp.definition.viewport, { height: 900, width: 1440, scale: 2 })
   assert.equal(sharp.definition.crop, 'marker')
   assert.equal(captureRecipeInputSchema.safeParse(sharp).success, true)
+  const phase2 = captureRecipeInput({
+    ...recipeForm,
+    colorScheme: 'dark',
+    maskStyle: 'blur',
+    optionalMasks: '.toast',
+    forbidden: '.error-banner',
+    allowedPostPaths: '/graphql',
+    versionPath: '',
+    versionSelector: 'meta[name=build]',
+    verifyWithVision: true,
+  })
+  assert.equal(phase2.definition.colorScheme, 'dark')
+  assert.equal(phase2.definition.maskStyle, 'blur')
+  assert.deepEqual(phase2.definition.optionalMasks, ['.toast'])
+  assert.deepEqual(phase2.definition.forbidden, ['.error-banner'])
+  assert.deepEqual(phase2.definition.allowedPostPaths, ['/graphql'])
+  assert.deepEqual(phase2.definition.version, { selector: 'meta[name=build]' })
+  assert.equal(phase2.definition.verifyWithVision, true)
+  assert.equal(captureRecipeInputSchema.safeParse(phase2).success, true)
   const tooSharp = {
     ...sharp,
     definition: { ...sharp.definition, viewport: { height: 900, width: 1440, scale: 3 } },
@@ -312,20 +331,55 @@ test('the SDK calls each capture route in the workspace scope', async () => {
   await sdk.startCaptureConnect('c/1')
   await sdk.refreshCaptureConnect('c/1')
   await sdk.finishCaptureConnect('c1', 'intent')
+  await sdk.bootstrapCaptureConnection('c/1')
   await sdk.revokeCaptureConnection('c1')
   await sdk.activateCaptureRecipe('r1')
   await sdk.archiveCaptureRecipe('r1')
   await sdk.requestCaptureJob('r1', { test: true })
+  await sdk.getCaptureJob('j/1')
   await sdk.cancelCaptureJob('j1')
   assert.deepEqual(requests, [
     'GET /v1/capture',
     'POST /v1/capture/connections/c%2F1/connect',
     'POST /v1/capture/connections/c%2F1/connect/refresh',
     'POST /v1/capture/connections/c1/connect/finish {"intentId":"intent"}',
+    'POST /v1/capture/connections/c%2F1/bootstrap',
     'POST /v1/capture/connections/c1/revoke',
     'POST /v1/capture/recipes/r1/activate',
     'POST /v1/capture/recipes/r1/archive',
     'POST /v1/capture/recipes/r1/jobs {"test":true}',
+    'GET /v1/capture/jobs/j%2F1',
     'POST /v1/capture/jobs/j1/cancel',
   ])
+})
+
+test('capture connection form encodes optional bootstrap fields and scroll navigation summaries', () => {
+  const withBootstrap = captureConnectionInputSchema.parse(
+    captureConnectionInput({
+      bootstrapSecret: '0123456789abcdef-secret',
+      bootstrapUrl: ' https://app.example.com/api/shots/bootstrap ',
+      environment: 'production',
+      expectedAccount: 'demo@example.com',
+      hosts: 'app.example.com',
+      identitySelector: '[data-account]',
+      loginHosts: '',
+      name: 'App',
+      origin: 'https://app.example.com',
+      protectedPath: '/dashboard',
+      sourceAppId: '',
+    })
+  )
+  assert.equal(withBootstrap.bootstrapUrl, 'https://app.example.com/api/shots/bootstrap')
+  assert.equal(withBootstrap.bootstrapSecret, '0123456789abcdef-secret')
+
+  assert.equal(
+    captureNavigationSummary({
+      navigationActions: [
+        { kind: 'link', path: '/analytics' },
+        { kind: 'scroll', path: '/analytics' },
+        { kind: 'frame', path: '/analytics' },
+      ],
+    }),
+    'AI opened /analytics, then scrolled on /analytics, then framed the result on /analytics.'
+  )
 })

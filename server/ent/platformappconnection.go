@@ -70,6 +70,12 @@ type PlatformAppConnection struct {
 	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 	// CreatedByUserID holds the value of the "created_by_user_id" field.
 	CreatedByUserID string `json:"created_by_user_id,omitempty"`
+	// DiscoveredRoutes holds the value of the "discovered_routes" field.
+	DiscoveredRoutes []map[string]string `json:"discovered_routes,omitempty"`
+	// BootstrapURL holds the value of the "bootstrap_url" field.
+	BootstrapURL *string `json:"bootstrap_url,omitempty"`
+	// BootstrapSecretCiphertext holds the value of the "bootstrap_secret_ciphertext" field.
+	BootstrapSecretCiphertext *string `json:"-"`
 	// RevokedAt holds the value of the "revoked_at" field.
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -84,11 +90,11 @@ func (*PlatformAppConnection) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case platformappconnection.FieldHosts, platformappconnection.FieldLoginHosts:
+		case platformappconnection.FieldHosts, platformappconnection.FieldLoginHosts, platformappconnection.FieldDiscoveredRoutes:
 			values[i] = new([]byte)
 		case platformappconnection.FieldGeneration, platformappconnection.FieldStateRevision, platformappconnection.FieldLeaseToken:
 			values[i] = new(sql.NullInt64)
-		case platformappconnection.FieldID, platformappconnection.FieldOrganizationID, platformappconnection.FieldSourceAppID, platformappconnection.FieldName, platformappconnection.FieldEnvironment, platformappconnection.FieldOrigin, platformappconnection.FieldProtectedPath, platformappconnection.FieldIdentitySelector, platformappconnection.FieldExpectedAccount, platformappconnection.FieldStatus, platformappconnection.FieldStateCiphertext, platformappconnection.FieldConnectIntentID, platformappconnection.FieldConnectUserID, platformappconnection.FieldConnectSessionID, platformappconnection.FieldConnectPhase, platformappconnection.FieldFailureCode, platformappconnection.FieldLeaseJobID, platformappconnection.FieldCreatedByUserID:
+		case platformappconnection.FieldID, platformappconnection.FieldOrganizationID, platformappconnection.FieldSourceAppID, platformappconnection.FieldName, platformappconnection.FieldEnvironment, platformappconnection.FieldOrigin, platformappconnection.FieldProtectedPath, platformappconnection.FieldIdentitySelector, platformappconnection.FieldExpectedAccount, platformappconnection.FieldStatus, platformappconnection.FieldStateCiphertext, platformappconnection.FieldConnectIntentID, platformappconnection.FieldConnectUserID, platformappconnection.FieldConnectSessionID, platformappconnection.FieldConnectPhase, platformappconnection.FieldFailureCode, platformappconnection.FieldLeaseJobID, platformappconnection.FieldCreatedByUserID, platformappconnection.FieldBootstrapURL, platformappconnection.FieldBootstrapSecretCiphertext:
 			values[i] = new(sql.NullString)
 		case platformappconnection.FieldValidatedAt, platformappconnection.FieldStateExpiresAt, platformappconnection.FieldConnectExpiresAt, platformappconnection.FieldLeaseExpiresAt, platformappconnection.FieldRevokedAt, platformappconnection.FieldCreatedAt, platformappconnection.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -285,6 +291,28 @@ func (_m *PlatformAppConnection) assignValues(columns []string, values []any) er
 			} else if value.Valid {
 				_m.CreatedByUserID = value.String
 			}
+		case platformappconnection.FieldDiscoveredRoutes:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field discovered_routes", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DiscoveredRoutes); err != nil {
+					return fmt.Errorf("unmarshal field discovered_routes: %w", err)
+				}
+			}
+		case platformappconnection.FieldBootstrapURL:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field bootstrap_url", values[i])
+			} else if value.Valid {
+				_m.BootstrapURL = new(string)
+				*_m.BootstrapURL = value.String
+			}
+		case platformappconnection.FieldBootstrapSecretCiphertext:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field bootstrap_secret_ciphertext", values[i])
+			} else if value.Valid {
+				_m.BootstrapSecretCiphertext = new(string)
+				*_m.BootstrapSecretCiphertext = value.String
+			}
 		case platformappconnection.FieldRevokedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field revoked_at", values[i])
@@ -435,6 +463,16 @@ func (_m *PlatformAppConnection) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("created_by_user_id=")
 	builder.WriteString(_m.CreatedByUserID)
+	builder.WriteString(", ")
+	builder.WriteString("discovered_routes=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DiscoveredRoutes))
+	builder.WriteString(", ")
+	if v := _m.BootstrapURL; v != nil {
+		builder.WriteString("bootstrap_url=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("bootstrap_secret_ciphertext=<sensitive>")
 	builder.WriteString(", ")
 	if v := _m.RevokedAt; v != nil {
 		builder.WriteString("revoked_at=")

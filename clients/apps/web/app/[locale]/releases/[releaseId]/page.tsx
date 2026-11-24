@@ -89,9 +89,16 @@ export default async function ReleasePage({
           </span>
         }
         actions={
-          <ButtonLink href="/workflows" size="sm" variant="outline">
-            Workflows
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            {access.campaignWorkflowEnabled && accessAllows(access, 'release:create') ? (
+              <ButtonLink href={`/campaigns/new?release=${encodeURIComponent(release.id)}`} size="sm">
+                Start campaign
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href="/workflows" size="sm" variant="outline">
+              Workflows
+            </ButtonLink>
+          </div>
         }
       >
         {screenshots.length ? (

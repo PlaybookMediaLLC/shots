@@ -648,7 +648,12 @@ func (c *Configuration) frontendWorkflow(ctx context.Context, tx *ent.Tx, s *ent
 // when it went live: a restored older deployment keeps its artifact's own time,
 // and only the activation time tells the rollback from a redelivery.
 func frontendWorkflowEvent(a *ent.FrontendActivation) ra.Event {
-	return ra.Event{Family: ra.Deployed, SemanticKey: "frontend:" + a.ID, RepositoryID: a.Snapshot.RepositoryID, ObjectID: a.Snapshot.DeploymentID, OccurredAt: frontendActivationTime(a.Snapshot), Origin: "live", Title: "Production deployment reported successful", Notes: a.Decision.Reason, URL: a.Snapshot.URL, Fields: map[string]ra.Value{"repository.id": ra.StringValue(a.Snapshot.RepositoryID), "deployment.environment": ra.StringValue(a.Snapshot.Environment), "deployment.state": ra.StringValue("success"), "deployment.production": ra.BoolValue(true), "deployment.sha": ra.StringValue(a.Snapshot.Revision), "event.family": ra.StringValue(string(ra.Deployed)), "event.action": ra.StringValue("success")}}
+	isProd := strings.EqualFold(a.Snapshot.Environment, "production")
+	title := "Production deployment reported successful"
+	if !isProd && strings.TrimSpace(a.Snapshot.Environment) != "" {
+		title = strings.TrimSpace(a.Snapshot.Environment) + " deployment reported successful"
+	}
+	return ra.Event{Family: ra.Deployed, SemanticKey: "frontend:" + a.ID, RepositoryID: a.Snapshot.RepositoryID, ObjectID: a.Snapshot.DeploymentID, OccurredAt: frontendActivationTime(a.Snapshot), Origin: "live", Title: title, Notes: a.Decision.Reason, URL: a.Snapshot.URL, Fields: map[string]ra.Value{"repository.id": ra.StringValue(a.Snapshot.RepositoryID), "deployment.environment": ra.StringValue(a.Snapshot.Environment), "deployment.state": ra.StringValue("success"), "deployment.production": ra.BoolValue(isProd), "deployment.sha": ra.StringValue(a.Snapshot.Revision), "event.family": ra.StringValue(string(ra.Deployed)), "event.action": ra.StringValue("success")}}
 }
 
 // acceptGitHubFrontend observes the same authenticated envelope for each opted-in

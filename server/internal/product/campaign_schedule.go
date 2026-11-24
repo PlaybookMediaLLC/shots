@@ -30,9 +30,16 @@ type ScheduleCampaignPostInput struct {
 // campaignChannelPlatforms lists the connection platforms that publish each
 // campaign post channel. Other channels cannot be scheduled.
 var campaignChannelPlatforms = map[string][]string{
-	"x":         {"x"},
-	"linkedin":  {"linkedin"},
+	"x":         {"x", "twitter"},
+	"linkedin":  {"linkedin", "linkedin-page"},
 	"instagram": {"instagram", "instagram-standalone"},
+	"threads":   {"threads"},
+	"bluesky":   {"bluesky"},
+	"mastodon":  {"mastodon"},
+	"tiktok":    {"tiktok"},
+	"youtube":   {"youtube"},
+	"facebook":  {"facebook"},
+	"pinterest": {"pinterest"},
 }
 
 // campaignChannelLimits mirrors bodyMax in CHANNEL_RULES (lib/launch/guards.ts):

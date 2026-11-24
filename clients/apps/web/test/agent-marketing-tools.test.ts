@@ -175,6 +175,20 @@ test('requestApproval refuses without a campaign', async () => {
   assert.deepEqual(calls, [])
 })
 
+test('requestApproval resolves a lazy campaignId populated mid-turn', async () => {
+  const state: { campaignId?: string } = {}
+  const { calls, run, services } = setup('creator', null)
+  const tools = marketingTools(run, {
+    campaignId: () => state.campaignId,
+    services,
+  })
+  assert.equal((await tools.requestApproval.execute({ postIds: POSTS }, options)).ok, false)
+  state.campaignId = CAMPAIGN
+  const result = await tools.requestApproval.execute({ postIds: POSTS }, options)
+  assert.deepEqual(result, { ok: true, status: 'READY_FOR_REVIEW', submitted: POSTS })
+  assert.deepEqual(calls.at(-1)?.args, [CAMPAIGN, 'submit', POSTS])
+})
+
 test('the scripted agent reads the product and brand, then submits for review', async () => {
   const { calls, events, run, tools } = setup()
   const result = await generateText({

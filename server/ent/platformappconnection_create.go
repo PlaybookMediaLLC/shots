@@ -304,6 +304,40 @@ func (_c *PlatformAppConnectionCreate) SetCreatedByUserID(v string) *PlatformApp
 	return _c
 }
 
+// SetDiscoveredRoutes sets the "discovered_routes" field.
+func (_c *PlatformAppConnectionCreate) SetDiscoveredRoutes(v []map[string]string) *PlatformAppConnectionCreate {
+	_c.mutation.SetDiscoveredRoutes(v)
+	return _c
+}
+
+// SetBootstrapURL sets the "bootstrap_url" field.
+func (_c *PlatformAppConnectionCreate) SetBootstrapURL(v string) *PlatformAppConnectionCreate {
+	_c.mutation.SetBootstrapURL(v)
+	return _c
+}
+
+// SetNillableBootstrapURL sets the "bootstrap_url" field if the given value is not nil.
+func (_c *PlatformAppConnectionCreate) SetNillableBootstrapURL(v *string) *PlatformAppConnectionCreate {
+	if v != nil {
+		_c.SetBootstrapURL(*v)
+	}
+	return _c
+}
+
+// SetBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field.
+func (_c *PlatformAppConnectionCreate) SetBootstrapSecretCiphertext(v string) *PlatformAppConnectionCreate {
+	_c.mutation.SetBootstrapSecretCiphertext(v)
+	return _c
+}
+
+// SetNillableBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field if the given value is not nil.
+func (_c *PlatformAppConnectionCreate) SetNillableBootstrapSecretCiphertext(v *string) *PlatformAppConnectionCreate {
+	if v != nil {
+		_c.SetBootstrapSecretCiphertext(*v)
+	}
+	return _c
+}
+
 // SetRevokedAt sets the "revoked_at" field.
 func (_c *PlatformAppConnectionCreate) SetRevokedAt(v time.Time) *PlatformAppConnectionCreate {
 	_c.mutation.SetRevokedAt(v)
@@ -606,6 +640,18 @@ func (_c *PlatformAppConnectionCreate) createSpec() (*PlatformAppConnection, *sq
 	if value, ok := _c.mutation.CreatedByUserID(); ok {
 		_spec.SetField(platformappconnection.FieldCreatedByUserID, field.TypeString, value)
 		_node.CreatedByUserID = value
+	}
+	if value, ok := _c.mutation.DiscoveredRoutes(); ok {
+		_spec.SetField(platformappconnection.FieldDiscoveredRoutes, field.TypeJSON, value)
+		_node.DiscoveredRoutes = value
+	}
+	if value, ok := _c.mutation.BootstrapURL(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapURL, field.TypeString, value)
+		_node.BootstrapURL = &value
+	}
+	if value, ok := _c.mutation.BootstrapSecretCiphertext(); ok {
+		_spec.SetField(platformappconnection.FieldBootstrapSecretCiphertext, field.TypeString, value)
+		_node.BootstrapSecretCiphertext = &value
 	}
 	if value, ok := _c.mutation.RevokedAt(); ok {
 		_spec.SetField(platformappconnection.FieldRevokedAt, field.TypeTime, value)

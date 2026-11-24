@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import {
   type CaptureJob,
   type CaptureRecipe,
 } from '@/lib/api/contracts/capture'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import { captureFailureMessage } from '@/lib/tenant/surface-freshness'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
@@ -36,21 +38,30 @@ import { CaptureError, CaptureField, useCaptureAction } from './capture-ui'
 import { automationSelectClass } from './ConditionEditor'
 import { relativeTime } from './workflow-ui'
 
-/** The recipe form's text fields; the rest are checkboxes. */
-type RecipeTextField = Exclude<keyof CaptureRecipeForm, 'sharp' | 'cropToMarker'>
+/** The recipe form's text fields; the rest are checkboxes or selects. */
+type RecipeTextField = Exclude<
+  keyof CaptureRecipeForm,
+  'sharp' | 'cropToMarker' | 'verifyWithVision' | 'colorScheme' | 'maskStyle'
+>
 
 /** Radix selects cannot hold an empty value. */
 const EMPTY_OPTION = '__empty_option__'
 
 const blankRecipe: CaptureRecipeForm = {
+  allowedPostPaths: '',
+  colorScheme: '',
   connectionId: '',
+  forbidden: '',
   height: '900',
   marker: '',
+  maskStyle: 'solid',
   masks: '',
   name: '',
+  optionalMasks: '',
   path: '',
   surfaceId: '',
   versionPath: '',
+  versionSelector: '',
   width: '1440',
   objective: '',
   navigationSteps: '4',
@@ -72,20 +83,25 @@ function TestResult({ job, recipeName }: { job: CaptureJob; recipeName: string }
       ) : null}
       {navigation ? <p className="text-muted-foreground">{navigation}</p> : null}
       {job.assetId ? (
-        <a
-          aria-label={`Open the test capture of ${recipeName} at full size`}
-          className="block w-full max-w-md overflow-hidden rounded-lg ring-1 ring-foreground/[0.08] focus-visible:ring-2"
-          href={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content`}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <img
-            alt={`Test capture of ${recipeName}`}
-            className="w-full"
-            loading="lazy"
-            src={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content?variant=thumbnail`}
-          />
-        </a>
+        <div className="space-y-2">
+          <a
+            aria-label={`Open the test capture of ${recipeName} at full size`}
+            className="block w-full max-w-md overflow-hidden rounded-lg ring-1 ring-foreground/[0.08] focus-visible:ring-2"
+            href={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content`}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <img
+              alt={`Test capture of ${recipeName}`}
+              className="w-full"
+              loading="lazy"
+              src={`/api/v1/assets/${encodeURIComponent(job.assetId)}/content?variant=thumbnail`}
+            />
+          </a>
+          <ButtonLink href={editorHref({ assetId: job.assetId })} size="sm" variant="outline">
+            Open in editor
+          </ButtonLink>
+        </div>
       ) : null}
     </div>
   )
@@ -327,6 +343,12 @@ function RecipeForm({
           'Reports the deployed commit, such as /api/version. Without it, images are labeled as the current state.',
           false
         )}
+        {text(
+          'versionSelector',
+          'Version proof CSS selector (optional)',
+          'Alternative to a path: element whose text or content attribute holds the commit SHA, such as meta[name=build].',
+          false
+        )}
         <CaptureField
           hint="One CSS selector per line, for private details. If one is missing, nothing is captured."
           label="Elements to hide (optional)"
@@ -336,6 +358,72 @@ function RecipeForm({
             rows={3}
             value={form.masks}
           />
+        </CaptureField>
+        <CaptureField
+          hint="One CSS selector per line. Hidden whenever present without failing if absent on a navigated route."
+          label="Optional elements to hide (optional)"
+        >
+          <Textarea
+            onChange={(event) => set('optionalMasks', event.target.value)}
+            rows={2}
+            value={form.optionalMasks ?? ''}
+          />
+        </CaptureField>
+        <CaptureField
+          hint="One CSS selector per line for error banners, empty states, or loading skeletons that should fail the capture."
+          label="Forbidden views (optional)"
+        >
+          <Textarea
+            onChange={(event) => set('forbidden', event.target.value)}
+            rows={2}
+            value={form.forbidden ?? ''}
+          />
+        </CaptureField>
+        <CaptureField
+          hint="Up to 5 exact read-only POST paths (one per line), such as /graphql. Other POSTs remain blocked."
+          label="Read-only POST paths (optional)"
+        >
+          <Textarea
+            onChange={(event) => set('allowedPostPaths', event.target.value)}
+            rows={2}
+            value={form.allowedPostPaths ?? ''}
+          />
+        </CaptureField>
+        <CaptureField hint="Emulate prefers-color-scheme on the captured page." label="Color scheme">
+          <Select
+            onValueChange={(next) =>
+              setForm((old) => ({
+                ...old,
+                colorScheme: next === EMPTY_OPTION ? '' : (next as 'light' | 'dark'),
+              }))
+            }
+            value={form.colorScheme || EMPTY_OPTION}
+          >
+            <SelectTrigger className={automationSelectClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_OPTION}>App default</SelectItem>
+              <SelectItem value="light">Light mode</SelectItem>
+              <SelectItem value="dark">Dark mode</SelectItem>
+            </SelectContent>
+          </Select>
+        </CaptureField>
+        <CaptureField hint="How hidden private elements are masked in the image." label="Mask style">
+          <Select
+            onValueChange={(next) =>
+              setForm((old) => ({ ...old, maskStyle: next as 'solid' | 'blur' }))
+            }
+            value={form.maskStyle ?? 'solid'}
+          >
+            <SelectTrigger className={automationSelectClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="solid">Solid black box</SelectItem>
+              <SelectItem value="blur">Clean Gaussian blur</SelectItem>
+            </SelectContent>
+          </Select>
         </CaptureField>
         <Label className="flex items-start gap-2 text-sm">
           <Checkbox
@@ -363,23 +451,66 @@ function RecipeForm({
             </span>
           </span>
         </Label>
-        <div className="grid grid-cols-2 gap-4">
-          <CaptureField label="Width">
-            <Input
-              onChange={(event) => set('width', event.target.value)}
-              required
-              type="number"
-              value={form.width}
-            />
-          </CaptureField>
-          <CaptureField label="Height">
-            <Input
-              onChange={(event) => set('height', event.target.value)}
-              required
-              type="number"
-              value={form.height}
-            />
-          </CaptureField>
+        <Label className="flex items-start gap-2 text-sm">
+          <Checkbox
+            checked={form.verifyWithVision ?? false}
+            onCheckedChange={(checked) =>
+              setForm((old) => ({ ...old, verifyWithVision: checked === true }))
+            }
+          />
+          <span>
+            Verify screenshot with AI vision
+            <span className="block text-xs leading-5 text-muted-foreground">
+              Checks the captured image before attaching it to a campaign, rejecting blank views,
+              loading skeletons, or error banners.
+            </span>
+          </span>
+        </Label>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              onClick={() => setForm((old) => ({ ...old, height: '900', width: '1440' }))}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Desktop 1440×900
+            </Button>
+            <Button
+              onClick={() => setForm((old) => ({ ...old, height: '800', width: '1280' }))}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Laptop 1280×800
+            </Button>
+            <Button
+              onClick={() => setForm((old) => ({ ...old, height: '844', width: '390' }))}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Mobile 390×844
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <CaptureField label="Width">
+              <Input
+                onChange={(event) => set('width', event.target.value)}
+                required
+                type="number"
+                value={form.width}
+              />
+            </CaptureField>
+            <CaptureField label="Height">
+              <Input
+                onChange={(event) => set('height', event.target.value)}
+                required
+                type="number"
+                value={form.height}
+              />
+            </CaptureField>
+          </div>
         </div>
       </div>
       <CaptureError message={error} />

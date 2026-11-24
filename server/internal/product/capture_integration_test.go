@@ -100,6 +100,10 @@ func (s *scriptedBrowser) Close(_ context.Context, id string) error {
 	return nil
 }
 func (s *scriptedBrowser) OpenLogin(context.Context, string, browser.Target) error { return nil }
+func (s *scriptedBrowser) ExportWithRoutes(ctx context.Context, session string, target browser.Target) (*browser.State, []browser.DiscoveredRoute, error) {
+	state, err := s.Export(ctx, session, target)
+	return state, nil, err
+}
 func (s *scriptedBrowser) Export(context.Context, string, browser.Target) (*browser.State, error) {
 	if s.exported != nil {
 		return nil, s.exported

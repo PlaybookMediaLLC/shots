@@ -114,12 +114,17 @@ export function ActionEditor({
           Input from action
           <Select
             value={action.input?.nodeId || EMPTY}
-            onValueChange={(nextValue) =>
+            onValueChange={(nextValue) => {
+              const chosen = graph.nodes.find((candidate) => candidate.id === nextValue)
+              const output =
+                chosen?.action && WORKFLOW_ACTIONS[chosen.action.type]
+                  ? WORKFLOW_ACTIONS[chosen.action.type].output
+                  : spec.input
               onChange({
                 ...action,
-                input: { nodeId: nextValue === EMPTY ? '' : nextValue, output: spec.input },
+                input: { nodeId: nextValue === EMPTY ? '' : nextValue, output },
               })
-            }
+            }}
           >
             <SelectTrigger className={automationSelectClass}>
               <SelectValue />
@@ -133,11 +138,16 @@ export function ActionEditor({
                     candidate.action &&
                     producers.includes(candidate.action.type)
                 )
-                .map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.id}.{spec.input}
-                  </SelectItem>
-                ))}
+                .map((candidate) => {
+                  const candidateOutput = candidate.action
+                    ? WORKFLOW_ACTIONS[candidate.action.type].output
+                    : spec.input
+                  return (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.id}.{candidateOutput}
+                    </SelectItem>
+                  )
+                })}
             </SelectContent>
           </Select>
         </Label>

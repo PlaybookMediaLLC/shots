@@ -441,11 +441,11 @@ func init() {
 	// captureattempt.DefaultRefusedRequests holds the default value on creation for the refused_requests field.
 	captureattempt.DefaultRefusedRequests = captureattemptDescRefusedRequests.Default.(int)
 	// captureattemptDescCreatedAt is the schema descriptor for created_at field.
-	captureattemptDescCreatedAt := captureattemptFields[20].Descriptor()
+	captureattemptDescCreatedAt := captureattemptFields[21].Descriptor()
 	// captureattempt.DefaultCreatedAt holds the default value on creation for the created_at field.
 	captureattempt.DefaultCreatedAt = captureattemptDescCreatedAt.Default.(func() time.Time)
 	// captureattemptDescUpdatedAt is the schema descriptor for updated_at field.
-	captureattemptDescUpdatedAt := captureattemptFields[21].Descriptor()
+	captureattemptDescUpdatedAt := captureattemptFields[22].Descriptor()
 	// captureattempt.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	captureattempt.DefaultUpdatedAt = captureattemptDescUpdatedAt.Default.(func() time.Time)
 	// captureattempt.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1257,11 +1257,11 @@ func init() {
 	// platformappconnection.DefaultLeaseToken holds the default value on creation for the lease_token field.
 	platformappconnection.DefaultLeaseToken = platformappconnectionDescLeaseToken.Default.(int64)
 	// platformappconnectionDescCreatedAt is the schema descriptor for created_at field.
-	platformappconnectionDescCreatedAt := platformappconnectionFields[28].Descriptor()
+	platformappconnectionDescCreatedAt := platformappconnectionFields[31].Descriptor()
 	// platformappconnection.DefaultCreatedAt holds the default value on creation for the created_at field.
 	platformappconnection.DefaultCreatedAt = platformappconnectionDescCreatedAt.Default.(func() time.Time)
 	// platformappconnectionDescUpdatedAt is the schema descriptor for updated_at field.
-	platformappconnectionDescUpdatedAt := platformappconnectionFields[29].Descriptor()
+	platformappconnectionDescUpdatedAt := platformappconnectionFields[32].Descriptor()
 	// platformappconnection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	platformappconnection.DefaultUpdatedAt = platformappconnectionDescUpdatedAt.Default.(func() time.Time)
 	// platformappconnection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

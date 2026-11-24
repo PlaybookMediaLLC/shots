@@ -32,13 +32,17 @@ export type MarketingServices = {
 const failure = (error: string) => ({ error, ok: false as const })
 
 /**
- * The marketing tool set for one run. `campaignId` is the campaign the run
- * works on; without one, `requestApproval` refuses.
+ * The marketing tool set for one run. `campaignId` (or a lazy getter) is the
+ * campaign the run works on; without one, `requestApproval` refuses.
  */
 export function marketingTools(
   run: ToolRun,
-  { campaignId, services }: { campaignId?: string; services: MarketingServices }
+  {
+    campaignId,
+    services,
+  }: { campaignId?: string | (() => string | undefined); services: MarketingServices }
 ) {
+  const resolveCampaignId = () => (typeof campaignId === 'function' ? campaignId() : campaignId)
   const getProduct = defineTool(run, {
     description:
       "Read the workspace's product profile: name, summary, problem, audience, capabilities, " +
@@ -157,11 +161,12 @@ export function marketingTools(
       'decides. Pass the post ids to submit.',
     effect: 'mutate',
     execute: async ({ postIds }) => {
-      if (!campaignId) return failure('This run has no campaign to submit posts from.')
+      const targetCampaignId = resolveCampaignId()
+      if (!targetCampaignId) return failure('This run has no campaign to submit posts from.')
       // Submit only: approval needs a person (RFC 012).
       const result = await services.transitionCampaignPosts(
         run.access,
-        campaignId,
+        targetCampaignId,
         'submit',
         postIds
       )

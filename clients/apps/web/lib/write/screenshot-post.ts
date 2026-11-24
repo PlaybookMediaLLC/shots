@@ -121,7 +121,7 @@ export function screenshotPostVersions(input: {
 }): PlatformVersions | undefined {
   const carried = carriedFollowUps(input.automation)
   let versions = readVersions(undefined, input.channelText ?? {}, input.body ?? [])
-  if (input.media) versions = withPlatformMedia(versions, input.media)
+  if (input.media) versions = withPlatformMedia(versions, input.media, input.body)
   if (carried) versions = withOptions(versions, 'x', { automation: carried })
   return versions.versions.length > 0 ? versions : undefined
 }
@@ -132,22 +132,31 @@ export function screenshotPostVersions(input: {
  * `readVersions` copies the body's media into every version it makes, which
  * is right when one picture serves everyone. When a platform was drawn at
  * its own size, its version must carry that picture instead: per-channel
- * text alone cannot hold per-channel media. A platform with no picture of
- * its own, and a platform with no version yet, are both left alone.
+ * text alone cannot hold per-channel media. When `primaryBody` is provided,
+ * a platform with its own resized picture gets a manual version seeded from
+ * the primary body even if it had no separate per-platform caption.
  */
 export function withPlatformMedia(
   versions: PlatformVersions,
-  media: Partial<Record<DraftChannel, PostMedia>>
+  media: Partial<Record<DraftChannel, PostMedia>>,
+  primaryBody?: PlateBody
 ): PlatformVersions {
-  return {
-    ...versions,
-    versions: versions.versions.map((version) => {
-      const own = media[version.channel]
-      if (!own || !version.body) return version
-      const kept = version.body.filter((node) => node.type !== 'img' && node.type !== 'video')
-      return { ...version, body: [...kept, own] as PlateBody }
-    }),
+  const next = versions.versions.map((version) => {
+    const own = media[version.channel]
+    if (!own || !version.body) return version
+    const kept = version.body.filter((node) => node.type !== 'img' && node.type !== 'video')
+    return { ...version, body: [...kept, own] as PlateBody }
+  })
+  if (primaryBody && primaryBody.length > 0) {
+    for (const [channel, own] of Object.entries(media) as [DraftChannel, PostMedia | undefined][]) {
+      if (!own || next.some((version) => version.channel === channel)) continue
+      const kept = structuredClone(primaryBody).filter(
+        (node) => node.type !== 'img' && node.type !== 'video'
+      )
+      next.push({ body: [...kept, own] as PlateBody, channel, mode: 'manual' })
+    }
   }
+  return { ...versions, versions: next }
 }
 
 /**

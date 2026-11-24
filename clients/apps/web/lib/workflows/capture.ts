@@ -100,15 +100,23 @@ function selectorList(text: string) {
 export type CaptureConnectionForm = Omit<
   CaptureConnectionInput,
   'hosts' | 'loginHosts' | 'sourceAppId'
-> & { hosts: string; loginHosts: string; sourceAppId: string }
+> & {
+  hosts: string
+  loginHosts: string
+  sourceAppId: string
+}
 
 /** A connection form as the backend's input. */
 export function captureConnectionInput(form: CaptureConnectionForm) {
+  const bootstrapUrl = (form.bootstrapUrl ?? '').trim()
+  const bootstrapSecret = (form.bootstrapSecret ?? '').trim()
+  const { bootstrapUrl: _u, bootstrapSecret: _s, ...rest } = form
   return {
-    ...form,
+    ...rest,
     hosts: hostList(form.hosts),
     loginHosts: hostList(form.loginHosts),
     sourceAppId: form.sourceAppId || undefined,
+    ...(bootstrapUrl ? { bootstrapUrl, bootstrapSecret } : {}),
   }
 }
 
@@ -120,9 +128,15 @@ export type CaptureRecipeForm = {
   path: string
   marker: string
   masks: string
+  optionalMasks?: string
+  forbidden?: string
+  allowedPostPaths?: string
   versionPath: string
+  versionSelector?: string
   width: string
   height: string
+  colorScheme?: '' | 'light' | 'dark'
+  maskStyle?: 'solid' | 'blur'
   objective: string
   navigationSteps: string
   navigationCredits: string
@@ -130,6 +144,8 @@ export type CaptureRecipeForm = {
   sharp?: boolean
   /** Make the image the proving element and a small margin around it. */
   cropToMarker?: boolean
+  /** Run fast multimodal verification before committing captures. */
+  verifyWithVision?: boolean
 }
 
 /**
@@ -138,7 +154,11 @@ export type CaptureRecipeForm = {
  */
 export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput {
   const masks = selectorList(form.masks)
+  const optionalMasks = selectorList(form.optionalMasks ?? '')
+  const forbidden = selectorList(form.forbidden ?? '')
+  const allowedPostPaths = selectorList(form.allowedPostPaths ?? '')
   const versionPath = form.versionPath.trim()
+  const versionSelector = (form.versionSelector ?? '').trim()
   const objective = form.objective.trim()
   return {
     connectionId: form.connectionId,
@@ -152,8 +172,18 @@ export function captureRecipeInput(form: CaptureRecipeForm): CaptureRecipeInput 
         ...(form.sharp ? { scale: 2 as const } : {}),
       },
       ...(form.cropToMarker ? { crop: 'marker' as const } : {}),
+      ...(form.colorScheme ? { colorScheme: form.colorScheme } : {}),
+      ...(form.maskStyle === 'blur' ? { maskStyle: 'blur' as const } : {}),
+      ...(form.verifyWithVision ? { verifyWithVision: true } : {}),
       ...(masks.length ? { masks } : {}),
-      ...(versionPath ? { version: { path: versionPath } } : {}),
+      ...(optionalMasks.length ? { optionalMasks } : {}),
+      ...(forbidden.length ? { forbidden } : {}),
+      ...(allowedPostPaths.length ? { allowedPostPaths } : {}),
+      ...(versionPath
+        ? { version: { path: versionPath } }
+        : versionSelector
+          ? { version: { selector: versionSelector } }
+          : {}),
       ...(objective
         ? {
             navigation: {
@@ -173,6 +203,7 @@ const NAVIGATION_STEP: Record<string, string> = {
   link: 'opened',
   tab: 'selected a tab on',
   button: 'pressed a button on',
+  scroll: 'scrolled on',
   frame: 'framed the result on',
 }
 

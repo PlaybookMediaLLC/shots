@@ -52,6 +52,12 @@ func (PlatformAppConnection) Fields() []ent.Field {
 		field.Int64("lease_token").StorageKey("leaseToken").Default(0),
 		field.Time("lease_expires_at").StorageKey("leaseExpiresAt").Optional().Nillable(),
 		field.String("created_by_user_id").StorageKey("createdByUserId").Immutable(),
+		// DiscoveredRoutes are safe navigation links observed when a person signed in.
+		field.JSON("discovered_routes", []map[string]string{}).StorageKey("discoveredRoutes").Optional(),
+		// BootstrapURL and BootstrapSecretCiphertext enable optional customer-signed
+		// short-lived demo session bootstrap on an approved host.
+		field.String("bootstrap_url").StorageKey("bootstrapUrl").Optional().Nillable(),
+		field.String("bootstrap_secret_ciphertext").StorageKey("bootstrapSecretCiphertext").Optional().Nillable().Sensitive(),
 		field.Time("revoked_at").StorageKey("revokedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
@@ -178,6 +184,8 @@ func (CaptureAttempt) Fields() []ent.Field {
 		// NavigationActions are the observed controls AI navigation used: kinds and
 		// paths only, never page text.
 		field.JSON("navigation_actions", []map[string]string{}).StorageKey("navigationActions").Optional(),
+		// FocusBox is where the first visible marker sat in the captured viewport (0-1 fractions).
+		field.JSON("focus_box", map[string]float64{}).StorageKey("focusBox").Optional(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

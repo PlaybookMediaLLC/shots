@@ -88,7 +88,10 @@ func (c *Configuration) HandleOutboxEvent(ctx context.Context, eventID, organiza
 	case EventSourceAppConnected:
 		return true, c.backfillSource(ctx, organizationID, aggregateID)
 	case EventDeploymentSucceeded:
-		return true, c.captureDeployment(ctx, organizationID, aggregateID)
+		if c.captureDispatcher != nil {
+			return true, c.captureDispatcher.StartDeploymentCapture(ctx, organizationID, aggregateID)
+		}
+		return true, c.captureDeployment(ctx, organizationID, aggregateID, false)
 	case EventCaptureJobDispatch:
 		return true, c.dispatchCaptureJob(ctx, organizationID, aggregateID)
 	case EventCaptureConnectionFinish:
@@ -523,12 +526,21 @@ func ignoresPullRequestAuthor(source *ent.SourceApp, login, accountType string) 
 // maxCapturedSurfaces bounds the pages one deployment captures.
 const maxCapturedSurfaces = 10
 
+// RunDeploymentCapture executes deployment capture from Temporal. When
+// retryTransient is true (non-final Temporal attempt), transient screenshot
+// provider errors return early so Temporal retries while preserving completed
+// receipts; on the final attempt (retryTransient == false), failures are
+// recorded on the surface and DeploymentEvent is finalized.
+func (c *Configuration) RunDeploymentCapture(ctx context.Context, organizationID, deploymentID string, retryTransient bool) error {
+	return c.captureDeployment(ctx, organizationID, deploymentID, retryTransient)
+}
+
 // captureDeployment captures the workspace's registered production pages on
 // the deployed origin once the deployment answers. Only registered product
 // surfaces are captured, never a URL taken from the payload. Each page's
 // capture is a receipt: a retried run captures only the pages still missing,
 // and the deployment is CAPTURED only when every page has one.
-func (c *Configuration) captureDeployment(ctx context.Context, organizationID, deploymentID string) error {
+func (c *Configuration) captureDeployment(ctx context.Context, organizationID, deploymentID string, retryTransient bool) error {
 	row, err := c.client.DeploymentEvent.Query().Where(deploymentevent.ID(deploymentID), deploymentevent.OrganizationID(organizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return ErrNotEligible
@@ -637,6 +649,7 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		return tx.Commit()
 	}
 	assets := []string{}
+	var transientErr error
 	for i, surface := range surfaces {
 		if asset, ok := captured[surface.ID]; ok {
 			assets = append(assets, asset)
@@ -644,6 +657,10 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		}
 		receipt, code, err := c.captureDeploymentSurface(ctx, row, surface, fmt.Sprintf("deployment-%d", i+1), nil)
 		if code != "" {
+			if retryTransient && code == "capture_failed" && err != nil {
+				transientErr = err
+				continue
+			}
 			if err := failed(surface, code, err); err != nil {
 				return err
 			}
@@ -653,6 +670,9 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 			return err
 		}
 		assets = append(assets, receipt.AssetID)
+	}
+	if transientErr != nil {
+		return transientErr
 	}
 	update := row.Update().SetAssetIds(assets).SetStatus(deploymentevent.StatusCAPTURED)
 	switch {

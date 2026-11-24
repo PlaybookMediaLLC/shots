@@ -18,6 +18,9 @@ export type CaptureConnection = {
   stateExpiresAt: string | null
   connectPhase: string | null
   failureCode: string | null
+  discoveredRoutes?: { path: string; label: string }[]
+  bootstrapUrl?: string | null
+  hasBootstrap?: boolean
   revokedAt: string | null
   createdAt: string
   updatedAt: string
@@ -33,6 +36,8 @@ export type CaptureConnectionInput = {
   protectedPath: string
   identitySelector: string
   expectedAccount: string
+  bootstrapUrl?: string
+  bootstrapSecret?: string
 }
 /**
  * The sign-in browser's Live View link is a bearer credential: pass it to the
@@ -42,7 +47,7 @@ export type CaptureConnectStart = { intentId: string; liveViewUrl: string; expir
 /** A reviewed capture of one screen. The Go validator is the authority on what can run. */
 export type CaptureRecipeDefinition = {
   schemaVersion: 1
-  viewport: { width: number; height: number }
+  viewport: { width: number; height: number; scale?: 1 | 2 }
   steps: {
     kind: 'NAVIGATE' | 'WAIT_FOR' | 'SELECT_TAB'
     path?: string
@@ -52,6 +57,11 @@ export type CaptureRecipeDefinition = {
   markers: string[]
   forbidden?: string[]
   masks?: string[]
+  optionalMasks?: string[]
+  maskStyle?: 'solid' | 'blur'
+  colorScheme?: 'light' | 'dark'
+  verifyWithVision?: boolean
+  crop?: 'marker'
   version?: { path?: string; selector?: string }
   allowedPostPaths?: string[]
   navigation?: { objective: string; maxSteps: number; creditLimit: number }
@@ -100,6 +110,9 @@ export type CaptureJob = {
   attempts: number
   createdAt: string
   updatedAt: string
+  releaseChange?: string | null
+  navigationActions?: { kind: string; path: string }[]
+  focusBox?: { x: number; y: number; w: number; h: number }
 }
 /** Everything a member may read about this workspace's authenticated capture. */
 export type CaptureOverview = {
