@@ -2,6 +2,7 @@ package product
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -133,7 +134,8 @@ func automationDraftCandidateMedia(input automation.Outputs) []string {
 // A captured campaign reaches Publish through the same draft owner as an
 // editor export. The session-only editor handoff keeps its authorization.
 func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Actor, input automation.Outputs) (automation.Outputs, error) {
-	if input.CaptureAssetID == "" && len(input.CaptureAssetIDs) == 0 && len(input.RenderedAssetIDs) == 0 {
+	hasCapture := input.CaptureAssetID != "" || len(input.CaptureAssetIDs) > 0
+	if !hasCapture && len(input.RenderedAssetIDs) == 0 {
 		return input, nil
 	}
 	if input.CampaignID == "" || len(input.PostIDs) == 0 {
@@ -170,6 +172,12 @@ func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Acto
 	}
 	for _, id := range media {
 		if !slices.Contains(linked, id) || kinds[id] != "img" {
+			if !hasCapture {
+				// Render-only workflows without a capture_product node are not
+				// guaranteed to have linked publish-ready assets or shared social
+				// sets; skip Publish draft creation instead of failing review.
+				return input, nil
+			}
 			return automation.Outputs{}, ErrCaptureRefused
 		}
 	}
@@ -200,6 +208,9 @@ func (c *Configuration) automationCampaignDrafts(ctx context.Context, actor Acto
 	}
 	connections, err := c.automationDraftDestinations(ctx, tx.Client(), actor.OrganizationID, input.DestinationIDs)
 	if err != nil {
+		if !hasCapture && (errors.Is(err, errAutomationDraftDestination) || errors.Is(err, publishing.ErrNotFound)) {
+			return input, nil
+		}
 		return automation.Outputs{}, err
 	}
 	remaining := map[string][]*ent.ChannelConnection{}
