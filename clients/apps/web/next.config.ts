@@ -43,6 +43,9 @@ const nextConfig: NextConfig = {
   // backend embeds (server/internal/medialimits/limits.json).
   outputFileTracingRoot: path.join(process.cwd(), '../../..'),
   reactCompiler: true,
+  experimental: {
+    agentUpgrade: 'security',
+  },
   // The vendored editor ships TypeScript source (packages/platejs-editor).
   transpilePackages: ['@shots/platejs-editor'],
   poweredByHeader: false,
