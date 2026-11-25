@@ -71,7 +71,7 @@ export function DocsSidebar({ homePage, sections }: DocsSidebarProps) {
   return (
     <aside
       aria-label="Documentation sidebar"
-      className="fixed top-[52px] bottom-0 left-0 z-30 hidden w-[268px] flex-col bg-background px-3 pb-3 lg:flex"
+      className="fixed top-[3.25rem] bottom-0 left-0 z-30 hidden w-[16.75rem] flex-col bg-background px-3 pb-3 lg:flex"
     >
       <div className="pt-1 pb-3">
         <Button

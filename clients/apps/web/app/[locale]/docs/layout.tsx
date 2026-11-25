@@ -23,7 +23,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
           </Suspense>
           <DocsShellNav homePage={homePage} sections={sections} />
           <DocsSidebar homePage={homePage} sections={sections} />
-          <div className="docs-panel lg:ms-[268px] lg:me-3 lg:mt-[52px] lg:mb-3 lg:h-[calc(100dvh-64px)] lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:border lg:border-border lg:bg-card">
+          <div className="docs-panel lg:ms-[16.75rem] lg:me-3 lg:mt-[3.25rem] lg:mb-3 lg:h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:border lg:border-border lg:bg-card">
             <FumaDocsLayout
               containerProps={{
                 className: 'docs-layout',

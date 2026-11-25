@@ -118,6 +118,15 @@
   display: none;
 }
 
+/* Scale the docs shell to 85% on tablet/desktop via root font-size — matching
+   platform-shell.css's rem-based zoom without breaking 100dvh or portal
+   positions. Phones keep full 100% sizing for touch targets. */
+@media (min-width: 768px) {
+  html:has(.docs-shell) {
+    font-size: 85%;
+  }
+}
+
 .docs-panel {
   scroll-padding-block: 2rem;
 }
@@ -127,10 +136,10 @@
   --fd-toc-width: 0px;
   --fd-layout-width: 100%;
   --fd-layout-offset: 0px;
-  --fd-page-width: 900px;
-  --fd-banner-height: 52px;
-  --docs-left-pane-width: 268px;
-  padding-top: 52px;
+  --fd-page-width: 56.25rem;
+  --fd-banner-height: 3.25rem;
+  --docs-left-pane-width: 16.75rem;
+  padding-top: 3.25rem;
   background: var(--background);
 }
 
@@ -138,8 +147,8 @@
   .docs-layout {
     --fd-banner-height: 0px;
     --fd-header-height: 0px;
-    --fd-docs-height: calc(100dvh - 64px);
-    --fd-layout-width: min(100%, 1240px);
+    --fd-docs-height: calc(100dvh - 4rem);
+    --fd-layout-width: min(100%, 77.5rem);
     padding-top: 0;
     min-height: 100%;
     background: transparent;
@@ -148,7 +157,7 @@
 
 @media (min-width: 80rem) {
   .docs-layout {
-    --fd-toc-width: 264px;
+    --fd-toc-width: 16.5rem;
   }
 
   .docs-layout #nd-toc {

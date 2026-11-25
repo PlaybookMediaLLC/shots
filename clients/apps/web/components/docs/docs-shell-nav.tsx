@@ -151,13 +151,13 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
   return (
     <>
       <header className="pointer-events-none fixed top-0 right-0 left-0 z-[99] flex items-center bg-background">
-        <div className="pointer-events-auto hidden h-[52px] w-[268px] shrink-0 items-center px-4 lg:flex">
+        <div className="pointer-events-auto hidden h-[3.25rem] w-[16.75rem] shrink-0 items-center px-4 lg:flex">
           <DocsBrandMark />
         </div>
 
         <nav
           aria-label="Documentation top navigation"
-          className="pointer-events-auto hidden h-[52px] min-w-0 flex-1 items-center gap-1 pr-3 lg:flex"
+          className="pointer-events-auto hidden h-[3.25rem] min-w-0 flex-1 items-center gap-1 pr-3 lg:flex"
           ref={desktopNavRef}
         >
           {NAVIGATION_TABS.map((item) => {
@@ -215,7 +215,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
           </div>
         </nav>
 
-        <div className="pointer-events-auto flex h-[52px] w-full items-center justify-between border-b border-border bg-background px-4 lg:hidden">
+        <div className="pointer-events-auto flex h-[3.25rem] w-full items-center justify-between border-b border-border bg-background px-4 lg:hidden">
           <DocsBrandMark />
           <div className="flex items-center gap-1">
             <Button
@@ -255,7 +255,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
         <div
           aria-label="Documentation navigation"
           aria-modal="true"
-          className="pointer-events-auto fixed inset-0 z-[98] bg-background/95 pt-[52px] backdrop-blur-sm lg:hidden"
+          className="pointer-events-auto fixed inset-0 z-[98] bg-background/95 pt-[3.25rem] backdrop-blur-sm lg:hidden"
           role="dialog"
         >
           <div className="flex h-full flex-col overflow-y-auto overscroll-contain px-3 py-3">
