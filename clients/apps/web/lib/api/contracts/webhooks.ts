@@ -50,7 +50,7 @@ export const ingestResendCaptureAuthWebhookContract = defineContract({
   bodyFormat: 'text',
   maxBodyBytes: 64 * 1024,
   method: 'POST',
-  name: 'webhooks.resendCaptureAuth',
+  name: 'webhooks.resend-capture-auth',
   output: z.object({ outcome: z.string() }),
   path: '/api/webhooks/resend/capture-auth',
   status: 200,
