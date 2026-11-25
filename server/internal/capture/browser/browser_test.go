@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"math"
@@ -271,7 +272,7 @@ open.onsuccess = () => {
 </script></body>`)
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
-		case "/dashboard", "/hydrating-account", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail", "/feature-panel", "/member-list", "/below-fold":
+		case "/dashboard", "/hydrating-account", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail", "/feature-panel", "/feature-autonomous", "/member-list", "/below-fold":
 			if !signed {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
@@ -313,6 +314,16 @@ open.onsuccess = () => {
 					`<div id="export-panel" class="export-panel" role="dialog" hidden style="background:#00ee00;width:300px;height:120px"><h2>Export as CSV</h2></div>`
 			case "/signed-in-tabs":
 				extra = `<button id="plain">not a tab</button><button id="tab" role="tab" onclick="document.body.insertAdjacentHTML('beforeend','<div id=tabbed></div>')">Reports</button>`
+			case "/feature-autonomous":
+				extra = `<main><h1>Analytics</h1>` +
+					`<button role="tab" aria-selected="true" id="tab-overview">Overview</button>` +
+					`<button role="tab" aria-selected="false" id="tab-cohorts" onclick="this.setAttribute('aria-selected','true');document.querySelector('#tab-overview').setAttribute('aria-selected','false');document.querySelector('#cohorts-panel').hidden=false">Weekly Cohorts</button>` +
+					`<input id="cohort-filter" type="search" aria-label="Filter cohorts" placeholder="Filter cohorts…" oninput="document.querySelector('#filter-out').textContent='Matching: '+this.value">` +
+					`<input id="sensitive-search" type="search" aria-label="Search" placeholder="Enter API key or email">` +
+					`<button role="combobox" aria-haspopup="listbox" id="region-combo">Region</button>` +
+					`<button aria-label="Delete report" onclick="fetch('/delete')">×</button>` +
+					`<div id="cohorts-panel" hidden><h2>Cohort Heatmap</h2><div id="filter-out">Matching: all</div><span data-private="true">ceo@globex.test</span></div>` +
+					`<div id="below-fold-attr" style="margin-top:950px;height:120px"><h2>Release Attribution</h2></div></main>`
 			case "/assets":
 				extra = fmt.Sprintf(`<img src="https://other.example.test:%s/pixel.png"><iframe src="https://other.example.test:%s/frame"></iframe>
 <script>alert('blocking dialog');window.open('https://other.example.test:'+location.port+'/popup');fetch('https://other.example.test:%s/fetch').catch(()=>{});try{new WebSocket('wss://app.example.test:%s/socket')}catch(e){};try{new Worker('data:text/javascript,new WebSocket("wss://app.example.test:'+location.port+'/worker-socket")')}catch(e){};fetch('/mutate',{method:'POST'}).catch(()=>{});fetch('/graphql',{method:'POST'}).catch(()=>{})</script>`, a.port, a.port, a.port, a.port)
@@ -1356,4 +1367,133 @@ func TestPhase3RecipeValidationSearchValueAndAgentRunner(t *testing.T) {
 	} else {
 		failed(t, err, ImageInvalid)
 	}
+}
+
+// Phase 3 real-Chrome regression test: Set-of-Mark JPEG previews, safe search fill,
+// combobox & destructive icon-button exclusions, scroll action, blur masking,
+// dark color scheme, zero-duplicate pre-action sequence frames, and overlay cleanup.
+func TestRealBrowserPhase3AutonomousVisionFillSequenceAndScroll(t *testing.T) {
+	a := newProtectedApp(t)
+	state := signIn(t, a)
+	b := localBrowser(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	recipe := Recipe{
+		SchemaVersion: RecipeSchemaVersion,
+		Viewport:      Viewport{Width: 1024, Height: 700, Scale: 2},
+		Steps:         []Step{{Kind: StepNavigate, Path: "/feature-autonomous"}},
+		Markers:       []string{DefaultZeroConfigMarker},
+		OptionalMasks: []string{"[data-private]"},
+		MaskStyle:     MaskStyleBlur,
+		ColorScheme:   ColorSchemeDark,
+		SequenceShots: 3,
+		Navigation: &Navigation{
+			Objective:       "Open Weekly Cohorts, filter by Enterprise, scroll down, and capture",
+			MaxSteps:        5,
+			CreditLimit:     10,
+			UseVision:       true,
+			AllowSearchFill: true,
+		},
+	}
+	step := 0
+	res, err := Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: recipe,
+		State:  state,
+		NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			defer func() { step++ }()
+			if _, decErr := jpeg.DecodeConfig(bytes.NewReader(view.ViewportPNG)); decErr != nil {
+				return NavigationChoice{}, fmt.Errorf("step %d: expected JPEG SoM preview, got %w", step, decErr)
+			}
+			for _, c := range view.Controls {
+				lower := strings.ToLower(c.Label)
+				if strings.Contains(lower, "delete") || c.Label == "×" {
+					return NavigationChoice{}, fmt.Errorf("destructive icon button exposed under UseVision: %+v", c)
+				}
+				if strings.Contains(lower, "api key") || strings.Contains(lower, "email") || (c.Kind == "search" && lower == "search") {
+					return NavigationChoice{}, fmt.Errorf("sensitive search input exposed: %+v", c)
+				}
+				if c.Kind == "search" && strings.Contains(lower, "region") {
+					return NavigationChoice{}, fmt.Errorf("non-<input> combobox button tagged as search: %+v", c)
+				}
+			}
+			switch step {
+			case 0:
+				for _, c := range view.Controls {
+					if c.Kind == "tab" && c.Label == "Weekly Cohorts" {
+						id := c.ID
+						return NavigationChoice{Action: "select", ControlID: &id}, nil
+					}
+				}
+				return NavigationChoice{}, fmt.Errorf("Weekly Cohorts tab missing: %+v", view.Controls)
+			case 1:
+				for _, c := range view.Controls {
+					if c.Kind == "search" && strings.Contains(c.Label, "Filter cohorts") {
+						id := c.ID
+						return NavigationChoice{Action: "fill", ControlID: &id, Value: "Enterprise"}, nil
+					}
+				}
+				return NavigationChoice{}, fmt.Errorf("Filter cohorts search input missing: %+v", view.Controls)
+			case 2:
+				if !view.CanScroll {
+					return NavigationChoice{}, errors.New("expected CanScroll=true on /feature-autonomous")
+				}
+				return NavigationChoice{Action: "scroll", ControlID: new(int(-1))}, nil
+			default:
+				return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("autonomous phase3 run failed: %v", err)
+	}
+	if a.count("GET /delete") != 0 {
+		t.Fatal("destructive icon button was clicked")
+	}
+	if res.Width != 2048 || res.Height != 1400 || len(res.Sequence) != 2 {
+		t.Fatalf("dims=%dx%d seq=%d actions=%+v", res.Width, res.Height, len(res.Sequence), res.NavigationActions)
+	}
+	wantKinds := []string{"tab", "fill", "scroll", "frame"}
+	gotKinds := make([]string, 0, len(res.NavigationActions))
+	for _, act := range res.NavigationActions {
+		gotKinds = append(gotKinds, act.Kind)
+	}
+	if !slices.Equal(gotKinds, wantKinds) {
+		t.Fatalf("actions=%v, want %v", gotKinds, wantKinds)
+	}
+
+	// Zero actions must produce zero intermediate frames (no duplicate final frame).
+	zeroRes, err := Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: recipe,
+		State:  state,
+		NextNavigation: func(_ context.Context, _ NavigationObservation) (NavigationChoice, error) {
+			return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("zero-action run failed: %v", err)
+	}
+	if len(zeroRes.Sequence) != 0 {
+		t.Fatalf("expected 0 intermediate frames for 0-action capture, got %d", len(zeroRes.Sequence))
+	}
+
+	// AllowedPostPaths disables search fill controls.
+	writable := recipe
+	writable.AllowedPostPaths = []string{"/graphql"}
+	_, err = Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: writable,
+		State:  state,
+		NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			for _, c := range view.Controls {
+				if c.Kind == "search" {
+					t.Fatalf("search control offered beside AllowedPostPaths: %+v", c)
+				}
+			}
+			return NavigationChoice{Action: "stop", ControlID: new(int(-1))}, nil
+		},
+	})
+	failed(t, err, NavigationFailed)
 }
