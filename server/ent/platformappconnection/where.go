@@ -194,6 +194,11 @@ func RevokedAt(v time.Time) predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldEQ(FieldRevokedAt, v))
 }
 
+// LastAutoAuthenticatedAt applies equality check predicate on the "last_auto_authenticated_at" field. It's identical to LastAutoAuthenticatedAtEQ.
+func LastAutoAuthenticatedAt(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldLastAutoAuthenticatedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldEQ(FieldCreatedAt, v))
@@ -1872,6 +1877,56 @@ func RevokedAtIsNil() predicate.PlatformAppConnection {
 // RevokedAtNotNil applies the NotNil predicate on the "revoked_at" field.
 func RevokedAtNotNil() predicate.PlatformAppConnection {
 	return predicate.PlatformAppConnection(sql.FieldNotNull(FieldRevokedAt))
+}
+
+// LastAutoAuthenticatedAtEQ applies the EQ predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtEQ(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldEQ(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtNEQ applies the NEQ predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtNEQ(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNEQ(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtIn applies the In predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtIn(vs ...time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIn(FieldLastAutoAuthenticatedAt, vs...))
+}
+
+// LastAutoAuthenticatedAtNotIn applies the NotIn predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtNotIn(vs ...time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotIn(FieldLastAutoAuthenticatedAt, vs...))
+}
+
+// LastAutoAuthenticatedAtGT applies the GT predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtGT(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGT(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtGTE applies the GTE predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtGTE(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldGTE(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtLT applies the LT predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtLT(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLT(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtLTE applies the LTE predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtLTE(v time.Time) predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldLTE(FieldLastAutoAuthenticatedAt, v))
+}
+
+// LastAutoAuthenticatedAtIsNil applies the IsNil predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtIsNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldIsNull(FieldLastAutoAuthenticatedAt))
+}
+
+// LastAutoAuthenticatedAtNotNil applies the NotNil predicate on the "last_auto_authenticated_at" field.
+func LastAutoAuthenticatedAtNotNil() predicate.PlatformAppConnection {
+	return predicate.PlatformAppConnection(sql.FieldNotNull(FieldLastAutoAuthenticatedAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

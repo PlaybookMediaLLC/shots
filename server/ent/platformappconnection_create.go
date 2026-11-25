@@ -352,6 +352,20 @@ func (_c *PlatformAppConnectionCreate) SetNillableRevokedAt(v *time.Time) *Platf
 	return _c
 }
 
+// SetLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field.
+func (_c *PlatformAppConnectionCreate) SetLastAutoAuthenticatedAt(v time.Time) *PlatformAppConnectionCreate {
+	_c.mutation.SetLastAutoAuthenticatedAt(v)
+	return _c
+}
+
+// SetNillableLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field if the given value is not nil.
+func (_c *PlatformAppConnectionCreate) SetNillableLastAutoAuthenticatedAt(v *time.Time) *PlatformAppConnectionCreate {
+	if v != nil {
+		_c.SetLastAutoAuthenticatedAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *PlatformAppConnectionCreate) SetCreatedAt(v time.Time) *PlatformAppConnectionCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -656,6 +670,10 @@ func (_c *PlatformAppConnectionCreate) createSpec() (*PlatformAppConnection, *sq
 	if value, ok := _c.mutation.RevokedAt(); ok {
 		_spec.SetField(platformappconnection.FieldRevokedAt, field.TypeTime, value)
 		_node.RevokedAt = &value
+	}
+	if value, ok := _c.mutation.LastAutoAuthenticatedAt(); ok {
+		_spec.SetField(platformappconnection.FieldLastAutoAuthenticatedAt, field.TypeTime, value)
+		_node.LastAutoAuthenticatedAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(platformappconnection.FieldCreatedAt, field.TypeTime, value)

@@ -30,6 +30,33 @@ export const captureConnectionInputSchema = z.object({
   bootstrapSecret: z.string().trim().max(512).optional(),
 })
 
+/**
+ * A new connection. With `assignTestEmail` Shots makes the expected account a
+ * new test email address that can receive sign-in emails (RFC 007A), so the
+ * expected account stays empty.
+ */
+export const captureConnectionCreateSchema = captureConnectionInputSchema
+  .extend({
+    expectedAccount: z.string().trim().max(200),
+    assignTestEmail: z.boolean().optional(),
+  })
+  .superRefine((input, context) => {
+    if (input.assignTestEmail && input.expectedAccount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Leave the expected account empty: Shots assigns the test email address.',
+        path: ['expectedAccount'],
+      })
+    }
+    if (!input.assignTestEmail && !input.expectedAccount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Say what the signed-in account shows.',
+        path: ['expectedAccount'],
+      })
+    }
+  })
+
 /** A connection and whether its stored session can still be used; no session material. */
 export const captureConnectionSchema = captureConnectionInputSchema
   .omit({ bootstrapSecret: true })
@@ -207,8 +234,107 @@ export const captureOverviewSchema = z.object({
 /** One connection, recipe or job by its ID; tenant scope always comes from the session. */
 export const captureIdentitySchema = z.object({ id: idSchema })
 
+/**
+ * A typed first-factor email sign-in: fixed selectors and paths, never a
+ * script. The Go validator is the authority on what may run.
+ */
+export const captureLoginRecipeSchema = z.object({
+  schemaVersion: z.literal(1),
+  method: z.enum(['MAGIC_LINK', 'EMAIL_CODE']),
+  startPath: pathSchema,
+  emailInput: selectorSchema,
+  requestChallenge: selectorSchema,
+  challengeConfirmation: selectorSchema.optional(),
+  submitPaths: z.array(pathSchema).min(1).max(5),
+  linkHosts: z.array(hostSchema).max(10).optional(),
+  linkPaths: z.array(pathSchema).max(10).optional(),
+  codeInput: selectorSchema.optional(),
+  codeLength: z.number().int().min(4).max(10).optional(),
+  submitCode: selectorSchema.optional(),
+})
+
+/** Where an email sign-in attempt is. No link, code, email, or browser ID. */
+export const captureAuthAttemptSchema = z.object({
+  id: idSchema,
+  connectionId: idSchema,
+  mode: z.enum(['TEST', 'AUTO_RECOVER']),
+  state: z.enum([
+    'ADMITTED',
+    'BROWSER_STARTING',
+    'CHALLENGE_REQUESTED',
+    'WAITING_FOR_EMAIL',
+    'EMAIL_MATCHED',
+    'APPLYING_CHALLENGE',
+    'VERIFYING',
+    'COMMITTING',
+    'SUCCEEDED',
+    'FAILED',
+    'EXPIRED',
+    'CANCELLED',
+    'HUMAN_REQUIRED',
+  ]),
+  startedAt: z.string(),
+  deadlineAt: z.string(),
+  emailRequestedAt: z.string().nullable(),
+  emailReceivedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  failureCode: z.string().nullable(),
+  safeMessage: z.string(),
+})
+
+/** A connection's email sign-in setup. The test address is shown on purpose. */
+export const captureEmailAuthSchema = z.object({
+  id: idSchema,
+  connectionId: idSchema,
+  method: z.enum(['MAGIC_LINK', 'EMAIL_CODE']),
+  status: z.enum(['DRAFT', 'VERIFIED', 'PAUSED', 'REVOKED']),
+  testEmail: z.string(),
+  expectedSenders: z.array(z.string()),
+  autoReconnect: z.boolean(),
+  revision: z.number().int(),
+  testedRevision: z.number().int().nullable(),
+  recipeVersion: z.number().int().nullable(),
+  recipe: captureLoginRecipeSchema.nullable(),
+  lastTestedAt: z.string().nullable(),
+  lastSuccessAt: z.string().nullable(),
+  lastFailureCode: z.string().nullable(),
+  approvedByUserId: z.string().nullable(),
+  approvedAt: z.string().nullable(),
+  autoReconnectAvailable: z.boolean(),
+  latestAttempt: captureAuthAttemptSchema.nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+/** A new login recipe version for the revision the owner last saw. */
+export const saveCaptureEmailAuthRecipeSchema = z.object({
+  id: idSchema,
+  expectedRevision: z.number().int().min(1),
+  recipe: captureLoginRecipeSchema,
+  expectedSenders: z
+    .array(z.string().trim().min(1).max(254))
+    .min(1, 'List the address or @domain the sign-in email comes from.')
+    .max(10),
+})
+
+/** The owner's opt-in to automatic sign-in for one tested revision. */
+export const enableCaptureEmailAuthSchema = z.object({
+  id: idSchema,
+  expectedRevision: z.number().int().min(1),
+})
+
 /** A connection without session material. */
 export type CaptureConnection = z.infer<typeof captureConnectionSchema>
+/** A new connection, optionally with a Shots test email address. */
+export type CaptureConnectionCreate = z.infer<typeof captureConnectionCreateSchema>
+/** A typed first-factor email sign-in. */
+export type CaptureLoginRecipe = z.infer<typeof captureLoginRecipeSchema>
+/** Where an email sign-in attempt is. */
+export type CaptureAuthAttempt = z.infer<typeof captureAuthAttemptSchema>
+/** A connection's email sign-in setup. */
+export type CaptureEmailAuth = z.infer<typeof captureEmailAuthSchema>
+/** A new login recipe version. */
+export type SaveCaptureEmailAuthRecipe = z.infer<typeof saveCaptureEmailAuthRecipeSchema>
 /** The app to sign in to. */
 export type CaptureConnectionInput = z.infer<typeof captureConnectionInputSchema>
 /** The one-time sign-in link and the intent that finishes it. */

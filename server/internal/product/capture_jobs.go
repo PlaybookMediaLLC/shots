@@ -616,6 +616,9 @@ func (c *Configuration) claimCaptureJob(ctx context.Context, org, id string) (*c
 		if err := parkCaptureJob(ctx, tx, job, "needs_auth", now); err != nil {
 			return nil, nil, err
 		}
+		if err := c.admitEmailAuthRecovery(ctx, tx, job); err != nil {
+			return nil, nil, err
+		}
 		return nil, captureDone(), tx.Commit()
 	}
 	busy := func() (*captureClaim, *CaptureJobOutcome, error) {
@@ -942,6 +945,9 @@ func (c *Configuration) failCapture(ctx context.Context, claim *captureClaim, ca
 		if err := parkCaptureJob(ctx, tx, job, string(code), now); err != nil {
 			return nil, err
 		}
+		if err := c.admitEmailAuthRecovery(ctx, tx, job); err != nil {
+			return nil, err
+		}
 	case failure != nil && failure.Retryable() && (job.DeadlineAt == nil || job.DeadlineAt.After(now)):
 		phase := capturejob.PhaseQUEUED
 		if code == browser.WaitingForDeployment || code == browser.DeploymentUnverified {
@@ -1139,6 +1145,9 @@ func openCaptureSessions(ctx context.Context, tx *ent.Tx, org, connectionID stri
 // run on every worker: each close is idempotent.
 func (c *Configuration) ReclaimCaptureResources(ctx context.Context) error {
 	now := time.Now().UTC()
+	if err := c.ReclaimCaptureAuthResources(ctx); err != nil {
+		return err
+	}
 	if c.captureRunner != nil {
 		attempts, err := c.client.CaptureAttempt.Query().Where(captureattempt.BrowserSessionIDNotNil(), captureattempt.BrowserClosedAtIsNil(), captureattempt.StartedAtLT(now.Add(-captureLease))).Limit(50).All(ctx)
 		if err != nil {

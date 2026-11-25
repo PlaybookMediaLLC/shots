@@ -100,6 +100,10 @@ func (c *Configuration) HandleOutboxEvent(ctx context.Context, eventID, organiza
 		return true, c.dispatchCaptureJob(ctx, organizationID, aggregateID)
 	case EventCaptureConnectionFinish:
 		return true, c.dispatchCaptureConnection(ctx, organizationID, aggregateID)
+	case EventCaptureAuthDispatch:
+		return true, c.dispatchCaptureAuth(ctx, organizationID, aggregateID, false)
+	case EventCaptureAuthEmail:
+		return true, c.dispatchCaptureAuth(ctx, organizationID, aggregateID, true)
 	case EventCampaignPostsSubmitted, EventCampaignPostsDecided:
 		// Personal deliveries are claimed independently by the notification dispatcher.
 		return true, nil

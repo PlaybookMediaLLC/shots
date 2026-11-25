@@ -74,6 +74,8 @@ const (
 	FieldBootstrapSecretCiphertext = "bootstrapSecretCiphertext"
 	// FieldRevokedAt holds the string denoting the revoked_at field in the database.
 	FieldRevokedAt = "revokedAt"
+	// FieldLastAutoAuthenticatedAt holds the string denoting the last_auto_authenticated_at field in the database.
+	FieldLastAutoAuthenticatedAt = "lastAutoAuthenticatedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -115,6 +117,7 @@ var Columns = []string{
 	FieldBootstrapURL,
 	FieldBootstrapSecretCiphertext,
 	FieldRevokedAt,
+	FieldLastAutoAuthenticatedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -313,6 +316,11 @@ func ByBootstrapSecretCiphertext(opts ...sql.OrderTermOption) OrderOption {
 // ByRevokedAt orders the results by the revoked_at field.
 func ByRevokedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRevokedAt, opts...).ToFunc()
+}
+
+// ByLastAutoAuthenticatedAt orders the results by the last_auto_authenticated_at field.
+func ByLastAutoAuthenticatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastAutoAuthenticatedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

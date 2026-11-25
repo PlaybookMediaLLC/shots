@@ -39,6 +39,89 @@ export type CaptureConnectionInput = {
   bootstrapUrl?: string
   bootstrapSecret?: string
 }
+/** A new connection; with assignTestEmail Shots assigns the expected account. */
+export type CaptureConnectionCreate = Omit<CaptureConnectionInput, 'expectedAccount'> & {
+  expectedAccount: string
+  assignTestEmail?: boolean
+}
+/** A typed first-factor email sign-in (RFC 007A). */
+export type CaptureLoginRecipe = {
+  schemaVersion: 1
+  method: 'MAGIC_LINK' | 'EMAIL_CODE'
+  startPath: string
+  emailInput: string
+  requestChallenge: string
+  challengeConfirmation?: string
+  submitPaths: string[]
+  linkHosts?: string[]
+  linkPaths?: string[]
+  codeInput?: string
+  codeLength?: number
+  submitCode?: string
+}
+/** An email sign-in attempt's safe progress. */
+export type CaptureAuthAttempt = {
+  id: string
+  connectionId: string
+  mode: 'TEST' | 'AUTO_RECOVER'
+  state:
+    | 'ADMITTED'
+    | 'BROWSER_STARTING'
+    | 'CHALLENGE_REQUESTED'
+    | 'WAITING_FOR_EMAIL'
+    | 'EMAIL_MATCHED'
+    | 'APPLYING_CHALLENGE'
+    | 'VERIFYING'
+    | 'COMMITTING'
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'EXPIRED'
+    | 'CANCELLED'
+    | 'HUMAN_REQUIRED'
+  startedAt: string
+  deadlineAt: string
+  emailRequestedAt: string | null
+  emailReceivedAt: string | null
+  completedAt: string | null
+  failureCode: string | null
+  safeMessage: string
+}
+/** A connection's email sign-in setup. */
+export type CaptureEmailAuth = {
+  id: string
+  connectionId: string
+  method: 'MAGIC_LINK' | 'EMAIL_CODE'
+  status: 'DRAFT' | 'VERIFIED' | 'PAUSED' | 'REVOKED'
+  testEmail: string
+  expectedSenders: string[]
+  autoReconnect: boolean
+  revision: number
+  testedRevision: number | null
+  recipeVersion: number | null
+  recipe: CaptureLoginRecipe | null
+  lastTestedAt: string | null
+  lastSuccessAt: string | null
+  lastFailureCode: string | null
+  approvedByUserId: string | null
+  approvedAt: string | null
+  autoReconnectAvailable: boolean
+  latestAttempt: CaptureAuthAttempt | null
+  createdAt: string
+  updatedAt: string
+}
+/** A new login recipe version for the revision the owner last saw. */
+export type SaveCaptureEmailAuthRecipeInput = {
+  expectedRevision: number
+  recipe: CaptureLoginRecipe
+  expectedSenders: string[]
+}
+/** Resend's delivery as the web received it: the exact signed bytes and headers. */
+export type CaptureAuthInboundEmail = {
+  payload: string
+  svixId: string
+  svixTimestamp: string
+  svixSignature: string
+}
 /**
  * The sign-in browser's Live View link is a bearer credential: pass it to the
  * person connecting and nowhere else, and never log or store it.

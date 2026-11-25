@@ -15,6 +15,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/emailauth"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/config"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -189,6 +190,15 @@ func main() {
 			runner = agentRunner
 		}
 		automationStore.WithAuthenticatedCapture(runner, captureKeys)
+	}
+	// Unattended email sign-in (RFC 007A) runs its attempts on this worker.
+	emailAuth, err := emailauth.SettingsFromEnvironment()
+	if err != nil {
+		slog.Error("invalid capture email sign-in configuration", "error", err)
+		os.Exit(1)
+	}
+	if emailAuth != nil {
+		automationStore.WithEmailAuth(emailAuth)
 	}
 	if github != nil {
 		// render_code_visual reads a merged pull request's diff only where its owner allowed it.

@@ -236,12 +236,21 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
-	ready := false
-	defer func() {
-		if !ready {
-			_ = page.Close()
-		}
-	}()
+	s, stop, err := guard(ctx, browser, page, hosts, postPaths)
+	if err != nil {
+		_ = page.Close()
+		return nil, err
+	}
+	s.close = func() {
+		stop()
+		_ = page.Close()
+	}
+	return s, nil
+}
+
+// guard applies the capture policy to a tab, new or already open. stop ends
+// the policy's request handling and leaves the tab open.
+func guard(ctx context.Context, browser *rod.Browser, page *rod.Page, hosts, postPaths []string) (*scope, func(), error) {
 	s := &scope{page: page, context: browser}
 	for _, setup := range []func() error{
 		func() error { return proto.NetworkEnable{}.Call(page) },
@@ -252,7 +261,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 		},
 	} {
 		if err := setup(); err != nil {
-			return nil, &Failure{Code: ProviderUnavailable}
+			return nil, nil, &Failure{Code: ProviderUnavailable}
 		}
 	}
 	router := page.HijackRequests()
@@ -267,7 +276,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 		}
 		hijack.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
 	}); err != nil {
-		return nil, &Failure{Code: ProviderUnavailable}
+		return nil, nil, &Failure{Code: ProviderUnavailable}
 	}
 	go router.Run()
 	// A dialog would stall the page until its deadline; nothing here answers yes.
@@ -278,12 +287,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 	}, func(*proto.PageJavascriptDialogOpening) {
 		_ = proto.PageHandleJavaScriptDialog{Accept: false}.Call(page)
 	})()
-	s.close = func() {
-		_ = router.Stop()
-		_ = page.Close()
-	}
-	ready = true
-	return s, nil
+	return s, func() { _ = router.Stop() }, nil
 }
 
 func (s *scope) restore(state *State) error {

@@ -3,7 +3,7 @@
 **Project:** Shots / PlaybookMediaLLC  
 **Repository:** [`PlaybookMediaLLC/shots`](https://github.com/PlaybookMediaLLC/shots)  
 **Target branch:** `develop` (design only; this document does not change the repository)  
-**Status:** Proposed — implementation-ready design; security review and live acceptance required  
+**Status:** Implemented behind configuration (2026-11-25); security review and live acceptance (Gates A–D) required. See [section 19](#19-implementation-status).  
 **Date:** 2026-11-20  
 **Owners:** Platform Engineering (auth, browser runtime, security), Product Engineering (connection onboarding, UI, capture integration)  
 **Parent:** [`docs/rfcs/007-authenticated-product-capture.md`](https://github.com/PlaybookMediaLLC/shots/blob/develop/docs/rfcs/007-authenticated-product-capture.md)  
@@ -1176,3 +1176,37 @@ Decide these explicitly during PR 1. Defaults below are designed to avoid silent
 - [Temporal: Signals, Updates and Queries](https://docs.temporal.io/encyclopedia/workflow-message-passing) — durable event-driven orchestration semantics.
 
 **Disclosure:** This RFC is a proposed implementation for Shots. It is not a description of Ferndesk's internal source code, and it does not claim that any of the proposed components, API paths, migrations, or tests have been shipped. Product descriptions from competitors are useful references, but the architecture above is grounded primarily in the existing Shots repository and current provider documentation.
+
+
+## 19. Implementation status
+
+Updated 2026-11-25. The feature is off unless `PLATFORM_CAPTURE_EMAIL_AUTH_ENABLED` and the Resend settings are set ([configuration](../../server/README.md)).
+
+| Area | Code |
+| --- | --- |
+| Records | `server/ent/schema/capture_email_auth.go`, `server/platformmigrations/sql/20261125100000_capture_email_auth.sql` |
+| Browser steps | `server/internal/capture/browser/email_auth.go` |
+| Signature, routing, Resend reader, parser | `server/internal/capture/emailauth` |
+| Admission, fences, intake, commit | `server/internal/product/capture_email_auth.go` |
+| Workflow | `server/internal/temporalcapture/email_auth.go` |
+| API | `server/internal/httpapi/capture_email_auth.go`; web `app/api/webhooks/resend/capture-auth`, tRPC `capture.*EmailAuth` |
+| UI | `clients/apps/web/components/workflows/CaptureEmailAuthPanel.tsx` |
+
+Decisions that differ from the sketch above:
+
+- `ValidatedAt` stays the last human authorization and anchors the 30-day cap. Every email sign-in, automatic or test, sets only the new `LastAutoAuthenticatedAt` and caps state expiry at that limit; a test sets `ValidatedAt` only on a connection no person has authorized yet. Only Live View renews the cap.
+- Automatic sign-in ends when the owner who turned it on is no longer an owner.
+- The kill switch is the `PLATFORM_CAPTURE_EMAIL_AUTH_*` environment: turning it off takes a restart, and each running attempt stops at its next step.
+- The sender check reads the From header only. A forged email to the random address can at most fail one attempt, since the link must still sign in as the expected account.
+- Only an owner may turn on automatic reconnects; an admin may set up and test.
+- Recipe locators are bounded CSS selectors, validated as capture recipes are.
+- The webhook arrives at the web facade and is forwarded with its exact bytes; Go verifies the Svix signature. No Resend SDK was added.
+- Reconciliation: 30 seconds after the request, each check lists the newest received emails and records any addressed to the attempt through the webhook's own intake, so a lost or late webhook still matches once.
+
+Tests: real Chrome (`email_auth_test.go`: magic link once, spent link refused, code, wrong code, CAPTCHA and changed page), database (`capture_email_auth_integration_test.go`: test sign-in with no stored secret, automatic recovery within the human cap, webhook idempotency and spoofing, human reconnect wins, revoke, admission guards, expiry), Temporal and HTTP adapters.
+
+Browser flow: `clients/apps/web/test/e2e/capture-email-auth.spec.ts` (unconfigured deployment saves nothing; unsigned webhook refused).
+
+Security gates (section 10.1), reviewed from code on 2026-11-25: verifier, tenant routing, secret handling, concurrency and the 30-day cap pass after fixes; the identity-policy owner, Cloudflare host enforcement, provider log retention, the synthetic inbox, and the kill-switch drill need live checks.
+
+Not done: Gate A–D acceptance on real Resend and Cloudflare and the security review in section 10.1. Both need a verified receiving domain and provider accounts.
