@@ -1,0 +1,54 @@
+---
+title: Automate Your Launches
+description: Turn a GitHub release, a merged pull request, or a production deployment into campaign drafts for review with Shots workflows.
+keywords:
+  - automate
+  - workflows
+  - github release
+  - pull request
+  - deployment
+---
+
+A workflow turns something you shipped into campaign drafts. A person always approves them before anything is published. You need a workspace on a plan that includes Automate, and an owner or admin to set it up.
+
+## 1. Watch a Repository
+
+In **Automate → Repositories** (`/workflows/sources`), connect GitHub, choose a repository, and select **Watch**. Shots imports its recent history without running anything.
+
+## 2. Pick a Template
+
+**New workflow** (`/workflows/new`) lists a template for each kind of event:
+
+- Published GitHub release
+- Merged pull request
+- Production deployment
+- Version tag
+- Closed milestone
+
+Each card states what starts the workflow, what it skips, and what outputs it creates. Choosing a template opens it in the workflow editor, where you can pick your brand kit, target channels, and adjust every step.
+
+## 3. Test and Activate
+
+Select **Test draft** to simulate the path an example or recorded event would take. Testing creates nothing and calls no AI model.
+
+When you are ready, select **Activate version**:
+
+- Only new events trigger active workflows.
+- Each run stays pinned to the workflow version it started with.
+- If several workflows match the same event, the **lowest priority number** runs.
+
+## 4. See What Happened
+
+**Automate → Runs** (`/workflows/runs`) lists every incoming event and what each workflow did with it. Resulting campaign drafts wait in review for a person to approve.
+
+## Start From a Deployment
+
+A deployment workflow needs one extra step after activation:
+
+1. Open **Automate → Deployments** (`/workflows/deployments`).
+2. Connect your deployment host (**Vercel**, **Netlify**, **Cloudflare**, or **GitHub**).
+3. Choose the watched repository and select your active workflow under **Shots workflow after a match**.
+
+## What If No Workflow Handles a Repository?
+
+Merged pull requests wait safely in **Campaigns → Release inbox** (`/campaigns/releases`), where you can start a campaign by hand. **Automate → Runs** displays these events as handled by Release inbox.

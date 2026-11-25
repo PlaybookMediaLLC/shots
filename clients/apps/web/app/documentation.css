@@ -1,0 +1,246 @@
+/* Scoped Shots documentation shell — aligned with the authenticated
+   platform-shell.css palette, three-surface hierarchy (#fafafa / #ffffff in
+   light mode, #000000 / #0a0a0a in dark mode), hairline borders, Inter
+   typography, and rounded console radii. */
+.docs-shell {
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #666666;
+  --fg-tertiary: #8f8f8f;
+  --accent: #f2f2f2;
+  --accent-foreground: #0a0a0a;
+  --destructive: #d11a28;
+  --destructive-foreground: #ffffff;
+  --border: #eaeaea;
+  --input: #eaeaea;
+  --divider: #f2f2f2;
+  --ring: #527bc4;
+  --radius: 0.5rem;
+  --fd-tocnav-height: 0px;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: var(--font-geist-mono), Menlo, monospace;
+  --color-fd-background: #fafafa;
+  --color-fd-foreground: #0a0a0a;
+  --color-fd-muted: #f4f4f5;
+  --color-fd-muted-foreground: #666666;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0a0a0a;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #0a0a0a;
+  --color-fd-border: #eaeaea;
+  --color-fd-primary: #0a0a0a;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f4f4f5;
+  --color-fd-secondary-foreground: #0a0a0a;
+  --color-fd-accent: #f2f2f2;
+  --color-fd-accent-foreground: #0a0a0a;
+  --color-fd-ring: #527bc4;
+  background: var(--background);
+  color: var(--foreground);
+  display: flow-root;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark .docs-shell {
+  --background: #000000;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+  --primary: #ffffff;
+  --primary-foreground: #0a0a0a;
+  --secondary: #141414;
+  --secondary-foreground: #ededed;
+  --muted: #141414;
+  --muted-foreground: #a1a1a1;
+  --fg-tertiary: #737373;
+  --accent: #161616;
+  --accent-foreground: #ffffff;
+  --destructive: #ff453a;
+  --destructive-foreground: #ffffff;
+  --border: #1f1f1f;
+  --input: #1f1f1f;
+  --divider: #1f1f1f;
+  --ring: #8daeea;
+  --color-fd-background: #000000;
+  --color-fd-foreground: #ededed;
+  --color-fd-muted: #141414;
+  --color-fd-muted-foreground: #a1a1a1;
+  --color-fd-popover: #0a0a0a;
+  --color-fd-popover-foreground: #ededed;
+  --color-fd-card: #0a0a0a;
+  --color-fd-card-foreground: #ededed;
+  --color-fd-border: #1f1f1f;
+  --color-fd-primary: #ffffff;
+  --color-fd-primary-foreground: #0a0a0a;
+  --color-fd-secondary: #141414;
+  --color-fd-secondary-foreground: #ededed;
+  --color-fd-accent: #161616;
+  --color-fd-accent-foreground: #ffffff;
+  --color-fd-ring: #8daeea;
+}
+
+.docs-shell :where(h1, h2, h3, h4) {
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.docs-shell ::selection {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.docs-shell .prose,
+.docs-shell article#nd-page {
+  font-family: var(--font-sans);
+}
+
+.docs-shell input[type='search']::-webkit-search-cancel-button,
+.docs-shell input[type='search']::-webkit-search-decoration,
+.docs-shell input[type='search']::-webkit-search-results-button,
+.docs-shell input[type='search']::-webkit-search-results-decoration {
+  appearance: none;
+  display: none;
+}
+
+.docs-layout {
+  --fd-sidebar-width: 0px;
+  --fd-toc-width: 0px;
+  --fd-layout-width: 100%;
+  --fd-layout-offset: 0px;
+  --fd-page-width: 900px;
+  --fd-banner-height: 52px;
+  --docs-left-pane-width: 268px;
+  padding-top: 52px;
+  background: var(--background);
+}
+
+@media (min-width: 64rem) {
+  .docs-layout {
+    --fd-header-height: -1px;
+    --fd-layout-width: min(calc(100% - var(--docs-left-pane-width) - 12px), 1240px);
+    margin-inline-start: var(--docs-left-pane-width);
+    margin-inline-end: 12px;
+    margin-top: 52px;
+    margin-bottom: 12px;
+    padding-top: 0;
+    min-height: calc(100dvh - 64px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+  }
+}
+
+@media (min-width: 80rem) {
+  .docs-layout {
+    --fd-toc-width: 264px;
+  }
+
+  .docs-layout #nd-toc {
+    padding-inline-start: 1.75rem;
+    padding-inline-end: 1.5rem;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+}
+
+.docs-layout #nd-toc > div {
+  overscroll-behavior-y: contain;
+}
+
+/* Prev/Next pagination footer — clean Polar/Shots cards with hairline borders
+   and 12px radius instead of dashed editorial rules. */
+.docs-layout article#nd-page > div.\@container {
+  gap: 0.75rem;
+  margin-top: 2.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.docs-layout article#nd-page > div.\@container > a {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--background);
+  padding: 1rem 1.25rem;
+  font-family: var(--font-sans);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  transition:
+    background-color 160ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.docs-layout article#nd-page > div.\@container > a:hover {
+  border-color: color-mix(in oklab, var(--foreground) 18%, var(--border));
+  background: var(--accent);
+}
+
+.docs-layout article#nd-page > div.\@container > a div {
+  gap: 0.375rem;
+  font-weight: 500;
+}
+
+.docs-layout article#nd-page > div.\@container > a div p {
+  font-size: 0.875rem;
+  letter-spacing: normal;
+  color: var(--foreground);
+}
+
+.docs-layout article#nd-page > div.\@container > a div svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground);
+  transition: color 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.docs-layout article#nd-page > div.\@container > a:hover div svg {
+  color: var(--foreground);
+}
+
+.docs-layout article#nd-page > div.\@container > a > p {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: normal;
+  color: var(--muted-foreground);
+}
+
+/* Code blocks — rounded console frames with subtle background contrast. */
+.docs-shell figure:has(.shiki),
+.docs-shell figure.shiki,
+.docs-shell .bg-fd-card:has(.shiki) {
+  border-radius: 0.75rem;
+  border-color: var(--border);
+  background-color: var(--background);
+  overflow: hidden;
+}
+
+.dark .docs-shell .shiki,
+.dark .docs-shell figure:has(pre),
+.dark .docs-shell .bg-fd-card:has(.shiki),
+.dark .docs-shell [class*='bg-(--shiki-dark-bg)'],
+.dark .docs-shell .fd-scroll-container,
+.dark .docs-shell figure:has(.shiki) > div:last-child {
+  background-color: #050505 !important;
+  border-color: var(--border);
+}
+
+.dark .docs-shell figure.shiki > div:first-child {
+  background: #0a0a0a;
+  border-color: var(--border);
+}

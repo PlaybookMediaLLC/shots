@@ -1,0 +1,35 @@
+---
+title: Approvals & Guardrails
+description: Enforce human-only sign-off on every launch post, run automated copy and citation checks, and audit every decision.
+keywords:
+  - approvals
+  - guardrails
+  - roles
+  - copy checks
+  - review
+---
+
+## Summary
+
+Shots enforces **human-only approval** on the server. AI workflows, Automate runs, workspace API keys, and MCP agents can draft campaigns, upload visuals, and submit posts for review—but **none of them can approve a post**.
+
+## Post Approval Lifecycle
+
+```text
+DRAFT → READY_FOR_REVIEW → APPROVED → SCHEDULED → PUBLISHED
+                         ↘ NEEDS_CHANGES / REJECTED
+```
+
+- Only signed-in workspace members whose role includes `release:approve` (and whose permission group does not deny it) can approve posts.
+- A solo founder with the `owner` role can approve their own drafts; larger teams can separate `creator`, `approver`, and `publisher` responsibilities.
+- Batch approval approves an entire launch atomically and writes a single audit record.
+- External reviewers can inspect a read-only preview link at `/review/[token]`.
+
+## Automated Guardrails
+
+Before a post reaches approval or goes out, Shots checks:
+
+- **Citation grounding:** Claims in the launch spec must cite the release brief or a numbered source; unsupported statements become open questions.
+- **Copy checks:** Flags channel length overflows, banned hype terms from your brand kit, unknown URLs, and uncited claims.
+- **Exact-version binding:** Editing a post or underlying dependency invalidates stale approval so revised materials are re-evaluated before delivery.
+- **Send-time re-verification:** Durable Temporal workflows re-check approval state at send time and mark a post `PUBLISHED` only after receiving a network receipt. Uncertain deliveries move to `UNKNOWN_DELIVERY` for human review instead of retrying blindly.

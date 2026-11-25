@@ -1,0 +1,28 @@
+---
+title: Automate Workflows
+description: Watch GitHub repositories and deployment hosts to automatically turn releases, pull requests, and deployments into reviewed campaign drafts.
+keywords:
+  - automate
+  - workflows
+  - github
+  - deployments
+  - vercel
+  - netlify
+---
+
+## Summary
+
+**Automate** (`/workflows/overview`) connects your engineering shipping events directly to Shots campaigns. When a repository publishes a release, merges a pull request, creates a tag, closes a milestone, or finishes a production deployment, matching workflows run automatically and stage campaign drafts for human review.
+
+For a step-by-step setup walkthrough, see [Automate Your Launches](/docs/automate).
+
+## Sub-Views in Automate
+
+| Section | Route | Purpose |
+| --- | --- | --- |
+| **Overview** | `/workflows/overview` | Status summary of watched repositories, active workflows, and recent runs |
+| **Workflows** | `/workflows`, `/workflows/new`, `/workflows/[workflowId]` | Create workflows from event templates, edit steps, pick brand kits and channels, test drafts with zero side effects, and activate versioned workflows |
+| **Repositories** | `/workflows/sources`, `/workflows/sources/[sourceId]/production` | Connect GitHub, choose watched repositories, and configure production-tracking & recovery rules |
+| **Runs** | `/workflows/runs`, `/workflows/runs/[runId]` | Inspect every incoming event, which workflow matched (lowest priority number wins), step execution logs, and resulting campaign drafts |
+| **Deployments** | `/workflows/deployments` | Connect Vercel, Netlify, Cloudflare, or GitHub deployment webhooks and bind matched production deployments to a workflow |
+| **Signed-in capture** | `/workflows/connections` | Configure authenticated browser capture for private app routes (owners and admins only) — see [Signed-In & Autonomous AI Capture](/docs/features/signed-in-capture) |

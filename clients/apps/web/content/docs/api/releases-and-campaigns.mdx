@@ -1,0 +1,43 @@
+---
+title: Releases & Campaigns API
+description: Programmatically submit releases, run qualification, manage campaigns and approvals, upload assets, and configure intake sources.
+keywords:
+  - /api/v1/releases
+  - /api/v1/campaigns
+  - /api/v1/assets
+  - /api/v1/approvals
+---
+
+The `/api/v1` release and campaign endpoints let CI/CD pipelines, developer tools, and MCP agents submit releases, inspect evidence and launch specs, upload visual assets, and submit drafts for human review.
+
+Inspect exact request and response JSON schemas in [/api-reference](/api-reference) or [/openapi.json](/openapi.json).
+
+## Releases & Qualification
+
+| Operation | Scope / Auth | Description |
+| --- | --- | --- |
+| `GET /api/v1/releases` | `artifact:read` or session | List releases in the active workspace |
+| `POST /api/v1/releases` | `release:create` or session | Create a release brief; pass `Idempotency-Key` to prevent duplicate entries on retry |
+| Release qualification & lineage | Workspace session | Create or decide release qualifications, inspect evidence revisions, and merge or split releases |
+| Release kits | Workspace session | Read and manage versioned role-specific release kits bound to verified facts |
+
+## Campaigns & Approvals
+
+| Operation | Scope / Auth | Description |
+| --- | --- | --- |
+| `GET /api/v1/campaigns` | `artifact:read` or session | List workspace campaigns |
+| `POST /api/v1/campaigns` | `release:create` or session | Create a draft campaign for a release |
+| `GET /api/v1/campaigns/{campaignId}` | `artifact:read` or session | Fetch a campaign, its launch spec, plan, and posts |
+| `GET /api/v1/approvals` | `artifact:read` or session | List campaign posts waiting for human review |
+| `POST /api/v1/campaigns/{campaignId}/review-requests` | `release:create` or session | Submit campaign drafts for review |
+| Approval decisions | Signed-in member session with `release:approve` | Approve, request changes, or reject posts; API keys cannot approve |
+
+## Assets & Source Apps
+
+| Operation | Scope / Auth | Description |
+| --- | --- | --- |
+| `POST /api/v1/assets/upload-url` | `upload:sign` or session | Generate a short-lived signed upload URL |
+| `POST /api/v1/assets/{assetId}/complete` | `asset:write` or session | Register an uploaded asset in workspace storage |
+| `GET /api/v1/assets/{assetId}/download-url` | `artifact:read` or session | Generate a short-lived signed download URL |
+| `DELETE /api/v1/assets/{assetId}` | `asset:write` or session | Delete a workspace asset |
+| Source apps & release sources | `source:write` or session | Register and update webhook intake sources |

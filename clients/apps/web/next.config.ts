@@ -42,6 +42,10 @@ const nextConfig: NextConfig = {
   // The repository root, so the web can import the media limits the Go
   // backend embeds (server/internal/medialimits/limits.json).
   outputFileTracingRoot: path.join(process.cwd(), '../../..'),
+  outputFileTracingIncludes: {
+    '/api/md/**': ['./content/docs/**/*'],
+    '/[locale]/docs/**': ['./content/docs/**/*'],
+  },
   reactCompiler: true,
   // The vendored editor ships TypeScript source (packages/platejs-editor).
   transpilePackages: ['@shots/platejs-editor'],

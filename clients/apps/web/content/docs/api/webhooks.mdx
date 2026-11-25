@@ -1,0 +1,26 @@
+---
+title: Webhooks
+description: Deliver release events into Shots via signed inbound webhooks and receive workspace event notifications via HMAC-signed outbound webhooks.
+keywords:
+  - webhooks
+  - github webhook
+  - gitlab webhook
+  - hmac
+  - outbound webhooks
+---
+
+Shots supports both **inbound webhooks** (for triggering releases and deployments) and **outbound webhooks** (for notifying your own systems when Shots workspace state changes).
+
+## Inbound Release & Deployment Webhooks
+
+1. Register a release source in **Automate → Repositories** (`/workflows/sources`), **Automate → Deployments** (`/workflows/deployments`), or via the Source Apps API (`source:write` scope).
+2. Point your GitHub, GitLab, Vercel, Netlify, Cloudflare, or custom CI webhook at your workspace's source endpoint (`/api/webhooks/source/{sourceAppId}`).
+3. Shots verifies the provider signature before accepting any event, deduplicates replayed deliveries, and routes the event to matching active [Automate workflows](/docs/automate) or to **Campaigns → Release inbox**.
+
+## Outbound Workspace Webhooks
+
+Configure outbound webhook destinations in **Settings → Developer API** (`/settings/developers`).
+
+- Every outbound delivery is signed with an HMAC secret generated per destination.
+- Always verify the signature header against the raw request body using a constant-time comparison before processing the event.
+- Return a `2xx` status quickly and process slow downstream work asynchronously; failed deliveries are retried with backoff and recorded in the workspace webhook delivery log.

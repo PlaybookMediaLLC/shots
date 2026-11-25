@@ -1,0 +1,42 @@
+import '@/app/documentation.css'
+import { DocsLayout as FumaDocsLayout } from 'fumadocs-ui/layouts/docs'
+import type { ReactNode } from 'react'
+import { Suspense } from 'react'
+import { DocsSearchJsonLd } from '@/components/docs/docs-search-json-ld'
+import { DocsSearchQuerySync } from '@/components/docs/docs-search-query-sync'
+import { DocsShellNav } from '@/components/docs/docs-shell-nav'
+import { DocsSidebar } from '@/components/docs/docs-sidebar'
+import { docsSource, getDocsRootPage, getDocsSidebarSections } from '@/lib/docs/source'
+import { DocsProvider } from './provider'
+
+export default function DocsLayout({ children }: { children: ReactNode }) {
+  const homePage = getDocsRootPage()
+  const sections = getDocsSidebarSections()
+
+  return (
+    <>
+      <DocsSearchJsonLd />
+      <DocsProvider>
+        <div className="docs-shell min-h-screen bg-background text-foreground">
+          <Suspense fallback={null}>
+            <DocsSearchQuerySync />
+          </Suspense>
+          <DocsShellNav homePage={homePage} sections={sections} />
+          <DocsSidebar homePage={homePage} sections={sections} />
+          <FumaDocsLayout
+            containerProps={{
+              className: 'docs-layout',
+            }}
+            nav={{ enabled: false }}
+            searchToggle={{ enabled: false }}
+            sidebar={{ enabled: false }}
+            themeSwitch={{ enabled: false }}
+            tree={docsSource.pageTree}
+          >
+            {children}
+          </FumaDocsLayout>
+        </div>
+      </DocsProvider>
+    </>
+  )
+}

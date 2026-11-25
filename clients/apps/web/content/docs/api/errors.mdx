@@ -1,0 +1,47 @@
+---
+title: Errors & Idempotency
+description: Shared JSON error envelope, HTTP status codes, entitlement and quota failures, and safe retry semantics across the Shots API.
+keywords:
+  - errors
+  - error codes
+  - status codes
+  - idempotency
+  - retries
+---
+
+Every failing request across Shots' editor utilities, `/api/v1` workspace routes, and MCP tools returns JSON with the same envelope. Branch programmatically on `code`, which is stable; `error` and `message` carry human-readable text, and `hint` explains how to recover.
+
+```json
+{
+  "error": "URL is required",
+  "code": "invalid_request",
+  "message": "URL is required",
+  "hint": "Send a JSON body with a \"url\" string, for example {\"url\": \"https://example.com\"}.",
+  "status": 400,
+  "documentation": "https://shots.playbookmedia.io/docs#errors"
+}
+```
+
+## Standard Error Codes
+
+| Code | HTTP Status | Meaning |
+| --- | --- | --- |
+| `invalid_request` | `400` | A required field is missing or failed Zod schema validation |
+| `invalid_url` | `400` | The URL is not a valid absolute `http` or `https` address |
+| `unsupported_value` | `400` | A field was set outside its allowed enum values |
+| `unauthorized` | `401` | No valid signed-in session or workspace API key was provided |
+| `forbidden_domain` | `403` | The requested host is not on the media proxy allowlist |
+| `workspace_feature_not_entitled` | `403` | The workspace lacks an active paid plan or the plan does not include the requested feature (`currentPlan`, `feature`, and `requiredPlan` are included) |
+| `not_found` | `404` | No endpoint or workspace-scoped resource matches the request |
+| `method_not_allowed` | `405` | The endpoint does not accept this HTTP method (check the `Allow` header) |
+| `upstream_timeout` | `408` | The target page or upstream capture took too long to load |
+| `rate_limited` | `429` | Rate limit or monthly quota exceeded; wait for `Retry-After` before retrying |
+| `internal_error` | `500` | Unexpected server-side failure |
+| `upstream_failed` | `502` | The upstream host refused or failed the request |
+| `upstream_unavailable` | `503` | The upstream capture or provider service is temporarily unreachable |
+
+## Safe Retries & Idempotency
+
+- Send an `Idempotency-Key` header on release creation and mutation endpoints that support it so network retries never create duplicate records.
+- Do **not** blindly retry ambiguous publish requests: Shots tracks delivery state durably and moves uncertain platform responses to `UNKNOWN_DELIVERY` for human review so a post is never published twice.
+- Honor `Retry-After` on every `429` response.

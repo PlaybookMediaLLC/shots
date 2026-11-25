@@ -212,6 +212,8 @@ test('workspace and editor routes follow appearance in every locale', () => {
     '/home',
     '/fr/library',
     '/canvas/design',
+    '/docs',
+    '/fr/docs/agents',
     '/workflows',
     ...SIGNED_IN_PATHS,
   ]) {

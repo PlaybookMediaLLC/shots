@@ -1,0 +1,32 @@
+---
+title: Roles & Permissions
+description: Reference for Shots' seven workspace roles, permission boundaries, subtractive permission groups, and human-only approval rules.
+keywords:
+  - roles
+  - permissions
+  - rbac
+  - permission groups
+  - approval
+---
+
+Every member in a Shots workspace holds one organization role enforced server-side on every web, API, and tRPC mutation.
+
+## Workspace Roles
+
+| Role | Primary responsibility | Key capabilities |
+| --- | --- | --- |
+| `owner` | Full workspace ownership | All permissions, including `billing:manage`, `workspace:delete`, `workspace:transfer_ownership`, and `support:manage` |
+| `admin` | Workspace administration | Manage members, roles, invitations, workspace settings, connections, brand kits, SSO/identity, audit logs/drains, campaigns, approvals, and publishing |
+| `creator` | Authoring & design | Read workspace/members, create releases (`release:create`), read and edit visual/copy artifacts (`artifact:read`, `artifact:edit`) |
+| `approver` | Launch sign-off | Read workspace/members/artifacts and approve or reject posts (`release:approve`) |
+| `publisher` | Scheduling & delivery | Read workspace/members/artifacts and manage publishing schedules (`publish:manage`) |
+| `writer_publisher` | Authoring + publishing | Combines `creator` and `publisher` capabilities (`release:create`, `artifact:read`, `artifact:edit`, `publish:manage`) without `release:approve` |
+| `viewer` | Read-only stakeholder | Read workspace, members, and artifacts (`workspace:read`, `member:read`, `artifact:read`) |
+
+## Permission Groups (Enterprise)
+
+On Enterprise plans, **Settings → Permission groups** (`/settings/permission-groups`) lets admins assign members to restriction groups that **subtract** specific permissions from their base role. Permission groups only narrow access—they never grant a capability that the member's role does not already include.
+
+## Human-Only Approval Rule
+
+`release:approve` is strictly reserved for signed-in human members (`owner`, `admin`, or `approver`). Workspace API keys, Automate workflows, webhooks, and MCP agents can never approve posts.
