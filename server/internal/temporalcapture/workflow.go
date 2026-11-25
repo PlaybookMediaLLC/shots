@@ -138,6 +138,7 @@ func Register(w worker.Worker, a *Activities) {
 	w.RegisterActivityWithOptions(a.Run, activity.RegisterOptions{Name: RunActivity})
 	w.RegisterActivityWithOptions(a.Complete, activity.RegisterOptions{Name: CompleteActivity})
 	w.RegisterActivityWithOptions(a.CaptureDeployment, activity.RegisterOptions{Name: DeploymentCaptureActivity})
+	RegisterEmailAuth(w, a)
 }
 
 // Client starts capture workflows from the outbox. A lost acknowledgement finds

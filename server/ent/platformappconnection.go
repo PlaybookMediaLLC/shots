@@ -78,6 +78,8 @@ type PlatformAppConnection struct {
 	BootstrapSecretCiphertext *string `json:"-"`
 	// RevokedAt holds the value of the "revoked_at" field.
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	// LastAutoAuthenticatedAt holds the value of the "last_auto_authenticated_at" field.
+	LastAutoAuthenticatedAt *time.Time `json:"last_auto_authenticated_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -96,7 +98,7 @@ func (*PlatformAppConnection) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case platformappconnection.FieldID, platformappconnection.FieldOrganizationID, platformappconnection.FieldSourceAppID, platformappconnection.FieldName, platformappconnection.FieldEnvironment, platformappconnection.FieldOrigin, platformappconnection.FieldProtectedPath, platformappconnection.FieldIdentitySelector, platformappconnection.FieldExpectedAccount, platformappconnection.FieldStatus, platformappconnection.FieldStateCiphertext, platformappconnection.FieldConnectIntentID, platformappconnection.FieldConnectUserID, platformappconnection.FieldConnectSessionID, platformappconnection.FieldConnectPhase, platformappconnection.FieldFailureCode, platformappconnection.FieldLeaseJobID, platformappconnection.FieldCreatedByUserID, platformappconnection.FieldBootstrapURL, platformappconnection.FieldBootstrapSecretCiphertext:
 			values[i] = new(sql.NullString)
-		case platformappconnection.FieldValidatedAt, platformappconnection.FieldStateExpiresAt, platformappconnection.FieldConnectExpiresAt, platformappconnection.FieldLeaseExpiresAt, platformappconnection.FieldRevokedAt, platformappconnection.FieldCreatedAt, platformappconnection.FieldUpdatedAt:
+		case platformappconnection.FieldValidatedAt, platformappconnection.FieldStateExpiresAt, platformappconnection.FieldConnectExpiresAt, platformappconnection.FieldLeaseExpiresAt, platformappconnection.FieldRevokedAt, platformappconnection.FieldLastAutoAuthenticatedAt, platformappconnection.FieldCreatedAt, platformappconnection.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -320,6 +322,13 @@ func (_m *PlatformAppConnection) assignValues(columns []string, values []any) er
 				_m.RevokedAt = new(time.Time)
 				*_m.RevokedAt = value.Time
 			}
+		case platformappconnection.FieldLastAutoAuthenticatedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_auto_authenticated_at", values[i])
+			} else if value.Valid {
+				_m.LastAutoAuthenticatedAt = new(time.Time)
+				*_m.LastAutoAuthenticatedAt = value.Time
+			}
 		case platformappconnection.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -476,6 +485,11 @@ func (_m *PlatformAppConnection) String() string {
 	builder.WriteString(", ")
 	if v := _m.RevokedAt; v != nil {
 		builder.WriteString("revoked_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.LastAutoAuthenticatedAt; v != nil {
+		builder.WriteString("last_auto_authenticated_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

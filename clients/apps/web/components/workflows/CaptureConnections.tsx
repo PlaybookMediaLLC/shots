@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import {
-  captureConnectionInputSchema,
+  captureConnectionCreateSchema,
   captureEnvironmentSchema,
   type CaptureConnection,
   type CaptureConnectStart,
@@ -28,6 +29,7 @@ import {
   type CaptureConnectionForm,
 } from '@/lib/workflows/capture'
 import { CaptureError, CaptureField, useCaptureAction } from './capture-ui'
+import { CaptureEmailAuthPanel } from './CaptureEmailAuthPanel'
 import { SignInPanel } from './CaptureSignInPanel'
 import { automationSelectClass } from './ConditionEditor'
 import { relativeTime } from './workflow-ui'
@@ -36,6 +38,7 @@ import { relativeTime } from './workflow-ui'
 const EMPTY_OPTION = '__empty_option__'
 
 const blankConnection: CaptureConnectionForm = {
+  assignTestEmail: false,
   bootstrapSecret: '',
   bootstrapUrl: '',
   environment: 'production',
@@ -187,6 +190,9 @@ function ConnectionRow({
       {connection.failureCode && !finishing ? (
         <p className="text-sm text-destructive">{captureFailureMessage(connection.failureCode)}</p>
       ) : null}
+      {connection.status !== 'REVOKED' ? (
+        <CaptureEmailAuthPanel canManage={canManage} connection={connection} onChanged={onChanged} />
+      ) : null}
       <CaptureError message={error} />
     </Row>
   )
@@ -202,9 +208,14 @@ function ConnectionForm({
   const client = useTRPCClient()
   const [form, setForm] = useState(blankConnection)
   const { busy, error, run } = useCaptureAction()
-  const set = (key: keyof CaptureConnectionForm, value: string) =>
+  const set = (key: Exclude<keyof CaptureConnectionForm, 'assignTestEmail'>, value: string) =>
     setForm((old) => ({ ...old, [key]: value }))
-  const text = (key: keyof CaptureConnectionForm, label: string, hint: string, required = true) => (
+  const text = (
+    key: Exclude<keyof CaptureConnectionForm, 'assignTestEmail'>,
+    label: string,
+    hint: string,
+    required = true
+  ) => (
     <CaptureField hint={hint} label={label}>
       <Input
         onChange={(event) => set(key, event.target.value)}
@@ -215,7 +226,7 @@ function ConnectionForm({
   )
   const submit = () =>
     run(async () => {
-      const input = captureConnectionInputSchema.safeParse(captureConnectionInput(form))
+      const input = captureConnectionCreateSchema.safeParse(captureConnectionInput(form))
       if (!input.success) throw new Error(input.error.issues[0]?.message ?? 'Check this form.')
       await client.capture.createConnection.mutate(input.data)
       setForm(blankConnection)
@@ -291,11 +302,27 @@ function ConnectionForm({
           'Protected path',
           'A page only a signed-in user reaches: /settings.'
         )}
-        {text(
-          'expectedAccount',
-          'Expected account text',
-          'What the signed-in account shows, such as demo@example.com.'
-        )}
+        <CaptureField
+          hint="Shots makes a test address that receives the app’s one-time sign-in emails, so Shots can sign in again by itself. Not for SSO, MFA, or password sign-in."
+          label="Sign-in by email"
+        >
+          <span className="flex items-center gap-2 text-sm font-normal">
+            <Checkbox
+              checked={form.assignTestEmail ?? false}
+              onCheckedChange={(checked) =>
+                setForm((old) => ({ ...old, assignTestEmail: checked === true, expectedAccount: '' }))
+              }
+            />
+            Use a Shots test email address
+          </span>
+        </CaptureField>
+        {form.assignTestEmail
+          ? null
+          : text(
+              'expectedAccount',
+              'Expected account text',
+              'What the signed-in account shows, such as demo@example.com.'
+            )}
         {text(
           'identitySelector',
           'Account element (optional)',

@@ -37,6 +37,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthrecipeversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureemailauthconfig"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureinboundreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
@@ -275,6 +279,10 @@ func checkColumn(t, c string) error {
 			campaignpost.Table:                    campaignpost.ValidColumn,
 			campaignrevision.Table:                campaignrevision.ValidColumn,
 			captureattempt.Table:                  captureattempt.ValidColumn,
+			captureauthattempt.Table:              captureauthattempt.ValidColumn,
+			captureauthrecipeversion.Table:        captureauthrecipeversion.ValidColumn,
+			captureemailauthconfig.Table:          captureemailauthconfig.ValidColumn,
+			captureinboundreceipt.Table:           captureinboundreceipt.ValidColumn,
 			capturejob.Table:                      capturejob.ValidColumn,
 			capturerecipe.Table:                   capturerecipe.ValidColumn,
 			channelconnection.Table:               channelconnection.ValidColumn,

@@ -62,6 +62,14 @@ type Tx struct {
 	CampaignRevision *CampaignRevisionClient
 	// CaptureAttempt is the client for interacting with the CaptureAttempt builders.
 	CaptureAttempt *CaptureAttemptClient
+	// CaptureAuthAttempt is the client for interacting with the CaptureAuthAttempt builders.
+	CaptureAuthAttempt *CaptureAuthAttemptClient
+	// CaptureAuthRecipeVersion is the client for interacting with the CaptureAuthRecipeVersion builders.
+	CaptureAuthRecipeVersion *CaptureAuthRecipeVersionClient
+	// CaptureEmailAuthConfig is the client for interacting with the CaptureEmailAuthConfig builders.
+	CaptureEmailAuthConfig *CaptureEmailAuthConfigClient
+	// CaptureInboundReceipt is the client for interacting with the CaptureInboundReceipt builders.
+	CaptureInboundReceipt *CaptureInboundReceiptClient
 	// CaptureJob is the client for interacting with the CaptureJob builders.
 	CaptureJob *CaptureJobClient
 	// CaptureRecipe is the client for interacting with the CaptureRecipe builders.
@@ -522,6 +530,10 @@ func (tx *Tx) init() {
 	tx.CampaignPost = NewCampaignPostClient(tx.config)
 	tx.CampaignRevision = NewCampaignRevisionClient(tx.config)
 	tx.CaptureAttempt = NewCaptureAttemptClient(tx.config)
+	tx.CaptureAuthAttempt = NewCaptureAuthAttemptClient(tx.config)
+	tx.CaptureAuthRecipeVersion = NewCaptureAuthRecipeVersionClient(tx.config)
+	tx.CaptureEmailAuthConfig = NewCaptureEmailAuthConfigClient(tx.config)
+	tx.CaptureInboundReceipt = NewCaptureInboundReceiptClient(tx.config)
 	tx.CaptureJob = NewCaptureJobClient(tx.config)
 	tx.CaptureRecipe = NewCaptureRecipeClient(tx.config)
 	tx.ChannelConnection = NewChannelConnectionClient(tx.config)

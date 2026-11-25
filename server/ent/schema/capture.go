@@ -59,6 +59,10 @@ func (PlatformAppConnection) Fields() []ent.Field {
 		field.String("bootstrap_url").StorageKey("bootstrapUrl").Optional().Nillable(),
 		field.String("bootstrap_secret_ciphertext").StorageKey("bootstrapSecretCiphertext").Optional().Nillable().Sensitive(),
 		field.Time("revoked_at").StorageKey("revokedAt").Optional().Nillable(),
+		// LastAutoAuthenticatedAt is the last automatic email sign-in. It never
+		// moves ValidatedAt, which stays the last human authorization and anchors
+		// the 30-day cap (RFC 007A section 7.5).
+		field.Time("last_auto_authenticated_at").StorageKey("lastAutoAuthenticatedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

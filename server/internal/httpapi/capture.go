@@ -71,6 +71,8 @@ func writeCaptureError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": string(failure.Code), "error": "Session verification failed (" + string(failure.Code) + ")."})
 	case errors.Is(err, product.ErrAuthenticatedCaptureUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "capture_unavailable", "error": err.Error()})
+	case errors.Is(err, product.ErrCaptureEmailAuthUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "email_auth_unavailable", "error": "Automatic email sign-in is not configured."})
 	default:
 		writeStoreError(w, err)
 	}

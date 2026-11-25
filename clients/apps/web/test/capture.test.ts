@@ -6,7 +6,10 @@ import { ScreenshotStudioBackendSDK } from '../../../packages/screenshot-studio-
 import { SignInPanel } from '@/components/workflows/CaptureSignInPanel'
 import {
   autoCaptureResultSchema,
+  captureAuthAttemptSchema,
+  captureConnectionCreateSchema,
   captureConnectionInputSchema,
+  captureLoginRecipeSchema,
   captureConnectStartSchema,
   captureOverviewSchema,
   captureRecipeInputSchema,
@@ -15,7 +18,11 @@ import {
   type CaptureOverview,
 } from '@/lib/api/contracts/capture'
 import {
+  ACTIVE_AUTH_ATTEMPT_STATES,
   DEFAULT_ZERO_CONFIG_MARKER,
+  emailAuthFailureMessage,
+  loginRecipeForm,
+  loginRecipeInput,
   activeRecipeForSurface,
   captureConnectionInput,
   captureInProgress,
@@ -462,4 +469,109 @@ test('zero-config AI capture defaults empty markers and validates vision, fill, 
   assert.deepEqual(captureJobFrames(auto.job), ['asset_1', 'asset_2', 'asset_3'])
   assert.deepEqual(captureJobFrames({ assetId: 'asset_only' }), ['asset_only'])
   assert.deepEqual(captureJobFrames({ assetId: null }), [])
+})
+
+test('a connection may take a Shots test email address instead of an account', () => {
+  const form = {
+    assignTestEmail: true,
+    environment: 'staging' as const,
+    expectedAccount: '',
+    hosts: 'app.example.com',
+    identitySelector: '',
+    loginHosts: '',
+    name: 'Demo',
+    origin: 'https://app.example.com',
+    protectedPath: '/app',
+    sourceAppId: '',
+  }
+  const parsed = captureConnectionCreateSchema.safeParse(captureConnectionInput(form))
+  assert.ok(parsed.success)
+  assert.equal(parsed.data.assignTestEmail, true)
+  assert.equal(
+    captureConnectionCreateSchema.safeParse({
+      ...captureConnectionInput(form),
+      expectedAccount: 'me@x.com',
+    }).success,
+    false
+  )
+  assert.equal(
+    captureConnectionCreateSchema.safeParse({
+      ...captureConnectionInput(form),
+      assignTestEmail: false,
+    }).success,
+    false
+  )
+})
+
+test('a login recipe form sends only the chosen method’s fields', () => {
+  const link = loginRecipeInput({
+    ...loginRecipeForm(null),
+    codeInput: '#ignored',
+    emailInput: ' [data-testid=email] ',
+    expectedSenders: 'login@acme.test, @mail.acme.test',
+    linkHosts: 'auth.acme.test',
+    linkPaths: '/auth/callback',
+    requestChallenge: '#send',
+    submitPaths: '/api/auth/email',
+  })
+  assert.deepEqual(link.expectedSenders, ['login@acme.test', '@mail.acme.test'])
+  assert.equal(link.recipe.codeInput, undefined)
+  assert.equal(link.recipe.emailInput, '[data-testid=email]')
+  assert.ok(captureLoginRecipeSchema.safeParse(link.recipe).success)
+  const code = loginRecipeInput({
+    ...loginRecipeForm(null),
+    codeInput: '[data-testid=code]',
+    emailInput: '#email',
+    expectedSenders: 'login@acme.test',
+    linkHosts: 'ignored.acme.test',
+    method: 'EMAIL_CODE',
+    requestChallenge: '#send',
+    submitPaths: '/api/auth/email',
+  })
+  assert.equal(code.recipe.codeLength, 6)
+  assert.equal(code.recipe.linkHosts, undefined)
+  assert.ok(captureLoginRecipeSchema.safeParse(code.recipe).success)
+})
+
+test('email sign-in records parse and explain failures without content', () => {
+  const attempt = {
+    completedAt: null,
+    connectionId: 'c1',
+    deadlineAt: '2026-11-25T10:03:00Z',
+    emailReceivedAt: null,
+    emailRequestedAt: '2026-11-25T10:00:00Z',
+    failureCode: null,
+    id: 'a1',
+    mode: 'TEST',
+    safeMessage: 'Waiting.',
+    startedAt: '2026-11-25T10:00:00Z',
+    state: 'WAITING_FOR_EMAIL',
+  }
+  assert.ok(captureAuthAttemptSchema.safeParse(attempt).success)
+  assert.ok(ACTIVE_AUTH_ATTEMPT_STATES.has('WAITING_FOR_EMAIL'))
+  assert.equal(ACTIVE_AUTH_ATTEMPT_STATES.has('SUCCEEDED'), false)
+  assert.match(emailAuthFailureMessage('unsupported_factor'), /person must sign in/)
+  assert.match(emailAuthFailureMessage('something_new'), /something new/)
+})
+
+test('the SDK forwards Resend deliveries to the service route only', async () => {
+  const calls: { url: string; init: RequestInit | undefined }[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.test',
+    'service',
+    { display: 'web', kind: 'service', organizationId: '', requestId: 'req-1' },
+    async (url, init) => {
+      calls.push({ init, url: String(url) })
+      return Response.json({ outcome: 'matched' })
+    }
+  )
+  const result = await sdk.receiveCaptureAuthEmail({
+    payload: '{"type":"email.received"}',
+    svixId: 'msg_1',
+    svixSignature: 'v1,abc',
+    svixTimestamp: '1',
+  })
+  assert.equal(result.outcome, 'matched')
+  assert.match(calls[0]!.url, /v1\/internal\/capture-auth\/resend$/)
+  assert.equal(JSON.parse(String(calls[0]!.init?.body)).payload, '{"type":"email.received"}')
 })

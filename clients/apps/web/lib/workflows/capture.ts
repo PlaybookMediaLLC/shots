@@ -1,6 +1,9 @@
 import type {
+  CaptureAuthAttempt,
   CaptureConnection,
-  CaptureConnectionInput,
+  CaptureConnectionCreate,
+  CaptureEmailAuth,
+  CaptureLoginRecipe,
   CaptureJob,
   CaptureOverview,
   CaptureRecipe,
@@ -98,7 +101,7 @@ function selectorList(text: string) {
 
 /** A connection form's text, before it is parsed. */
 export type CaptureConnectionForm = Omit<
-  CaptureConnectionInput,
+  CaptureConnectionCreate,
   'hosts' | 'loginHosts' | 'sourceAppId'
 > & {
   hosts: string
@@ -237,4 +240,118 @@ export function captureNavigationSummary(job: Pick<CaptureJob, 'navigationAction
 export function captureJobFrames(job: Pick<CaptureJob, 'assetId' | 'sequenceAssetIds'>): string[] {
   if (job.sequenceAssetIds && job.sequenceAssetIds.length > 1) return job.sequenceAssetIds
   return job.assetId ? [job.assetId] : []
+}
+
+/** An email sign-in setup's state (RFC 007A). */
+export const CAPTURE_EMAIL_AUTH_STATUS = {
+  DRAFT: { label: 'Not tested', tone: 'gray' },
+  VERIFIED: { label: 'Tested', tone: 'green' },
+  PAUSED: { label: 'Paused', tone: 'yellow' },
+  REVOKED: { label: 'Removed', tone: 'gray' },
+} as const satisfies Record<CaptureEmailAuth['status'], { label: string; tone: string }>
+
+/** The states in which an email sign-in attempt is still running. */
+export const ACTIVE_AUTH_ATTEMPT_STATES: ReadonlySet<CaptureAuthAttempt['state']> = new Set([
+  'ADMITTED',
+  'BROWSER_STARTING',
+  'CHALLENGE_REQUESTED',
+  'WAITING_FOR_EMAIL',
+  'EMAIL_MATCHED',
+  'APPLYING_CHALLENGE',
+  'VERIFYING',
+  'COMMITTING',
+])
+
+const EMAIL_AUTH_FAILURES: Record<string, string> = {
+  auth_policy_review_required: 'A person must sign in again before automatic sign-in can renew this session.',
+  cancelled: 'The sign-in was stopped.',
+  challenge_ambiguous: 'The email held more than one possible link or code. Shots chose neither.',
+  challenge_consumed_unknown: 'The sign-in stopped after the link or code may have been used. Start a new test.',
+  challenge_expired: 'The app refused the code as wrong or expired.',
+  challenge_host_refused: 'The email’s link points to a host or path the recipe does not approve.',
+  challenge_not_found: 'No approved link or code was in the email.',
+  config_incomplete: 'Save a login recipe and the sender list first.',
+  email_delivery_timeout: 'No sign-in email arrived in time. Check that the app sends to the test address.',
+  email_unmatched: 'The email did not come from an approved sender.',
+  feature_disabled: 'Automatic email sign-in is off.',
+  generation_stale: 'The setup or the session changed during the sign-in.',
+  human_reconnect: 'A person started signing in, so the automatic sign-in stopped.',
+  login_page_changed: 'The sign-in page no longer matches the recipe. Update the selectors.',
+  provider_read_failed: 'Shots could not read the email from the provider.',
+  rate_limited: 'This connection used today’s sign-in attempts.',
+  revoked: 'Email sign-in was removed.',
+  session_restore_failed: 'A fresh browser could not restore the session.',
+  session_restore_unsupported: 'This app keeps its session where Shots cannot save it.',
+  sign_in_incomplete: 'The app did not finish the sign-in.',
+  unsupported_factor: 'The app asked for a password, CAPTCHA, or another factor. A person must sign in.',
+  wrong_account: 'The app signed in as another account.',
+}
+
+/** A safe sign-in failure code, as a person reads it. */
+export function emailAuthFailureMessage(code: string): string {
+  return Object.hasOwn(EMAIL_AUTH_FAILURES, code)
+    ? EMAIL_AUTH_FAILURES[code]!
+    : `The sign-in failed (${code.replaceAll('_', ' ')}).`
+}
+
+/** A login recipe form's text, before it is parsed. */
+export type LoginRecipeForm = {
+  method: CaptureLoginRecipe['method']
+  startPath: string
+  emailInput: string
+  requestChallenge: string
+  challengeConfirmation: string
+  submitPaths: string
+  linkHosts: string
+  linkPaths: string
+  codeInput: string
+  codeLength: string
+  submitCode: string
+  expectedSenders: string
+}
+
+/** An empty login recipe form, or one filled from the saved version. */
+export function loginRecipeForm(setup: CaptureEmailAuth | null): LoginRecipeForm {
+  const recipe = setup?.recipe
+  return {
+    method: recipe?.method ?? 'MAGIC_LINK',
+    startPath: recipe?.startPath ?? '/login',
+    emailInput: recipe?.emailInput ?? '',
+    requestChallenge: recipe?.requestChallenge ?? '',
+    challengeConfirmation: recipe?.challengeConfirmation ?? '',
+    submitPaths: (recipe?.submitPaths ?? []).join(', '),
+    linkHosts: (recipe?.linkHosts ?? []).join(', '),
+    linkPaths: (recipe?.linkPaths ?? []).join(', '),
+    codeInput: recipe?.codeInput ?? '',
+    codeLength: recipe?.codeLength ? String(recipe.codeLength) : '6',
+    submitCode: recipe?.submitCode ?? '',
+    expectedSenders: (setup?.expectedSenders ?? []).join(', '),
+  }
+}
+
+/** A login recipe form as the backend's input; only the chosen method's fields go. */
+export function loginRecipeInput(form: LoginRecipeForm): {
+  recipe: CaptureLoginRecipe
+  expectedSenders: string[]
+} {
+  const optional = (value: string) => (value.trim() ? value.trim() : undefined)
+  const base = {
+    schemaVersion: 1 as const,
+    method: form.method,
+    startPath: form.startPath.trim(),
+    emailInput: form.emailInput.trim(),
+    requestChallenge: form.requestChallenge.trim(),
+    challengeConfirmation: optional(form.challengeConfirmation),
+    submitPaths: hostList(form.submitPaths),
+  }
+  const recipe: CaptureLoginRecipe =
+    form.method === 'MAGIC_LINK'
+      ? { ...base, linkHosts: hostList(form.linkHosts), linkPaths: hostList(form.linkPaths) }
+      : {
+          ...base,
+          codeInput: form.codeInput.trim(),
+          codeLength: Number.parseInt(form.codeLength, 10),
+          submitCode: optional(form.submitCode),
+        }
+  return { recipe, expectedSenders: hostList(form.expectedSenders) }
 }

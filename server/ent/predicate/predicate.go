@@ -81,6 +81,18 @@ type CampaignRevision func(*sql.Selector)
 // CaptureAttempt is the predicate function for captureattempt builders.
 type CaptureAttempt func(*sql.Selector)
 
+// CaptureAuthAttempt is the predicate function for captureauthattempt builders.
+type CaptureAuthAttempt func(*sql.Selector)
+
+// CaptureAuthRecipeVersion is the predicate function for captureauthrecipeversion builders.
+type CaptureAuthRecipeVersion func(*sql.Selector)
+
+// CaptureEmailAuthConfig is the predicate function for captureemailauthconfig builders.
+type CaptureEmailAuthConfig func(*sql.Selector)
+
+// CaptureInboundReceipt is the predicate function for captureinboundreceipt builders.
+type CaptureInboundReceipt func(*sql.Selector)
+
 // CaptureJob is the predicate function for capturejob builders.
 type CaptureJob func(*sql.Selector)
 

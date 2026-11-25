@@ -532,6 +532,26 @@ func (_u *PlatformAppConnectionUpdate) ClearRevokedAt() *PlatformAppConnectionUp
 	return _u
 }
 
+// SetLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field.
+func (_u *PlatformAppConnectionUpdate) SetLastAutoAuthenticatedAt(v time.Time) *PlatformAppConnectionUpdate {
+	_u.mutation.SetLastAutoAuthenticatedAt(v)
+	return _u
+}
+
+// SetNillableLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdate) SetNillableLastAutoAuthenticatedAt(v *time.Time) *PlatformAppConnectionUpdate {
+	if v != nil {
+		_u.SetLastAutoAuthenticatedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastAutoAuthenticatedAt clears the value of the "last_auto_authenticated_at" field.
+func (_u *PlatformAppConnectionUpdate) ClearLastAutoAuthenticatedAt() *PlatformAppConnectionUpdate {
+	_u.mutation.ClearLastAutoAuthenticatedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *PlatformAppConnectionUpdate) SetUpdatedAt(v time.Time) *PlatformAppConnectionUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -756,6 +776,12 @@ func (_u *PlatformAppConnectionUpdate) sqlSave(ctx context.Context) (_node int, 
 	}
 	if _u.mutation.RevokedAtCleared() {
 		_spec.ClearField(platformappconnection.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastAutoAuthenticatedAt(); ok {
+		_spec.SetField(platformappconnection.FieldLastAutoAuthenticatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastAutoAuthenticatedAtCleared() {
+		_spec.ClearField(platformappconnection.FieldLastAutoAuthenticatedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(platformappconnection.FieldUpdatedAt, field.TypeTime, value)
@@ -1283,6 +1309,26 @@ func (_u *PlatformAppConnectionUpdateOne) ClearRevokedAt() *PlatformAppConnectio
 	return _u
 }
 
+// SetLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field.
+func (_u *PlatformAppConnectionUpdateOne) SetLastAutoAuthenticatedAt(v time.Time) *PlatformAppConnectionUpdateOne {
+	_u.mutation.SetLastAutoAuthenticatedAt(v)
+	return _u
+}
+
+// SetNillableLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field if the given value is not nil.
+func (_u *PlatformAppConnectionUpdateOne) SetNillableLastAutoAuthenticatedAt(v *time.Time) *PlatformAppConnectionUpdateOne {
+	if v != nil {
+		_u.SetLastAutoAuthenticatedAt(*v)
+	}
+	return _u
+}
+
+// ClearLastAutoAuthenticatedAt clears the value of the "last_auto_authenticated_at" field.
+func (_u *PlatformAppConnectionUpdateOne) ClearLastAutoAuthenticatedAt() *PlatformAppConnectionUpdateOne {
+	_u.mutation.ClearLastAutoAuthenticatedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *PlatformAppConnectionUpdateOne) SetUpdatedAt(v time.Time) *PlatformAppConnectionUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -1537,6 +1583,12 @@ func (_u *PlatformAppConnectionUpdateOne) sqlSave(ctx context.Context) (_node *P
 	}
 	if _u.mutation.RevokedAtCleared() {
 		_spec.ClearField(platformappconnection.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastAutoAuthenticatedAt(); ok {
+		_spec.SetField(platformappconnection.FieldLastAutoAuthenticatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastAutoAuthenticatedAtCleared() {
+		_spec.ClearField(platformappconnection.FieldLastAutoAuthenticatedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(platformappconnection.FieldUpdatedAt, field.TypeTime, value)

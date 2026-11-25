@@ -226,6 +226,19 @@ successful capture. Each verified capture renews it for that long again, never p
 session expiry still ends it sooner. The worker registers the `platform-capture` queue only
 when capture is configured. See [authenticated capture](../docs/rfcs/authenticated-release-capture-review.md#10-implementation-status).
 
+Unattended email sign-in ([RFC 007A](../docs/rfcs/authenticated-capture-email-authentication.md))
+needs authenticated capture and stays off unless the API and the worker both have
+`PLATFORM_CAPTURE_EMAIL_AUTH_ENABLED=true`. It then requires
+`PLATFORM_CAPTURE_RESEND_DOMAIN` (the verified Resend receiving subdomain),
+`PLATFORM_CAPTURE_RESEND_WEBHOOK_SECRET` (the `whsec_` secret of an
+`email.received` webhook pointed at the web's `/api/webhooks/resend/capture-auth`),
+and `PLATFORM_CAPTURE_RESEND_API_KEY`; a process refuses to start with only some of
+them. `PLATFORM_CAPTURE_EMAIL_AUTH_AUTO_RECONNECT=true` lets a job parked on
+`needs_auth` start an attempt on its own, and each connection's owner must still opt in.
+`PLATFORM_CAPTURE_AUTH_ATTEMPT_TTL` (30s to 4m, default `3m`),
+`PLATFORM_CAPTURE_AUTH_RATE_PER_CONNECTION` (default 3 a day) and
+`PLATFORM_CAPTURE_AUTH_MAX_ACTIVE_GLOBAL` (default 5) bound the attempts.
+
 ## Social code (`internal/social`)
 
 `internal/social` is a library, not a service: the provider adapters, the

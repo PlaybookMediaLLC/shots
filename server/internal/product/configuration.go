@@ -15,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/authstore"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/brand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/emailauth"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/collab"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/notifications"
@@ -91,6 +92,8 @@ type Configuration struct {
 	captureKeys       *sessionstate.Keys
 	captureDispatcher CaptureDispatcher
 	captureStateAge   time.Duration
+	// emailAuth enables unattended email sign-in (RFC 007A); nil keeps it off.
+	emailAuth *emailauth.Settings
 	// collabKey signs content draft collaboration tokens (RFC 013).
 	collabKey []byte
 	// collabEpochs counts the changes that can alter live collaboration access.

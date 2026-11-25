@@ -40,6 +40,30 @@ export const ingestGitHubAppWebhookContract = defineContract({
   summary: 'Ingest a signed GitHub App webhook',
 })
 
+/**
+ * `POST /api/webhooks/resend/capture-auth`: Resend's signed email.received
+ * event, read as raw text. The backend verifies the Svix signature over these
+ * exact bytes; the event carries metadata only, never the email body.
+ */
+export const ingestResendCaptureAuthWebhookContract = defineContract({
+  body: z.string(),
+  bodyFormat: 'text',
+  maxBodyBytes: 64 * 1024,
+  method: 'POST',
+  name: 'webhooks.resend-capture-auth',
+  output: z.object({ outcome: z.string() }),
+  path: '/api/webhooks/resend/capture-auth',
+  status: 200,
+  summary: 'Ingest a signed Resend inbound email event for capture sign-in',
+})
+
+/** The Svix headers Resend signs a delivery with. */
+export const resendSignatureSchema = z.object({
+  svixId: z.string().min(1).max(255),
+  svixSignature: z.string().min(1).max(2048),
+  svixTimestamp: z.string().regex(/^\d{1,12}$/),
+})
+
 /** `POST /api/webhooks/stripe`: a Stripe event signed with the endpoint secret, read as raw text. */
 export const stripeWebhookContract = defineContract({
   body: z.string(),

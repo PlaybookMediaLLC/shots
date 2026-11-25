@@ -22,6 +22,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureemailauthconfig"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
@@ -31,6 +32,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/emailauth"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -177,6 +179,9 @@ type CreateCaptureConnectionInput struct {
 	ExpectedAccount  string   `json:"expectedAccount"`
 	BootstrapURL     *string  `json:"bootstrapUrl,omitempty"`
 	BootstrapSecret  *string  `json:"bootstrapSecret,omitempty"`
+	// AssignTestEmail makes the expected account a new Shots test address
+	// that can receive sign-in emails (RFC 007A). ExpectedAccount must be empty.
+	AssignTestEmail bool `json:"assignTestEmail,omitempty"`
 }
 
 // CreateCaptureConnection registers an app; signing in comes next.
@@ -193,6 +198,20 @@ func (c *Configuration) CreateCaptureConnection(ctx context.Context, actor Actor
 	}
 	if input.LoginHosts == nil {
 		input.LoginHosts = []string{}
+	}
+	testLocalPart := ""
+	var err error
+	if input.AssignTestEmail {
+		if c.emailAuth == nil {
+			return nil, ErrCaptureEmailAuthUnavailable
+		}
+		if strings.TrimSpace(input.ExpectedAccount) != "" {
+			return nil, invalid("Leave the expected account empty: Shots assigns the test email address.")
+		}
+		if testLocalPart, err = emailauth.NewLocalPart(); err != nil {
+			return nil, err
+		}
+		input.ExpectedAccount = testLocalPart + "@" + c.emailAuth.Domain
 	}
 	target := browser.Target{Origin: strings.TrimRight(strings.TrimSpace(input.Origin), "/"), Hosts: input.Hosts, ProtectedPath: input.ProtectedPath, IdentitySelector: input.IdentitySelector, ExpectedAccount: input.ExpectedAccount}
 	if err := target.Validate(); err != nil {
@@ -247,6 +266,11 @@ func (c *Configuration) CreateCaptureConnection(ctx context.Context, actor Actor
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_connection_created", "platform_app_connection", row.ID); err != nil {
 		return nil, err
+	}
+	if testLocalPart != "" {
+		if _, err := c.createEmailAuthConfig(ctx, tx, actor, row, testLocalPart); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -332,6 +356,11 @@ func (c *Configuration) StartCaptureConnect(ctx context.Context, actor Actor, id
 	if err == nil {
 		err = locked.Update().SetConnectIntentID(intent).SetConnectUserID(actor.UserID).SetConnectSessionID(session).SetConnectExpiresAt(expires).SetConnectPhase("OPEN").ClearFailureCode().Exec(ctx)
 	}
+	// A person signing in always wins over an automatic email sign-in.
+	var autoSessions []string
+	if err == nil {
+		autoSessions, err = cancelAuthAttempts(ctx, tx, actor.OrganizationID, id, authHumanReconnect)
+	}
 	if err == nil {
 		err = appendConfigurationAudit(ctx, tx, actor, "product.capture_connect_started", "platform_app_connection", id)
 	}
@@ -345,6 +374,7 @@ func (c *Configuration) StartCaptureConnect(ctx context.Context, actor Actor, id
 	if locked.ConnectSessionID != nil {
 		_ = c.captureRunner.Close(context.WithoutCancel(ctx), *locked.ConnectSessionID)
 	}
+	c.closeAuthSessions(ctx, autoSessions)
 	return &CaptureConnectStart{IntentID: intent, LiveViewURL: link, ExpiresAt: expires}, nil
 }
 
@@ -498,6 +528,8 @@ type commitConnectionOptions struct {
 	expectedIntent    *string
 	rejectActiveLease bool
 	resealedBootstrap *string
+	// emailAuth fences an unattended email sign-in's commit to its attempt.
+	emailAuth *emailAuthCommit
 }
 
 func (c *Configuration) commitVerifiedConnectionState(ctx context.Context, actor Actor, org, id string, state *browser.State, opts commitConnectionOptions) (*ent.PlatformAppConnection, *string, error) {
@@ -514,7 +546,17 @@ func (c *Configuration) commitVerifiedConnectionState(ctx context.Context, actor
 	if err != nil {
 		return nil, nil, err
 	}
-	if opts.expectedIntent != nil {
+	now := time.Now().UTC()
+	if opts.emailAuth != nil {
+		current, err := c.checkEmailAuthCommit(ctx, tx, locked, opts.emailAuth, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !current {
+			// Replaced, revoked or cancelled while verifying: nothing is saved.
+			return nil, nil, tx.Commit()
+		}
+	} else if opts.expectedIntent != nil {
 		// Revoked or replaced while verifying: this sign-in no longer counts.
 		if locked.Status == platformappconnection.StatusREVOKED || locked.ConnectIntentID == nil || *locked.ConnectIntentID != *opts.expectedIntent || locked.ConnectPhase == nil || *locked.ConnectPhase != "FINISHING" {
 			return nil, nil, tx.Commit()
@@ -522,7 +564,6 @@ func (c *Configuration) commitVerifiedConnectionState(ctx context.Context, actor
 	} else if locked.Status == platformappconnection.StatusREVOKED {
 		return nil, nil, publishing.ErrInvalidState
 	}
-	now := time.Now().UTC()
 	if opts.rejectActiveLease && locked.LeaseJobID != nil && locked.LeaseExpiresAt != nil && locked.LeaseExpiresAt.After(now) {
 		return nil, nil, conflict("A capture job is currently using this connection. Try again when it finishes.")
 	}
@@ -541,9 +582,25 @@ func (c *Configuration) commitVerifiedConnectionState(ctx context.Context, actor
 	if err != nil {
 		return nil, nil, err
 	}
-	update := locked.Update().SetStatus(platformappconnection.StatusREADY).SetStateCiphertext(sealed).SetGeneration(generation).AddStateRevision(1).SetValidatedAt(now).
-		SetStateExpiresAt(now.Add(c.captureStateAge)).ClearConnectIntentID().ClearConnectUserID().ClearConnectSessionID().ClearConnectExpiresAt().ClearConnectPhase().ClearFailureCode().
+	update := locked.Update().SetStatus(platformappconnection.StatusREADY).SetStateCiphertext(sealed).SetGeneration(generation).AddStateRevision(1).ClearConnectIntentID().ClearConnectUserID().ClearConnectSessionID().ClearConnectExpiresAt().ClearConnectPhase().ClearFailureCode().
 		ClearLeaseJobID().ClearLeaseExpiresAt()
+	// Only a person's Live View sign-in renews the 30-day human anchor. An
+	// email sign-in, automatic or a test, may set it only when none exists.
+	if opts.emailAuth != nil && locked.ValidatedAt != nil {
+		// An automatic sign-in renews the session but never the person's
+		// authorization: ValidatedAt and its 30-day cap stay where they were.
+		expires := now.Add(c.captureStateAge)
+		if limit := locked.ValidatedAt.Add(captureStateAbsoluteAge); expires.After(limit) {
+			expires = limit
+		}
+		update.SetStateExpiresAt(expires).SetLastAutoAuthenticatedAt(now)
+	} else {
+		// A person's sign-in, or the first test of a never-authorized connection.
+		update.SetValidatedAt(now).SetStateExpiresAt(now.Add(c.captureStateAge))
+		if opts.emailAuth != nil {
+			update.SetLastAutoAuthenticatedAt(now)
+		}
+	}
 	if opts.resealedBootstrap != nil {
 		update.SetBootstrapSecretCiphertext(*opts.resealedBootstrap)
 	}
@@ -819,6 +876,16 @@ func (c *Configuration) RevokeCaptureConnection(ctx context.Context, actor Actor
 			return err
 		}
 	}
+	// The test address stops routing with the connection's authority.
+	if err := tx.CaptureEmailAuthConfig.Update().Where(captureemailauthconfig.OrganizationID(actor.OrganizationID), captureemailauthconfig.ConnectionID(id), captureemailauthconfig.StatusNEQ(captureemailauthconfig.StatusREVOKED)).
+		SetStatus(captureemailauthconfig.StatusREVOKED).SetAutoReconnect(false).SetRevokedAt(time.Now().UTC()).AddRevision(1).Exec(ctx); err != nil {
+		return err
+	}
+	autoSessions, err := cancelAuthAttempts(ctx, tx, actor.OrganizationID, id, authRevoked)
+	if err != nil {
+		return err
+	}
+	sessions = append(sessions, autoSessions...)
 	if err := tx.Commit(); err != nil {
 		return err
 	}
