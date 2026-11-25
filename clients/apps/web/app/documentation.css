@@ -118,6 +118,10 @@
   display: none;
 }
 
+.docs-panel {
+  scroll-padding-block: 2rem;
+}
+
 .docs-layout {
   --fd-sidebar-width: 0px;
   --fd-toc-width: 0px;
@@ -132,17 +136,13 @@
 
 @media (min-width: 64rem) {
   .docs-layout {
-    --fd-header-height: -1px;
-    --fd-layout-width: min(calc(100% - var(--docs-left-pane-width) - 12px), 1240px);
-    margin-inline-start: var(--docs-left-pane-width);
-    margin-inline-end: 12px;
-    margin-top: 52px;
-    margin-bottom: 12px;
+    --fd-banner-height: 0px;
+    --fd-header-height: 0px;
+    --fd-docs-height: calc(100dvh - 64px);
+    --fd-layout-width: min(100%, 1240px);
     padding-top: 0;
-    min-height: calc(100dvh - 64px);
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 1rem;
+    min-height: 100%;
+    background: transparent;
   }
 }
 

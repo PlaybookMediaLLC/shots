@@ -17,24 +17,26 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
     <>
       <DocsSearchJsonLd />
       <DocsProvider>
-        <div className="docs-shell min-h-screen bg-background text-foreground">
+        <div className="docs-shell min-h-screen bg-background text-foreground lg:h-dvh lg:overflow-hidden">
           <Suspense fallback={null}>
             <DocsSearchQuerySync />
           </Suspense>
           <DocsShellNav homePage={homePage} sections={sections} />
           <DocsSidebar homePage={homePage} sections={sections} />
-          <FumaDocsLayout
-            containerProps={{
-              className: 'docs-layout',
-            }}
-            nav={{ enabled: false }}
-            searchToggle={{ enabled: false }}
-            sidebar={{ enabled: false }}
-            themeSwitch={{ enabled: false }}
-            tree={docsSource.pageTree}
-          >
-            {children}
-          </FumaDocsLayout>
+          <div className="docs-panel lg:ms-[268px] lg:me-3 lg:mt-[52px] lg:mb-3 lg:h-[calc(100dvh-64px)] lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:border lg:border-border lg:bg-card">
+            <FumaDocsLayout
+              containerProps={{
+                className: 'docs-layout',
+              }}
+              nav={{ enabled: false }}
+              searchToggle={{ enabled: false }}
+              sidebar={{ enabled: false }}
+              themeSwitch={{ enabled: false }}
+              tree={docsSource.pageTree}
+            >
+              {children}
+            </FumaDocsLayout>
+          </div>
         </div>
       </DocsProvider>
     </>
