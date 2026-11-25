@@ -13,21 +13,17 @@ export const organizationRoleSchema = z.enum(organizationRoles)
 export const apiKeyScopeSchema = z.enum(apiKeyScopes)
 
 /**
- * How recent a sign-in must be. `true` is for destructive and account
- * actions; `connection` is only for connecting a social channel, which the
- * provider's own consent screen also guards.
+ * How recent a sign-in must be. `true` is for destructive and account actions.
+ * `connection` is only for connecting a social channel. It trades security for
+ * fewer sign-ins: a stolen session up to 24 hours old can connect a channel.
  */
 export const sensitiveAccessSchema = z.union([z.boolean(), z.literal('connection')])
 
-const signInMaxAgeMilliseconds = {
-  connection: 24 * 60 * 60 * 1000,
-  sensitive: 15 * 60 * 1000,
-}
-
 /** Whether a session created at `createdAt` must sign in again for this action. */
 export function isSignInTooOld(createdAt: Date, sensitive: true | 'connection', now = Date.now()) {
-  const limit = signInMaxAgeMilliseconds[sensitive === true ? 'sensitive' : sensitive]
-  return now - createdAt.getTime() > limit
+  // Every value but `connection` gets the strict limit.
+  const minutes = sensitive === 'connection' ? 24 * 60 : 15
+  return now - createdAt.getTime() > minutes * 60_000
 }
 
 /**
