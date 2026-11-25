@@ -162,7 +162,7 @@ uses `organizationProcedure('publish:manage')` for listing and
 | --------------------------- | ---------------------------------------- | ------------------ |
 | List channel connections    | `organizationProcedure`                  | no                 |
 | Create a channel connection | `sensitiveOrganizationProcedure`         | yes                |
-| Start X/Instagram OAuth     | `requireSensitiveOrganizationPermission` | yes                |
+| Start social channel OAuth  | `requireSensitiveActiveOrganizationPermission` | yes, 24 hours |
 | List scheduled posts        | `organizationProcedure`                  | no                 |
 | Create a scheduled post     | `sensitiveOrganizationProcedure`         | yes                |
 | Cancel a scheduled post     | `sensitiveOrganizationProcedure`         | yes                |
@@ -174,6 +174,11 @@ scheduling is the last reversible moment before content becomes public and
 binding a channel connection confers the ability to speak as the tenant. Both
 warrant proof of a live, strongly authenticated human rather than a long-lived
 cookie.
+
+A sign-in is recent for 15 minutes. Connecting or reconnecting a social channel
+through OAuth or Bluesky is the exception: it accepts a sign-in up to 24 hours
+old, with the same two-factor rule. A stolen session of that age can then
+connect a channel.
 
 This is the one place where the platform's general rule that reads and writes
 share an authorization path is deliberately broken, and the asymmetry is the

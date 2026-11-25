@@ -12,7 +12,7 @@ export const createSocialConnectionAttemptContract = defineContract({
     permission: 'workspace:update',
     feature: 'content:drafts',
     quota: 'api:write:minute',
-    sensitive: true,
+    sensitive: 'connection',
   },
   body: socialOAuthBeginRequestSchema
     .safeExtend({ operation: socialOAuthOperationSchema })

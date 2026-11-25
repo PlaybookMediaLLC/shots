@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { getRequestId } from '@/lib/api/request-context'
 import { backendSDK } from '@/lib/backend/sdk'
 import { BackendSDKError } from 'screenshot-studio-backend-sdk'
+import { isSignInTooOld } from '@/lib/api/access-requirements'
 import { assertAuthEnvironment } from './environment'
 import {
   accessAllows,
@@ -22,8 +23,6 @@ function readAuthSession(headers: Headers) {
     auth.api.getSession({ headers, query: { disableCookieCache: true } })
   )
 }
-
-const freshSessionAgeMilliseconds = 15 * 60 * 1000
 
 export class AuthorizationError extends Error {
   constructor(
@@ -273,9 +272,10 @@ export async function requireSupportTenantContext(
 
 async function assertFreshTwoFactorSession(
   headers: Headers,
-  session: AuthSessionResult
+  session: AuthSessionResult,
+  sensitive: true | 'connection' = true
 ): Promise<void> {
-  if (Date.now() - session.session.createdAt.getTime() > freshSessionAgeMilliseconds) {
+  if (isSignInTooOld(session.session.createdAt, sensitive)) {
     throw new AuthorizationError('A fresh sign-in is required.', 401)
   }
   if (session.user.twoFactorEnabled) return
@@ -286,19 +286,16 @@ async function assertFreshTwoFactorSession(
 }
 
 /**
- * Same as {@link requireActiveOrganizationPermission}, and the session must
- * be under 15 minutes old with a second factor: Shots two-factor, or the
+ * Same as {@link requireActiveOrganizationPermission}, and the session must be
+ * recent (see isSignInTooOld) with a second factor: Shots two-factor, or the
  * sign-in provider for an account with no Shots password. Reads the session once.
  */
 export async function requireSensitiveActiveOrganizationPermission(
   headers: Headers,
-  permission: Permission
+  permission: Permission,
+  sensitive: true | 'connection' = true
 ): Promise<OrganizationAccess> {
-  const session = await requireAuthSession(headers)
-  const access = await requireActiveSessionOrganization(headers, session)
-  assertPermission(access, permission)
-  await assertFreshTwoFactorSession(headers, session)
-  return access
+  return requireActiveOrganizationAccess(headers, permission, sensitive, async () => {})
 }
 
 /**
@@ -310,7 +307,7 @@ export async function requireSensitiveActiveOrganizationPermission(
 export async function requireActiveOrganizationAccess(
   headers: Headers,
   permission: Permission,
-  sensitive: boolean,
+  sensitive: boolean | 'connection',
   check: (context: TenantContext) => Promise<void>
 ): Promise<OrganizationAccess> {
   const session = await requireAuthSession(headers)
@@ -326,7 +323,7 @@ export async function requireActiveOrganizationAccess(
   early?.catch(() => {})
   const access = await requireActiveSessionOrganization(headers, session)
   assertPermission(access, permission)
-  if (sensitive) await assertFreshTwoFactorSession(headers, session)
+  if (sensitive) await assertFreshTwoFactorSession(headers, session, sensitive)
   await (early && access.organizationId === recorded ? early : check(access))
   return access
 }
