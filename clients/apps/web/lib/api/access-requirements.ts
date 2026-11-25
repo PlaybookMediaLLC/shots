@@ -13,17 +13,36 @@ export const organizationRoleSchema = z.enum(organizationRoles)
 export const apiKeyScopeSchema = z.enum(apiKeyScopes)
 
 /**
+ * How recent a sign-in must be. `true` is for destructive and account
+ * actions; `connection` is only for connecting a social channel, which the
+ * provider's own consent screen also guards.
+ */
+export const sensitiveAccessSchema = z.union([z.boolean(), z.literal('connection')])
+
+const signInMaxAgeMilliseconds = {
+  connection: 24 * 60 * 60 * 1000,
+  sensitive: 15 * 60 * 1000,
+}
+
+/** Whether a session created at `createdAt` must sign in again for this action. */
+export function isSignInTooOld(createdAt: Date, sensitive: true | 'connection', now = Date.now()) {
+  const limit = signInMaxAgeMilliseconds[sensitive === true ? 'sensitive' : sensitive]
+  return now - createdAt.getTime() > limit
+}
+
+/**
  * What a tenant operation requires: a session member with `permission`, or
  * an organization API key with `apiKeyScope`, then the optional plan feature
  * and metered quota. `sensitive` also requires a session to have signed in
- * under 15 minutes ago with two-factor; a key is its own credential.
+ * recently (see {@link isSignInTooOld}) with two-factor; a key is its own
+ * credential.
  */
 export const tenantAccessRequirementSchema = z.object({
   apiKeyScope: apiKeyScopeSchema,
   feature: workspaceFeatureSchema.optional(),
   permission: permissionSchema,
   quota: workspaceQuotaSchema.optional(),
-  sensitive: z.boolean().optional(),
+  sensitive: sensitiveAccessSchema.optional(),
 })
 
 /** One of {@link tenantAccessRequirementSchema}. */
@@ -42,7 +61,7 @@ export const editorUtilityAccess = tenantAccessRequirementSchema.parse({
 /**
  * What a human-only operation requires: a signed-in member with `permission`
  * on a paid plan, then the optional feature and quota. API keys are refused.
- * `sensitive` also requires a sign-in under 15 minutes old with two-factor.
+ * `sensitive` also requires a recent sign-in with two-factor.
  */
 export const memberAccessRequirementSchema = tenantAccessRequirementSchema
   .omit({ apiKeyScope: true })

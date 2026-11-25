@@ -12,7 +12,7 @@ const access = {
   permission: 'workspace:update',
   feature: 'content:drafts',
   quota: 'api:write:minute',
-  sensitive: true,
+  sensitive: 'connection',
 } as const
 
 /** Start an original-workspace Bluesky credential attempt without a password. */

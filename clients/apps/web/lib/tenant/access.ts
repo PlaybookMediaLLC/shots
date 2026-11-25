@@ -23,7 +23,7 @@ export async function requireTenantAccess(
     context = await requireActiveOrganizationAccess(
       headers,
       requirement.permission,
-      Boolean(requirement.sensitive),
+      requirement.sensitive ?? false,
       gates
     )
   }

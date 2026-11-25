@@ -131,7 +131,7 @@ export function memberAccess(
     const access = await requireActiveOrganizationAccess(
       request.headers,
       permission,
-      Boolean(sensitive),
+      sensitive ?? false,
       (context) =>
         requireWorkspaceFeatures(context, feature ? ['workspace:use', feature] : ['workspace:use'])
     )
