@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { BackendSDKError } from 'screenshot-studio-backend-sdk'
 import {
+  autoCaptureResultSchema,
   captureConnectFinishSchema,
   captureConnectionInputSchema,
   captureConnectionSchema,
@@ -13,6 +14,8 @@ import {
   captureOverviewSchema,
   captureRecipeInputSchema,
   captureRecipeSchema,
+  proposeCaptureRecipeInputSchema,
+  proposedCaptureRecipeSchema,
 } from '@/lib/api/contracts/capture'
 import { backendSDK } from '@/lib/backend/sdk'
 import { router } from '../init'
@@ -95,6 +98,21 @@ export const captureRouter = router({
       explainConflict(
         backendSDK(ctx.access).createCaptureRecipe(input),
         'This connection was revoked, or this version was just saved. Reload and try again.'
+      )
+    ),
+  /** Proposes a zero-config AI capture recipe from plain English and discovered routes. */
+  proposeRecipe: organizationProcedure('workspace:update')
+    .input(proposeCaptureRecipeInputSchema)
+    .output(z.object({ proposal: proposedCaptureRecipeSchema }))
+    .mutation(({ ctx, input }) => backendSDK(ctx.access).proposeCaptureRecipe(input)),
+  /** Proposes, saves, and immediately queues a zero-config AI capture from plain English. */
+  autoCapture: organizationProcedure('workspace:update')
+    .input(proposeCaptureRecipeInputSchema)
+    .output(autoCaptureResultSchema)
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).autoCaptureFromPrompt(input),
+        'This connection was revoked or cannot run a capture right now.'
       )
     ),
   activateRecipe: organizationProcedure('workspace:update')

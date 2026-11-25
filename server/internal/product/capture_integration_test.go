@@ -1154,7 +1154,7 @@ func TestCaptureFencingRefusesAnOlderAttemptWhileANewerOneRuns(t *testing.T) {
 	if row.LeaseJobID == nil || row.LeaseToken != newer.token {
 		t.Fatalf("the older attempt touched the newer lease: %+v", row)
 	}
-	if outcome, err := w.repo.commitCapture(w.ctx, newer, nil, *attempts[0].AssetID, attempts[0].ObservedRevision, false); err != nil || !outcome.Done {
+	if outcome, err := w.repo.commitCapture(w.ctx, newer, nil, *attempts[0].AssetID, nil, attempts[0].ObservedRevision, false); err != nil || !outcome.Done {
 		t.Fatalf("newer commit: %+v %v", outcome, err)
 	}
 	if w.job(t, job.ID).Phase != "SUCCEEDED" {
@@ -2466,5 +2466,107 @@ func TestCaptureSuspendedInstallationOpensNoBrowser(t *testing.T) {
 	}
 	if w.browser.runs.Load() != runs || len(w.browser.allocated) != allocated || w.browser.open() != 0 {
 		t.Fatalf("a suspended installation opened a browser: runs=%d allocated=%d", w.browser.runs.Load(), len(w.browser.allocated))
+	}
+}
+
+func TestCapturePhase3ProposeAutoAndMultiShotPersistence(t *testing.T) {
+	w := newCaptureWorld(t)
+	conn := w.connection(t)
+	w.signIn(t, conn.ID)
+	w.db.Client.PlatformAppConnection.UpdateOneID(conn.ID).SetDiscoveredRoutes([]map[string]string{
+		{"path": "/dashboard", "label": "Dashboard"},
+		{"path": "/analytics", "label": "Analytics"},
+	}).ExecX(w.ctx)
+
+	// 1. ProposeCaptureRecipe builds a validated zero-config vision recipe from plain English.
+	proposed, err := w.repo.ProposeCaptureRecipe(w.ctx, w.owner, ProposeCaptureRecipeInput{
+		ConnectionID:  conn.ID,
+		SurfaceID:     w.surface,
+		Prompt:        "Show the dark mode analytics walkthrough",
+		SequenceShots: 3,
+	})
+	if err != nil {
+		t.Fatalf("ProposeCaptureRecipe: %v", err)
+	}
+	if proposed.Definition.Steps[0].Path != "/analytics" || proposed.Definition.ColorScheme != browser.ColorSchemeDark ||
+		proposed.Definition.SequenceShots != 3 || proposed.Definition.Navigation == nil || !proposed.Definition.Navigation.UseVision || !proposed.Definition.Navigation.AllowSearchFill {
+		t.Fatalf("unexpected proposal: %+v", proposed.Definition)
+	}
+
+	// Cross-tenant and member callers are refused.
+	other := newTestWorkspace(t)
+	subscribe(t, other.ctx, other.repo, other.org, "pro")
+	other.repo.WithAuthenticatedCapture(w.browser, w.keys)
+	if _, err := other.repo.ProposeCaptureRecipe(other.ctx, other.owner, ProposeCaptureRecipeInput{ConnectionID: conn.ID, SurfaceID: w.surface, Prompt: "Show analytics"}); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("other tenant propose=%v, want ErrNotFound", err)
+	}
+	w.addMember(t, "reader", "member")
+	if _, err := w.repo.AutoCaptureFromPrompt(w.ctx, w.actor("reader"), ProposeCaptureRecipeInput{ConnectionID: conn.ID, SurfaceID: w.surface, Prompt: "Show analytics"}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("member autoCapture=%v, want ErrForbidden", err)
+	}
+
+	// 2. AutoCaptureFromPrompt atomically creates the recipe and admits a test capture job.
+	autoRes, err := w.repo.AutoCaptureFromPrompt(w.ctx, w.owner, ProposeCaptureRecipeInput{
+		ConnectionID:  conn.ID,
+		SurfaceID:     w.surface,
+		Prompt:        "Show analytics cohorts",
+		SequenceShots: 3,
+	})
+	if err != nil {
+		t.Fatalf("AutoCaptureFromPrompt: %v", err)
+	}
+	if autoRes.Recipe.ID == "" || autoRes.Job.ID == "" || autoRes.Job.Kind != "test" {
+		t.Fatalf("unexpected autoCapture result: %+v", autoRes)
+	}
+
+	// 3. Running a 3-shot sequence job with vision verification persists SequenceAssetIds,
+	// applies AI-detected FocusBox for generic markers, and scopes captureFocusBox to the primary asset only.
+	var frameBuf bytes.Buffer
+	if err := png.Encode(&frameBuf, image.NewRGBA(image.Rect(0, 0, 800, 600))); err != nil {
+		t.Fatal(err)
+	}
+	w.browser.run = func(input browser.RunInput) (*browser.RunResult, error) {
+		return &browser.RunResult{
+			Image:            frameBuf.Bytes(),
+			Width:            800,
+			Height:           600,
+			ObservedRevision: input.ExpectedRevision,
+			SourcePath:       "/analytics",
+			Focus:            &browser.Focus{X: 0, Y: 0, W: 0.98, H: 0.98},
+			Sequence: []browser.SequenceShot{
+				{Image: frameBuf.Bytes(), Width: 800, Height: 600},
+				{Image: frameBuf.Bytes(), Width: 800, Height: 600},
+			},
+		}, nil
+	}
+	w.repo.WithAutomationModel(fakeVisionModel{fn: func(_ context.Context, _ platformai.Request, out any) (platformai.Usage, error) {
+		_ = json.Unmarshal([]byte(`{"verified":true,"reason":"clean chart","focus":{"x":0.12,"y":0.18,"w":0.6,"h":0.45}}`), out)
+		return platformai.Usage{InputTokens: 40, OutputTokens: 12}, nil
+	}}).WithMonthlyMeter(&recordingMonthlyMeter{})
+
+	if outcome := w.run(t, autoRes.Job.ID); !outcome.Done {
+		t.Fatalf("auto capture job outcome=%+v", outcome)
+	}
+	done := w.job(t, autoRes.Job.ID)
+	if done.Phase != "SUCCEEDED" || done.AssetID == nil || len(done.SequenceAssetIDs) != 3 || done.SequenceAssetIDs[2] != *done.AssetID {
+		t.Fatalf("expected 3 sequence assets ending with primary AssetID, got %+v", done)
+	}
+	if done.FocusBox == nil || done.FocusBox["w"] != 0.6 {
+		t.Fatalf("expected AI-detected focusBox w=0.6, got %+v", done.FocusBox)
+	}
+	// Primary asset receives the AI FocusBox; intermediate sequence assets must NOT inherit it.
+	if primaryBox := w.repo.captureFocusBox(w.ctx, w.org, *done.AssetID); len(primaryBox) == 0 || primaryBox["w"] != 0.6 {
+		t.Fatalf("primary asset focusBox=%+v", primaryBox)
+	}
+	if interBox := w.repo.captureFocusBox(w.ctx, w.org, done.SequenceAssetIDs[0]); interBox != nil {
+		t.Fatalf("intermediate sequence asset should not inherit final FocusBox, got %+v", interBox)
+	}
+
+	// 4. Revoking the connection blocks ProposeCaptureRecipe before calling AI.
+	if err := w.repo.RevokeCaptureConnection(w.ctx, w.owner, conn.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.ProposeCaptureRecipe(w.ctx, w.owner, ProposeCaptureRecipeInput{ConnectionID: conn.ID, SurfaceID: w.surface, Prompt: "Show analytics"}); !errors.Is(err, publishing.ErrInvalidState) {
+		t.Fatalf("revoked connection propose=%v, want ErrInvalidState", err)
 	}
 }

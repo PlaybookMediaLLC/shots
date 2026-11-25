@@ -24162,6 +24162,8 @@ type CaptureJobMutation struct {
 	requested_by_user_id     *string
 	surface_capture_id       *string
 	asset_id                 *string
+	sequence_asset_ids       *[]string
+	appendsequence_asset_ids []string
 	resume_count             *int
 	addresume_count          *int
 	created_at               *time.Time
@@ -25409,6 +25411,71 @@ func (m *CaptureJobMutation) ResetAssetID() {
 	delete(m.clearedFields, capturejob.FieldAssetID)
 }
 
+// SetSequenceAssetIds sets the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) SetSequenceAssetIds(s []string) {
+	m.sequence_asset_ids = &s
+	m.appendsequence_asset_ids = nil
+}
+
+// SequenceAssetIds returns the value of the "sequence_asset_ids" field in the mutation.
+func (m *CaptureJobMutation) SequenceAssetIds() (r []string, exists bool) {
+	v := m.sequence_asset_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSequenceAssetIds returns the old "sequence_asset_ids" field's value of the CaptureJob entity.
+// If the CaptureJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureJobMutation) OldSequenceAssetIds(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSequenceAssetIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSequenceAssetIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSequenceAssetIds: %w", err)
+	}
+	return oldValue.SequenceAssetIds, nil
+}
+
+// AppendSequenceAssetIds adds s to the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) AppendSequenceAssetIds(s []string) {
+	m.appendsequence_asset_ids = append(m.appendsequence_asset_ids, s...)
+}
+
+// AppendedSequenceAssetIds returns the list of values that were appended to the "sequence_asset_ids" field in this mutation.
+func (m *CaptureJobMutation) AppendedSequenceAssetIds() ([]string, bool) {
+	if len(m.appendsequence_asset_ids) == 0 {
+		return nil, false
+	}
+	return m.appendsequence_asset_ids, true
+}
+
+// ClearSequenceAssetIds clears the value of the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) ClearSequenceAssetIds() {
+	m.sequence_asset_ids = nil
+	m.appendsequence_asset_ids = nil
+	m.clearedFields[capturejob.FieldSequenceAssetIds] = struct{}{}
+}
+
+// SequenceAssetIdsCleared returns if the "sequence_asset_ids" field was cleared in this mutation.
+func (m *CaptureJobMutation) SequenceAssetIdsCleared() bool {
+	_, ok := m.clearedFields[capturejob.FieldSequenceAssetIds]
+	return ok
+}
+
+// ResetSequenceAssetIds resets all changes to the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) ResetSequenceAssetIds() {
+	m.sequence_asset_ids = nil
+	m.appendsequence_asset_ids = nil
+	delete(m.clearedFields, capturejob.FieldSequenceAssetIds)
+}
+
 // SetResumeCount sets the "resume_count" field.
 func (m *CaptureJobMutation) SetResumeCount(i int) {
 	m.resume_count = &i
@@ -25571,7 +25638,7 @@ func (m *CaptureJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CaptureJobMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 28)
 	if m.organization_id != nil {
 		fields = append(fields, capturejob.FieldOrganizationID)
 	}
@@ -25644,6 +25711,9 @@ func (m *CaptureJobMutation) Fields() []string {
 	if m.asset_id != nil {
 		fields = append(fields, capturejob.FieldAssetID)
 	}
+	if m.sequence_asset_ids != nil {
+		fields = append(fields, capturejob.FieldSequenceAssetIds)
+	}
 	if m.resume_count != nil {
 		fields = append(fields, capturejob.FieldResumeCount)
 	}
@@ -25709,6 +25779,8 @@ func (m *CaptureJobMutation) Field(name string) (ent.Value, bool) {
 		return m.SurfaceCaptureID()
 	case capturejob.FieldAssetID:
 		return m.AssetID()
+	case capturejob.FieldSequenceAssetIds:
+		return m.SequenceAssetIds()
 	case capturejob.FieldResumeCount:
 		return m.ResumeCount()
 	case capturejob.FieldCreatedAt:
@@ -25772,6 +25844,8 @@ func (m *CaptureJobMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldSurfaceCaptureID(ctx)
 	case capturejob.FieldAssetID:
 		return m.OldAssetID(ctx)
+	case capturejob.FieldSequenceAssetIds:
+		return m.OldSequenceAssetIds(ctx)
 	case capturejob.FieldResumeCount:
 		return m.OldResumeCount(ctx)
 	case capturejob.FieldCreatedAt:
@@ -25955,6 +26029,13 @@ func (m *CaptureJobMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAssetID(v)
 		return nil
+	case capturejob.FieldSequenceAssetIds:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSequenceAssetIds(v)
+		return nil
 	case capturejob.FieldResumeCount:
 		v, ok := value.(int)
 		if !ok {
@@ -26120,6 +26201,9 @@ func (m *CaptureJobMutation) ClearedFields() []string {
 	if m.FieldCleared(capturejob.FieldAssetID) {
 		fields = append(fields, capturejob.FieldAssetID)
 	}
+	if m.FieldCleared(capturejob.FieldSequenceAssetIds) {
+		fields = append(fields, capturejob.FieldSequenceAssetIds)
+	}
 	return fields
 }
 
@@ -26172,6 +26256,9 @@ func (m *CaptureJobMutation) ClearField(name string) error {
 		return nil
 	case capturejob.FieldAssetID:
 		m.ClearAssetID()
+		return nil
+	case capturejob.FieldSequenceAssetIds:
+		m.ClearSequenceAssetIds()
 		return nil
 	}
 	return fmt.Errorf("unknown CaptureJob nullable field %s", name)
@@ -26252,6 +26339,9 @@ func (m *CaptureJobMutation) ResetField(name string) error {
 		return nil
 	case capturejob.FieldAssetID:
 		m.ResetAssetID()
+		return nil
+	case capturejob.FieldSequenceAssetIds:
+		m.ResetSequenceAssetIds()
 		return nil
 	case capturejob.FieldResumeCount:
 		m.ResetResumeCount()

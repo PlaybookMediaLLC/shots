@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
@@ -94,12 +95,14 @@ type CaptureJobRecord struct {
 	NavigationActions []map[string]string `json:"navigationActions,omitempty"`
 	// FocusBox is where the first marker sat in the captured viewport (0-1 fractions).
 	FocusBox map[string]float64 `json:"focusBox,omitempty"`
+	// SequenceAssetIDs lists ordered assets for multi-shot sequence captures (before -> interaction -> final).
+	SequenceAssetIDs []string `json:"sequenceAssetIds,omitempty"`
 }
 
 func captureJobRecord(row *ent.CaptureJob) CaptureJobRecord {
 	return CaptureJobRecord{ID: row.ID, RecipeID: row.RecipeID, RecipeVersion: row.RecipeVersion, Kind: string(row.Kind), Phase: string(row.Phase), SurfaceID: row.SurfaceID, ConnectionID: row.AppConnectionID,
 		DeploymentEventID: row.DeploymentEventID, ExpectedRevision: row.ExpectedRevision, SurfaceCaptureID: row.SurfaceCaptureID, AssetID: row.AssetID, FailureCode: row.FailureCode, Attempts: row.Attempts, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
-		ReleaseChange: row.ObjectiveEvidence}
+		ReleaseChange: row.ObjectiveEvidence, SequenceAssetIDs: row.SequenceAssetIds}
 }
 
 // withNavigation adds each job's newest recorded AI navigation path and focus box.
@@ -711,7 +714,19 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 		return outcome, err
 	}
 	if claim.reusedAsset != nil {
-		return c.commitCapture(ctx, claim, nil, *claim.reusedAsset.AssetID, claim.reusedAsset.ObservedRevision, false)
+		// Reconstruct any already-uploaded sequence frames linked to the prior attempt
+		// so crash recovery preserves multi-shot captures cleanly.
+		var reusedSeq []string
+		if rows, qErr := c.client.Asset.Query().Where(asset.OrganizationID(org), asset.CaptureID(claim.reusedAsset.ID)).Order(ent.Asc(asset.FieldCreatedAt), ent.Asc(asset.FieldID)).IDs(ctx); qErr == nil && len(rows) > 1 {
+			primary := *claim.reusedAsset.AssetID
+			for _, id := range rows {
+				if id != primary {
+					reusedSeq = append(reusedSeq, id)
+				}
+			}
+			reusedSeq = append(reusedSeq, primary)
+		}
+		return c.commitCapture(ctx, claim, nil, *claim.reusedAsset.AssetID, reusedSeq, claim.reusedAsset.ObservedRevision, false)
 	}
 	binding := captureBinding(claim.connection)
 	binding.Generation = claim.job.ConnectionGeneration
@@ -745,7 +760,14 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if claim.job.ExpectedRevision != nil {
 		expected = *claim.job.ExpectedRevision
 	}
-	result, runErr := c.captureRunner.Run(ctx, session, browser.RunInput{Target: captureTarget(claim.connection), Recipe: recipe, State: state, ExpectedRevision: expected, NextNavigation: navigate})
+	result, runErr := c.captureRunner.Run(ctx, session, browser.RunInput{
+		Target:             captureTarget(claim.connection),
+		Recipe:             recipe,
+		State:              state,
+		ExpectedRevision:   expected,
+		NextNavigation:     navigate,
+		ReserveExternalRun: c.reserveExternalNavigation(claim, recipe.Navigation),
+	})
 	cleanup := context.WithoutCancel(ctx)
 	if err := c.captureRunner.Close(cleanup, session); err == nil {
 		if err := c.client.CaptureAttempt.UpdateOneID(claim.attempt.ID).SetBrowserClosedAt(time.Now().UTC()).Exec(cleanup); err != nil {
@@ -755,15 +777,20 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if runErr != nil {
 		return c.failCapture(ctx, claim, runErr)
 	}
-	if err := c.verifyCaptureWithVision(ctx, claim, recipe, result.Image); err != nil {
+	aiFocus, err := c.verifyCaptureWithVision(ctx, claim, recipe, result.Image)
+	if err != nil {
 		return c.failCapture(ctx, claim, err)
+	}
+	// Only replace the DOM focus box with the AI-detected box when no tight
+	// explicit marker was configured (generic marker or near-full viewport).
+	if aiFocus != nil && recipe.Crop != browser.CropMarker && (result.Focus == nil || recipe.Markers[0] == browser.DefaultZeroConfigMarker || result.Focus.W*result.Focus.H >= 0.72) {
+		result.Focus = aiFocus
 	}
 	actor := Actor{OrganizationID: org, Kind: "service", Display: "capture", RequestID: claim.job.ID}
 	if claim.job.RequestedByUserID != nil {
 		actor.UserID = *claim.job.RequestedByUserID
 	}
-	stored, err := c.storeImage(ctx, actor, result.Image, http.DetectContentType(result.Image), "capture-"+claim.job.ID)
-	if err != nil {
+	storeFailure := func(err error) (*CaptureJobOutcome, error) {
 		// Classify permanent quota, size, or entitlement failures as non-retryable
 		// so a worker never loops for 30 minutes burning browsers and AI credits.
 		var entitlement *FeatureNotEntitledError
@@ -771,6 +798,36 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 			return c.failCapture(ctx, claim, &browser.Failure{Code: browser.StorageLimit})
 		}
 		return c.failCapture(ctx, claim, &browser.Failure{Code: browser.ProviderUnavailable})
+	}
+	stored, err := c.storeImage(ctx, actor, result.Image, http.DetectContentType(result.Image), "capture-"+claim.job.ID)
+	if err != nil {
+		return storeFailure(err)
+	}
+	var sequenceAssetIDs []string
+	var intermediateAssetIDs []string
+	if len(result.Sequence) > 0 {
+		for idx, frame := range result.Sequence {
+			if len(frame.Image) == 0 {
+				continue
+			}
+			if recipe.VerifyWithVision {
+				if _, seqVerifyErr := c.verifyCaptureWithVision(ctx, claim, recipe, frame.Image); seqVerifyErr != nil {
+					slog.Info("dropping unverified intermediate capture frame", "job", claim.job.ID, "frame", idx+1)
+					continue
+				}
+			}
+			frameID, frameErr := c.storeImage(ctx, actor, frame.Image, http.DetectContentType(frame.Image), fmt.Sprintf("capture-%s-seq-%d", claim.job.ID, idx+1))
+			if frameErr != nil {
+				// Degrade gracefully once the verified primary shot is stored rather than
+				// aborting the attempt and orphaning stored assets.
+				slog.Warn("intermediate sequence frame not stored", "job", claim.job.ID, "frame", idx+1, "err", frameErr)
+				break
+			}
+			intermediateAssetIDs = append(intermediateAssetIDs, frameID)
+		}
+		if len(intermediateAssetIDs) > 0 {
+			sequenceAssetIDs = append(append([]string{}, intermediateAssetIDs...), stored)
+		}
 	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
@@ -799,12 +856,13 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	if err := update.Exec(ctx); err != nil {
 		return nil, err
 	}
-	if err := tx.Asset.UpdateOneID(stored).SetCaptureID(claim.attempt.ID).Exec(ctx); err != nil {
+	allLinkedAssets := append([]string{stored}, intermediateAssetIDs...)
+	if err := tx.Asset.Update().Where(asset.OrganizationID(org), asset.IDIn(allLinkedAssets...)).SetCaptureID(claim.attempt.ID).Exec(ctx); err != nil {
 		return nil, err
 	}
 	if recipe.Navigation != nil {
 		if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_navigation_completed", "capture", claim.attempt.ID,
-			map[string]any{"captureJobId": claim.job.ID, "recipeId": claim.recipe.ID, "assetId": stored, "path": result.SourcePath, "actions": result.NavigationActions, "focus": result.Focus, "steered": claim.job.ObjectiveEvidence != nil}); err != nil {
+			map[string]any{"captureJobId": claim.job.ID, "recipeId": claim.recipe.ID, "assetId": stored, "sequenceCount": len(sequenceAssetIDs), "path": result.SourcePath, "actions": result.NavigationActions, "focus": result.Focus, "steered": claim.job.ObjectiveEvidence != nil}); err != nil {
 			return nil, err
 		}
 	}
@@ -817,7 +875,7 @@ func (c *Configuration) RunCaptureJob(ctx context.Context, org, id string) (*Cap
 	} else if stale {
 		rotated = state
 	}
-	return c.commitCapture(ctx, claim, rotated, stored, observed, stale)
+	return c.commitCapture(ctx, claim, rotated, stored, sequenceAssetIDs, observed, stale)
 }
 
 // failCapture records why an attempt ended and releases the lease.
@@ -914,7 +972,7 @@ func (c *Configuration) failCapture(ctx context.Context, claim *captureClaim, ca
 // commitCapture finalizes one canonical result, or nothing. The fencing token,
 // generation, status, and eligibility are all checked in this transaction, so
 // an attempt that lost its authority cannot write anything.
-func (c *Configuration) commitCapture(ctx context.Context, claim *captureClaim, rotated *browser.State, assetID string, observed *string, stale bool) (*CaptureJobOutcome, error) {
+func (c *Configuration) commitCapture(ctx context.Context, claim *captureClaim, rotated *browser.State, assetID string, sequenceAssetIDs []string, observed *string, stale bool) (*CaptureJobOutcome, error) {
 	org := claim.job.OrganizationID
 	now := time.Now().UTC()
 	tx, err := c.client.Tx(ctx)
@@ -987,6 +1045,7 @@ func (c *Configuration) commitCapture(ctx context.Context, claim *captureClaim, 
 		actor.UserID = *job.RequestedByUserID
 	}
 	jobUpdate := setCaptureJobTerminal(job.Update(), capturejob.PhaseSUCCEEDED, "").SetAssetID(assetID).ClearFailureCode()
+	keepSequence := len(sequenceAssetIDs) > 0
 	switch {
 	case job.Kind == capturejob.KindTest:
 		// A test proves the recipe. It never replaces the surface's current image.
@@ -1002,6 +1061,12 @@ func (c *Configuration) commitCapture(ctx context.Context, claim *captureClaim, 
 			return nil, err
 		}
 		jobUpdate.SetSurfaceCaptureID(receipt.ID).SetAssetID(receipt.AssetID)
+		if receipt.AssetID != assetID {
+			keepSequence = false
+		}
+	}
+	if keepSequence {
+		jobUpdate.SetSequenceAssetIds(sequenceAssetIDs)
 	}
 	if err := jobUpdate.Exec(ctx); err != nil {
 		return nil, err

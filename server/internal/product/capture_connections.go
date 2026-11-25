@@ -858,53 +858,43 @@ type CreateCaptureRecipeInput struct {
 	Definition   browser.Recipe `json:"definition"`
 }
 
-// CreateCaptureRecipe saves a draft version. It can run only as a test until a
-// successful test lets an owner or admin activate this exact version.
-func (c *Configuration) CreateCaptureRecipe(ctx context.Context, actor Actor, input CreateCaptureRecipeInput) (*CaptureRecipeRecord, error) {
-	if err := c.authorizeAutomationAdmin(ctx, actor); err != nil {
-		return nil, err
-	}
+func createCaptureRecipeInTx(ctx context.Context, tx *ent.Tx, actor Actor, input CreateCaptureRecipeInput) (*ent.CaptureRecipe, *ent.PlatformAppConnection, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	if input.Name == "" || utf8.RuneCountInString(input.Name) > 160 {
-		return nil, invalid("Name the recipe.")
+		return nil, nil, invalid("Name the recipe.")
 	}
 	if err := input.Definition.Validate(); err != nil {
-		return nil, invalid(err.Error())
+		return nil, nil, invalid(err.Error())
 	}
 	hash, err := input.Definition.Hash()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	encoded, err := json.Marshal(input.Definition)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	definition := map[string]any{}
 	if err := json.Unmarshal(encoded, &definition); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	tx, err := c.client.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 	connection, err := lockCaptureConnection(ctx, tx, actor.OrganizationID, input.ConnectionID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if connection.Status == platformappconnection.StatusREVOKED {
-		return nil, publishing.ErrInvalidState
+		return nil, nil, publishing.ErrInvalidState
 	}
 	owned, err := tx.ProductSurface.Query().Where(productsurface.ID(input.SurfaceID), productsurface.OrganizationID(actor.OrganizationID)).Exist(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !owned {
-		return nil, publishing.ErrNotFound
+		return nil, nil, publishing.ErrNotFound
 	}
 	latest, err := tx.CaptureRecipe.Query().Where(capturerecipe.OrganizationID(actor.OrganizationID), capturerecipe.Name(input.Name)).Order(ent.Desc(capturerecipe.FieldVersion)).First(ctx)
 	if err != nil && !ent.IsNotFound(err) {
-		return nil, err
+		return nil, nil, err
 	}
 	version := 1
 	if latest != nil {
@@ -913,12 +903,30 @@ func (c *Configuration) CreateCaptureRecipe(ctx context.Context, actor Actor, in
 	row, err := tx.CaptureRecipe.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).SetNillableSourceAppID(connection.SourceAppID).SetName(input.Name).SetVersion(version).
 		SetDefinition(definition).SetSurfaceID(input.SurfaceID).SetAppConnectionID(connection.ID).SetDefinitionHash(hash).SetCreatedByUserID(actor.UserID).Save(ctx)
 	if ent.IsConstraintError(err) {
-		return nil, publishing.ErrConflict
+		return nil, nil, publishing.ErrConflict
 	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_recipe_created", "capture_recipe", row.ID, map[string]any{"version": version, "hash": hash}); err != nil {
+		return nil, nil, err
+	}
+	return row, connection, nil
+}
+
+// CreateCaptureRecipe saves a draft version. It can run only as a test until a
+// successful test lets an owner or admin activate this exact version.
+func (c *Configuration) CreateCaptureRecipe(ctx context.Context, actor Actor, input CreateCaptureRecipeInput) (*CaptureRecipeRecord, error) {
+	if err := c.authorizeAutomationAdmin(ctx, actor); err != nil {
+		return nil, err
+	}
+	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_recipe_created", "capture_recipe", row.ID, map[string]any{"version": version, "hash": hash}); err != nil {
+	defer tx.Rollback()
+	row, _, err := createCaptureRecipeInTx(ctx, tx, actor, input)
+	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

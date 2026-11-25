@@ -20,6 +20,7 @@ type captureConfiguration struct {
 	actor        product.Actor
 	connection   product.CreateCaptureConnectionInput
 	recipe       product.CreateCaptureRecipeInput
+	propose      product.ProposeCaptureRecipeInput
 	intent       string
 	test         bool
 }
@@ -62,6 +63,26 @@ func (c *captureConfiguration) RevokeCaptureConnection(context.Context, product.
 func (c *captureConfiguration) CreateCaptureRecipe(_ context.Context, _ product.Actor, input product.CreateCaptureRecipeInput) (*product.CaptureRecipeRecord, error) {
 	c.recipe = input
 	return &product.CaptureRecipeRecord{ID: "recipe-1", Version: 1, Status: "DRAFT"}, nil
+}
+func (c *captureConfiguration) ProposeCaptureRecipe(_ context.Context, _ product.Actor, input product.ProposeCaptureRecipeInput) (*product.ProposedCaptureRecipe, error) {
+	c.propose = input
+	return &product.ProposedCaptureRecipe{
+		Name:      "Cohort chart",
+		Reasoning: "Matched analytics route.",
+		Definition: browser.Recipe{
+			SchemaVersion: browser.RecipeSchemaVersion,
+			Viewport:      browser.Viewport{Width: 1440, Height: 900, Scale: 2},
+			Steps:         []browser.Step{{Kind: browser.StepNavigate, Path: "/analytics"}},
+			Markers:       []string{browser.DefaultZeroConfigMarker},
+		},
+	}, nil
+}
+func (c *captureConfiguration) AutoCaptureFromPrompt(_ context.Context, _ product.Actor, input product.ProposeCaptureRecipeInput) (*product.AutoCaptureResult, error) {
+	c.propose = input
+	return &product.AutoCaptureResult{
+		Recipe: product.CaptureRecipeRecord{ID: "recipe-auto", Version: 1, Status: "DRAFT"},
+		Job:    product.CaptureJobRecord{ID: "job-auto", Phase: "QUEUED"},
+	}, nil
 }
 func (c *captureConfiguration) ListCaptureRecipes(context.Context, product.Actor) ([]product.CaptureRecipeRecord, error) {
 	return []product.CaptureRecipeRecord{}, nil
@@ -129,6 +150,20 @@ func TestCaptureRoutesAdaptTransportOntoTheDomain(t *testing.T) {
 	recipe := configurationRequest(handler, http.MethodPost, "/v1/capture/recipes", `{"name":"Dashboard","surfaceId":"s","connectionId":"c","definition":{"schemaVersion":1,"viewport":{"width":800,"height":600},"steps":[{"kind":"NAVIGATE","path":"/app"}],"markers":["#ready"],"version":{"path":"/api/version"}}}`)
 	if recipe.Code != http.StatusCreated || config.recipe.Definition.Version == nil || config.recipe.Definition.Steps[0].Kind != browser.StepNavigate {
 		t.Fatalf("recipe=%d %s %+v", recipe.Code, recipe.Body, config.recipe)
+	}
+	propose := configurationRequest(handler, http.MethodPost, "/v1/capture/recipes/propose", `{"connectionId":"connection-1","surfaceId":"surface-1","prompt":"Show cohort chart in dark mode"}`)
+	if propose.Code != http.StatusOK || config.propose.Prompt != "Show cohort chart in dark mode" || !strings.Contains(propose.Body.String(), `"proposal"`) {
+		t.Fatalf("propose=%d %s", propose.Code, propose.Body)
+	}
+	if badPropose := configurationRequest(handler, http.MethodPost, "/v1/capture/recipes/propose", `{`); badPropose.Code != http.StatusBadRequest {
+		t.Fatalf("badPropose=%d", badPropose.Code)
+	}
+	auto := configurationRequest(handler, http.MethodPost, "/v1/capture/auto", `{"connectionId":"connection-1","surfaceId":"surface-1","prompt":"Walkthrough of billing","sequenceShots":3}`)
+	if auto.Code != http.StatusAccepted || config.propose.SequenceShots != 3 || !strings.Contains(auto.Body.String(), `"job-auto"`) {
+		t.Fatalf("auto=%d %s", auto.Code, auto.Body)
+	}
+	if badAuto := configurationRequest(handler, http.MethodPost, "/v1/capture/auto", `{`); badAuto.Code != http.StatusBadRequest {
+		t.Fatalf("badAuto=%d", badAuto.Code)
 	}
 	if job := configurationRequest(handler, http.MethodPost, "/v1/capture/recipes/recipe-1/jobs", `{"test":true}`); job.Code != http.StatusAccepted || !config.test {
 		t.Fatalf("job=%d", job.Code)

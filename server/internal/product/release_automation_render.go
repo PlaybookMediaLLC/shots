@@ -272,8 +272,8 @@ func (c *Configuration) captureFocusBox(ctx context.Context, org, assetID string
 	if err != nil || row.CaptureID == nil || *row.CaptureID == "" {
 		return nil
 	}
-	attempt, err := c.client.CaptureAttempt.Query().Where(captureattempt.ID(*row.CaptureID), captureattempt.OrganizationID(org)).Select(captureattempt.FieldFocusBox).Only(ctx)
-	if err != nil || len(attempt.FocusBox) == 0 {
+	attempt, err := c.client.CaptureAttempt.Query().Where(captureattempt.ID(*row.CaptureID), captureattempt.OrganizationID(org)).Select(captureattempt.FieldAssetID, captureattempt.FieldFocusBox).Only(ctx)
+	if err != nil || len(attempt.FocusBox) == 0 || attempt.AssetID == nil || *attempt.AssetID != assetID {
 		return nil
 	}
 	return attempt.FocusBox

@@ -324,6 +324,12 @@ func (_c *CaptureJobCreate) SetNillableAssetID(v *string) *CaptureJobCreate {
 	return _c
 }
 
+// SetSequenceAssetIds sets the "sequence_asset_ids" field.
+func (_c *CaptureJobCreate) SetSequenceAssetIds(v []string) *CaptureJobCreate {
+	_c.mutation.SetSequenceAssetIds(v)
+	return _c
+}
+
 // SetResumeCount sets the "resume_count" field.
 func (_c *CaptureJobCreate) SetResumeCount(v int) *CaptureJobCreate {
 	_c.mutation.SetResumeCount(v)
@@ -638,6 +644,10 @@ func (_c *CaptureJobCreate) createSpec() (*CaptureJob, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AssetID(); ok {
 		_spec.SetField(capturejob.FieldAssetID, field.TypeString, value)
 		_node.AssetID = &value
+	}
+	if value, ok := _c.mutation.SequenceAssetIds(); ok {
+		_spec.SetField(capturejob.FieldSequenceAssetIds, field.TypeJSON, value)
+		_node.SequenceAssetIds = value
 	}
 	if value, ok := _c.mutation.ResumeCount(); ok {
 		_spec.SetField(capturejob.FieldResumeCount, field.TypeInt, value)

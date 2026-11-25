@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -65,6 +66,8 @@ type CaptureJob struct {
 	SurfaceCaptureID *string `json:"surface_capture_id,omitempty"`
 	// AssetID holds the value of the "asset_id" field.
 	AssetID *string `json:"asset_id,omitempty"`
+	// SequenceAssetIds holds the value of the "sequence_asset_ids" field.
+	SequenceAssetIds []string `json:"sequence_asset_ids,omitempty"`
 	// ResumeCount holds the value of the "resume_count" field.
 	ResumeCount int `json:"resume_count,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -79,6 +82,8 @@ func (*CaptureJob) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case capturejob.FieldSequenceAssetIds:
+			values[i] = new([]byte)
 		case capturejob.FieldRecipeVersion, capturejob.FieldAttempts, capturejob.FieldNavigationAttempts, capturejob.FieldConnectionGeneration, capturejob.FieldFencingToken, capturejob.FieldResumeCount:
 			values[i] = new(sql.NullInt64)
 		case capturejob.FieldID, capturejob.FieldOrganizationID, capturejob.FieldReleaseID, capturejob.FieldRecipeID, capturejob.FieldStatus, capturejob.FieldPhase, capturejob.FieldKind, capturejob.FieldTriggerRunID, capturejob.FieldIdempotencyKey, capturejob.FieldSurfaceID, capturejob.FieldAppConnectionID, capturejob.FieldDeploymentEventID, capturejob.FieldExpectedRevision, capturejob.FieldRecipeHash, capturejob.FieldObjectiveEvidence, capturejob.FieldFailureCode, capturejob.FieldRequestedByUserID, capturejob.FieldSurfaceCaptureID, capturejob.FieldAssetID:
@@ -263,6 +268,14 @@ func (_m *CaptureJob) assignValues(columns []string, values []any) error {
 				_m.AssetID = new(string)
 				*_m.AssetID = value.String
 			}
+		case capturejob.FieldSequenceAssetIds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field sequence_asset_ids", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SequenceAssetIds); err != nil {
+					return fmt.Errorf("unmarshal field sequence_asset_ids: %w", err)
+				}
+			}
 		case capturejob.FieldResumeCount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field resume_count", values[i])
@@ -414,6 +427,9 @@ func (_m *CaptureJob) String() string {
 		builder.WriteString("asset_id=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("sequence_asset_ids=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SequenceAssetIds))
 	builder.WriteString(", ")
 	builder.WriteString("resume_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ResumeCount))
