@@ -1,17 +1,28 @@
 'use client'
 
 import {
+  ArrowRightIcon,
   ArrowUpRightIcon,
+  BookOpenTextIcon,
   CaretDownIcon,
+  CheckCircleIcon,
+  ClockCounterClockwiseIcon,
+  CodeIcon,
+  EnvelopeSimpleIcon,
   ListIcon,
   MagnifyingGlassIcon,
+  PaintBrushIcon,
+  PaperPlaneTiltIcon,
+  ShieldCheckIcon,
+  SparkleIcon,
+  SquaresFourIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import { useSearchContext } from 'fumadocs-ui/contexts/search'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
 import { Button } from '@/components/ui/button'
 import { publicImageUrl } from '@/lib/assets/public-image'
 import type { DocsPageEntry, DocsSidebarSection } from '@/lib/docs/source'
@@ -27,20 +38,77 @@ const NAVIGATION_TABS = [
   { href: '/pricing', label: 'Pricing' },
 ] as const
 
-const PRODUCT_ITEMS = [
-  { href: '/product', label: 'Platform overview' },
-  { href: '/product/launch-intelligence', label: 'Launch intelligence' },
-  { href: '/product/creative-engine', label: 'Creative engine' },
-  { href: '/product/approvals', label: 'Approvals' },
-  { href: '/product/publishing', label: 'Publishing' },
+interface NavDropdownItem {
+  readonly description: string
+  readonly href: string
+  readonly icon: ComponentType<{ className?: string }>
+  readonly label: string
+}
+
+const PRODUCT_ITEMS: readonly NavDropdownItem[] = [
+  {
+    description: 'End-to-end release readiness and visual launches',
+    href: '/product',
+    icon: SquaresFourIcon,
+    label: 'Platform overview',
+  },
+  {
+    description: 'Cited launch briefs and channel copy from releases',
+    href: '/product/launch-intelligence',
+    icon: SparkleIcon,
+    label: 'Launch intelligence',
+  },
+  {
+    description: 'On-brand screenshots, mockups, and story sets',
+    href: '/product/creative-engine',
+    icon: PaintBrushIcon,
+    label: 'Creative engine',
+  },
+  {
+    description: 'Human review gates and source-grounded guardrails',
+    href: '/product/approvals',
+    icon: CheckCircleIcon,
+    label: 'Approvals',
+  },
+  {
+    description: 'Scheduled multi-channel delivery and analytics',
+    href: '/product/publishing',
+    icon: PaperPlaneTiltIcon,
+    label: 'Publishing',
+  },
 ] as const
 
-const RESOURCE_ITEMS = [
-  { href: '/developers', label: 'Developer portal' },
-  { href: '/changelog', label: 'Changelog' },
-  { href: '/guides', label: 'Guides' },
-  { href: '/security', label: 'Security' },
-  { href: '/contact', label: 'Contact' },
+const RESOURCE_ITEMS: readonly NavDropdownItem[] = [
+  {
+    description: 'API keys, OpenAPI spec, SDKs, and MCP servers',
+    href: '/developers',
+    icon: CodeIcon,
+    label: 'Developer portal',
+  },
+  {
+    description: 'Latest shipped features and platform updates',
+    href: '/changelog',
+    icon: ClockCounterClockwiseIcon,
+    label: 'Changelog',
+  },
+  {
+    description: 'Playbooks for launches, captures, and workflows',
+    href: '/guides',
+    icon: BookOpenTextIcon,
+    label: 'Guides',
+  },
+  {
+    description: 'Tenant isolation, encryption, SSO, and audit logs',
+    href: '/security',
+    icon: ShieldCheckIcon,
+    label: 'Security',
+  },
+  {
+    description: 'Talk with the team or request enterprise setup',
+    href: '/contact',
+    icon: EnvelopeSimpleIcon,
+    label: 'Contact',
+  },
 ] as const
 
 type DropdownId = 'product' | 'resources' | null
@@ -100,7 +168,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
     closeTimeoutRef.current = window.setTimeout(() => {
       closeTimeoutRef.current = null
       setOpenDropdown(null)
-    }, 120)
+    }, 140)
   }, [clearPendingClose])
 
   const toggleMenu = useCallback(
@@ -179,6 +247,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
           })}
 
           <NavDropdown
+            footer={{ href: '/docs/features', label: 'Browse all feature docs' }}
             items={PRODUCT_ITEMS}
             label="Product"
             onClose={() => {
@@ -192,6 +261,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
           />
 
           <NavDropdown
+            footer={{ href: '/api-reference', label: 'Open interactive API explorer' }}
             items={RESOURCE_ITEMS}
             label="Resources"
             onClose={() => {
@@ -347,6 +417,7 @@ export function DocsShellNav({ homePage, sections }: DocsShellNavProps) {
 }
 
 function NavDropdown({
+  footer,
   items,
   label,
   onClose,
@@ -355,7 +426,8 @@ function NavDropdown({
   onToggle,
   open,
 }: {
-  items: readonly { href: string; label: string }[]
+  footer: { readonly href: string; readonly label: string }
+  items: readonly NavDropdownItem[]
   label: string
   onClose: () => void
   onMouseEnter: () => void
@@ -369,10 +441,10 @@ function NavDropdown({
         aria-expanded={open}
         aria-haspopup="true"
         className={cn(
-          'inline-flex h-8 items-center gap-1 rounded-lg border border-transparent px-3 text-ui font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-ui font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           open
-            ? 'bg-foreground/[0.05] text-foreground'
-            : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'
+            ? 'border-border bg-card text-foreground shadow-[0_1px_2px_rgb(0_0_0_/_5%)]'
+            : 'border-transparent text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'
         )}
         onClick={onToggle}
         size={null}
@@ -384,24 +456,65 @@ function NavDropdown({
           aria-hidden="true"
           className={cn(
             'size-3 text-muted-foreground transition-transform duration-150',
-            open ? 'rotate-180' : ''
+            open ? 'rotate-180 text-foreground' : ''
           )}
         />
       </Button>
-      {open ? (
-        <div className="absolute top-full left-0 z-50 mt-1.5 min-w-[200px] rounded-xl border border-border bg-popover p-1 shadow-[var(--shadow-popover)]">
-          {items.map((item) => (
+      <div
+        aria-hidden={!open}
+        className={cn(
+          'absolute top-full left-0 z-50 pt-2 transition-[opacity,transform,visibility] duration-150 ease-[cubic-bezier(0.2,0,0,1)]',
+          open
+            ? 'visible translate-y-0 opacity-100'
+            : 'pointer-events-none invisible -translate-y-1 opacity-0'
+        )}
+        inert={!open}
+      >
+        <div className="w-[24.5rem] overflow-hidden rounded-2xl border border-border bg-popover/95 ring-1 ring-black/[0.03] backdrop-blur-xl shadow-[0_4px_12px_rgb(0_0_0_/_6%),0_20px_48px_-12px_rgb(0_0_0_/_16%)] dark:ring-white/[0.05] dark:shadow-[0_16px_48px_-12px_rgb(0_0_0_/_80%)]">
+          <div className="flex flex-col gap-0.5 p-1.5">
+            {items.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  className="group/item flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors duration-150 hover:bg-foreground/[0.045] focus-visible:bg-foreground/[0.045] focus-visible:outline-none"
+                  href={item.href}
+                  key={item.href}
+                  onClick={onClose}
+                >
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-background text-muted-foreground shadow-[0_1px_2px_rgb(0_0_0_/_3%)] transition-colors duration-150 group-hover/item:border-foreground/15 group-hover/item:bg-card group-hover/item:text-foreground">
+                    <Icon aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ui font-medium text-foreground">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block truncate text-caption text-muted-foreground">
+                      {item.description}
+                    </span>
+                  </span>
+                  <ArrowRightIcon
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 -translate-x-1 text-muted-foreground opacity-0 transition-all duration-150 group-hover/item:translate-x-0 group-hover/item:text-foreground group-hover/item:opacity-100"
+                  />
+                </Link>
+              )
+            })}
+          </div>
+          <div className="border-t border-border bg-background/60 px-2 py-1.5">
             <Link
-              className="flex items-center rounded-md px-2.5 py-1.5 text-ui text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
-              href={item.href}
-              key={item.href}
+              className="group/footer flex items-center justify-between rounded-lg px-2.5 py-1.5 text-caption font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={footer.href}
               onClick={onClose}
             >
-              {item.label}
+              <span>{footer.label}</span>
+              <ArrowUpRightIcon
+                aria-hidden="true"
+                className="size-3.5 text-muted-foreground transition-transform duration-150 group-hover/footer:translate-x-0.5 group-hover/footer:-translate-y-0.5 group-hover/footer:text-foreground"
+              />
             </Link>
-          ))}
+          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   )
 }
