@@ -56,29 +56,29 @@ type RecipeTextField = Exclude<
 const EMPTY_OPTION = '__empty_option__'
 
 const blankRecipe: CaptureRecipeForm = {
-  allowSearchFill: true,
+  allowSearchFill: false,
   allowedPostPaths: '',
   colorScheme: '',
   connectionId: '',
   forbidden: '',
   height: '900',
   marker: '',
-  maskStyle: 'blur',
+  maskStyle: 'solid',
   masks: '',
   name: '',
   optionalMasks: '',
   path: '',
   sequenceShots: '1',
-  sharp: true,
+  sharp: false,
   surfaceId: '',
-  useVision: true,
-  verifyWithVision: true,
+  useVision: false,
+  verifyWithVision: false,
   versionPath: '',
   versionSelector: '',
   width: '1440',
   objective: '',
-  navigationSteps: '6',
-  navigationCredits: '8',
+  navigationSteps: '4',
+  navigationCredits: '10',
 }
 
 /** A test's outcome. The image goes through the authorized asset route, which rechecks access. */
@@ -316,45 +316,6 @@ function RecipeForm({
     })
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
-        <CaptureField hint="The page whose current image this belongs to." label="Product page">
-          <Select
-            onValueChange={(next) => set('surfaceId', next === EMPTY_OPTION ? '' : next)}
-            value={form.surfaceId || EMPTY_OPTION}
-          >
-            <SelectTrigger className={automationSelectClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EMPTY_OPTION}>Choose a page</SelectItem>
-              {surfaces.map((surface) => (
-                <SelectItem key={surface.id} value={surface.id}>
-                  {surface.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CaptureField>
-        <CaptureField hint="The signed-in app connection to drive." label="Connection">
-          <Select
-            onValueChange={(next) => set('connectionId', next === EMPTY_OPTION ? '' : next)}
-            value={form.connectionId || EMPTY_OPTION}
-          >
-            <SelectTrigger className={automationSelectClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EMPTY_OPTION}>Choose a connection</SelectItem>
-              {activeConnections.map((connection) => (
-                <SelectItem key={connection.id} value={connection.id}>
-                  {connection.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CaptureField>
-      </div>
-
       <div className="space-y-4 rounded-lg border bg-muted/20 p-5">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -366,6 +327,47 @@ function RecipeForm({
             app visually with Set-of-Mark vision, detects the feature focus box, and verifies the
             screenshot — no CSS selectors required.
           </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <CaptureField hint="The page this AI capture belongs to." label="Target page">
+            <Select
+              onValueChange={(next) => set('surfaceId', next === EMPTY_OPTION ? '' : next)}
+              value={form.surfaceId || EMPTY_OPTION}
+            >
+              <SelectTrigger className={automationSelectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_OPTION}>Choose a page</SelectItem>
+                {surfaces.map((surface) => (
+                  <SelectItem key={surface.id} value={surface.id}>
+                    {surface.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CaptureField>
+          <CaptureField
+            hint="The signed-in app connection AI will drive."
+            label="Target connection"
+          >
+            <Select
+              onValueChange={(next) => set('connectionId', next === EMPTY_OPTION ? '' : next)}
+              value={form.connectionId || EMPTY_OPTION}
+            >
+              <SelectTrigger className={automationSelectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_OPTION}>Choose a connection</SelectItem>
+                {activeConnections.map((connection) => (
+                  <SelectItem key={connection.id} value={connection.id}>
+                    {connection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CaptureField>
         </div>
         <CaptureField
           hint="Example: “Show the dark-mode analytics cohort chart” or “Capture a 3-shot walkthrough opening the invoice export dialog”."
@@ -419,14 +421,58 @@ function RecipeForm({
           void submit()
         }}
       >
-        <h3 className="font-medium">Add or customize a screen</h3>
+        <h3 className="font-medium">Add a screen</h3>
         <p className="text-sm text-muted-foreground">
           Saving under an existing name adds a new version. A new version runs only as a test until
           you enable it.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           {text('name', 'Name', 'Such as Billing dashboard.')}
-          {text('path', 'Starting path', 'On the connected app: /billing.')}
+          <CaptureField hint="The page whose current image this replaces." label="Product page">
+            <Select
+              onValueChange={(next) => set('surfaceId', next === EMPTY_OPTION ? '' : next)}
+              required
+              value={form.surfaceId || EMPTY_OPTION}
+            >
+              <SelectTrigger className={automationSelectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_OPTION}>Choose a page</SelectItem>
+                {surfaces.map((surface) => (
+                  <SelectItem key={surface.id} value={surface.id}>
+                    {surface.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CaptureField>
+          <CaptureField hint="The sign-in this screen uses." label="Connection">
+            <Select
+              onValueChange={(next) => set('connectionId', next === EMPTY_OPTION ? '' : next)}
+              required
+              value={form.connectionId || EMPTY_OPTION}
+            >
+              <SelectTrigger className={automationSelectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_OPTION}>Choose a connection</SelectItem>
+                {activeConnections.map((connection) => (
+                  <SelectItem key={connection.id} value={connection.id}>
+                    {connection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CaptureField>
+          {text('path', 'Path', 'On the connected app: /billing.')}
+          {text(
+            'marker',
+            'Element that proves the screen',
+            'Optional — leave blank to auto-detect main content, or enter a CSS selector such as [data-testid=invoice-table].',
+            false
+          )}
         </div>
         {selectedConnection?.discoveredRoutes?.length ? (
           <div className="space-y-1.5">
@@ -508,7 +554,7 @@ function RecipeForm({
             <div className="grid gap-3 md:grid-cols-2">
               <Label className="flex items-start gap-2 text-sm">
                 <Checkbox
-                  checked={form.useVision ?? true}
+                  checked={form.useVision ?? false}
                   onCheckedChange={(checked) =>
                     setForm((old) => ({ ...old, useVision: checked === true }))
                   }
@@ -523,7 +569,7 @@ function RecipeForm({
               </Label>
               <Label className="flex items-start gap-2 text-sm">
                 <Checkbox
-                  checked={form.allowSearchFill ?? true}
+                  checked={form.allowSearchFill ?? false}
                   onCheckedChange={(checked) =>
                     setForm((old) => ({ ...old, allowSearchFill: checked === true }))
                   }
@@ -572,7 +618,7 @@ function RecipeForm({
               onValueChange={(next) =>
                 setForm((old) => ({ ...old, maskStyle: next as 'solid' | 'blur' }))
               }
-              value={form.maskStyle ?? 'blur'}
+              value={form.maskStyle ?? 'solid'}
             >
               <SelectTrigger className={automationSelectClass}>
                 <SelectValue />
@@ -588,7 +634,7 @@ function RecipeForm({
         <div className="grid gap-3 md:grid-cols-2">
           <Label className="flex items-start gap-2 text-sm">
             <Checkbox
-              checked={form.verifyWithVision ?? true}
+              checked={form.verifyWithVision ?? false}
               onCheckedChange={(checked) =>
                 setForm((old) => ({ ...old, verifyWithVision: checked === true }))
               }
@@ -603,7 +649,7 @@ function RecipeForm({
           </Label>
           <Label className="flex items-start gap-2 text-sm">
             <Checkbox
-              checked={form.sharp ?? true}
+              checked={form.sharp ?? false}
               onCheckedChange={(checked) => setForm((old) => ({ ...old, sharp: checked === true }))}
             />
             <span>
@@ -624,12 +670,6 @@ function RecipeForm({
           </DisclosureTrigger>
           <DisclosureContent className="space-y-4 pt-4">
             <div className="grid gap-4 md:grid-cols-2">
-              {text(
-                'marker',
-                'Element that proves the screen (optional)',
-                'Leave blank to match the main app container automatically (main, [role=main], body), or enter a CSS selector such as [data-testid=invoice-table].',
-                false
-              )}
               {text(
                 'versionPath',
                 'Version proof path (optional)',
