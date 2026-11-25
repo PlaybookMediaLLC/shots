@@ -150,13 +150,21 @@ import type {
 } from './release-automation.js'
 export type * from './release-automation.js'
 import type {
+  AutoCaptureResult,
+  CaptureAuthAttempt,
+  CaptureAuthInboundEmail,
   CaptureConnection,
+  CaptureConnectionCreate,
   CaptureConnectionInput,
   CaptureConnectStart,
+  CaptureEmailAuth,
+  SaveCaptureEmailAuthRecipeInput,
   CaptureJob,
   CaptureOverview,
   CaptureRecipe,
   CaptureRecipeInput,
+  ProposeCaptureRecipeInput,
+  ProposedCaptureRecipe,
 } from './capture.js'
 export type * from './capture.js'
 import type {
@@ -5420,7 +5428,7 @@ export class ScreenshotStudioBackendSDK {
     return this.request<CaptureOverview>('v1/capture')
   }
 
-  async createCaptureConnection(input: CaptureConnectionInput) {
+  async createCaptureConnection(input: CaptureConnectionInput | CaptureConnectionCreate) {
     return this.request<{ connection: CaptureConnection }>('v1/capture/connections', {
       body: input,
       method: 'POST',
@@ -5451,6 +5459,91 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Exchanges a signed request to the connection's bootstrap URL for a verified session. */
+  async bootstrapCaptureConnection(id: string) {
+    return this.request<{ connection: CaptureConnection }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/bootstrap`,
+      { method: 'POST' }
+    )
+  }
+
+  /** A connection's email sign-in setup (RFC 007A); 404 when it has none. */
+  async getCaptureEmailAuth(id: string) {
+    return this.request<{ emailAuth: CaptureEmailAuth }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth`
+    )
+  }
+
+  /** Assigns a test email address to a connection that proves identity by element. */
+  async createCaptureEmailAuth(id: string) {
+    return this.request<{ emailAuth: CaptureEmailAuth }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Saves a new login recipe version; the setup returns to draft until tested. */
+  async saveCaptureEmailAuthRecipe(id: string, input: SaveCaptureEmailAuthRecipeInput) {
+    return this.request<{ emailAuth: CaptureEmailAuth }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth/recipe`,
+      { body: input, method: 'PUT' }
+    )
+  }
+
+  /** Starts one watched email sign-in. */
+  async testCaptureEmailAuth(id: string) {
+    return this.request<{ attempt: CaptureAuthAttempt }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth/test`,
+      { method: 'POST' }
+    )
+  }
+
+  /** The owner's opt-in to automatic sign-in for one tested revision. */
+  async enableCaptureEmailAuth(id: string, expectedRevision: number) {
+    return this.request<{ emailAuth: CaptureEmailAuth }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth/enable`,
+      { body: { expectedRevision }, method: 'POST' }
+    )
+  }
+
+  /** Stops automatic sign-in and any running attempt. */
+  async pauseCaptureEmailAuth(id: string) {
+    return this.request<{ emailAuth: CaptureEmailAuth }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth/pause`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Ends the setup: the test address stops routing. */
+  async revokeCaptureEmailAuth(id: string) {
+    return this.request<{ revoked: true }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/email-auth`,
+      { method: 'DELETE' }
+    )
+  }
+
+  /** One email sign-in attempt's safe progress. */
+  async getCaptureAuthAttempt(id: string) {
+    return this.request<{ attempt: CaptureAuthAttempt }>(
+      `v1/capture/auth-attempts/${encodeURIComponent(id)}`
+    )
+  }
+
+  async cancelCaptureAuthAttempt(id: string) {
+    return this.request<{ cancelled: true }>(
+      `v1/capture/auth-attempts/${encodeURIComponent(id)}/cancel`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Facade-only: forwards Resend's signed delivery; the backend verifies it. */
+  async receiveCaptureAuthEmail(input: CaptureAuthInboundEmail) {
+    return this.request<{ outcome: string }>('v1/internal/capture-auth/resend', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
   async revokeCaptureConnection(id: string) {
     return this.request<{ revoked: true }>(
       `v1/capture/connections/${encodeURIComponent(id)}/revoke`,
@@ -5460,6 +5553,22 @@ export class ScreenshotStudioBackendSDK {
 
   async createCaptureRecipe(input: CaptureRecipeInput) {
     return this.request<{ recipe: CaptureRecipe }>('v1/capture/recipes', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Proposes a zero-config AI capture recipe from a single plain-English prompt. */
+  async proposeCaptureRecipe(input: ProposeCaptureRecipeInput) {
+    return this.request<{ proposal: ProposedCaptureRecipe }>('v1/capture/recipes/propose', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Proposes, saves, and immediately queues a zero-config AI capture from plain English. */
+  async autoCaptureFromPrompt(input: ProposeCaptureRecipeInput) {
+    return this.request<AutoCaptureResult>('v1/capture/auto', {
       body: input,
       method: 'POST',
     })
@@ -5489,6 +5598,11 @@ export class ScreenshotStudioBackendSDK {
       `v1/capture/recipes/${encodeURIComponent(recipeId)}/jobs`,
       { body: input, method: 'POST' }
     )
+  }
+
+  /** Returns the current status of a capture job in this workspace. */
+  async getCaptureJob(id: string) {
+    return this.request<{ job: CaptureJob }>(`v1/capture/jobs/${encodeURIComponent(id)}`)
   }
 
   async cancelCaptureJob(id: string) {

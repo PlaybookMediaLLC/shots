@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getAspectRatioPreset } from '@/lib/aspect-ratio-utils'
 import { useHydratedSession } from '@/lib/auth/client'
-import { draftsApi } from '@/lib/content-drafts/client'
+import { DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
 import { canExportMotion } from '@/lib/editor/canvas-content'
 import { safeBaseName } from '@/lib/export/naming'
 import { useExportSettings } from '@/lib/export/use-export-settings'
@@ -43,8 +43,8 @@ import { cn } from '@/lib/utils'
  * to it or start another post.
  */
 
-/** The draft this editor last opened in Publish, so the next export can join it. */
-let lastDraftId: string | null = null
+/** The draft this editor last opened in Publish per workspace, so the next export can join it. */
+const lastDraftByWorkspace = new Map<string, string>()
 
 type Where = 'new' | 'draft'
 
@@ -89,17 +89,46 @@ export function PublishButton({
     setBusy(true)
     setError(null)
     try {
-      const draftId =
-        to === 'draft' && draft
-          ? draft
-          : (
-              await draftsApi.create({
-                body: draftPostBody({ media: [] }),
-                requestKey: requestKey.current,
-              })
-            ).id
+      const origin = readEditorReturn(window.location.search)
+      const editorCopy = useImageStore.getState().copy
+      const caption =
+        editorCopy?.captions.x?.trim() ||
+        editorCopy?.captions.linkedin?.trim() ||
+        Object.values(editorCopy?.captions ?? {})
+          .find((v) => v?.trim())
+          ?.trim() ||
+        ''
+      const createDraft = async (includeRelease: boolean) =>
+        (
+          await draftsApi.create({
+            body: draftPostBody({ caption, media: [] }),
+            ...(includeRelease && origin.releaseId ? { releaseId: origin.releaseId } : {}),
+            ...(caption ? { plainText: caption } : {}),
+            requestKey: requestKey.current,
+          })
+        ).id
+      let draftId: string
+      if (to === 'draft' && draft) {
+        draftId = draft
+      } else {
+        try {
+          draftId = await createDraft(true)
+        } catch (createErr) {
+          // If the fromRelease URL param was deleted or belongs to another workspace, retry unlinked.
+          if (
+            origin.releaseId &&
+            createErr instanceof DraftRequestError &&
+            createErr.status === 404
+          ) {
+            requestKey.current = crypto.randomUUID()
+            draftId = await createDraft(false)
+          } else {
+            throw createErr
+          }
+        }
+      }
       requestKey.current = crypto.randomUUID()
-      lastDraftId = draftId
+      if (workspaceId) lastDraftByWorkspace.set(workspaceId, draftId)
       const preset = getAspectRatioPreset(design.selectedAspectRatio)
       startIncomingMedia(draftId, publishKindLabel(what, design.slideCount), (onProgress) =>
         preparePublication(what, {
@@ -129,7 +158,7 @@ export function PublishButton({
 
   const begin = () => {
     const returned = readEditorReturn(window.location.search).draftId ?? null
-    const draft = returned ?? lastDraftId
+    const draft = returned ?? (workspaceId ? (lastDraftByWorkspace.get(workspaceId) ?? null) : null)
     setTarget(draft ? { id: draft, returned: Boolean(returned) } : null)
     setWhere(draft ? 'draft' : 'new')
     // Nothing to choose: publish the picture into a new post.

@@ -1,14 +1,75 @@
 package platformai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestStructuredEncodesMultimodalImagesAndPreservesStringWithoutImages(t *testing.T) {
+	var sent map[string]any
+	httpClient := &http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			_ = json.NewDecoder(r.Body).Decode(&sent)
+			body := `{"choices":[{"message":{"content":"{\"verified\":true,\"reason\":\"ok\"}"}}],"usage":{"prompt_tokens":50,"completion_tokens":10,"cost":0.001}}`
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString(body)), Header: http.Header{}}, nil
+		}),
+	}
+	client := &Client{APIKey: "key", BaseURL: "https://openrouter.example/api/v1", HTTP: httpClient, Models: map[Role]string{RoleFast: "model-fast"}}
+
+	var out struct {
+		Verified bool   `json:"verified"`
+		Reason   string `json:"reason"`
+	}
+	// With images (including an empty entry that must be skipped):
+	_, err := client.Structured(context.Background(), Request{
+		Role:       RoleFast,
+		System:     "sys",
+		Prompt:     "verify",
+		Images:     []ImageInput{{MediaType: "image/jpeg", Base64: "abc123"}, {MediaType: "", Base64: ""}},
+		Schema:     json.RawMessage(`{"type":"object"}`),
+		SchemaName: "verify",
+	}, &out)
+	if err != nil || !out.Verified {
+		t.Fatalf("multimodal err=%v out=%+v", err, out)
+	}
+	userMsg := sent["messages"].([]any)[1].(map[string]any)
+	parts, ok := userMsg["content"].([]any)
+	if !ok || len(parts) != 2 {
+		t.Fatalf("expected 2 multimodal content parts, got %#v", userMsg["content"])
+	}
+	imgPart := parts[1].(map[string]any)
+	if imgPart["type"] != "image_url" || imgPart["image_url"].(map[string]any)["url"] != "data:image/jpeg;base64,abc123" {
+		t.Fatalf("unexpected image part: %#v", imgPart)
+	}
+
+	// Without images: content stays a plain JSON string for broad model compatibility.
+	sent = nil
+	_, err = client.Structured(context.Background(), Request{
+		Role:       RoleFast,
+		System:     "sys",
+		Prompt:     "plain",
+		Schema:     json.RawMessage(`{"type":"object"}`),
+		SchemaName: "verify",
+	}, &out)
+	if err != nil {
+		t.Fatalf("plain err=%v", err)
+	}
+	userMsg = sent["messages"].([]any)[1].(map[string]any)
+	if str, ok := userMsg["content"].(string); !ok || str != "plain" {
+		t.Fatalf("expected plain string content, got %#v", userMsg["content"])
+	}
+}
 
 func TestStructuredDecodesTheReplyAndItsCost(t *testing.T) {
 	var sent map[string]any

@@ -472,7 +472,7 @@ func (c *Configuration) approveCampaignVisual(ctx context.Context, actor Actor, 
 	}
 	if assetID != "" {
 		link, err := tx.CampaignAsset.Query().Where(campaignasset.CampaignID(campaignID), campaignasset.AssetID(assetID),
-			campaignasset.OrganizationID(actor.OrganizationID), campaignasset.Kind("product-shot")).Only(ctx)
+			campaignasset.OrganizationID(actor.OrganizationID), campaignasset.KindIn("product-shot", "code-visual")).Only(ctx)
 		if ent.IsNotFound(err) {
 			return nil, publishing.ErrNotFound
 		}

@@ -3,7 +3,9 @@
 import type { ProductSurface, SurfaceCapture } from 'screenshot-studio-backend-sdk'
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react'
 import { toast } from 'sonner'
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Pill, type PillTone, Row, Section } from '@/components/platform-ui'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -203,25 +205,22 @@ function SurfaceForm({
   )
 }
 
-/** A private capture asset, shown through a short-lived signed URL. */
+/** A private capture asset, shown through the authorized thumbnail route. */
 function CaptureThumbnail({ assetId }: { assetId: string }) {
-  const trpcClient = useTRPCClient()
-  const [url, setUrl] = useState<string | null>(null)
-  useEffect(() => {
-    trpcClient.asset.signDownload
-      .query({ assetId })
-      .then((result) => setUrl(result.downloadUrl))
-      .catch(() => undefined)
-  }, [assetId, trpcClient])
   return (
-    <div className="grid aspect-[16/10] w-32 shrink-0 place-items-center overflow-hidden rounded-lg bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
-      {url ? (
-        // A signed, short-lived storage URL, so a plain img: next/image would cache it.
-        <img alt="" className="size-full object-cover object-top" loading="lazy" src={url} />
-      ) : (
-        <div className="size-full animate-pulse bg-foreground/[0.02]" />
-      )}
-    </div>
+    <a
+      className="grid aspect-[16/10] w-32 shrink-0 place-items-center overflow-hidden rounded-lg bg-foreground/[0.03] ring-1 ring-foreground/[0.06] hover:ring-foreground/[0.2]"
+      href={`/api/v1/assets/${encodeURIComponent(assetId)}/content`}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      <img
+        alt="Captured product screenshot"
+        className="size-full object-cover object-top"
+        loading="lazy"
+        src={`/api/v1/assets/${encodeURIComponent(assetId)}/content?variant=thumbnail`}
+      />
+    </a>
   )
 }
 
@@ -283,6 +282,15 @@ function CaptureHistory({
                         <Pill tone="green">Current</Pill>
                       </span>
                     )}
+                    <div className="pt-1">
+                      <ButtonLink
+                        href={editorHref({ assetId: capture.assetId })}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Open in editor
+                      </ButtonLink>
+                    </div>
                   </div>
                 </li>
               ))}

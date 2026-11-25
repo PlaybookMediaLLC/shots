@@ -7,10 +7,11 @@ import { captureFailureMessage } from '@/lib/tenant/surface-freshness'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
   CAPTURE_JOB_PHASE,
+  captureJobFrames,
   captureJobOpen,
   captureNavigationSummary,
 } from '@/lib/workflows/capture'
-import { CaptureError, useCaptureAction } from './capture-ui'
+import { CaptureError, CaptureFrameList, useCaptureAction } from './capture-ui'
 import { relativeTime } from './workflow-ui'
 
 const KIND: Record<CaptureJob['kind'], string> = {
@@ -40,6 +41,7 @@ function JobRow({
       await client.capture.cancelJob.mutate({ id: job.id })
       await onChanged()
     })
+  const frames = captureJobFrames(job)
   return (
     <Row>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -49,6 +51,7 @@ function JobRow({
               {recipe?.name ?? 'Recipe'} · version {job.recipeVersion}
             </h3>
             <Pill tone={phase.tone}>{phase.label}</Pill>
+            {frames.length > 1 ? <Pill>{frames.length}-shot sequence</Pill> : null}
           </div>
           <p className="text-xs text-muted-foreground">
             {KIND[job.kind]} · {relativeTime(job.createdAt)}
@@ -62,6 +65,7 @@ function JobRow({
             <p className="text-sm text-muted-foreground">Steered to show: {job.releaseChange}</p>
           ) : null}
           {navigation ? <p className="text-sm text-muted-foreground">{navigation}</p> : null}
+          <CaptureFrameList compact frames={frames} name={recipe?.name ?? 'screen'} />
           <CaptureError message={error} />
         </div>
         {canManage && captureJobOpen(job.phase) ? (

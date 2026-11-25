@@ -66,8 +66,16 @@ const (
 	FieldLeaseExpiresAt = "leaseExpiresAt"
 	// FieldCreatedByUserID holds the string denoting the created_by_user_id field in the database.
 	FieldCreatedByUserID = "createdByUserId"
+	// FieldDiscoveredRoutes holds the string denoting the discovered_routes field in the database.
+	FieldDiscoveredRoutes = "discoveredRoutes"
+	// FieldBootstrapURL holds the string denoting the bootstrap_url field in the database.
+	FieldBootstrapURL = "bootstrapUrl"
+	// FieldBootstrapSecretCiphertext holds the string denoting the bootstrap_secret_ciphertext field in the database.
+	FieldBootstrapSecretCiphertext = "bootstrapSecretCiphertext"
 	// FieldRevokedAt holds the string denoting the revoked_at field in the database.
 	FieldRevokedAt = "revokedAt"
+	// FieldLastAutoAuthenticatedAt holds the string denoting the last_auto_authenticated_at field in the database.
+	FieldLastAutoAuthenticatedAt = "lastAutoAuthenticatedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -105,7 +113,11 @@ var Columns = []string{
 	FieldLeaseToken,
 	FieldLeaseExpiresAt,
 	FieldCreatedByUserID,
+	FieldDiscoveredRoutes,
+	FieldBootstrapURL,
+	FieldBootstrapSecretCiphertext,
 	FieldRevokedAt,
+	FieldLastAutoAuthenticatedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -291,9 +303,24 @@ func ByCreatedByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedByUserID, opts...).ToFunc()
 }
 
+// ByBootstrapURL orders the results by the bootstrap_url field.
+func ByBootstrapURL(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBootstrapURL, opts...).ToFunc()
+}
+
+// ByBootstrapSecretCiphertext orders the results by the bootstrap_secret_ciphertext field.
+func ByBootstrapSecretCiphertext(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBootstrapSecretCiphertext, opts...).ToFunc()
+}
+
 // ByRevokedAt orders the results by the revoked_at field.
 func ByRevokedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRevokedAt, opts...).ToFunc()
+}
+
+// ByLastAutoAuthenticatedAt orders the results by the last_auto_authenticated_at field.
+func ByLastAutoAuthenticatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastAutoAuthenticatedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -177,7 +177,7 @@ func (c *Configuration) automationAuthenticatedCapture(ctx context.Context, org 
 	if !c.CaptureAvailable() {
 		return automation.Outputs{}, ErrAuthenticatedCaptureUnavailable
 	}
-	job, err := c.automationRecipeJob(ctx, org, event, action.RecipeID, action.CurrentState, "")
+	job, err := c.automationRecipeJob(ctx, org, event, action.RecipeID, action.CurrentState, "", nil)
 	if err != nil {
 		return automation.Outputs{}, err
 	}
@@ -190,6 +190,9 @@ func (c *Configuration) automationAuthenticatedCapture(ctx context.Context, org 
 	outputs := input
 	outputs.CreditsCharged = 0
 	outputs.CaptureID, outputs.CaptureAssetID, outputs.CaptureProof = *job.SurfaceCaptureID, *job.AssetID, automation.CaptureProofCurrentState
+	if len(job.SequenceAssetIds) > 1 {
+		outputs.CaptureAssetIDs = append([]string{}, job.SequenceAssetIds...)
+	}
 	if job.ExpectedRevision != nil {
 		outputs.CaptureProof = automation.CaptureProofVersion
 	}
@@ -211,8 +214,9 @@ func (c *Configuration) automationReleaseCaptures(ctx context.Context, org strin
 	outputs.CreditsCharged = credits
 	outputs.CaptureAssetIDs, outputs.CaptureFeatures = []string{}, []string{}
 	proven, waiting, needsAuth, superseded := true, false, false, 0
-	for _, planned := range plan {
-		job, err := c.automationRecipeJob(ctx, org, event, planned.RecipeID, action.CurrentState, planned.Feature)
+	deploymentsByEnv := map[string]*ent.DeploymentEvent{}
+	for idx, planned := range plan {
+		job, err := c.automationRecipeJob(ctx, org, event, planned.RecipeID, action.CurrentState, planned.Feature, deploymentsByEnv)
 		if errors.Is(err, ErrCaptureRefused) {
 			continue // archived or rebound since it was chosen: that page is missing
 		}
@@ -224,8 +228,20 @@ func (c *Configuration) automationReleaseCaptures(ctx context.Context, org strin
 			if outputs.CaptureAssetID == "" {
 				outputs.CaptureID, outputs.CaptureAssetID = optionalText(job.SurfaceCaptureID), *job.AssetID
 			}
-			outputs.CaptureAssetIDs = append(outputs.CaptureAssetIDs, *job.AssetID)
-			outputs.CaptureFeatures = append(outputs.CaptureFeatures, planned.Feature)
+			// Cap total rendered frames across a multi-recipe release plan to 6 so
+			// sequential creative renders stay well inside the 5-minute activity timeout.
+			const maxReleaseCaptureFrames = 6
+			remainingRecipes := len(plan) - idx - 1
+			budget := maxReleaseCaptureFrames - len(outputs.CaptureAssetIDs) - remainingRecipes
+			if len(job.SequenceAssetIds) > 1 && budget >= len(job.SequenceAssetIds) {
+				for _, seqAssetID := range job.SequenceAssetIds {
+					outputs.CaptureAssetIDs = append(outputs.CaptureAssetIDs, seqAssetID)
+					outputs.CaptureFeatures = append(outputs.CaptureFeatures, planned.Feature)
+				}
+			} else {
+				outputs.CaptureAssetIDs = append(outputs.CaptureAssetIDs, *job.AssetID)
+				outputs.CaptureFeatures = append(outputs.CaptureFeatures, planned.Feature)
+			}
 			proven = proven && job.ExpectedRevision != nil
 		case errors.Is(state, ErrCapturePending):
 			waiting = true
@@ -255,7 +271,7 @@ func (c *Configuration) automationReleaseCaptures(ctx context.Context, org strin
 // automationRecipeJob admits, or finds, the job one recipe runs for this run's
 // deployment. A feature steers a navigating recipe toward that release change in
 // a job of its own; every other capture shares the deployment's job.
-func (c *Configuration) automationRecipeJob(ctx context.Context, org string, event *ent.ReleaseSourceEvent, recipeID string, currentState bool, feature string) (*ent.CaptureJob, error) {
+func (c *Configuration) automationRecipeJob(ctx context.Context, org string, event *ent.ReleaseSourceEvent, recipeID string, currentState bool, feature string, deploymentCache map[string]*ent.DeploymentEvent) (*ent.CaptureJob, error) {
 	recipe, err := activeRecipeVersion(ctx, c.client.CaptureRecipe, org, recipeID)
 	if ent.IsNotFound(err) {
 		return nil, ErrCaptureRefused
@@ -276,9 +292,18 @@ func (c *Configuration) automationRecipeJob(ctx context.Context, org string, eve
 		(definition.Version == nil && !currentState) {
 		return nil, ErrCaptureRefused
 	}
-	deployment, err := c.automationDeployment(ctx, org, event, connection.Environment)
-	if err != nil {
-		return nil, err
+	var deployment *ent.DeploymentEvent
+	if deploymentCache != nil {
+		deployment = deploymentCache[connection.Environment]
+	}
+	if deployment == nil {
+		deployment, err = c.automationDeployment(ctx, org, event, connection.Environment)
+		if err != nil {
+			return nil, err
+		}
+		if deploymentCache != nil {
+			deploymentCache[connection.Environment] = deployment
+		}
 	}
 	// And to one environment: a staging session never captures production.
 	if deployment.Environment != connection.Environment {

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import {
-  captureConnectionInputSchema,
+  captureConnectionCreateSchema,
   captureEnvironmentSchema,
   type CaptureConnection,
   type CaptureConnectStart,
@@ -28,6 +29,7 @@ import {
   type CaptureConnectionForm,
 } from '@/lib/workflows/capture'
 import { CaptureError, CaptureField, useCaptureAction } from './capture-ui'
+import { CaptureEmailAuthPanel } from './CaptureEmailAuthPanel'
 import { SignInPanel } from './CaptureSignInPanel'
 import { automationSelectClass } from './ConditionEditor'
 import { relativeTime } from './workflow-ui'
@@ -36,6 +38,9 @@ import { relativeTime } from './workflow-ui'
 const EMPTY_OPTION = '__empty_option__'
 
 const blankConnection: CaptureConnectionForm = {
+  assignTestEmail: false,
+  bootstrapSecret: '',
+  bootstrapUrl: '',
   environment: 'production',
   expectedAccount: '',
   hosts: '',
@@ -81,6 +86,11 @@ function ConnectionRow({
       setStart(null)
       await onChanged()
     })
+  const bootstrap = () =>
+    run(async () => {
+      await client.capture.bootstrapConnection.mutate({ id: connection.id })
+      await onChanged()
+    })
   return (
     <Row>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -119,6 +129,16 @@ function ConnectionRow({
             >
               {open ? 'Start over' : connection.status === 'CONNECTING' ? 'Connect' : 'Reconnect'}
             </Button>
+            {connection.hasBootstrap ? (
+              <Button
+                disabled={busy || finishing}
+                onClick={() => void bootstrap()}
+                type="button"
+                variant="outline"
+              >
+                Refresh via bootstrap
+              </Button>
+            ) : null}
             <ConfirmDialog
               confirmLabel="Revoke"
               description="Deletes the stored session and cancels this connection's waiting captures. Signing in again needs a new connection."
@@ -153,8 +173,25 @@ function ConnectionRow({
           restore the sign-in. This updates on its own.
         </p>
       ) : null}
+      {connection.discoveredRoutes?.length ? (
+        <div className="space-y-1 pt-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            Discovered routes from sign-in ({connection.discoveredRoutes.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {connection.discoveredRoutes.slice(0, 12).map((route) => (
+              <Pill key={route.path}>
+                {route.label} ({route.path})
+              </Pill>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {connection.failureCode && !finishing ? (
         <p className="text-sm text-destructive">{captureFailureMessage(connection.failureCode)}</p>
+      ) : null}
+      {connection.status !== 'REVOKED' ? (
+        <CaptureEmailAuthPanel canManage={canManage} connection={connection} onChanged={onChanged} />
       ) : null}
       <CaptureError message={error} />
     </Row>
@@ -171,20 +208,25 @@ function ConnectionForm({
   const client = useTRPCClient()
   const [form, setForm] = useState(blankConnection)
   const { busy, error, run } = useCaptureAction()
-  const set = (key: keyof CaptureConnectionForm, value: string) =>
+  const set = (key: Exclude<keyof CaptureConnectionForm, 'assignTestEmail'>, value: string) =>
     setForm((old) => ({ ...old, [key]: value }))
-  const text = (key: keyof CaptureConnectionForm, label: string, hint: string, required = true) => (
+  const text = (
+    key: Exclude<keyof CaptureConnectionForm, 'assignTestEmail'>,
+    label: string,
+    hint: string,
+    required = true
+  ) => (
     <CaptureField hint={hint} label={label}>
       <Input
         onChange={(event) => set(key, event.target.value)}
         required={required}
-        value={form[key]}
+        value={form[key] ?? ''}
       />
     </CaptureField>
   )
   const submit = () =>
     run(async () => {
-      const input = captureConnectionInputSchema.safeParse(captureConnectionInput(form))
+      const input = captureConnectionCreateSchema.safeParse(captureConnectionInput(form))
       if (!input.success) throw new Error(input.error.issues[0]?.message ?? 'Check this form.')
       await client.capture.createConnection.mutate(input.data)
       setForm(blankConnection)
@@ -260,17 +302,52 @@ function ConnectionForm({
           'Protected path',
           'A page only a signed-in user reaches: /settings.'
         )}
-        {text(
-          'expectedAccount',
-          'Expected account text',
-          'What the signed-in account shows, such as demo@example.com.'
-        )}
+        <CaptureField
+          hint="Shots makes a test address that receives the app’s one-time sign-in emails, so Shots can sign in again by itself. Not for SSO, MFA, or password sign-in."
+          label="Sign-in by email"
+        >
+          <span className="flex items-center gap-2 text-sm font-normal">
+            <Checkbox
+              checked={form.assignTestEmail ?? false}
+              onCheckedChange={(checked) =>
+                setForm((old) => ({ ...old, assignTestEmail: checked === true, expectedAccount: '' }))
+              }
+            />
+            Use a Shots test email address
+          </span>
+        </CaptureField>
+        {form.assignTestEmail
+          ? null
+          : text(
+              'expectedAccount',
+              'Expected account text',
+              'What the signed-in account shows, such as demo@example.com.'
+            )}
         {text(
           'identitySelector',
           'Account element (optional)',
           'Leave empty and Shots looks for the account’s email in the app’s header or navigation; the expected account must then be that email. Or give the CSS selector of what shows it: [data-testid=account-email].',
           false
         )}
+        {text(
+          'bootstrapUrl',
+          'Session bootstrap URL (optional)',
+          'An https endpoint on an approved host that returns short-lived demo session cookies/localStorage for unattended renewal.',
+          false
+        )}
+        {form.bootstrapUrl?.trim() ? (
+          <CaptureField
+            hint="HMAC-SHA256 signing secret (at least 16 characters), encrypted at rest and never shown again."
+            label="Bootstrap signing secret"
+          >
+            <Input
+              onChange={(event) => set('bootstrapSecret', event.target.value)}
+              required
+              type="password"
+              value={form.bootstrapSecret ?? ''}
+            />
+          </CaptureField>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">
         A connection&apos;s address and account never change: new access needs a new connection.

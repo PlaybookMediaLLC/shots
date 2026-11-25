@@ -19,6 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
@@ -40,6 +41,8 @@ type AutomationRenderRequest struct {
 	// Part numbers each capture a node renders; 0 is the node's first and only
 	// capture before release matching, so its designs keep their names.
 	Part int `json:"part,omitempty"`
+	// Focus is the captured marker's normalized bounding box (0-1 viewport fractions).
+	Focus map[string]float64 `json:"focus,omitempty"`
 }
 
 // AutomationRender is one rendered creative.
@@ -185,8 +188,9 @@ func (c *Configuration) automationRenderCreatives(ctx context.Context, org, runI
 				return automation.Outputs{}, err
 			}
 		}
+		focus := c.captureFocusBox(ctx, org, captureAssetID)
 		renders, err := c.automationRenderer.Render(ctx, AutomationRenderRequest{OrganizationID: org, CampaignID: input.CampaignID, RunID: runID, NodeID: nodeID,
-			BrandKitID: input.BrandKitID, CaptureAssetID: captureAssetID, Headline: releasenotes.Clean(title, 60), Subheadline: releasenotes.Clean(subheadline, 100), TemplateIDs: templates, Part: part})
+			BrandKitID: input.BrandKitID, CaptureAssetID: captureAssetID, Headline: releasenotes.Clean(title, 60), Subheadline: releasenotes.Clean(subheadline, 100), TemplateIDs: templates, Part: part, Focus: focus})
 		if errors.Is(err, ErrRendererRefused) {
 			return automation.Outputs{}, ErrInvalidInput
 		}
@@ -256,6 +260,23 @@ func (c *Configuration) currentCapture(ctx context.Context, org, surfaceID strin
 		}
 	}
 	return "", ErrCaptureMissing
+}
+
+// captureFocusBox loads the persisted marker bounding box for a captured asset
+// via its primary-key CaptureID reference, avoiding table scans on capture attempts.
+func (c *Configuration) captureFocusBox(ctx context.Context, org, assetID string) map[string]float64 {
+	if assetID == "" {
+		return nil
+	}
+	row, err := c.client.Asset.Query().Where(asset.ID(assetID), asset.OrganizationID(org)).Select(asset.FieldCaptureID).Only(ctx)
+	if err != nil || row.CaptureID == nil || *row.CaptureID == "" {
+		return nil
+	}
+	attempt, err := c.client.CaptureAttempt.Query().Where(captureattempt.ID(*row.CaptureID), captureattempt.OrganizationID(org)).Select(captureattempt.FieldAssetID, captureattempt.FieldFocusBox).Only(ctx)
+	if err != nil || len(attempt.FocusBox) == 0 || attempt.AssetID == nil || *attempt.AssetID != assetID {
+		return nil
+	}
+	return attempt.FocusBox
 }
 
 // ErrAutomationRendererUnavailable is retryable: another worker may render.

@@ -84,6 +84,146 @@ export async function findSurfacesForFeature(
 /** Why a manual capture did not produce a screenshot, with the HTTP status it maps to. */
 export type SurfaceCaptureFailure = { message: string; status: number }
 
+/** Normalize a URL for matching registered surfaces (ignores fragment and trailing slash). */
+function normalizeSurfaceUrl(raw: string): string {
+  try {
+    const parsed = new URL(raw)
+    parsed.hash = ''
+    const normalized = parsed.toString()
+    return normalized.endsWith('/') && parsed.pathname !== '/'
+      ? normalized.slice(0, -1)
+      : normalized
+  } catch {
+    return raw.trim()
+  }
+}
+
+/** Result of resolving a signed-in capture for a registered product surface URL. */
+export type SignedInCaptureResolution =
+  | { assetId: string; kind: 'existing' | 'captured' }
+  | { jobId: string; kind: 'queued' }
+  | { kind: 'unavailable' }
+
+const FRESH_SIGNED_IN_CAPTURE_MS = 24 * 60 * 60 * 1000
+const POLL_BACKOFF_MS = [1_000, 2_000, 3_000, 5_000] as const
+
+/** True when an object key (`org/<org>/<class>/...`) holds a raw capture image. */
+export function isCaptureAssetKey(objectKey: string | null | undefined): boolean {
+  return objectKey?.split('/')[2] === 'capture'
+}
+
+function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal?.aborted) return Promise.resolve()
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * Resolves a signed-in capture when a registered surface at `url` has an active
+ * recipe: reuses an existing fresh capture (< 24h) immediately, attaches to an
+ * already-open job for the same recipe, or queues a capture job and waits
+ * briefly (up to `pollMs`) with abort-aware backoff.
+ * Returns null when `url` is an ordinary public page.
+ */
+export async function resolveSignedInCaptureAt(
+  context: TenantContext,
+  url: string,
+  sourceId: string,
+  {
+    pollMs = 30_000,
+    reuseFresh = true,
+    signal,
+  }: { pollMs?: number; reuseFresh?: boolean; signal?: AbortSignal } = {}
+): Promise<SignedInCaptureResolution | null> {
+  const sdk = backendSDK(context)
+  const [{ available, jobs, recipes }, { productSurfaces }] = await Promise.all([
+    sdk.captureOverview(),
+    sdk.listProductSurfaces(),
+  ])
+  const target = normalizeSurfaceUrl(url)
+  const surface = productSurfaces.find(
+    (entry) =>
+      normalizeSurfaceUrl(entry.url) === target &&
+      Boolean(activeRecipeForSurface(recipes, entry.id))
+  )
+  const recipe = surface ? activeRecipeForSurface(recipes, surface.id) : undefined
+  if (!surface || !recipe) return null
+
+  if (reuseFresh) {
+    // Reuse an existing fresh (< 24h) current capture of this signed-in surface when available.
+    const captures = await orNull(sdk.listSurfaceCaptures(surface.id))
+    const current = captures?.captures?.find((item) => !item.supersededAt)
+    if (
+      current &&
+      Date.now() - new Date(current.capturedAt).getTime() < FRESH_SIGNED_IN_CAPTURE_MS
+    ) {
+      return { assetId: current.assetId, kind: 'existing' }
+    }
+  }
+
+  if (!available) return { kind: 'unavailable' }
+  const openJob = jobs?.find(
+    (item) =>
+      item.recipeId === recipe.id &&
+      (item.phase === 'QUEUED' || item.phase === 'RUNNING' || item.phase === 'WAITING_DEPLOYMENT')
+  )
+  let job: CaptureJob
+  if (openJob) {
+    job = openJob
+  } else {
+    try {
+      const response = await sdk.requestCaptureJob(recipe.id, {
+        test: false,
+        source: 'agent',
+        sourceId,
+      })
+      job = response.job
+    } catch (error) {
+      if (error instanceof BackendSDKError && error.status === 409) return { kind: 'unavailable' }
+      throw error
+    }
+  }
+
+  if (job.phase === 'SUCCEEDED' && job.assetId) {
+    return { assetId: job.assetId, kind: 'captured' }
+  }
+
+  const deadline = Date.now() + Math.max(0, pollMs)
+  let attempt = 0
+  while (Date.now() < deadline) {
+    signal?.throwIfAborted()
+    const stepMs = POLL_BACKOFF_MS[Math.min(attempt, POLL_BACKOFF_MS.length - 1)] ?? 5_000
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) break
+    await sleepWithAbort(Math.min(stepMs, remaining), signal)
+    signal?.throwIfAborted()
+    attempt++
+    const polled = await orNull(sdk.getCaptureJob(job.id))
+    const latest = polled?.job
+    if (!latest) break
+    if (latest.phase === 'SUCCEEDED' && latest.assetId) {
+      return { assetId: latest.assetId, kind: 'captured' }
+    }
+    if (
+      latest.phase === 'FAILED' ||
+      latest.phase === 'CANCELLED' ||
+      latest.phase === 'NEEDS_AUTH'
+    ) {
+      return { kind: 'unavailable' }
+    }
+  }
+  return { jobId: job.id, kind: 'queued' }
+}
+
 /**
  * Queues a signed-in capture when a registered surface at this URL has an active
  * recipe, because a public screenshot of it would only show the sign-in screen.
@@ -94,24 +234,13 @@ export async function queueSignedInCaptureAt(
   url: string,
   sourceId: string
 ): Promise<'queued' | 'unavailable' | null> {
-  const sdk = backendSDK(context)
-  const [{ available, recipes }, { productSurfaces }] = await Promise.all([
-    sdk.captureOverview(),
-    sdk.listProductSurfaces(),
-  ])
-  const recipe = productSurfaces
-    .filter((surface) => surface.url === url)
-    .map((surface) => activeRecipeForSurface(recipes, surface.id))
-    .find(Boolean)
-  if (!recipe) return null
-  if (!available) return 'unavailable'
-  try {
-    await sdk.requestCaptureJob(recipe.id, { test: false, source: 'agent', sourceId })
-    return 'queued'
-  } catch (error) {
-    if (error instanceof BackendSDKError && error.status === 409) return 'unavailable'
-    throw error
-  }
+  const resolved = await resolveSignedInCaptureAt(context, url, sourceId, {
+    pollMs: 0,
+    reuseFresh: false,
+  })
+  if (!resolved) return null
+  if (resolved.kind === 'unavailable') return 'unavailable'
+  return 'queued'
 }
 
 /**

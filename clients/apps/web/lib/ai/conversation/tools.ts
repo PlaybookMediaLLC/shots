@@ -65,7 +65,7 @@ async function permanent<T>(work: () => Promise<T>) {
 export function conversationTools(run: ToolRun, state: TurnState, { canAsk }: { canAsk: boolean }) {
   const access = run.access
   const marketing = marketingTools(run, {
-    campaignId: state.campaignId ?? undefined,
+    campaignId: () => state.campaignId ?? undefined,
     services: marketingServices,
   })
 
@@ -189,8 +189,11 @@ export function conversationTools(run: ToolRun, state: TurnState, { canAsk }: { 
         if (!(await getWorkingPlan(access, campaignId))) {
           await draftCampaignPlan(access, campaignId, signal)
         }
-        const posts = (await getCampaign(access, campaignId))?.posts.length ?? 0
-        if (posts > 0) return { campaignId, ok: true as const, postCount: posts, produced: false }
+        const existing = await getCampaign(access, campaignId)
+        const posts = existing?.posts.length ?? 0
+        const assets = existing?.assets.length ?? 0
+        if (posts > 0 && assets > 0)
+          return { assetCount: assets, campaignId, ok: true as const, postCount: posts, produced: false }
         // ponytail: produce runs untraced; its own tool steps would reuse this run's indexes.
         const result = await produceCampaign(access, campaignId, { signal })
         return {

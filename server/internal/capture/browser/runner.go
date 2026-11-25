@@ -43,13 +43,20 @@ func (r Runner) OpenLogin(ctx context.Context, sessionID string, target Target) 
 
 // Export reads the state the person's sign-in left in the session.
 func (r Runner) Export(ctx context.Context, sessionID string, target Target) (*State, error) {
+	state, _, err := r.ExportWithRoutes(ctx, sessionID, target)
+	return state, err
+}
+
+// ExportWithRoutes reads the state and safe navigation routes from the sign-in session.
+func (r Runner) ExportWithRoutes(ctx context.Context, sessionID string, target Target) (*State, []DiscoveredRoute, error) {
 	var state *State
+	var routes []DiscoveredRoute
 	err := r.attached(ctx, sessionID, func(ctx context.Context, browser *rod.Browser) error {
 		var err error
-		state, err = ExportConnected(ctx, browser, target)
+		state, routes, err = ExportConnectedWithRoutes(ctx, browser, target)
 		return err
 	})
-	return state, err
+	return state, routes, err
 }
 
 // Verify proves state reaches the protected page as the expected account.

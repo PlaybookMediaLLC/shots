@@ -4,8 +4,11 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { BackendSDKError } from 'screenshot-studio-backend-sdk'
 import {
+  autoCaptureResultSchema,
+  captureAuthAttemptSchema,
   captureConnectFinishSchema,
-  captureConnectionInputSchema,
+  captureConnectionCreateSchema,
+  captureEmailAuthSchema,
   captureConnectionSchema,
   captureConnectStartSchema,
   captureIdentitySchema,
@@ -13,6 +16,10 @@ import {
   captureOverviewSchema,
   captureRecipeInputSchema,
   captureRecipeSchema,
+  enableCaptureEmailAuthSchema,
+  proposeCaptureRecipeInputSchema,
+  saveCaptureEmailAuthRecipeSchema,
+  proposedCaptureRecipeSchema,
 } from '@/lib/api/contracts/capture'
 import { backendSDK } from '@/lib/backend/sdk'
 import { router } from '../init'
@@ -36,7 +43,7 @@ export const captureRouter = router({
     .output(captureOverviewSchema)
     .query(({ ctx }) => backendSDK(ctx.access).captureOverview()),
   createConnection: organizationProcedure('workspace:update')
-    .input(captureConnectionInputSchema)
+    .input(captureConnectionCreateSchema)
     .output(z.object({ connection: captureConnectionSchema }))
     .mutation(({ ctx, input }) =>
       explainConflict(
@@ -75,6 +82,16 @@ export const captureRouter = router({
         'This sign-in expired or was replaced. Start the sign-in again.'
       )
     ),
+  /** Refreshes the connection's session via its configured signed bootstrap endpoint. */
+  bootstrapConnection: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ connection: captureConnectionSchema }))
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).bootstrapCaptureConnection(input.id),
+        'This connection was revoked and cannot bootstrap a new session.'
+      )
+    ),
   revokeConnection: organizationProcedure('workspace:update')
     .input(captureIdentitySchema)
     .mutation(({ ctx, input }) => backendSDK(ctx.access).revokeCaptureConnection(input.id)),
@@ -85,6 +102,21 @@ export const captureRouter = router({
       explainConflict(
         backendSDK(ctx.access).createCaptureRecipe(input),
         'This connection was revoked, or this version was just saved. Reload and try again.'
+      )
+    ),
+  /** Proposes a zero-config AI capture recipe from plain English and discovered routes. */
+  proposeRecipe: organizationProcedure('workspace:update')
+    .input(proposeCaptureRecipeInputSchema)
+    .output(z.object({ proposal: proposedCaptureRecipeSchema }))
+    .mutation(({ ctx, input }) => backendSDK(ctx.access).proposeCaptureRecipe(input)),
+  /** Proposes, saves, and immediately queues a zero-config AI capture from plain English. */
+  autoCapture: organizationProcedure('workspace:update')
+    .input(proposeCaptureRecipeInputSchema)
+    .output(autoCaptureResultSchema)
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).autoCaptureFromPrompt(input),
+        'This connection was revoked or cannot run a capture right now.'
       )
     ),
   activateRecipe: organizationProcedure('workspace:update')
@@ -107,4 +139,67 @@ export const captureRouter = router({
   cancelJob: organizationProcedure('workspace:update')
     .input(captureIdentitySchema)
     .mutation(({ ctx, input }) => backendSDK(ctx.access).cancelCaptureJob(input.id)),
+  /** A connection's email sign-in setup, or null when it has none (RFC 007A). */
+  emailAuth: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ emailAuth: captureEmailAuthSchema.nullable() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await backendSDK(ctx.access).getCaptureEmailAuth(input.id)
+      } catch (error) {
+        if (error instanceof BackendSDKError && error.status === 404) return { emailAuth: null }
+        throw error
+      }
+    }),
+  createEmailAuth: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ emailAuth: captureEmailAuthSchema }))
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).createCaptureEmailAuth(input.id),
+        'This connection expects another account. Create a new connection with a Shots test email address.'
+      )
+    ),
+  saveEmailAuthRecipe: organizationProcedure('workspace:update')
+    .input(saveCaptureEmailAuthRecipeSchema)
+    .output(z.object({ emailAuth: captureEmailAuthSchema }))
+    .mutation(({ ctx, input: { id, ...input } }) =>
+      explainConflict(
+        backendSDK(ctx.access).saveCaptureEmailAuthRecipe(id, input),
+        'The setup changed since you opened it. Reload and try again.'
+      )
+    ),
+  testEmailAuth: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ attempt: captureAuthAttemptSchema }))
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).testCaptureEmailAuth(input.id),
+        'Another sign-in is running, a person is signing in, or today’s attempts are used up.'
+      )
+    ),
+  /** Only an owner may opt in; Go enforces it again. */
+  enableEmailAuth: organizationProcedure('workspace:update')
+    .input(enableCaptureEmailAuthSchema)
+    .output(z.object({ emailAuth: captureEmailAuthSchema }))
+    .mutation(({ ctx, input }) =>
+      explainConflict(
+        backendSDK(ctx.access).enableCaptureEmailAuth(input.id, input.expectedRevision),
+        'Run a passing test of this exact setup first.'
+      )
+    ),
+  pauseEmailAuth: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ emailAuth: captureEmailAuthSchema }))
+    .mutation(({ ctx, input }) => backendSDK(ctx.access).pauseCaptureEmailAuth(input.id)),
+  revokeEmailAuth: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .mutation(({ ctx, input }) => backendSDK(ctx.access).revokeCaptureEmailAuth(input.id)),
+  authAttempt: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .output(z.object({ attempt: captureAuthAttemptSchema }))
+    .query(({ ctx, input }) => backendSDK(ctx.access).getCaptureAuthAttempt(input.id)),
+  cancelAuthAttempt: organizationProcedure('workspace:update')
+    .input(captureIdentitySchema)
+    .mutation(({ ctx, input }) => backendSDK(ctx.access).cancelCaptureAuthAttempt(input.id)),
 })

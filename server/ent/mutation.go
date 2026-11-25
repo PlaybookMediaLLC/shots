@@ -37,6 +37,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthrecipeversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureemailauthconfig"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureinboundreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
@@ -240,6 +244,10 @@ const (
 	TypeCampaignPost                    = "CampaignPost"
 	TypeCampaignRevision                = "CampaignRevision"
 	TypeCaptureAttempt                  = "CaptureAttempt"
+	TypeCaptureAuthAttempt              = "CaptureAuthAttempt"
+	TypeCaptureAuthRecipeVersion        = "CaptureAuthRecipeVersion"
+	TypeCaptureEmailAuthConfig          = "CaptureEmailAuthConfig"
+	TypeCaptureInboundReceipt           = "CaptureInboundReceipt"
 	TypeCaptureJob                      = "CaptureJob"
 	TypeCaptureRecipe                   = "CaptureRecipe"
 	TypeChannelConnection               = "ChannelConnection"
@@ -22346,6 +22354,7 @@ type CaptureAttemptMutation struct {
 	asset_id                 *string
 	navigation_actions       *[]map[string]string
 	appendnavigation_actions []map[string]string
+	focus_box                *map[string]float64
 	created_at               *time.Time
 	updated_at               *time.Time
 	clearedFields            map[string]struct{}
@@ -23355,6 +23364,55 @@ func (m *CaptureAttemptMutation) ResetNavigationActions() {
 	delete(m.clearedFields, captureattempt.FieldNavigationActions)
 }
 
+// SetFocusBox sets the "focus_box" field.
+func (m *CaptureAttemptMutation) SetFocusBox(value map[string]float64) {
+	m.focus_box = &value
+}
+
+// FocusBox returns the value of the "focus_box" field in the mutation.
+func (m *CaptureAttemptMutation) FocusBox() (r map[string]float64, exists bool) {
+	v := m.focus_box
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFocusBox returns the old "focus_box" field's value of the CaptureAttempt entity.
+// If the CaptureAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAttemptMutation) OldFocusBox(ctx context.Context) (v map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFocusBox is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFocusBox requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFocusBox: %w", err)
+	}
+	return oldValue.FocusBox, nil
+}
+
+// ClearFocusBox clears the value of the "focus_box" field.
+func (m *CaptureAttemptMutation) ClearFocusBox() {
+	m.focus_box = nil
+	m.clearedFields[captureattempt.FieldFocusBox] = struct{}{}
+}
+
+// FocusBoxCleared returns if the "focus_box" field was cleared in this mutation.
+func (m *CaptureAttemptMutation) FocusBoxCleared() bool {
+	_, ok := m.clearedFields[captureattempt.FieldFocusBox]
+	return ok
+}
+
+// ResetFocusBox resets all changes to the "focus_box" field.
+func (m *CaptureAttemptMutation) ResetFocusBox() {
+	m.focus_box = nil
+	delete(m.clearedFields, captureattempt.FieldFocusBox)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *CaptureAttemptMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -23461,7 +23519,7 @@ func (m *CaptureAttemptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CaptureAttemptMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.organization_id != nil {
 		fields = append(fields, captureattempt.FieldOrganizationID)
 	}
@@ -23519,6 +23577,9 @@ func (m *CaptureAttemptMutation) Fields() []string {
 	if m.navigation_actions != nil {
 		fields = append(fields, captureattempt.FieldNavigationActions)
 	}
+	if m.focus_box != nil {
+		fields = append(fields, captureattempt.FieldFocusBox)
+	}
 	if m.created_at != nil {
 		fields = append(fields, captureattempt.FieldCreatedAt)
 	}
@@ -23571,6 +23632,8 @@ func (m *CaptureAttemptMutation) Field(name string) (ent.Value, bool) {
 		return m.AssetID()
 	case captureattempt.FieldNavigationActions:
 		return m.NavigationActions()
+	case captureattempt.FieldFocusBox:
+		return m.FocusBox()
 	case captureattempt.FieldCreatedAt:
 		return m.CreatedAt()
 	case captureattempt.FieldUpdatedAt:
@@ -23622,6 +23685,8 @@ func (m *CaptureAttemptMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldAssetID(ctx)
 	case captureattempt.FieldNavigationActions:
 		return m.OldNavigationActions(ctx)
+	case captureattempt.FieldFocusBox:
+		return m.OldFocusBox(ctx)
 	case captureattempt.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case captureattempt.FieldUpdatedAt:
@@ -23768,6 +23833,13 @@ func (m *CaptureAttemptMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNavigationActions(v)
 		return nil
+	case captureattempt.FieldFocusBox:
+		v, ok := value.(map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFocusBox(v)
+		return nil
 	case captureattempt.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -23890,6 +23962,9 @@ func (m *CaptureAttemptMutation) ClearedFields() []string {
 	if m.FieldCleared(captureattempt.FieldNavigationActions) {
 		fields = append(fields, captureattempt.FieldNavigationActions)
 	}
+	if m.FieldCleared(captureattempt.FieldFocusBox) {
+		fields = append(fields, captureattempt.FieldFocusBox)
+	}
 	return fields
 }
 
@@ -23930,6 +24005,9 @@ func (m *CaptureAttemptMutation) ClearField(name string) error {
 		return nil
 	case captureattempt.FieldNavigationActions:
 		m.ClearNavigationActions()
+		return nil
+	case captureattempt.FieldFocusBox:
+		m.ClearFocusBox()
 		return nil
 	}
 	return fmt.Errorf("unknown CaptureAttempt nullable field %s", name)
@@ -23996,6 +24074,9 @@ func (m *CaptureAttemptMutation) ResetField(name string) error {
 	case captureattempt.FieldNavigationActions:
 		m.ResetNavigationActions()
 		return nil
+	case captureattempt.FieldFocusBox:
+		m.ResetFocusBox()
+		return nil
 	case captureattempt.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -24054,6 +24135,5225 @@ func (m *CaptureAttemptMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown CaptureAttempt edge %s", name)
 }
 
+// CaptureAuthAttemptMutation represents an operation that mutates the CaptureAuthAttempt nodes in the graph.
+type CaptureAuthAttemptMutation struct {
+	config
+	op                       Op
+	typ                      string
+	id                       *string
+	organization_id          *string
+	connection_id            *string
+	config_id                *string
+	config_revision          *int
+	addconfig_revision       *int
+	recipe_version_id        *string
+	recipe_hash              *string
+	connection_generation    *int
+	addconnection_generation *int
+	mode                     *captureauthattempt.Mode
+	state                    *captureauthattempt.State
+	browser_session_id       *string
+	browser_closed_at        *time.Time
+	email_requested_at       *time.Time
+	email_received_at        *time.Time
+	receipt_id               *string
+	deadline_at              *time.Time
+	completed_at             *time.Time
+	failure_code             *string
+	fence_token              *int64
+	addfence_token           *int64
+	created_by_user_id       *string
+	trigger_capture_job_id   *string
+	created_at               *time.Time
+	updated_at               *time.Time
+	clearedFields            map[string]struct{}
+	done                     bool
+	oldValue                 func(context.Context) (*CaptureAuthAttempt, error)
+	predicates               []predicate.CaptureAuthAttempt
+}
+
+var _ ent.Mutation = (*CaptureAuthAttemptMutation)(nil)
+
+// captureauthattemptOption allows management of the mutation configuration using functional options.
+type captureauthattemptOption func(*CaptureAuthAttemptMutation)
+
+// newCaptureAuthAttemptMutation creates new mutation for the CaptureAuthAttempt entity.
+func newCaptureAuthAttemptMutation(c config, op Op, opts ...captureauthattemptOption) *CaptureAuthAttemptMutation {
+	m := &CaptureAuthAttemptMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCaptureAuthAttempt,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCaptureAuthAttemptID sets the ID field of the mutation.
+func withCaptureAuthAttemptID(id string) captureauthattemptOption {
+	return func(m *CaptureAuthAttemptMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CaptureAuthAttempt
+		)
+		m.oldValue = func(ctx context.Context) (*CaptureAuthAttempt, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CaptureAuthAttempt.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCaptureAuthAttempt sets the old CaptureAuthAttempt of the mutation.
+func withCaptureAuthAttempt(node *CaptureAuthAttempt) captureauthattemptOption {
+	return func(m *CaptureAuthAttemptMutation) {
+		m.oldValue = func(context.Context) (*CaptureAuthAttempt, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CaptureAuthAttemptMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CaptureAuthAttemptMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of CaptureAuthAttempt entities.
+func (m *CaptureAuthAttemptMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CaptureAuthAttemptMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CaptureAuthAttemptMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CaptureAuthAttempt.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *CaptureAuthAttemptMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *CaptureAuthAttemptMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetConnectionID sets the "connection_id" field.
+func (m *CaptureAuthAttemptMutation) SetConnectionID(s string) {
+	m.connection_id = &s
+}
+
+// ConnectionID returns the value of the "connection_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) ConnectionID() (r string, exists bool) {
+	v := m.connection_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConnectionID returns the old "connection_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldConnectionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConnectionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConnectionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConnectionID: %w", err)
+	}
+	return oldValue.ConnectionID, nil
+}
+
+// ResetConnectionID resets all changes to the "connection_id" field.
+func (m *CaptureAuthAttemptMutation) ResetConnectionID() {
+	m.connection_id = nil
+}
+
+// SetConfigID sets the "config_id" field.
+func (m *CaptureAuthAttemptMutation) SetConfigID(s string) {
+	m.config_id = &s
+}
+
+// ConfigID returns the value of the "config_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) ConfigID() (r string, exists bool) {
+	v := m.config_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigID returns the old "config_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldConfigID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigID: %w", err)
+	}
+	return oldValue.ConfigID, nil
+}
+
+// ResetConfigID resets all changes to the "config_id" field.
+func (m *CaptureAuthAttemptMutation) ResetConfigID() {
+	m.config_id = nil
+}
+
+// SetConfigRevision sets the "config_revision" field.
+func (m *CaptureAuthAttemptMutation) SetConfigRevision(i int) {
+	m.config_revision = &i
+	m.addconfig_revision = nil
+}
+
+// ConfigRevision returns the value of the "config_revision" field in the mutation.
+func (m *CaptureAuthAttemptMutation) ConfigRevision() (r int, exists bool) {
+	v := m.config_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigRevision returns the old "config_revision" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldConfigRevision(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigRevision: %w", err)
+	}
+	return oldValue.ConfigRevision, nil
+}
+
+// AddConfigRevision adds i to the "config_revision" field.
+func (m *CaptureAuthAttemptMutation) AddConfigRevision(i int) {
+	if m.addconfig_revision != nil {
+		*m.addconfig_revision += i
+	} else {
+		m.addconfig_revision = &i
+	}
+}
+
+// AddedConfigRevision returns the value that was added to the "config_revision" field in this mutation.
+func (m *CaptureAuthAttemptMutation) AddedConfigRevision() (r int, exists bool) {
+	v := m.addconfig_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConfigRevision resets all changes to the "config_revision" field.
+func (m *CaptureAuthAttemptMutation) ResetConfigRevision() {
+	m.config_revision = nil
+	m.addconfig_revision = nil
+}
+
+// SetRecipeVersionID sets the "recipe_version_id" field.
+func (m *CaptureAuthAttemptMutation) SetRecipeVersionID(s string) {
+	m.recipe_version_id = &s
+}
+
+// RecipeVersionID returns the value of the "recipe_version_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) RecipeVersionID() (r string, exists bool) {
+	v := m.recipe_version_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipeVersionID returns the old "recipe_version_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldRecipeVersionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipeVersionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipeVersionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipeVersionID: %w", err)
+	}
+	return oldValue.RecipeVersionID, nil
+}
+
+// ResetRecipeVersionID resets all changes to the "recipe_version_id" field.
+func (m *CaptureAuthAttemptMutation) ResetRecipeVersionID() {
+	m.recipe_version_id = nil
+}
+
+// SetRecipeHash sets the "recipe_hash" field.
+func (m *CaptureAuthAttemptMutation) SetRecipeHash(s string) {
+	m.recipe_hash = &s
+}
+
+// RecipeHash returns the value of the "recipe_hash" field in the mutation.
+func (m *CaptureAuthAttemptMutation) RecipeHash() (r string, exists bool) {
+	v := m.recipe_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipeHash returns the old "recipe_hash" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldRecipeHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipeHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipeHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipeHash: %w", err)
+	}
+	return oldValue.RecipeHash, nil
+}
+
+// ResetRecipeHash resets all changes to the "recipe_hash" field.
+func (m *CaptureAuthAttemptMutation) ResetRecipeHash() {
+	m.recipe_hash = nil
+}
+
+// SetConnectionGeneration sets the "connection_generation" field.
+func (m *CaptureAuthAttemptMutation) SetConnectionGeneration(i int) {
+	m.connection_generation = &i
+	m.addconnection_generation = nil
+}
+
+// ConnectionGeneration returns the value of the "connection_generation" field in the mutation.
+func (m *CaptureAuthAttemptMutation) ConnectionGeneration() (r int, exists bool) {
+	v := m.connection_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConnectionGeneration returns the old "connection_generation" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldConnectionGeneration(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConnectionGeneration is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConnectionGeneration requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConnectionGeneration: %w", err)
+	}
+	return oldValue.ConnectionGeneration, nil
+}
+
+// AddConnectionGeneration adds i to the "connection_generation" field.
+func (m *CaptureAuthAttemptMutation) AddConnectionGeneration(i int) {
+	if m.addconnection_generation != nil {
+		*m.addconnection_generation += i
+	} else {
+		m.addconnection_generation = &i
+	}
+}
+
+// AddedConnectionGeneration returns the value that was added to the "connection_generation" field in this mutation.
+func (m *CaptureAuthAttemptMutation) AddedConnectionGeneration() (r int, exists bool) {
+	v := m.addconnection_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConnectionGeneration resets all changes to the "connection_generation" field.
+func (m *CaptureAuthAttemptMutation) ResetConnectionGeneration() {
+	m.connection_generation = nil
+	m.addconnection_generation = nil
+}
+
+// SetMode sets the "mode" field.
+func (m *CaptureAuthAttemptMutation) SetMode(c captureauthattempt.Mode) {
+	m.mode = &c
+}
+
+// Mode returns the value of the "mode" field in the mutation.
+func (m *CaptureAuthAttemptMutation) Mode() (r captureauthattempt.Mode, exists bool) {
+	v := m.mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMode returns the old "mode" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldMode(ctx context.Context) (v captureauthattempt.Mode, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMode: %w", err)
+	}
+	return oldValue.Mode, nil
+}
+
+// ResetMode resets all changes to the "mode" field.
+func (m *CaptureAuthAttemptMutation) ResetMode() {
+	m.mode = nil
+}
+
+// SetState sets the "state" field.
+func (m *CaptureAuthAttemptMutation) SetState(c captureauthattempt.State) {
+	m.state = &c
+}
+
+// State returns the value of the "state" field in the mutation.
+func (m *CaptureAuthAttemptMutation) State() (r captureauthattempt.State, exists bool) {
+	v := m.state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldState returns the old "state" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldState(ctx context.Context) (v captureauthattempt.State, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
+	}
+	return oldValue.State, nil
+}
+
+// ResetState resets all changes to the "state" field.
+func (m *CaptureAuthAttemptMutation) ResetState() {
+	m.state = nil
+}
+
+// SetBrowserSessionID sets the "browser_session_id" field.
+func (m *CaptureAuthAttemptMutation) SetBrowserSessionID(s string) {
+	m.browser_session_id = &s
+}
+
+// BrowserSessionID returns the value of the "browser_session_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) BrowserSessionID() (r string, exists bool) {
+	v := m.browser_session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBrowserSessionID returns the old "browser_session_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldBrowserSessionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBrowserSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBrowserSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBrowserSessionID: %w", err)
+	}
+	return oldValue.BrowserSessionID, nil
+}
+
+// ClearBrowserSessionID clears the value of the "browser_session_id" field.
+func (m *CaptureAuthAttemptMutation) ClearBrowserSessionID() {
+	m.browser_session_id = nil
+	m.clearedFields[captureauthattempt.FieldBrowserSessionID] = struct{}{}
+}
+
+// BrowserSessionIDCleared returns if the "browser_session_id" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) BrowserSessionIDCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldBrowserSessionID]
+	return ok
+}
+
+// ResetBrowserSessionID resets all changes to the "browser_session_id" field.
+func (m *CaptureAuthAttemptMutation) ResetBrowserSessionID() {
+	m.browser_session_id = nil
+	delete(m.clearedFields, captureauthattempt.FieldBrowserSessionID)
+}
+
+// SetBrowserClosedAt sets the "browser_closed_at" field.
+func (m *CaptureAuthAttemptMutation) SetBrowserClosedAt(t time.Time) {
+	m.browser_closed_at = &t
+}
+
+// BrowserClosedAt returns the value of the "browser_closed_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) BrowserClosedAt() (r time.Time, exists bool) {
+	v := m.browser_closed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBrowserClosedAt returns the old "browser_closed_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldBrowserClosedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBrowserClosedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBrowserClosedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBrowserClosedAt: %w", err)
+	}
+	return oldValue.BrowserClosedAt, nil
+}
+
+// ClearBrowserClosedAt clears the value of the "browser_closed_at" field.
+func (m *CaptureAuthAttemptMutation) ClearBrowserClosedAt() {
+	m.browser_closed_at = nil
+	m.clearedFields[captureauthattempt.FieldBrowserClosedAt] = struct{}{}
+}
+
+// BrowserClosedAtCleared returns if the "browser_closed_at" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) BrowserClosedAtCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldBrowserClosedAt]
+	return ok
+}
+
+// ResetBrowserClosedAt resets all changes to the "browser_closed_at" field.
+func (m *CaptureAuthAttemptMutation) ResetBrowserClosedAt() {
+	m.browser_closed_at = nil
+	delete(m.clearedFields, captureauthattempt.FieldBrowserClosedAt)
+}
+
+// SetEmailRequestedAt sets the "email_requested_at" field.
+func (m *CaptureAuthAttemptMutation) SetEmailRequestedAt(t time.Time) {
+	m.email_requested_at = &t
+}
+
+// EmailRequestedAt returns the value of the "email_requested_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) EmailRequestedAt() (r time.Time, exists bool) {
+	v := m.email_requested_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmailRequestedAt returns the old "email_requested_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldEmailRequestedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmailRequestedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmailRequestedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmailRequestedAt: %w", err)
+	}
+	return oldValue.EmailRequestedAt, nil
+}
+
+// ClearEmailRequestedAt clears the value of the "email_requested_at" field.
+func (m *CaptureAuthAttemptMutation) ClearEmailRequestedAt() {
+	m.email_requested_at = nil
+	m.clearedFields[captureauthattempt.FieldEmailRequestedAt] = struct{}{}
+}
+
+// EmailRequestedAtCleared returns if the "email_requested_at" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) EmailRequestedAtCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldEmailRequestedAt]
+	return ok
+}
+
+// ResetEmailRequestedAt resets all changes to the "email_requested_at" field.
+func (m *CaptureAuthAttemptMutation) ResetEmailRequestedAt() {
+	m.email_requested_at = nil
+	delete(m.clearedFields, captureauthattempt.FieldEmailRequestedAt)
+}
+
+// SetEmailReceivedAt sets the "email_received_at" field.
+func (m *CaptureAuthAttemptMutation) SetEmailReceivedAt(t time.Time) {
+	m.email_received_at = &t
+}
+
+// EmailReceivedAt returns the value of the "email_received_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) EmailReceivedAt() (r time.Time, exists bool) {
+	v := m.email_received_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmailReceivedAt returns the old "email_received_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldEmailReceivedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmailReceivedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmailReceivedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmailReceivedAt: %w", err)
+	}
+	return oldValue.EmailReceivedAt, nil
+}
+
+// ClearEmailReceivedAt clears the value of the "email_received_at" field.
+func (m *CaptureAuthAttemptMutation) ClearEmailReceivedAt() {
+	m.email_received_at = nil
+	m.clearedFields[captureauthattempt.FieldEmailReceivedAt] = struct{}{}
+}
+
+// EmailReceivedAtCleared returns if the "email_received_at" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) EmailReceivedAtCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldEmailReceivedAt]
+	return ok
+}
+
+// ResetEmailReceivedAt resets all changes to the "email_received_at" field.
+func (m *CaptureAuthAttemptMutation) ResetEmailReceivedAt() {
+	m.email_received_at = nil
+	delete(m.clearedFields, captureauthattempt.FieldEmailReceivedAt)
+}
+
+// SetReceiptID sets the "receipt_id" field.
+func (m *CaptureAuthAttemptMutation) SetReceiptID(s string) {
+	m.receipt_id = &s
+}
+
+// ReceiptID returns the value of the "receipt_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) ReceiptID() (r string, exists bool) {
+	v := m.receipt_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceiptID returns the old "receipt_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldReceiptID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceiptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceiptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceiptID: %w", err)
+	}
+	return oldValue.ReceiptID, nil
+}
+
+// ClearReceiptID clears the value of the "receipt_id" field.
+func (m *CaptureAuthAttemptMutation) ClearReceiptID() {
+	m.receipt_id = nil
+	m.clearedFields[captureauthattempt.FieldReceiptID] = struct{}{}
+}
+
+// ReceiptIDCleared returns if the "receipt_id" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) ReceiptIDCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldReceiptID]
+	return ok
+}
+
+// ResetReceiptID resets all changes to the "receipt_id" field.
+func (m *CaptureAuthAttemptMutation) ResetReceiptID() {
+	m.receipt_id = nil
+	delete(m.clearedFields, captureauthattempt.FieldReceiptID)
+}
+
+// SetDeadlineAt sets the "deadline_at" field.
+func (m *CaptureAuthAttemptMutation) SetDeadlineAt(t time.Time) {
+	m.deadline_at = &t
+}
+
+// DeadlineAt returns the value of the "deadline_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) DeadlineAt() (r time.Time, exists bool) {
+	v := m.deadline_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeadlineAt returns the old "deadline_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldDeadlineAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeadlineAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeadlineAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeadlineAt: %w", err)
+	}
+	return oldValue.DeadlineAt, nil
+}
+
+// ResetDeadlineAt resets all changes to the "deadline_at" field.
+func (m *CaptureAuthAttemptMutation) ResetDeadlineAt() {
+	m.deadline_at = nil
+}
+
+// SetCompletedAt sets the "completed_at" field.
+func (m *CaptureAuthAttemptMutation) SetCompletedAt(t time.Time) {
+	m.completed_at = &t
+}
+
+// CompletedAt returns the value of the "completed_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) CompletedAt() (r time.Time, exists bool) {
+	v := m.completed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompletedAt returns the old "completed_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldCompletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompletedAt: %w", err)
+	}
+	return oldValue.CompletedAt, nil
+}
+
+// ClearCompletedAt clears the value of the "completed_at" field.
+func (m *CaptureAuthAttemptMutation) ClearCompletedAt() {
+	m.completed_at = nil
+	m.clearedFields[captureauthattempt.FieldCompletedAt] = struct{}{}
+}
+
+// CompletedAtCleared returns if the "completed_at" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) CompletedAtCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldCompletedAt]
+	return ok
+}
+
+// ResetCompletedAt resets all changes to the "completed_at" field.
+func (m *CaptureAuthAttemptMutation) ResetCompletedAt() {
+	m.completed_at = nil
+	delete(m.clearedFields, captureauthattempt.FieldCompletedAt)
+}
+
+// SetFailureCode sets the "failure_code" field.
+func (m *CaptureAuthAttemptMutation) SetFailureCode(s string) {
+	m.failure_code = &s
+}
+
+// FailureCode returns the value of the "failure_code" field in the mutation.
+func (m *CaptureAuthAttemptMutation) FailureCode() (r string, exists bool) {
+	v := m.failure_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureCode returns the old "failure_code" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldFailureCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureCode: %w", err)
+	}
+	return oldValue.FailureCode, nil
+}
+
+// ClearFailureCode clears the value of the "failure_code" field.
+func (m *CaptureAuthAttemptMutation) ClearFailureCode() {
+	m.failure_code = nil
+	m.clearedFields[captureauthattempt.FieldFailureCode] = struct{}{}
+}
+
+// FailureCodeCleared returns if the "failure_code" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) FailureCodeCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldFailureCode]
+	return ok
+}
+
+// ResetFailureCode resets all changes to the "failure_code" field.
+func (m *CaptureAuthAttemptMutation) ResetFailureCode() {
+	m.failure_code = nil
+	delete(m.clearedFields, captureauthattempt.FieldFailureCode)
+}
+
+// SetFenceToken sets the "fence_token" field.
+func (m *CaptureAuthAttemptMutation) SetFenceToken(i int64) {
+	m.fence_token = &i
+	m.addfence_token = nil
+}
+
+// FenceToken returns the value of the "fence_token" field in the mutation.
+func (m *CaptureAuthAttemptMutation) FenceToken() (r int64, exists bool) {
+	v := m.fence_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFenceToken returns the old "fence_token" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldFenceToken(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFenceToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFenceToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFenceToken: %w", err)
+	}
+	return oldValue.FenceToken, nil
+}
+
+// AddFenceToken adds i to the "fence_token" field.
+func (m *CaptureAuthAttemptMutation) AddFenceToken(i int64) {
+	if m.addfence_token != nil {
+		*m.addfence_token += i
+	} else {
+		m.addfence_token = &i
+	}
+}
+
+// AddedFenceToken returns the value that was added to the "fence_token" field in this mutation.
+func (m *CaptureAuthAttemptMutation) AddedFenceToken() (r int64, exists bool) {
+	v := m.addfence_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFenceToken resets all changes to the "fence_token" field.
+func (m *CaptureAuthAttemptMutation) ResetFenceToken() {
+	m.fence_token = nil
+	m.addfence_token = nil
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *CaptureAuthAttemptMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldCreatedByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (m *CaptureAuthAttemptMutation) ClearCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.clearedFields[captureauthattempt.FieldCreatedByUserID] = struct{}{}
+}
+
+// CreatedByUserIDCleared returns if the "created_by_user_id" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) CreatedByUserIDCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldCreatedByUserID]
+	return ok
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *CaptureAuthAttemptMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+	delete(m.clearedFields, captureauthattempt.FieldCreatedByUserID)
+}
+
+// SetTriggerCaptureJobID sets the "trigger_capture_job_id" field.
+func (m *CaptureAuthAttemptMutation) SetTriggerCaptureJobID(s string) {
+	m.trigger_capture_job_id = &s
+}
+
+// TriggerCaptureJobID returns the value of the "trigger_capture_job_id" field in the mutation.
+func (m *CaptureAuthAttemptMutation) TriggerCaptureJobID() (r string, exists bool) {
+	v := m.trigger_capture_job_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTriggerCaptureJobID returns the old "trigger_capture_job_id" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldTriggerCaptureJobID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTriggerCaptureJobID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTriggerCaptureJobID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTriggerCaptureJobID: %w", err)
+	}
+	return oldValue.TriggerCaptureJobID, nil
+}
+
+// ClearTriggerCaptureJobID clears the value of the "trigger_capture_job_id" field.
+func (m *CaptureAuthAttemptMutation) ClearTriggerCaptureJobID() {
+	m.trigger_capture_job_id = nil
+	m.clearedFields[captureauthattempt.FieldTriggerCaptureJobID] = struct{}{}
+}
+
+// TriggerCaptureJobIDCleared returns if the "trigger_capture_job_id" field was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) TriggerCaptureJobIDCleared() bool {
+	_, ok := m.clearedFields[captureauthattempt.FieldTriggerCaptureJobID]
+	return ok
+}
+
+// ResetTriggerCaptureJobID resets all changes to the "trigger_capture_job_id" field.
+func (m *CaptureAuthAttemptMutation) ResetTriggerCaptureJobID() {
+	m.trigger_capture_job_id = nil
+	delete(m.clearedFields, captureauthattempt.FieldTriggerCaptureJobID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CaptureAuthAttemptMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CaptureAuthAttemptMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *CaptureAuthAttemptMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *CaptureAuthAttemptMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the CaptureAuthAttempt entity.
+// If the CaptureAuthAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthAttemptMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *CaptureAuthAttemptMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the CaptureAuthAttemptMutation builder.
+func (m *CaptureAuthAttemptMutation) Where(ps ...predicate.CaptureAuthAttempt) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CaptureAuthAttemptMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CaptureAuthAttemptMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CaptureAuthAttempt, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CaptureAuthAttemptMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CaptureAuthAttemptMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CaptureAuthAttempt).
+func (m *CaptureAuthAttemptMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CaptureAuthAttemptMutation) Fields() []string {
+	fields := make([]string, 0, 22)
+	if m.organization_id != nil {
+		fields = append(fields, captureauthattempt.FieldOrganizationID)
+	}
+	if m.connection_id != nil {
+		fields = append(fields, captureauthattempt.FieldConnectionID)
+	}
+	if m.config_id != nil {
+		fields = append(fields, captureauthattempt.FieldConfigID)
+	}
+	if m.config_revision != nil {
+		fields = append(fields, captureauthattempt.FieldConfigRevision)
+	}
+	if m.recipe_version_id != nil {
+		fields = append(fields, captureauthattempt.FieldRecipeVersionID)
+	}
+	if m.recipe_hash != nil {
+		fields = append(fields, captureauthattempt.FieldRecipeHash)
+	}
+	if m.connection_generation != nil {
+		fields = append(fields, captureauthattempt.FieldConnectionGeneration)
+	}
+	if m.mode != nil {
+		fields = append(fields, captureauthattempt.FieldMode)
+	}
+	if m.state != nil {
+		fields = append(fields, captureauthattempt.FieldState)
+	}
+	if m.browser_session_id != nil {
+		fields = append(fields, captureauthattempt.FieldBrowserSessionID)
+	}
+	if m.browser_closed_at != nil {
+		fields = append(fields, captureauthattempt.FieldBrowserClosedAt)
+	}
+	if m.email_requested_at != nil {
+		fields = append(fields, captureauthattempt.FieldEmailRequestedAt)
+	}
+	if m.email_received_at != nil {
+		fields = append(fields, captureauthattempt.FieldEmailReceivedAt)
+	}
+	if m.receipt_id != nil {
+		fields = append(fields, captureauthattempt.FieldReceiptID)
+	}
+	if m.deadline_at != nil {
+		fields = append(fields, captureauthattempt.FieldDeadlineAt)
+	}
+	if m.completed_at != nil {
+		fields = append(fields, captureauthattempt.FieldCompletedAt)
+	}
+	if m.failure_code != nil {
+		fields = append(fields, captureauthattempt.FieldFailureCode)
+	}
+	if m.fence_token != nil {
+		fields = append(fields, captureauthattempt.FieldFenceToken)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, captureauthattempt.FieldCreatedByUserID)
+	}
+	if m.trigger_capture_job_id != nil {
+		fields = append(fields, captureauthattempt.FieldTriggerCaptureJobID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, captureauthattempt.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, captureauthattempt.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CaptureAuthAttemptMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case captureauthattempt.FieldOrganizationID:
+		return m.OrganizationID()
+	case captureauthattempt.FieldConnectionID:
+		return m.ConnectionID()
+	case captureauthattempt.FieldConfigID:
+		return m.ConfigID()
+	case captureauthattempt.FieldConfigRevision:
+		return m.ConfigRevision()
+	case captureauthattempt.FieldRecipeVersionID:
+		return m.RecipeVersionID()
+	case captureauthattempt.FieldRecipeHash:
+		return m.RecipeHash()
+	case captureauthattempt.FieldConnectionGeneration:
+		return m.ConnectionGeneration()
+	case captureauthattempt.FieldMode:
+		return m.Mode()
+	case captureauthattempt.FieldState:
+		return m.State()
+	case captureauthattempt.FieldBrowserSessionID:
+		return m.BrowserSessionID()
+	case captureauthattempt.FieldBrowserClosedAt:
+		return m.BrowserClosedAt()
+	case captureauthattempt.FieldEmailRequestedAt:
+		return m.EmailRequestedAt()
+	case captureauthattempt.FieldEmailReceivedAt:
+		return m.EmailReceivedAt()
+	case captureauthattempt.FieldReceiptID:
+		return m.ReceiptID()
+	case captureauthattempt.FieldDeadlineAt:
+		return m.DeadlineAt()
+	case captureauthattempt.FieldCompletedAt:
+		return m.CompletedAt()
+	case captureauthattempt.FieldFailureCode:
+		return m.FailureCode()
+	case captureauthattempt.FieldFenceToken:
+		return m.FenceToken()
+	case captureauthattempt.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case captureauthattempt.FieldTriggerCaptureJobID:
+		return m.TriggerCaptureJobID()
+	case captureauthattempt.FieldCreatedAt:
+		return m.CreatedAt()
+	case captureauthattempt.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CaptureAuthAttemptMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case captureauthattempt.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case captureauthattempt.FieldConnectionID:
+		return m.OldConnectionID(ctx)
+	case captureauthattempt.FieldConfigID:
+		return m.OldConfigID(ctx)
+	case captureauthattempt.FieldConfigRevision:
+		return m.OldConfigRevision(ctx)
+	case captureauthattempt.FieldRecipeVersionID:
+		return m.OldRecipeVersionID(ctx)
+	case captureauthattempt.FieldRecipeHash:
+		return m.OldRecipeHash(ctx)
+	case captureauthattempt.FieldConnectionGeneration:
+		return m.OldConnectionGeneration(ctx)
+	case captureauthattempt.FieldMode:
+		return m.OldMode(ctx)
+	case captureauthattempt.FieldState:
+		return m.OldState(ctx)
+	case captureauthattempt.FieldBrowserSessionID:
+		return m.OldBrowserSessionID(ctx)
+	case captureauthattempt.FieldBrowserClosedAt:
+		return m.OldBrowserClosedAt(ctx)
+	case captureauthattempt.FieldEmailRequestedAt:
+		return m.OldEmailRequestedAt(ctx)
+	case captureauthattempt.FieldEmailReceivedAt:
+		return m.OldEmailReceivedAt(ctx)
+	case captureauthattempt.FieldReceiptID:
+		return m.OldReceiptID(ctx)
+	case captureauthattempt.FieldDeadlineAt:
+		return m.OldDeadlineAt(ctx)
+	case captureauthattempt.FieldCompletedAt:
+		return m.OldCompletedAt(ctx)
+	case captureauthattempt.FieldFailureCode:
+		return m.OldFailureCode(ctx)
+	case captureauthattempt.FieldFenceToken:
+		return m.OldFenceToken(ctx)
+	case captureauthattempt.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case captureauthattempt.FieldTriggerCaptureJobID:
+		return m.OldTriggerCaptureJobID(ctx)
+	case captureauthattempt.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case captureauthattempt.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown CaptureAuthAttempt field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureAuthAttemptMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case captureauthattempt.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case captureauthattempt.FieldConnectionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConnectionID(v)
+		return nil
+	case captureauthattempt.FieldConfigID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigID(v)
+		return nil
+	case captureauthattempt.FieldConfigRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigRevision(v)
+		return nil
+	case captureauthattempt.FieldRecipeVersionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipeVersionID(v)
+		return nil
+	case captureauthattempt.FieldRecipeHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipeHash(v)
+		return nil
+	case captureauthattempt.FieldConnectionGeneration:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConnectionGeneration(v)
+		return nil
+	case captureauthattempt.FieldMode:
+		v, ok := value.(captureauthattempt.Mode)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMode(v)
+		return nil
+	case captureauthattempt.FieldState:
+		v, ok := value.(captureauthattempt.State)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetState(v)
+		return nil
+	case captureauthattempt.FieldBrowserSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBrowserSessionID(v)
+		return nil
+	case captureauthattempt.FieldBrowserClosedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBrowserClosedAt(v)
+		return nil
+	case captureauthattempt.FieldEmailRequestedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmailRequestedAt(v)
+		return nil
+	case captureauthattempt.FieldEmailReceivedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmailReceivedAt(v)
+		return nil
+	case captureauthattempt.FieldReceiptID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceiptID(v)
+		return nil
+	case captureauthattempt.FieldDeadlineAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeadlineAt(v)
+		return nil
+	case captureauthattempt.FieldCompletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompletedAt(v)
+		return nil
+	case captureauthattempt.FieldFailureCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureCode(v)
+		return nil
+	case captureauthattempt.FieldFenceToken:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFenceToken(v)
+		return nil
+	case captureauthattempt.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case captureauthattempt.FieldTriggerCaptureJobID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTriggerCaptureJobID(v)
+		return nil
+	case captureauthattempt.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case captureauthattempt.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthAttempt field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CaptureAuthAttemptMutation) AddedFields() []string {
+	var fields []string
+	if m.addconfig_revision != nil {
+		fields = append(fields, captureauthattempt.FieldConfigRevision)
+	}
+	if m.addconnection_generation != nil {
+		fields = append(fields, captureauthattempt.FieldConnectionGeneration)
+	}
+	if m.addfence_token != nil {
+		fields = append(fields, captureauthattempt.FieldFenceToken)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CaptureAuthAttemptMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case captureauthattempt.FieldConfigRevision:
+		return m.AddedConfigRevision()
+	case captureauthattempt.FieldConnectionGeneration:
+		return m.AddedConnectionGeneration()
+	case captureauthattempt.FieldFenceToken:
+		return m.AddedFenceToken()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureAuthAttemptMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case captureauthattempt.FieldConfigRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfigRevision(v)
+		return nil
+	case captureauthattempt.FieldConnectionGeneration:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConnectionGeneration(v)
+		return nil
+	case captureauthattempt.FieldFenceToken:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFenceToken(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthAttempt numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CaptureAuthAttemptMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(captureauthattempt.FieldBrowserSessionID) {
+		fields = append(fields, captureauthattempt.FieldBrowserSessionID)
+	}
+	if m.FieldCleared(captureauthattempt.FieldBrowserClosedAt) {
+		fields = append(fields, captureauthattempt.FieldBrowserClosedAt)
+	}
+	if m.FieldCleared(captureauthattempt.FieldEmailRequestedAt) {
+		fields = append(fields, captureauthattempt.FieldEmailRequestedAt)
+	}
+	if m.FieldCleared(captureauthattempt.FieldEmailReceivedAt) {
+		fields = append(fields, captureauthattempt.FieldEmailReceivedAt)
+	}
+	if m.FieldCleared(captureauthattempt.FieldReceiptID) {
+		fields = append(fields, captureauthattempt.FieldReceiptID)
+	}
+	if m.FieldCleared(captureauthattempt.FieldCompletedAt) {
+		fields = append(fields, captureauthattempt.FieldCompletedAt)
+	}
+	if m.FieldCleared(captureauthattempt.FieldFailureCode) {
+		fields = append(fields, captureauthattempt.FieldFailureCode)
+	}
+	if m.FieldCleared(captureauthattempt.FieldCreatedByUserID) {
+		fields = append(fields, captureauthattempt.FieldCreatedByUserID)
+	}
+	if m.FieldCleared(captureauthattempt.FieldTriggerCaptureJobID) {
+		fields = append(fields, captureauthattempt.FieldTriggerCaptureJobID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CaptureAuthAttemptMutation) ClearField(name string) error {
+	switch name {
+	case captureauthattempt.FieldBrowserSessionID:
+		m.ClearBrowserSessionID()
+		return nil
+	case captureauthattempt.FieldBrowserClosedAt:
+		m.ClearBrowserClosedAt()
+		return nil
+	case captureauthattempt.FieldEmailRequestedAt:
+		m.ClearEmailRequestedAt()
+		return nil
+	case captureauthattempt.FieldEmailReceivedAt:
+		m.ClearEmailReceivedAt()
+		return nil
+	case captureauthattempt.FieldReceiptID:
+		m.ClearReceiptID()
+		return nil
+	case captureauthattempt.FieldCompletedAt:
+		m.ClearCompletedAt()
+		return nil
+	case captureauthattempt.FieldFailureCode:
+		m.ClearFailureCode()
+		return nil
+	case captureauthattempt.FieldCreatedByUserID:
+		m.ClearCreatedByUserID()
+		return nil
+	case captureauthattempt.FieldTriggerCaptureJobID:
+		m.ClearTriggerCaptureJobID()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthAttempt nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CaptureAuthAttemptMutation) ResetField(name string) error {
+	switch name {
+	case captureauthattempt.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case captureauthattempt.FieldConnectionID:
+		m.ResetConnectionID()
+		return nil
+	case captureauthattempt.FieldConfigID:
+		m.ResetConfigID()
+		return nil
+	case captureauthattempt.FieldConfigRevision:
+		m.ResetConfigRevision()
+		return nil
+	case captureauthattempt.FieldRecipeVersionID:
+		m.ResetRecipeVersionID()
+		return nil
+	case captureauthattempt.FieldRecipeHash:
+		m.ResetRecipeHash()
+		return nil
+	case captureauthattempt.FieldConnectionGeneration:
+		m.ResetConnectionGeneration()
+		return nil
+	case captureauthattempt.FieldMode:
+		m.ResetMode()
+		return nil
+	case captureauthattempt.FieldState:
+		m.ResetState()
+		return nil
+	case captureauthattempt.FieldBrowserSessionID:
+		m.ResetBrowserSessionID()
+		return nil
+	case captureauthattempt.FieldBrowserClosedAt:
+		m.ResetBrowserClosedAt()
+		return nil
+	case captureauthattempt.FieldEmailRequestedAt:
+		m.ResetEmailRequestedAt()
+		return nil
+	case captureauthattempt.FieldEmailReceivedAt:
+		m.ResetEmailReceivedAt()
+		return nil
+	case captureauthattempt.FieldReceiptID:
+		m.ResetReceiptID()
+		return nil
+	case captureauthattempt.FieldDeadlineAt:
+		m.ResetDeadlineAt()
+		return nil
+	case captureauthattempt.FieldCompletedAt:
+		m.ResetCompletedAt()
+		return nil
+	case captureauthattempt.FieldFailureCode:
+		m.ResetFailureCode()
+		return nil
+	case captureauthattempt.FieldFenceToken:
+		m.ResetFenceToken()
+		return nil
+	case captureauthattempt.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case captureauthattempt.FieldTriggerCaptureJobID:
+		m.ResetTriggerCaptureJobID()
+		return nil
+	case captureauthattempt.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case captureauthattempt.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthAttempt field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CaptureAuthAttemptMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CaptureAuthAttemptMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CaptureAuthAttemptMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CaptureAuthAttemptMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CaptureAuthAttemptMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CaptureAuthAttemptMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown CaptureAuthAttempt unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CaptureAuthAttemptMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown CaptureAuthAttempt edge %s", name)
+}
+
+// CaptureAuthRecipeVersionMutation represents an operation that mutates the CaptureAuthRecipeVersion nodes in the graph.
+type CaptureAuthRecipeVersionMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *string
+	organization_id    *string
+	connection_id      *string
+	config_id          *string
+	version            *int
+	addversion         *int
+	definition         *map[string]interface{}
+	definition_hash    *string
+	created_by_user_id *string
+	created_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*CaptureAuthRecipeVersion, error)
+	predicates         []predicate.CaptureAuthRecipeVersion
+}
+
+var _ ent.Mutation = (*CaptureAuthRecipeVersionMutation)(nil)
+
+// captureauthrecipeversionOption allows management of the mutation configuration using functional options.
+type captureauthrecipeversionOption func(*CaptureAuthRecipeVersionMutation)
+
+// newCaptureAuthRecipeVersionMutation creates new mutation for the CaptureAuthRecipeVersion entity.
+func newCaptureAuthRecipeVersionMutation(c config, op Op, opts ...captureauthrecipeversionOption) *CaptureAuthRecipeVersionMutation {
+	m := &CaptureAuthRecipeVersionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCaptureAuthRecipeVersion,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCaptureAuthRecipeVersionID sets the ID field of the mutation.
+func withCaptureAuthRecipeVersionID(id string) captureauthrecipeversionOption {
+	return func(m *CaptureAuthRecipeVersionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CaptureAuthRecipeVersion
+		)
+		m.oldValue = func(ctx context.Context) (*CaptureAuthRecipeVersion, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CaptureAuthRecipeVersion.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCaptureAuthRecipeVersion sets the old CaptureAuthRecipeVersion of the mutation.
+func withCaptureAuthRecipeVersion(node *CaptureAuthRecipeVersion) captureauthrecipeversionOption {
+	return func(m *CaptureAuthRecipeVersionMutation) {
+		m.oldValue = func(context.Context) (*CaptureAuthRecipeVersion, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CaptureAuthRecipeVersionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CaptureAuthRecipeVersionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of CaptureAuthRecipeVersion entities.
+func (m *CaptureAuthRecipeVersionMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CaptureAuthRecipeVersionMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CaptureAuthRecipeVersionMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CaptureAuthRecipeVersion.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *CaptureAuthRecipeVersionMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetConnectionID sets the "connection_id" field.
+func (m *CaptureAuthRecipeVersionMutation) SetConnectionID(s string) {
+	m.connection_id = &s
+}
+
+// ConnectionID returns the value of the "connection_id" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) ConnectionID() (r string, exists bool) {
+	v := m.connection_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConnectionID returns the old "connection_id" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldConnectionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConnectionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConnectionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConnectionID: %w", err)
+	}
+	return oldValue.ConnectionID, nil
+}
+
+// ResetConnectionID resets all changes to the "connection_id" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetConnectionID() {
+	m.connection_id = nil
+}
+
+// SetConfigID sets the "config_id" field.
+func (m *CaptureAuthRecipeVersionMutation) SetConfigID(s string) {
+	m.config_id = &s
+}
+
+// ConfigID returns the value of the "config_id" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) ConfigID() (r string, exists bool) {
+	v := m.config_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigID returns the old "config_id" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldConfigID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigID: %w", err)
+	}
+	return oldValue.ConfigID, nil
+}
+
+// ResetConfigID resets all changes to the "config_id" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetConfigID() {
+	m.config_id = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *CaptureAuthRecipeVersionMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *CaptureAuthRecipeVersionMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetDefinition sets the "definition" field.
+func (m *CaptureAuthRecipeVersionMutation) SetDefinition(value map[string]interface{}) {
+	m.definition = &value
+}
+
+// Definition returns the value of the "definition" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) Definition() (r map[string]interface{}, exists bool) {
+	v := m.definition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefinition returns the old "definition" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldDefinition(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefinition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefinition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefinition: %w", err)
+	}
+	return oldValue.Definition, nil
+}
+
+// ResetDefinition resets all changes to the "definition" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetDefinition() {
+	m.definition = nil
+}
+
+// SetDefinitionHash sets the "definition_hash" field.
+func (m *CaptureAuthRecipeVersionMutation) SetDefinitionHash(s string) {
+	m.definition_hash = &s
+}
+
+// DefinitionHash returns the value of the "definition_hash" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) DefinitionHash() (r string, exists bool) {
+	v := m.definition_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefinitionHash returns the old "definition_hash" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldDefinitionHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefinitionHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefinitionHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefinitionHash: %w", err)
+	}
+	return oldValue.DefinitionHash, nil
+}
+
+// ResetDefinitionHash resets all changes to the "definition_hash" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetDefinitionHash() {
+	m.definition_hash = nil
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *CaptureAuthRecipeVersionMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CaptureAuthRecipeVersionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CaptureAuthRecipeVersionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CaptureAuthRecipeVersion entity.
+// If the CaptureAuthRecipeVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureAuthRecipeVersionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CaptureAuthRecipeVersionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the CaptureAuthRecipeVersionMutation builder.
+func (m *CaptureAuthRecipeVersionMutation) Where(ps ...predicate.CaptureAuthRecipeVersion) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CaptureAuthRecipeVersionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CaptureAuthRecipeVersionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CaptureAuthRecipeVersion, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CaptureAuthRecipeVersionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CaptureAuthRecipeVersionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CaptureAuthRecipeVersion).
+func (m *CaptureAuthRecipeVersionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CaptureAuthRecipeVersionMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.organization_id != nil {
+		fields = append(fields, captureauthrecipeversion.FieldOrganizationID)
+	}
+	if m.connection_id != nil {
+		fields = append(fields, captureauthrecipeversion.FieldConnectionID)
+	}
+	if m.config_id != nil {
+		fields = append(fields, captureauthrecipeversion.FieldConfigID)
+	}
+	if m.version != nil {
+		fields = append(fields, captureauthrecipeversion.FieldVersion)
+	}
+	if m.definition != nil {
+		fields = append(fields, captureauthrecipeversion.FieldDefinition)
+	}
+	if m.definition_hash != nil {
+		fields = append(fields, captureauthrecipeversion.FieldDefinitionHash)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, captureauthrecipeversion.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, captureauthrecipeversion.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CaptureAuthRecipeVersionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case captureauthrecipeversion.FieldOrganizationID:
+		return m.OrganizationID()
+	case captureauthrecipeversion.FieldConnectionID:
+		return m.ConnectionID()
+	case captureauthrecipeversion.FieldConfigID:
+		return m.ConfigID()
+	case captureauthrecipeversion.FieldVersion:
+		return m.Version()
+	case captureauthrecipeversion.FieldDefinition:
+		return m.Definition()
+	case captureauthrecipeversion.FieldDefinitionHash:
+		return m.DefinitionHash()
+	case captureauthrecipeversion.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case captureauthrecipeversion.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CaptureAuthRecipeVersionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case captureauthrecipeversion.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case captureauthrecipeversion.FieldConnectionID:
+		return m.OldConnectionID(ctx)
+	case captureauthrecipeversion.FieldConfigID:
+		return m.OldConfigID(ctx)
+	case captureauthrecipeversion.FieldVersion:
+		return m.OldVersion(ctx)
+	case captureauthrecipeversion.FieldDefinition:
+		return m.OldDefinition(ctx)
+	case captureauthrecipeversion.FieldDefinitionHash:
+		return m.OldDefinitionHash(ctx)
+	case captureauthrecipeversion.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case captureauthrecipeversion.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown CaptureAuthRecipeVersion field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureAuthRecipeVersionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case captureauthrecipeversion.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case captureauthrecipeversion.FieldConnectionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConnectionID(v)
+		return nil
+	case captureauthrecipeversion.FieldConfigID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigID(v)
+		return nil
+	case captureauthrecipeversion.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case captureauthrecipeversion.FieldDefinition:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefinition(v)
+		return nil
+	case captureauthrecipeversion.FieldDefinitionHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefinitionHash(v)
+		return nil
+	case captureauthrecipeversion.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case captureauthrecipeversion.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CaptureAuthRecipeVersionMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, captureauthrecipeversion.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CaptureAuthRecipeVersionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case captureauthrecipeversion.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureAuthRecipeVersionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case captureauthrecipeversion.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CaptureAuthRecipeVersionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CaptureAuthRecipeVersionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CaptureAuthRecipeVersionMutation) ResetField(name string) error {
+	switch name {
+	case captureauthrecipeversion.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case captureauthrecipeversion.FieldConnectionID:
+		m.ResetConnectionID()
+		return nil
+	case captureauthrecipeversion.FieldConfigID:
+		m.ResetConfigID()
+		return nil
+	case captureauthrecipeversion.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case captureauthrecipeversion.FieldDefinition:
+		m.ResetDefinition()
+		return nil
+	case captureauthrecipeversion.FieldDefinitionHash:
+		m.ResetDefinitionHash()
+		return nil
+	case captureauthrecipeversion.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case captureauthrecipeversion.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CaptureAuthRecipeVersionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CaptureAuthRecipeVersionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CaptureAuthRecipeVersionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown CaptureAuthRecipeVersion edge %s", name)
+}
+
+// CaptureEmailAuthConfigMutation represents an operation that mutates the CaptureEmailAuthConfig nodes in the graph.
+type CaptureEmailAuthConfigMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *string
+	organization_id        *string
+	connection_id          *string
+	environment            *string
+	recipient_local_part   *string
+	recipient_domain       *string
+	method                 *captureemailauthconfig.Method
+	recipe_version_id      *string
+	expected_senders       *[]string
+	appendexpected_senders []string
+	auto_reconnect         *bool
+	status                 *captureemailauthconfig.Status
+	revision               *int
+	addrevision            *int
+	tested_revision        *int
+	addtested_revision     *int
+	last_tested_at         *time.Time
+	last_success_at        *time.Time
+	last_failure_code      *string
+	created_by_user_id     *string
+	approved_by_user_id    *string
+	approved_at            *time.Time
+	revoked_at             *time.Time
+	created_at             *time.Time
+	updated_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*CaptureEmailAuthConfig, error)
+	predicates             []predicate.CaptureEmailAuthConfig
+}
+
+var _ ent.Mutation = (*CaptureEmailAuthConfigMutation)(nil)
+
+// captureemailauthconfigOption allows management of the mutation configuration using functional options.
+type captureemailauthconfigOption func(*CaptureEmailAuthConfigMutation)
+
+// newCaptureEmailAuthConfigMutation creates new mutation for the CaptureEmailAuthConfig entity.
+func newCaptureEmailAuthConfigMutation(c config, op Op, opts ...captureemailauthconfigOption) *CaptureEmailAuthConfigMutation {
+	m := &CaptureEmailAuthConfigMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCaptureEmailAuthConfig,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCaptureEmailAuthConfigID sets the ID field of the mutation.
+func withCaptureEmailAuthConfigID(id string) captureemailauthconfigOption {
+	return func(m *CaptureEmailAuthConfigMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CaptureEmailAuthConfig
+		)
+		m.oldValue = func(ctx context.Context) (*CaptureEmailAuthConfig, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CaptureEmailAuthConfig.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCaptureEmailAuthConfig sets the old CaptureEmailAuthConfig of the mutation.
+func withCaptureEmailAuthConfig(node *CaptureEmailAuthConfig) captureemailauthconfigOption {
+	return func(m *CaptureEmailAuthConfigMutation) {
+		m.oldValue = func(context.Context) (*CaptureEmailAuthConfig, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CaptureEmailAuthConfigMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CaptureEmailAuthConfigMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of CaptureEmailAuthConfig entities.
+func (m *CaptureEmailAuthConfigMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CaptureEmailAuthConfigMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CaptureEmailAuthConfigMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CaptureEmailAuthConfig.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *CaptureEmailAuthConfigMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *CaptureEmailAuthConfigMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetConnectionID sets the "connection_id" field.
+func (m *CaptureEmailAuthConfigMutation) SetConnectionID(s string) {
+	m.connection_id = &s
+}
+
+// ConnectionID returns the value of the "connection_id" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) ConnectionID() (r string, exists bool) {
+	v := m.connection_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConnectionID returns the old "connection_id" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldConnectionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConnectionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConnectionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConnectionID: %w", err)
+	}
+	return oldValue.ConnectionID, nil
+}
+
+// ResetConnectionID resets all changes to the "connection_id" field.
+func (m *CaptureEmailAuthConfigMutation) ResetConnectionID() {
+	m.connection_id = nil
+}
+
+// SetEnvironment sets the "environment" field.
+func (m *CaptureEmailAuthConfigMutation) SetEnvironment(s string) {
+	m.environment = &s
+}
+
+// Environment returns the value of the "environment" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) Environment() (r string, exists bool) {
+	v := m.environment
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnvironment returns the old "environment" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldEnvironment(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnvironment is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnvironment requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnvironment: %w", err)
+	}
+	return oldValue.Environment, nil
+}
+
+// ResetEnvironment resets all changes to the "environment" field.
+func (m *CaptureEmailAuthConfigMutation) ResetEnvironment() {
+	m.environment = nil
+}
+
+// SetRecipientLocalPart sets the "recipient_local_part" field.
+func (m *CaptureEmailAuthConfigMutation) SetRecipientLocalPart(s string) {
+	m.recipient_local_part = &s
+}
+
+// RecipientLocalPart returns the value of the "recipient_local_part" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) RecipientLocalPart() (r string, exists bool) {
+	v := m.recipient_local_part
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientLocalPart returns the old "recipient_local_part" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldRecipientLocalPart(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientLocalPart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientLocalPart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientLocalPart: %w", err)
+	}
+	return oldValue.RecipientLocalPart, nil
+}
+
+// ResetRecipientLocalPart resets all changes to the "recipient_local_part" field.
+func (m *CaptureEmailAuthConfigMutation) ResetRecipientLocalPart() {
+	m.recipient_local_part = nil
+}
+
+// SetRecipientDomain sets the "recipient_domain" field.
+func (m *CaptureEmailAuthConfigMutation) SetRecipientDomain(s string) {
+	m.recipient_domain = &s
+}
+
+// RecipientDomain returns the value of the "recipient_domain" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) RecipientDomain() (r string, exists bool) {
+	v := m.recipient_domain
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientDomain returns the old "recipient_domain" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldRecipientDomain(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientDomain is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientDomain requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientDomain: %w", err)
+	}
+	return oldValue.RecipientDomain, nil
+}
+
+// ResetRecipientDomain resets all changes to the "recipient_domain" field.
+func (m *CaptureEmailAuthConfigMutation) ResetRecipientDomain() {
+	m.recipient_domain = nil
+}
+
+// SetMethod sets the "method" field.
+func (m *CaptureEmailAuthConfigMutation) SetMethod(c captureemailauthconfig.Method) {
+	m.method = &c
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) Method() (r captureemailauthconfig.Method, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldMethod(ctx context.Context) (v captureemailauthconfig.Method, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *CaptureEmailAuthConfigMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetRecipeVersionID sets the "recipe_version_id" field.
+func (m *CaptureEmailAuthConfigMutation) SetRecipeVersionID(s string) {
+	m.recipe_version_id = &s
+}
+
+// RecipeVersionID returns the value of the "recipe_version_id" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) RecipeVersionID() (r string, exists bool) {
+	v := m.recipe_version_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipeVersionID returns the old "recipe_version_id" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldRecipeVersionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipeVersionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipeVersionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipeVersionID: %w", err)
+	}
+	return oldValue.RecipeVersionID, nil
+}
+
+// ClearRecipeVersionID clears the value of the "recipe_version_id" field.
+func (m *CaptureEmailAuthConfigMutation) ClearRecipeVersionID() {
+	m.recipe_version_id = nil
+	m.clearedFields[captureemailauthconfig.FieldRecipeVersionID] = struct{}{}
+}
+
+// RecipeVersionIDCleared returns if the "recipe_version_id" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) RecipeVersionIDCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldRecipeVersionID]
+	return ok
+}
+
+// ResetRecipeVersionID resets all changes to the "recipe_version_id" field.
+func (m *CaptureEmailAuthConfigMutation) ResetRecipeVersionID() {
+	m.recipe_version_id = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldRecipeVersionID)
+}
+
+// SetExpectedSenders sets the "expected_senders" field.
+func (m *CaptureEmailAuthConfigMutation) SetExpectedSenders(s []string) {
+	m.expected_senders = &s
+	m.appendexpected_senders = nil
+}
+
+// ExpectedSenders returns the value of the "expected_senders" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) ExpectedSenders() (r []string, exists bool) {
+	v := m.expected_senders
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedSenders returns the old "expected_senders" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldExpectedSenders(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedSenders is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedSenders requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedSenders: %w", err)
+	}
+	return oldValue.ExpectedSenders, nil
+}
+
+// AppendExpectedSenders adds s to the "expected_senders" field.
+func (m *CaptureEmailAuthConfigMutation) AppendExpectedSenders(s []string) {
+	m.appendexpected_senders = append(m.appendexpected_senders, s...)
+}
+
+// AppendedExpectedSenders returns the list of values that were appended to the "expected_senders" field in this mutation.
+func (m *CaptureEmailAuthConfigMutation) AppendedExpectedSenders() ([]string, bool) {
+	if len(m.appendexpected_senders) == 0 {
+		return nil, false
+	}
+	return m.appendexpected_senders, true
+}
+
+// ResetExpectedSenders resets all changes to the "expected_senders" field.
+func (m *CaptureEmailAuthConfigMutation) ResetExpectedSenders() {
+	m.expected_senders = nil
+	m.appendexpected_senders = nil
+}
+
+// SetAutoReconnect sets the "auto_reconnect" field.
+func (m *CaptureEmailAuthConfigMutation) SetAutoReconnect(b bool) {
+	m.auto_reconnect = &b
+}
+
+// AutoReconnect returns the value of the "auto_reconnect" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) AutoReconnect() (r bool, exists bool) {
+	v := m.auto_reconnect
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAutoReconnect returns the old "auto_reconnect" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldAutoReconnect(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAutoReconnect is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAutoReconnect requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAutoReconnect: %w", err)
+	}
+	return oldValue.AutoReconnect, nil
+}
+
+// ResetAutoReconnect resets all changes to the "auto_reconnect" field.
+func (m *CaptureEmailAuthConfigMutation) ResetAutoReconnect() {
+	m.auto_reconnect = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *CaptureEmailAuthConfigMutation) SetStatus(c captureemailauthconfig.Status) {
+	m.status = &c
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) Status() (r captureemailauthconfig.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldStatus(ctx context.Context) (v captureemailauthconfig.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *CaptureEmailAuthConfigMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetRevision sets the "revision" field.
+func (m *CaptureEmailAuthConfigMutation) SetRevision(i int) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) Revision() (r int, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldRevision(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *CaptureEmailAuthConfigMutation) AddRevision(i int) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *CaptureEmailAuthConfigMutation) AddedRevision() (r int, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *CaptureEmailAuthConfigMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// SetTestedRevision sets the "tested_revision" field.
+func (m *CaptureEmailAuthConfigMutation) SetTestedRevision(i int) {
+	m.tested_revision = &i
+	m.addtested_revision = nil
+}
+
+// TestedRevision returns the value of the "tested_revision" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) TestedRevision() (r int, exists bool) {
+	v := m.tested_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTestedRevision returns the old "tested_revision" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldTestedRevision(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTestedRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTestedRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTestedRevision: %w", err)
+	}
+	return oldValue.TestedRevision, nil
+}
+
+// AddTestedRevision adds i to the "tested_revision" field.
+func (m *CaptureEmailAuthConfigMutation) AddTestedRevision(i int) {
+	if m.addtested_revision != nil {
+		*m.addtested_revision += i
+	} else {
+		m.addtested_revision = &i
+	}
+}
+
+// AddedTestedRevision returns the value that was added to the "tested_revision" field in this mutation.
+func (m *CaptureEmailAuthConfigMutation) AddedTestedRevision() (r int, exists bool) {
+	v := m.addtested_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearTestedRevision clears the value of the "tested_revision" field.
+func (m *CaptureEmailAuthConfigMutation) ClearTestedRevision() {
+	m.tested_revision = nil
+	m.addtested_revision = nil
+	m.clearedFields[captureemailauthconfig.FieldTestedRevision] = struct{}{}
+}
+
+// TestedRevisionCleared returns if the "tested_revision" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) TestedRevisionCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldTestedRevision]
+	return ok
+}
+
+// ResetTestedRevision resets all changes to the "tested_revision" field.
+func (m *CaptureEmailAuthConfigMutation) ResetTestedRevision() {
+	m.tested_revision = nil
+	m.addtested_revision = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldTestedRevision)
+}
+
+// SetLastTestedAt sets the "last_tested_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetLastTestedAt(t time.Time) {
+	m.last_tested_at = &t
+}
+
+// LastTestedAt returns the value of the "last_tested_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) LastTestedAt() (r time.Time, exists bool) {
+	v := m.last_tested_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastTestedAt returns the old "last_tested_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldLastTestedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastTestedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastTestedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastTestedAt: %w", err)
+	}
+	return oldValue.LastTestedAt, nil
+}
+
+// ClearLastTestedAt clears the value of the "last_tested_at" field.
+func (m *CaptureEmailAuthConfigMutation) ClearLastTestedAt() {
+	m.last_tested_at = nil
+	m.clearedFields[captureemailauthconfig.FieldLastTestedAt] = struct{}{}
+}
+
+// LastTestedAtCleared returns if the "last_tested_at" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) LastTestedAtCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldLastTestedAt]
+	return ok
+}
+
+// ResetLastTestedAt resets all changes to the "last_tested_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetLastTestedAt() {
+	m.last_tested_at = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldLastTestedAt)
+}
+
+// SetLastSuccessAt sets the "last_success_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetLastSuccessAt(t time.Time) {
+	m.last_success_at = &t
+}
+
+// LastSuccessAt returns the value of the "last_success_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) LastSuccessAt() (r time.Time, exists bool) {
+	v := m.last_success_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastSuccessAt returns the old "last_success_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldLastSuccessAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastSuccessAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastSuccessAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastSuccessAt: %w", err)
+	}
+	return oldValue.LastSuccessAt, nil
+}
+
+// ClearLastSuccessAt clears the value of the "last_success_at" field.
+func (m *CaptureEmailAuthConfigMutation) ClearLastSuccessAt() {
+	m.last_success_at = nil
+	m.clearedFields[captureemailauthconfig.FieldLastSuccessAt] = struct{}{}
+}
+
+// LastSuccessAtCleared returns if the "last_success_at" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) LastSuccessAtCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldLastSuccessAt]
+	return ok
+}
+
+// ResetLastSuccessAt resets all changes to the "last_success_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetLastSuccessAt() {
+	m.last_success_at = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldLastSuccessAt)
+}
+
+// SetLastFailureCode sets the "last_failure_code" field.
+func (m *CaptureEmailAuthConfigMutation) SetLastFailureCode(s string) {
+	m.last_failure_code = &s
+}
+
+// LastFailureCode returns the value of the "last_failure_code" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) LastFailureCode() (r string, exists bool) {
+	v := m.last_failure_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastFailureCode returns the old "last_failure_code" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldLastFailureCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastFailureCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastFailureCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastFailureCode: %w", err)
+	}
+	return oldValue.LastFailureCode, nil
+}
+
+// ClearLastFailureCode clears the value of the "last_failure_code" field.
+func (m *CaptureEmailAuthConfigMutation) ClearLastFailureCode() {
+	m.last_failure_code = nil
+	m.clearedFields[captureemailauthconfig.FieldLastFailureCode] = struct{}{}
+}
+
+// LastFailureCodeCleared returns if the "last_failure_code" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) LastFailureCodeCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldLastFailureCode]
+	return ok
+}
+
+// ResetLastFailureCode resets all changes to the "last_failure_code" field.
+func (m *CaptureEmailAuthConfigMutation) ResetLastFailureCode() {
+	m.last_failure_code = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldLastFailureCode)
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *CaptureEmailAuthConfigMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *CaptureEmailAuthConfigMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetApprovedByUserID sets the "approved_by_user_id" field.
+func (m *CaptureEmailAuthConfigMutation) SetApprovedByUserID(s string) {
+	m.approved_by_user_id = &s
+}
+
+// ApprovedByUserID returns the value of the "approved_by_user_id" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) ApprovedByUserID() (r string, exists bool) {
+	v := m.approved_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedByUserID returns the old "approved_by_user_id" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldApprovedByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedByUserID: %w", err)
+	}
+	return oldValue.ApprovedByUserID, nil
+}
+
+// ClearApprovedByUserID clears the value of the "approved_by_user_id" field.
+func (m *CaptureEmailAuthConfigMutation) ClearApprovedByUserID() {
+	m.approved_by_user_id = nil
+	m.clearedFields[captureemailauthconfig.FieldApprovedByUserID] = struct{}{}
+}
+
+// ApprovedByUserIDCleared returns if the "approved_by_user_id" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) ApprovedByUserIDCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldApprovedByUserID]
+	return ok
+}
+
+// ResetApprovedByUserID resets all changes to the "approved_by_user_id" field.
+func (m *CaptureEmailAuthConfigMutation) ResetApprovedByUserID() {
+	m.approved_by_user_id = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldApprovedByUserID)
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetApprovedAt(t time.Time) {
+	m.approved_at = &t
+}
+
+// ApprovedAt returns the value of the "approved_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) ApprovedAt() (r time.Time, exists bool) {
+	v := m.approved_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedAt returns the old "approved_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldApprovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedAt: %w", err)
+	}
+	return oldValue.ApprovedAt, nil
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (m *CaptureEmailAuthConfigMutation) ClearApprovedAt() {
+	m.approved_at = nil
+	m.clearedFields[captureemailauthconfig.FieldApprovedAt] = struct{}{}
+}
+
+// ApprovedAtCleared returns if the "approved_at" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) ApprovedAtCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldApprovedAt]
+	return ok
+}
+
+// ResetApprovedAt resets all changes to the "approved_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetApprovedAt() {
+	m.approved_at = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldApprovedAt)
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetRevokedAt(t time.Time) {
+	m.revoked_at = &t
+}
+
+// RevokedAt returns the value of the "revoked_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) RevokedAt() (r time.Time, exists bool) {
+	v := m.revoked_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokedAt returns the old "revoked_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldRevokedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokedAt: %w", err)
+	}
+	return oldValue.RevokedAt, nil
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (m *CaptureEmailAuthConfigMutation) ClearRevokedAt() {
+	m.revoked_at = nil
+	m.clearedFields[captureemailauthconfig.FieldRevokedAt] = struct{}{}
+}
+
+// RevokedAtCleared returns if the "revoked_at" field was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) RevokedAtCleared() bool {
+	_, ok := m.clearedFields[captureemailauthconfig.FieldRevokedAt]
+	return ok
+}
+
+// ResetRevokedAt resets all changes to the "revoked_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetRevokedAt() {
+	m.revoked_at = nil
+	delete(m.clearedFields, captureemailauthconfig.FieldRevokedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *CaptureEmailAuthConfigMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *CaptureEmailAuthConfigMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the CaptureEmailAuthConfig entity.
+// If the CaptureEmailAuthConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureEmailAuthConfigMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *CaptureEmailAuthConfigMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the CaptureEmailAuthConfigMutation builder.
+func (m *CaptureEmailAuthConfigMutation) Where(ps ...predicate.CaptureEmailAuthConfig) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CaptureEmailAuthConfigMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CaptureEmailAuthConfigMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CaptureEmailAuthConfig, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CaptureEmailAuthConfigMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CaptureEmailAuthConfigMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CaptureEmailAuthConfig).
+func (m *CaptureEmailAuthConfigMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CaptureEmailAuthConfigMutation) Fields() []string {
+	fields := make([]string, 0, 21)
+	if m.organization_id != nil {
+		fields = append(fields, captureemailauthconfig.FieldOrganizationID)
+	}
+	if m.connection_id != nil {
+		fields = append(fields, captureemailauthconfig.FieldConnectionID)
+	}
+	if m.environment != nil {
+		fields = append(fields, captureemailauthconfig.FieldEnvironment)
+	}
+	if m.recipient_local_part != nil {
+		fields = append(fields, captureemailauthconfig.FieldRecipientLocalPart)
+	}
+	if m.recipient_domain != nil {
+		fields = append(fields, captureemailauthconfig.FieldRecipientDomain)
+	}
+	if m.method != nil {
+		fields = append(fields, captureemailauthconfig.FieldMethod)
+	}
+	if m.recipe_version_id != nil {
+		fields = append(fields, captureemailauthconfig.FieldRecipeVersionID)
+	}
+	if m.expected_senders != nil {
+		fields = append(fields, captureemailauthconfig.FieldExpectedSenders)
+	}
+	if m.auto_reconnect != nil {
+		fields = append(fields, captureemailauthconfig.FieldAutoReconnect)
+	}
+	if m.status != nil {
+		fields = append(fields, captureemailauthconfig.FieldStatus)
+	}
+	if m.revision != nil {
+		fields = append(fields, captureemailauthconfig.FieldRevision)
+	}
+	if m.tested_revision != nil {
+		fields = append(fields, captureemailauthconfig.FieldTestedRevision)
+	}
+	if m.last_tested_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldLastTestedAt)
+	}
+	if m.last_success_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldLastSuccessAt)
+	}
+	if m.last_failure_code != nil {
+		fields = append(fields, captureemailauthconfig.FieldLastFailureCode)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, captureemailauthconfig.FieldCreatedByUserID)
+	}
+	if m.approved_by_user_id != nil {
+		fields = append(fields, captureemailauthconfig.FieldApprovedByUserID)
+	}
+	if m.approved_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldApprovedAt)
+	}
+	if m.revoked_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldRevokedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, captureemailauthconfig.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CaptureEmailAuthConfigMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case captureemailauthconfig.FieldOrganizationID:
+		return m.OrganizationID()
+	case captureemailauthconfig.FieldConnectionID:
+		return m.ConnectionID()
+	case captureemailauthconfig.FieldEnvironment:
+		return m.Environment()
+	case captureemailauthconfig.FieldRecipientLocalPart:
+		return m.RecipientLocalPart()
+	case captureemailauthconfig.FieldRecipientDomain:
+		return m.RecipientDomain()
+	case captureemailauthconfig.FieldMethod:
+		return m.Method()
+	case captureemailauthconfig.FieldRecipeVersionID:
+		return m.RecipeVersionID()
+	case captureemailauthconfig.FieldExpectedSenders:
+		return m.ExpectedSenders()
+	case captureemailauthconfig.FieldAutoReconnect:
+		return m.AutoReconnect()
+	case captureemailauthconfig.FieldStatus:
+		return m.Status()
+	case captureemailauthconfig.FieldRevision:
+		return m.Revision()
+	case captureemailauthconfig.FieldTestedRevision:
+		return m.TestedRevision()
+	case captureemailauthconfig.FieldLastTestedAt:
+		return m.LastTestedAt()
+	case captureemailauthconfig.FieldLastSuccessAt:
+		return m.LastSuccessAt()
+	case captureemailauthconfig.FieldLastFailureCode:
+		return m.LastFailureCode()
+	case captureemailauthconfig.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case captureemailauthconfig.FieldApprovedByUserID:
+		return m.ApprovedByUserID()
+	case captureemailauthconfig.FieldApprovedAt:
+		return m.ApprovedAt()
+	case captureemailauthconfig.FieldRevokedAt:
+		return m.RevokedAt()
+	case captureemailauthconfig.FieldCreatedAt:
+		return m.CreatedAt()
+	case captureemailauthconfig.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CaptureEmailAuthConfigMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case captureemailauthconfig.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case captureemailauthconfig.FieldConnectionID:
+		return m.OldConnectionID(ctx)
+	case captureemailauthconfig.FieldEnvironment:
+		return m.OldEnvironment(ctx)
+	case captureemailauthconfig.FieldRecipientLocalPart:
+		return m.OldRecipientLocalPart(ctx)
+	case captureemailauthconfig.FieldRecipientDomain:
+		return m.OldRecipientDomain(ctx)
+	case captureemailauthconfig.FieldMethod:
+		return m.OldMethod(ctx)
+	case captureemailauthconfig.FieldRecipeVersionID:
+		return m.OldRecipeVersionID(ctx)
+	case captureemailauthconfig.FieldExpectedSenders:
+		return m.OldExpectedSenders(ctx)
+	case captureemailauthconfig.FieldAutoReconnect:
+		return m.OldAutoReconnect(ctx)
+	case captureemailauthconfig.FieldStatus:
+		return m.OldStatus(ctx)
+	case captureemailauthconfig.FieldRevision:
+		return m.OldRevision(ctx)
+	case captureemailauthconfig.FieldTestedRevision:
+		return m.OldTestedRevision(ctx)
+	case captureemailauthconfig.FieldLastTestedAt:
+		return m.OldLastTestedAt(ctx)
+	case captureemailauthconfig.FieldLastSuccessAt:
+		return m.OldLastSuccessAt(ctx)
+	case captureemailauthconfig.FieldLastFailureCode:
+		return m.OldLastFailureCode(ctx)
+	case captureemailauthconfig.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case captureemailauthconfig.FieldApprovedByUserID:
+		return m.OldApprovedByUserID(ctx)
+	case captureemailauthconfig.FieldApprovedAt:
+		return m.OldApprovedAt(ctx)
+	case captureemailauthconfig.FieldRevokedAt:
+		return m.OldRevokedAt(ctx)
+	case captureemailauthconfig.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case captureemailauthconfig.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown CaptureEmailAuthConfig field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureEmailAuthConfigMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case captureemailauthconfig.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case captureemailauthconfig.FieldConnectionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConnectionID(v)
+		return nil
+	case captureemailauthconfig.FieldEnvironment:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnvironment(v)
+		return nil
+	case captureemailauthconfig.FieldRecipientLocalPart:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientLocalPart(v)
+		return nil
+	case captureemailauthconfig.FieldRecipientDomain:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientDomain(v)
+		return nil
+	case captureemailauthconfig.FieldMethod:
+		v, ok := value.(captureemailauthconfig.Method)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case captureemailauthconfig.FieldRecipeVersionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipeVersionID(v)
+		return nil
+	case captureemailauthconfig.FieldExpectedSenders:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedSenders(v)
+		return nil
+	case captureemailauthconfig.FieldAutoReconnect:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAutoReconnect(v)
+		return nil
+	case captureemailauthconfig.FieldStatus:
+		v, ok := value.(captureemailauthconfig.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case captureemailauthconfig.FieldRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	case captureemailauthconfig.FieldTestedRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTestedRevision(v)
+		return nil
+	case captureemailauthconfig.FieldLastTestedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastTestedAt(v)
+		return nil
+	case captureemailauthconfig.FieldLastSuccessAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastSuccessAt(v)
+		return nil
+	case captureemailauthconfig.FieldLastFailureCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastFailureCode(v)
+		return nil
+	case captureemailauthconfig.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case captureemailauthconfig.FieldApprovedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedByUserID(v)
+		return nil
+	case captureemailauthconfig.FieldApprovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedAt(v)
+		return nil
+	case captureemailauthconfig.FieldRevokedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokedAt(v)
+		return nil
+	case captureemailauthconfig.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case captureemailauthconfig.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureEmailAuthConfig field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CaptureEmailAuthConfigMutation) AddedFields() []string {
+	var fields []string
+	if m.addrevision != nil {
+		fields = append(fields, captureemailauthconfig.FieldRevision)
+	}
+	if m.addtested_revision != nil {
+		fields = append(fields, captureemailauthconfig.FieldTestedRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CaptureEmailAuthConfigMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case captureemailauthconfig.FieldRevision:
+		return m.AddedRevision()
+	case captureemailauthconfig.FieldTestedRevision:
+		return m.AddedTestedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureEmailAuthConfigMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case captureemailauthconfig.FieldRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	case captureemailauthconfig.FieldTestedRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTestedRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureEmailAuthConfig numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CaptureEmailAuthConfigMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(captureemailauthconfig.FieldRecipeVersionID) {
+		fields = append(fields, captureemailauthconfig.FieldRecipeVersionID)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldTestedRevision) {
+		fields = append(fields, captureemailauthconfig.FieldTestedRevision)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldLastTestedAt) {
+		fields = append(fields, captureemailauthconfig.FieldLastTestedAt)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldLastSuccessAt) {
+		fields = append(fields, captureemailauthconfig.FieldLastSuccessAt)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldLastFailureCode) {
+		fields = append(fields, captureemailauthconfig.FieldLastFailureCode)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldApprovedByUserID) {
+		fields = append(fields, captureemailauthconfig.FieldApprovedByUserID)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldApprovedAt) {
+		fields = append(fields, captureemailauthconfig.FieldApprovedAt)
+	}
+	if m.FieldCleared(captureemailauthconfig.FieldRevokedAt) {
+		fields = append(fields, captureemailauthconfig.FieldRevokedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CaptureEmailAuthConfigMutation) ClearField(name string) error {
+	switch name {
+	case captureemailauthconfig.FieldRecipeVersionID:
+		m.ClearRecipeVersionID()
+		return nil
+	case captureemailauthconfig.FieldTestedRevision:
+		m.ClearTestedRevision()
+		return nil
+	case captureemailauthconfig.FieldLastTestedAt:
+		m.ClearLastTestedAt()
+		return nil
+	case captureemailauthconfig.FieldLastSuccessAt:
+		m.ClearLastSuccessAt()
+		return nil
+	case captureemailauthconfig.FieldLastFailureCode:
+		m.ClearLastFailureCode()
+		return nil
+	case captureemailauthconfig.FieldApprovedByUserID:
+		m.ClearApprovedByUserID()
+		return nil
+	case captureemailauthconfig.FieldApprovedAt:
+		m.ClearApprovedAt()
+		return nil
+	case captureemailauthconfig.FieldRevokedAt:
+		m.ClearRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureEmailAuthConfig nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CaptureEmailAuthConfigMutation) ResetField(name string) error {
+	switch name {
+	case captureemailauthconfig.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case captureemailauthconfig.FieldConnectionID:
+		m.ResetConnectionID()
+		return nil
+	case captureemailauthconfig.FieldEnvironment:
+		m.ResetEnvironment()
+		return nil
+	case captureemailauthconfig.FieldRecipientLocalPart:
+		m.ResetRecipientLocalPart()
+		return nil
+	case captureemailauthconfig.FieldRecipientDomain:
+		m.ResetRecipientDomain()
+		return nil
+	case captureemailauthconfig.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case captureemailauthconfig.FieldRecipeVersionID:
+		m.ResetRecipeVersionID()
+		return nil
+	case captureemailauthconfig.FieldExpectedSenders:
+		m.ResetExpectedSenders()
+		return nil
+	case captureemailauthconfig.FieldAutoReconnect:
+		m.ResetAutoReconnect()
+		return nil
+	case captureemailauthconfig.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case captureemailauthconfig.FieldRevision:
+		m.ResetRevision()
+		return nil
+	case captureemailauthconfig.FieldTestedRevision:
+		m.ResetTestedRevision()
+		return nil
+	case captureemailauthconfig.FieldLastTestedAt:
+		m.ResetLastTestedAt()
+		return nil
+	case captureemailauthconfig.FieldLastSuccessAt:
+		m.ResetLastSuccessAt()
+		return nil
+	case captureemailauthconfig.FieldLastFailureCode:
+		m.ResetLastFailureCode()
+		return nil
+	case captureemailauthconfig.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case captureemailauthconfig.FieldApprovedByUserID:
+		m.ResetApprovedByUserID()
+		return nil
+	case captureemailauthconfig.FieldApprovedAt:
+		m.ResetApprovedAt()
+		return nil
+	case captureemailauthconfig.FieldRevokedAt:
+		m.ResetRevokedAt()
+		return nil
+	case captureemailauthconfig.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case captureemailauthconfig.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureEmailAuthConfig field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CaptureEmailAuthConfigMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CaptureEmailAuthConfigMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CaptureEmailAuthConfigMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CaptureEmailAuthConfigMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CaptureEmailAuthConfigMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CaptureEmailAuthConfigMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown CaptureEmailAuthConfig unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CaptureEmailAuthConfigMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown CaptureEmailAuthConfig edge %s", name)
+}
+
+// CaptureInboundReceiptMutation represents an operation that mutates the CaptureInboundReceipt nodes in the graph.
+type CaptureInboundReceiptMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *string
+	provider          *string
+	provider_event_id *string
+	provider_email_id *string
+	recipient_hash    *string
+	organization_id   *string
+	config_id         *string
+	attempt_id        *string
+	state             *captureinboundreceipt.State
+	failure_code      *string
+	received_at       *time.Time
+	processed_at      *time.Time
+	expires_at        *time.Time
+	created_at        *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*CaptureInboundReceipt, error)
+	predicates        []predicate.CaptureInboundReceipt
+}
+
+var _ ent.Mutation = (*CaptureInboundReceiptMutation)(nil)
+
+// captureinboundreceiptOption allows management of the mutation configuration using functional options.
+type captureinboundreceiptOption func(*CaptureInboundReceiptMutation)
+
+// newCaptureInboundReceiptMutation creates new mutation for the CaptureInboundReceipt entity.
+func newCaptureInboundReceiptMutation(c config, op Op, opts ...captureinboundreceiptOption) *CaptureInboundReceiptMutation {
+	m := &CaptureInboundReceiptMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCaptureInboundReceipt,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCaptureInboundReceiptID sets the ID field of the mutation.
+func withCaptureInboundReceiptID(id string) captureinboundreceiptOption {
+	return func(m *CaptureInboundReceiptMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CaptureInboundReceipt
+		)
+		m.oldValue = func(ctx context.Context) (*CaptureInboundReceipt, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CaptureInboundReceipt.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCaptureInboundReceipt sets the old CaptureInboundReceipt of the mutation.
+func withCaptureInboundReceipt(node *CaptureInboundReceipt) captureinboundreceiptOption {
+	return func(m *CaptureInboundReceiptMutation) {
+		m.oldValue = func(context.Context) (*CaptureInboundReceipt, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CaptureInboundReceiptMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CaptureInboundReceiptMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of CaptureInboundReceipt entities.
+func (m *CaptureInboundReceiptMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CaptureInboundReceiptMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CaptureInboundReceiptMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CaptureInboundReceipt.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetProvider sets the "provider" field.
+func (m *CaptureInboundReceiptMutation) SetProvider(s string) {
+	m.provider = &s
+}
+
+// Provider returns the value of the "provider" field in the mutation.
+func (m *CaptureInboundReceiptMutation) Provider() (r string, exists bool) {
+	v := m.provider
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvider returns the old "provider" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldProvider(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvider is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvider requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvider: %w", err)
+	}
+	return oldValue.Provider, nil
+}
+
+// ResetProvider resets all changes to the "provider" field.
+func (m *CaptureInboundReceiptMutation) ResetProvider() {
+	m.provider = nil
+}
+
+// SetProviderEventID sets the "provider_event_id" field.
+func (m *CaptureInboundReceiptMutation) SetProviderEventID(s string) {
+	m.provider_event_id = &s
+}
+
+// ProviderEventID returns the value of the "provider_event_id" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ProviderEventID() (r string, exists bool) {
+	v := m.provider_event_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderEventID returns the old "provider_event_id" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldProviderEventID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderEventID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderEventID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderEventID: %w", err)
+	}
+	return oldValue.ProviderEventID, nil
+}
+
+// ResetProviderEventID resets all changes to the "provider_event_id" field.
+func (m *CaptureInboundReceiptMutation) ResetProviderEventID() {
+	m.provider_event_id = nil
+}
+
+// SetProviderEmailID sets the "provider_email_id" field.
+func (m *CaptureInboundReceiptMutation) SetProviderEmailID(s string) {
+	m.provider_email_id = &s
+}
+
+// ProviderEmailID returns the value of the "provider_email_id" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ProviderEmailID() (r string, exists bool) {
+	v := m.provider_email_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderEmailID returns the old "provider_email_id" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldProviderEmailID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderEmailID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderEmailID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderEmailID: %w", err)
+	}
+	return oldValue.ProviderEmailID, nil
+}
+
+// ResetProviderEmailID resets all changes to the "provider_email_id" field.
+func (m *CaptureInboundReceiptMutation) ResetProviderEmailID() {
+	m.provider_email_id = nil
+}
+
+// SetRecipientHash sets the "recipient_hash" field.
+func (m *CaptureInboundReceiptMutation) SetRecipientHash(s string) {
+	m.recipient_hash = &s
+}
+
+// RecipientHash returns the value of the "recipient_hash" field in the mutation.
+func (m *CaptureInboundReceiptMutation) RecipientHash() (r string, exists bool) {
+	v := m.recipient_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientHash returns the old "recipient_hash" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldRecipientHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientHash: %w", err)
+	}
+	return oldValue.RecipientHash, nil
+}
+
+// ResetRecipientHash resets all changes to the "recipient_hash" field.
+func (m *CaptureInboundReceiptMutation) ResetRecipientHash() {
+	m.recipient_hash = nil
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *CaptureInboundReceiptMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *CaptureInboundReceiptMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldOrganizationID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ClearOrganizationID clears the value of the "organization_id" field.
+func (m *CaptureInboundReceiptMutation) ClearOrganizationID() {
+	m.organization_id = nil
+	m.clearedFields[captureinboundreceipt.FieldOrganizationID] = struct{}{}
+}
+
+// OrganizationIDCleared returns if the "organization_id" field was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) OrganizationIDCleared() bool {
+	_, ok := m.clearedFields[captureinboundreceipt.FieldOrganizationID]
+	return ok
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *CaptureInboundReceiptMutation) ResetOrganizationID() {
+	m.organization_id = nil
+	delete(m.clearedFields, captureinboundreceipt.FieldOrganizationID)
+}
+
+// SetConfigID sets the "config_id" field.
+func (m *CaptureInboundReceiptMutation) SetConfigID(s string) {
+	m.config_id = &s
+}
+
+// ConfigID returns the value of the "config_id" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ConfigID() (r string, exists bool) {
+	v := m.config_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigID returns the old "config_id" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldConfigID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigID: %w", err)
+	}
+	return oldValue.ConfigID, nil
+}
+
+// ClearConfigID clears the value of the "config_id" field.
+func (m *CaptureInboundReceiptMutation) ClearConfigID() {
+	m.config_id = nil
+	m.clearedFields[captureinboundreceipt.FieldConfigID] = struct{}{}
+}
+
+// ConfigIDCleared returns if the "config_id" field was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) ConfigIDCleared() bool {
+	_, ok := m.clearedFields[captureinboundreceipt.FieldConfigID]
+	return ok
+}
+
+// ResetConfigID resets all changes to the "config_id" field.
+func (m *CaptureInboundReceiptMutation) ResetConfigID() {
+	m.config_id = nil
+	delete(m.clearedFields, captureinboundreceipt.FieldConfigID)
+}
+
+// SetAttemptID sets the "attempt_id" field.
+func (m *CaptureInboundReceiptMutation) SetAttemptID(s string) {
+	m.attempt_id = &s
+}
+
+// AttemptID returns the value of the "attempt_id" field in the mutation.
+func (m *CaptureInboundReceiptMutation) AttemptID() (r string, exists bool) {
+	v := m.attempt_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptID returns the old "attempt_id" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldAttemptID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptID: %w", err)
+	}
+	return oldValue.AttemptID, nil
+}
+
+// ClearAttemptID clears the value of the "attempt_id" field.
+func (m *CaptureInboundReceiptMutation) ClearAttemptID() {
+	m.attempt_id = nil
+	m.clearedFields[captureinboundreceipt.FieldAttemptID] = struct{}{}
+}
+
+// AttemptIDCleared returns if the "attempt_id" field was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) AttemptIDCleared() bool {
+	_, ok := m.clearedFields[captureinboundreceipt.FieldAttemptID]
+	return ok
+}
+
+// ResetAttemptID resets all changes to the "attempt_id" field.
+func (m *CaptureInboundReceiptMutation) ResetAttemptID() {
+	m.attempt_id = nil
+	delete(m.clearedFields, captureinboundreceipt.FieldAttemptID)
+}
+
+// SetState sets the "state" field.
+func (m *CaptureInboundReceiptMutation) SetState(c captureinboundreceipt.State) {
+	m.state = &c
+}
+
+// State returns the value of the "state" field in the mutation.
+func (m *CaptureInboundReceiptMutation) State() (r captureinboundreceipt.State, exists bool) {
+	v := m.state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldState returns the old "state" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldState(ctx context.Context) (v captureinboundreceipt.State, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
+	}
+	return oldValue.State, nil
+}
+
+// ResetState resets all changes to the "state" field.
+func (m *CaptureInboundReceiptMutation) ResetState() {
+	m.state = nil
+}
+
+// SetFailureCode sets the "failure_code" field.
+func (m *CaptureInboundReceiptMutation) SetFailureCode(s string) {
+	m.failure_code = &s
+}
+
+// FailureCode returns the value of the "failure_code" field in the mutation.
+func (m *CaptureInboundReceiptMutation) FailureCode() (r string, exists bool) {
+	v := m.failure_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureCode returns the old "failure_code" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldFailureCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureCode: %w", err)
+	}
+	return oldValue.FailureCode, nil
+}
+
+// ClearFailureCode clears the value of the "failure_code" field.
+func (m *CaptureInboundReceiptMutation) ClearFailureCode() {
+	m.failure_code = nil
+	m.clearedFields[captureinboundreceipt.FieldFailureCode] = struct{}{}
+}
+
+// FailureCodeCleared returns if the "failure_code" field was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) FailureCodeCleared() bool {
+	_, ok := m.clearedFields[captureinboundreceipt.FieldFailureCode]
+	return ok
+}
+
+// ResetFailureCode resets all changes to the "failure_code" field.
+func (m *CaptureInboundReceiptMutation) ResetFailureCode() {
+	m.failure_code = nil
+	delete(m.clearedFields, captureinboundreceipt.FieldFailureCode)
+}
+
+// SetReceivedAt sets the "received_at" field.
+func (m *CaptureInboundReceiptMutation) SetReceivedAt(t time.Time) {
+	m.received_at = &t
+}
+
+// ReceivedAt returns the value of the "received_at" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ReceivedAt() (r time.Time, exists bool) {
+	v := m.received_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceivedAt returns the old "received_at" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldReceivedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceivedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceivedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceivedAt: %w", err)
+	}
+	return oldValue.ReceivedAt, nil
+}
+
+// ResetReceivedAt resets all changes to the "received_at" field.
+func (m *CaptureInboundReceiptMutation) ResetReceivedAt() {
+	m.received_at = nil
+}
+
+// SetProcessedAt sets the "processed_at" field.
+func (m *CaptureInboundReceiptMutation) SetProcessedAt(t time.Time) {
+	m.processed_at = &t
+}
+
+// ProcessedAt returns the value of the "processed_at" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ProcessedAt() (r time.Time, exists bool) {
+	v := m.processed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessedAt returns the old "processed_at" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldProcessedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessedAt: %w", err)
+	}
+	return oldValue.ProcessedAt, nil
+}
+
+// ClearProcessedAt clears the value of the "processed_at" field.
+func (m *CaptureInboundReceiptMutation) ClearProcessedAt() {
+	m.processed_at = nil
+	m.clearedFields[captureinboundreceipt.FieldProcessedAt] = struct{}{}
+}
+
+// ProcessedAtCleared returns if the "processed_at" field was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) ProcessedAtCleared() bool {
+	_, ok := m.clearedFields[captureinboundreceipt.FieldProcessedAt]
+	return ok
+}
+
+// ResetProcessedAt resets all changes to the "processed_at" field.
+func (m *CaptureInboundReceiptMutation) ResetProcessedAt() {
+	m.processed_at = nil
+	delete(m.clearedFields, captureinboundreceipt.FieldProcessedAt)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *CaptureInboundReceiptMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *CaptureInboundReceiptMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *CaptureInboundReceiptMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CaptureInboundReceiptMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CaptureInboundReceiptMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CaptureInboundReceipt entity.
+// If the CaptureInboundReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureInboundReceiptMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CaptureInboundReceiptMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the CaptureInboundReceiptMutation builder.
+func (m *CaptureInboundReceiptMutation) Where(ps ...predicate.CaptureInboundReceipt) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CaptureInboundReceiptMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CaptureInboundReceiptMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CaptureInboundReceipt, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CaptureInboundReceiptMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CaptureInboundReceiptMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CaptureInboundReceipt).
+func (m *CaptureInboundReceiptMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CaptureInboundReceiptMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.provider != nil {
+		fields = append(fields, captureinboundreceipt.FieldProvider)
+	}
+	if m.provider_event_id != nil {
+		fields = append(fields, captureinboundreceipt.FieldProviderEventID)
+	}
+	if m.provider_email_id != nil {
+		fields = append(fields, captureinboundreceipt.FieldProviderEmailID)
+	}
+	if m.recipient_hash != nil {
+		fields = append(fields, captureinboundreceipt.FieldRecipientHash)
+	}
+	if m.organization_id != nil {
+		fields = append(fields, captureinboundreceipt.FieldOrganizationID)
+	}
+	if m.config_id != nil {
+		fields = append(fields, captureinboundreceipt.FieldConfigID)
+	}
+	if m.attempt_id != nil {
+		fields = append(fields, captureinboundreceipt.FieldAttemptID)
+	}
+	if m.state != nil {
+		fields = append(fields, captureinboundreceipt.FieldState)
+	}
+	if m.failure_code != nil {
+		fields = append(fields, captureinboundreceipt.FieldFailureCode)
+	}
+	if m.received_at != nil {
+		fields = append(fields, captureinboundreceipt.FieldReceivedAt)
+	}
+	if m.processed_at != nil {
+		fields = append(fields, captureinboundreceipt.FieldProcessedAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, captureinboundreceipt.FieldExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, captureinboundreceipt.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CaptureInboundReceiptMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case captureinboundreceipt.FieldProvider:
+		return m.Provider()
+	case captureinboundreceipt.FieldProviderEventID:
+		return m.ProviderEventID()
+	case captureinboundreceipt.FieldProviderEmailID:
+		return m.ProviderEmailID()
+	case captureinboundreceipt.FieldRecipientHash:
+		return m.RecipientHash()
+	case captureinboundreceipt.FieldOrganizationID:
+		return m.OrganizationID()
+	case captureinboundreceipt.FieldConfigID:
+		return m.ConfigID()
+	case captureinboundreceipt.FieldAttemptID:
+		return m.AttemptID()
+	case captureinboundreceipt.FieldState:
+		return m.State()
+	case captureinboundreceipt.FieldFailureCode:
+		return m.FailureCode()
+	case captureinboundreceipt.FieldReceivedAt:
+		return m.ReceivedAt()
+	case captureinboundreceipt.FieldProcessedAt:
+		return m.ProcessedAt()
+	case captureinboundreceipt.FieldExpiresAt:
+		return m.ExpiresAt()
+	case captureinboundreceipt.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CaptureInboundReceiptMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case captureinboundreceipt.FieldProvider:
+		return m.OldProvider(ctx)
+	case captureinboundreceipt.FieldProviderEventID:
+		return m.OldProviderEventID(ctx)
+	case captureinboundreceipt.FieldProviderEmailID:
+		return m.OldProviderEmailID(ctx)
+	case captureinboundreceipt.FieldRecipientHash:
+		return m.OldRecipientHash(ctx)
+	case captureinboundreceipt.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case captureinboundreceipt.FieldConfigID:
+		return m.OldConfigID(ctx)
+	case captureinboundreceipt.FieldAttemptID:
+		return m.OldAttemptID(ctx)
+	case captureinboundreceipt.FieldState:
+		return m.OldState(ctx)
+	case captureinboundreceipt.FieldFailureCode:
+		return m.OldFailureCode(ctx)
+	case captureinboundreceipt.FieldReceivedAt:
+		return m.OldReceivedAt(ctx)
+	case captureinboundreceipt.FieldProcessedAt:
+		return m.OldProcessedAt(ctx)
+	case captureinboundreceipt.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case captureinboundreceipt.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown CaptureInboundReceipt field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureInboundReceiptMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case captureinboundreceipt.FieldProvider:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvider(v)
+		return nil
+	case captureinboundreceipt.FieldProviderEventID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderEventID(v)
+		return nil
+	case captureinboundreceipt.FieldProviderEmailID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderEmailID(v)
+		return nil
+	case captureinboundreceipt.FieldRecipientHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientHash(v)
+		return nil
+	case captureinboundreceipt.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case captureinboundreceipt.FieldConfigID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigID(v)
+		return nil
+	case captureinboundreceipt.FieldAttemptID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptID(v)
+		return nil
+	case captureinboundreceipt.FieldState:
+		v, ok := value.(captureinboundreceipt.State)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetState(v)
+		return nil
+	case captureinboundreceipt.FieldFailureCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureCode(v)
+		return nil
+	case captureinboundreceipt.FieldReceivedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceivedAt(v)
+		return nil
+	case captureinboundreceipt.FieldProcessedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessedAt(v)
+		return nil
+	case captureinboundreceipt.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case captureinboundreceipt.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureInboundReceipt field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CaptureInboundReceiptMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CaptureInboundReceiptMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CaptureInboundReceiptMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown CaptureInboundReceipt numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CaptureInboundReceiptMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(captureinboundreceipt.FieldOrganizationID) {
+		fields = append(fields, captureinboundreceipt.FieldOrganizationID)
+	}
+	if m.FieldCleared(captureinboundreceipt.FieldConfigID) {
+		fields = append(fields, captureinboundreceipt.FieldConfigID)
+	}
+	if m.FieldCleared(captureinboundreceipt.FieldAttemptID) {
+		fields = append(fields, captureinboundreceipt.FieldAttemptID)
+	}
+	if m.FieldCleared(captureinboundreceipt.FieldFailureCode) {
+		fields = append(fields, captureinboundreceipt.FieldFailureCode)
+	}
+	if m.FieldCleared(captureinboundreceipt.FieldProcessedAt) {
+		fields = append(fields, captureinboundreceipt.FieldProcessedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CaptureInboundReceiptMutation) ClearField(name string) error {
+	switch name {
+	case captureinboundreceipt.FieldOrganizationID:
+		m.ClearOrganizationID()
+		return nil
+	case captureinboundreceipt.FieldConfigID:
+		m.ClearConfigID()
+		return nil
+	case captureinboundreceipt.FieldAttemptID:
+		m.ClearAttemptID()
+		return nil
+	case captureinboundreceipt.FieldFailureCode:
+		m.ClearFailureCode()
+		return nil
+	case captureinboundreceipt.FieldProcessedAt:
+		m.ClearProcessedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureInboundReceipt nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CaptureInboundReceiptMutation) ResetField(name string) error {
+	switch name {
+	case captureinboundreceipt.FieldProvider:
+		m.ResetProvider()
+		return nil
+	case captureinboundreceipt.FieldProviderEventID:
+		m.ResetProviderEventID()
+		return nil
+	case captureinboundreceipt.FieldProviderEmailID:
+		m.ResetProviderEmailID()
+		return nil
+	case captureinboundreceipt.FieldRecipientHash:
+		m.ResetRecipientHash()
+		return nil
+	case captureinboundreceipt.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case captureinboundreceipt.FieldConfigID:
+		m.ResetConfigID()
+		return nil
+	case captureinboundreceipt.FieldAttemptID:
+		m.ResetAttemptID()
+		return nil
+	case captureinboundreceipt.FieldState:
+		m.ResetState()
+		return nil
+	case captureinboundreceipt.FieldFailureCode:
+		m.ResetFailureCode()
+		return nil
+	case captureinboundreceipt.FieldReceivedAt:
+		m.ResetReceivedAt()
+		return nil
+	case captureinboundreceipt.FieldProcessedAt:
+		m.ResetProcessedAt()
+		return nil
+	case captureinboundreceipt.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case captureinboundreceipt.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CaptureInboundReceipt field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CaptureInboundReceiptMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CaptureInboundReceiptMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CaptureInboundReceiptMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CaptureInboundReceiptMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CaptureInboundReceiptMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CaptureInboundReceiptMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown CaptureInboundReceipt unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CaptureInboundReceiptMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown CaptureInboundReceipt edge %s", name)
+}
+
 // CaptureJobMutation represents an operation that mutates the CaptureJob nodes in the graph.
 type CaptureJobMutation struct {
 	config
@@ -24089,6 +29389,8 @@ type CaptureJobMutation struct {
 	requested_by_user_id     *string
 	surface_capture_id       *string
 	asset_id                 *string
+	sequence_asset_ids       *[]string
+	appendsequence_asset_ids []string
 	resume_count             *int
 	addresume_count          *int
 	created_at               *time.Time
@@ -25336,6 +30638,71 @@ func (m *CaptureJobMutation) ResetAssetID() {
 	delete(m.clearedFields, capturejob.FieldAssetID)
 }
 
+// SetSequenceAssetIds sets the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) SetSequenceAssetIds(s []string) {
+	m.sequence_asset_ids = &s
+	m.appendsequence_asset_ids = nil
+}
+
+// SequenceAssetIds returns the value of the "sequence_asset_ids" field in the mutation.
+func (m *CaptureJobMutation) SequenceAssetIds() (r []string, exists bool) {
+	v := m.sequence_asset_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSequenceAssetIds returns the old "sequence_asset_ids" field's value of the CaptureJob entity.
+// If the CaptureJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CaptureJobMutation) OldSequenceAssetIds(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSequenceAssetIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSequenceAssetIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSequenceAssetIds: %w", err)
+	}
+	return oldValue.SequenceAssetIds, nil
+}
+
+// AppendSequenceAssetIds adds s to the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) AppendSequenceAssetIds(s []string) {
+	m.appendsequence_asset_ids = append(m.appendsequence_asset_ids, s...)
+}
+
+// AppendedSequenceAssetIds returns the list of values that were appended to the "sequence_asset_ids" field in this mutation.
+func (m *CaptureJobMutation) AppendedSequenceAssetIds() ([]string, bool) {
+	if len(m.appendsequence_asset_ids) == 0 {
+		return nil, false
+	}
+	return m.appendsequence_asset_ids, true
+}
+
+// ClearSequenceAssetIds clears the value of the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) ClearSequenceAssetIds() {
+	m.sequence_asset_ids = nil
+	m.appendsequence_asset_ids = nil
+	m.clearedFields[capturejob.FieldSequenceAssetIds] = struct{}{}
+}
+
+// SequenceAssetIdsCleared returns if the "sequence_asset_ids" field was cleared in this mutation.
+func (m *CaptureJobMutation) SequenceAssetIdsCleared() bool {
+	_, ok := m.clearedFields[capturejob.FieldSequenceAssetIds]
+	return ok
+}
+
+// ResetSequenceAssetIds resets all changes to the "sequence_asset_ids" field.
+func (m *CaptureJobMutation) ResetSequenceAssetIds() {
+	m.sequence_asset_ids = nil
+	m.appendsequence_asset_ids = nil
+	delete(m.clearedFields, capturejob.FieldSequenceAssetIds)
+}
+
 // SetResumeCount sets the "resume_count" field.
 func (m *CaptureJobMutation) SetResumeCount(i int) {
 	m.resume_count = &i
@@ -25498,7 +30865,7 @@ func (m *CaptureJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CaptureJobMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 28)
 	if m.organization_id != nil {
 		fields = append(fields, capturejob.FieldOrganizationID)
 	}
@@ -25571,6 +30938,9 @@ func (m *CaptureJobMutation) Fields() []string {
 	if m.asset_id != nil {
 		fields = append(fields, capturejob.FieldAssetID)
 	}
+	if m.sequence_asset_ids != nil {
+		fields = append(fields, capturejob.FieldSequenceAssetIds)
+	}
 	if m.resume_count != nil {
 		fields = append(fields, capturejob.FieldResumeCount)
 	}
@@ -25636,6 +31006,8 @@ func (m *CaptureJobMutation) Field(name string) (ent.Value, bool) {
 		return m.SurfaceCaptureID()
 	case capturejob.FieldAssetID:
 		return m.AssetID()
+	case capturejob.FieldSequenceAssetIds:
+		return m.SequenceAssetIds()
 	case capturejob.FieldResumeCount:
 		return m.ResumeCount()
 	case capturejob.FieldCreatedAt:
@@ -25699,6 +31071,8 @@ func (m *CaptureJobMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldSurfaceCaptureID(ctx)
 	case capturejob.FieldAssetID:
 		return m.OldAssetID(ctx)
+	case capturejob.FieldSequenceAssetIds:
+		return m.OldSequenceAssetIds(ctx)
 	case capturejob.FieldResumeCount:
 		return m.OldResumeCount(ctx)
 	case capturejob.FieldCreatedAt:
@@ -25882,6 +31256,13 @@ func (m *CaptureJobMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAssetID(v)
 		return nil
+	case capturejob.FieldSequenceAssetIds:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSequenceAssetIds(v)
+		return nil
 	case capturejob.FieldResumeCount:
 		v, ok := value.(int)
 		if !ok {
@@ -26047,6 +31428,9 @@ func (m *CaptureJobMutation) ClearedFields() []string {
 	if m.FieldCleared(capturejob.FieldAssetID) {
 		fields = append(fields, capturejob.FieldAssetID)
 	}
+	if m.FieldCleared(capturejob.FieldSequenceAssetIds) {
+		fields = append(fields, capturejob.FieldSequenceAssetIds)
+	}
 	return fields
 }
 
@@ -26099,6 +31483,9 @@ func (m *CaptureJobMutation) ClearField(name string) error {
 		return nil
 	case capturejob.FieldAssetID:
 		m.ClearAssetID()
+		return nil
+	case capturejob.FieldSequenceAssetIds:
+		m.ClearSequenceAssetIds()
 		return nil
 	}
 	return fmt.Errorf("unknown CaptureJob nullable field %s", name)
@@ -26179,6 +31566,9 @@ func (m *CaptureJobMutation) ResetField(name string) error {
 		return nil
 	case capturejob.FieldAssetID:
 		m.ResetAssetID()
+		return nil
+	case capturejob.FieldSequenceAssetIds:
+		m.ResetSequenceAssetIds()
 		return nil
 	case capturejob.FieldResumeCount:
 		m.ResetResumeCount()
@@ -81463,47 +86853,52 @@ func (m *PermissionGroupMemberMutation) ResetEdge(name string) error {
 // PlatformAppConnectionMutation represents an operation that mutates the PlatformAppConnection nodes in the graph.
 type PlatformAppConnectionMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *string
-	organization_id    *string
-	source_app_id      *string
-	name               *string
-	environment        *string
-	origin             *string
-	hosts              *[]string
-	appendhosts        []string
-	login_hosts        *[]string
-	appendlogin_hosts  []string
-	protected_path     *string
-	identity_selector  *string
-	expected_account   *string
-	status             *platformappconnection.Status
-	state_ciphertext   *string
-	generation         *int
-	addgeneration      *int
-	state_revision     *int
-	addstate_revision  *int
-	validated_at       *time.Time
-	state_expires_at   *time.Time
-	connect_intent_id  *string
-	connect_user_id    *string
-	connect_session_id *string
-	connect_expires_at *time.Time
-	connect_phase      *string
-	failure_code       *string
-	lease_job_id       *string
-	lease_token        *int64
-	addlease_token     *int64
-	lease_expires_at   *time.Time
-	created_by_user_id *string
-	revoked_at         *time.Time
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	done               bool
-	oldValue           func(context.Context) (*PlatformAppConnection, error)
-	predicates         []predicate.PlatformAppConnection
+	op                          Op
+	typ                         string
+	id                          *string
+	organization_id             *string
+	source_app_id               *string
+	name                        *string
+	environment                 *string
+	origin                      *string
+	hosts                       *[]string
+	appendhosts                 []string
+	login_hosts                 *[]string
+	appendlogin_hosts           []string
+	protected_path              *string
+	identity_selector           *string
+	expected_account            *string
+	status                      *platformappconnection.Status
+	state_ciphertext            *string
+	generation                  *int
+	addgeneration               *int
+	state_revision              *int
+	addstate_revision           *int
+	validated_at                *time.Time
+	state_expires_at            *time.Time
+	connect_intent_id           *string
+	connect_user_id             *string
+	connect_session_id          *string
+	connect_expires_at          *time.Time
+	connect_phase               *string
+	failure_code                *string
+	lease_job_id                *string
+	lease_token                 *int64
+	addlease_token              *int64
+	lease_expires_at            *time.Time
+	created_by_user_id          *string
+	discovered_routes           *[]map[string]string
+	appenddiscovered_routes     []map[string]string
+	bootstrap_url               *string
+	bootstrap_secret_ciphertext *string
+	revoked_at                  *time.Time
+	last_auto_authenticated_at  *time.Time
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*PlatformAppConnection, error)
+	predicates                  []predicate.PlatformAppConnection
 }
 
 var _ ent.Mutation = (*PlatformAppConnectionMutation)(nil)
@@ -82792,6 +88187,169 @@ func (m *PlatformAppConnectionMutation) ResetCreatedByUserID() {
 	m.created_by_user_id = nil
 }
 
+// SetDiscoveredRoutes sets the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) SetDiscoveredRoutes(value []map[string]string) {
+	m.discovered_routes = &value
+	m.appenddiscovered_routes = nil
+}
+
+// DiscoveredRoutes returns the value of the "discovered_routes" field in the mutation.
+func (m *PlatformAppConnectionMutation) DiscoveredRoutes() (r []map[string]string, exists bool) {
+	v := m.discovered_routes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiscoveredRoutes returns the old "discovered_routes" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldDiscoveredRoutes(ctx context.Context) (v []map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiscoveredRoutes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiscoveredRoutes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiscoveredRoutes: %w", err)
+	}
+	return oldValue.DiscoveredRoutes, nil
+}
+
+// AppendDiscoveredRoutes adds value to the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) AppendDiscoveredRoutes(value []map[string]string) {
+	m.appenddiscovered_routes = append(m.appenddiscovered_routes, value...)
+}
+
+// AppendedDiscoveredRoutes returns the list of values that were appended to the "discovered_routes" field in this mutation.
+func (m *PlatformAppConnectionMutation) AppendedDiscoveredRoutes() ([]map[string]string, bool) {
+	if len(m.appenddiscovered_routes) == 0 {
+		return nil, false
+	}
+	return m.appenddiscovered_routes, true
+}
+
+// ClearDiscoveredRoutes clears the value of the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) ClearDiscoveredRoutes() {
+	m.discovered_routes = nil
+	m.appenddiscovered_routes = nil
+	m.clearedFields[platformappconnection.FieldDiscoveredRoutes] = struct{}{}
+}
+
+// DiscoveredRoutesCleared returns if the "discovered_routes" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) DiscoveredRoutesCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldDiscoveredRoutes]
+	return ok
+}
+
+// ResetDiscoveredRoutes resets all changes to the "discovered_routes" field.
+func (m *PlatformAppConnectionMutation) ResetDiscoveredRoutes() {
+	m.discovered_routes = nil
+	m.appenddiscovered_routes = nil
+	delete(m.clearedFields, platformappconnection.FieldDiscoveredRoutes)
+}
+
+// SetBootstrapURL sets the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) SetBootstrapURL(s string) {
+	m.bootstrap_url = &s
+}
+
+// BootstrapURL returns the value of the "bootstrap_url" field in the mutation.
+func (m *PlatformAppConnectionMutation) BootstrapURL() (r string, exists bool) {
+	v := m.bootstrap_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBootstrapURL returns the old "bootstrap_url" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldBootstrapURL(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBootstrapURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBootstrapURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBootstrapURL: %w", err)
+	}
+	return oldValue.BootstrapURL, nil
+}
+
+// ClearBootstrapURL clears the value of the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) ClearBootstrapURL() {
+	m.bootstrap_url = nil
+	m.clearedFields[platformappconnection.FieldBootstrapURL] = struct{}{}
+}
+
+// BootstrapURLCleared returns if the "bootstrap_url" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) BootstrapURLCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldBootstrapURL]
+	return ok
+}
+
+// ResetBootstrapURL resets all changes to the "bootstrap_url" field.
+func (m *PlatformAppConnectionMutation) ResetBootstrapURL() {
+	m.bootstrap_url = nil
+	delete(m.clearedFields, platformappconnection.FieldBootstrapURL)
+}
+
+// SetBootstrapSecretCiphertext sets the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) SetBootstrapSecretCiphertext(s string) {
+	m.bootstrap_secret_ciphertext = &s
+}
+
+// BootstrapSecretCiphertext returns the value of the "bootstrap_secret_ciphertext" field in the mutation.
+func (m *PlatformAppConnectionMutation) BootstrapSecretCiphertext() (r string, exists bool) {
+	v := m.bootstrap_secret_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBootstrapSecretCiphertext returns the old "bootstrap_secret_ciphertext" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldBootstrapSecretCiphertext(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBootstrapSecretCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBootstrapSecretCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBootstrapSecretCiphertext: %w", err)
+	}
+	return oldValue.BootstrapSecretCiphertext, nil
+}
+
+// ClearBootstrapSecretCiphertext clears the value of the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) ClearBootstrapSecretCiphertext() {
+	m.bootstrap_secret_ciphertext = nil
+	m.clearedFields[platformappconnection.FieldBootstrapSecretCiphertext] = struct{}{}
+}
+
+// BootstrapSecretCiphertextCleared returns if the "bootstrap_secret_ciphertext" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) BootstrapSecretCiphertextCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldBootstrapSecretCiphertext]
+	return ok
+}
+
+// ResetBootstrapSecretCiphertext resets all changes to the "bootstrap_secret_ciphertext" field.
+func (m *PlatformAppConnectionMutation) ResetBootstrapSecretCiphertext() {
+	m.bootstrap_secret_ciphertext = nil
+	delete(m.clearedFields, platformappconnection.FieldBootstrapSecretCiphertext)
+}
+
 // SetRevokedAt sets the "revoked_at" field.
 func (m *PlatformAppConnectionMutation) SetRevokedAt(t time.Time) {
 	m.revoked_at = &t
@@ -82839,6 +88397,55 @@ func (m *PlatformAppConnectionMutation) RevokedAtCleared() bool {
 func (m *PlatformAppConnectionMutation) ResetRevokedAt() {
 	m.revoked_at = nil
 	delete(m.clearedFields, platformappconnection.FieldRevokedAt)
+}
+
+// SetLastAutoAuthenticatedAt sets the "last_auto_authenticated_at" field.
+func (m *PlatformAppConnectionMutation) SetLastAutoAuthenticatedAt(t time.Time) {
+	m.last_auto_authenticated_at = &t
+}
+
+// LastAutoAuthenticatedAt returns the value of the "last_auto_authenticated_at" field in the mutation.
+func (m *PlatformAppConnectionMutation) LastAutoAuthenticatedAt() (r time.Time, exists bool) {
+	v := m.last_auto_authenticated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastAutoAuthenticatedAt returns the old "last_auto_authenticated_at" field's value of the PlatformAppConnection entity.
+// If the PlatformAppConnection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformAppConnectionMutation) OldLastAutoAuthenticatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastAutoAuthenticatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastAutoAuthenticatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastAutoAuthenticatedAt: %w", err)
+	}
+	return oldValue.LastAutoAuthenticatedAt, nil
+}
+
+// ClearLastAutoAuthenticatedAt clears the value of the "last_auto_authenticated_at" field.
+func (m *PlatformAppConnectionMutation) ClearLastAutoAuthenticatedAt() {
+	m.last_auto_authenticated_at = nil
+	m.clearedFields[platformappconnection.FieldLastAutoAuthenticatedAt] = struct{}{}
+}
+
+// LastAutoAuthenticatedAtCleared returns if the "last_auto_authenticated_at" field was cleared in this mutation.
+func (m *PlatformAppConnectionMutation) LastAutoAuthenticatedAtCleared() bool {
+	_, ok := m.clearedFields[platformappconnection.FieldLastAutoAuthenticatedAt]
+	return ok
+}
+
+// ResetLastAutoAuthenticatedAt resets all changes to the "last_auto_authenticated_at" field.
+func (m *PlatformAppConnectionMutation) ResetLastAutoAuthenticatedAt() {
+	m.last_auto_authenticated_at = nil
+	delete(m.clearedFields, platformappconnection.FieldLastAutoAuthenticatedAt)
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -82947,7 +88554,7 @@ func (m *PlatformAppConnectionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PlatformAppConnectionMutation) Fields() []string {
-	fields := make([]string, 0, 29)
+	fields := make([]string, 0, 33)
 	if m.organization_id != nil {
 		fields = append(fields, platformappconnection.FieldOrganizationID)
 	}
@@ -83026,8 +88633,20 @@ func (m *PlatformAppConnectionMutation) Fields() []string {
 	if m.created_by_user_id != nil {
 		fields = append(fields, platformappconnection.FieldCreatedByUserID)
 	}
+	if m.discovered_routes != nil {
+		fields = append(fields, platformappconnection.FieldDiscoveredRoutes)
+	}
+	if m.bootstrap_url != nil {
+		fields = append(fields, platformappconnection.FieldBootstrapURL)
+	}
+	if m.bootstrap_secret_ciphertext != nil {
+		fields = append(fields, platformappconnection.FieldBootstrapSecretCiphertext)
+	}
 	if m.revoked_at != nil {
 		fields = append(fields, platformappconnection.FieldRevokedAt)
+	}
+	if m.last_auto_authenticated_at != nil {
+		fields = append(fields, platformappconnection.FieldLastAutoAuthenticatedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, platformappconnection.FieldCreatedAt)
@@ -83095,8 +88714,16 @@ func (m *PlatformAppConnectionMutation) Field(name string) (ent.Value, bool) {
 		return m.LeaseExpiresAt()
 	case platformappconnection.FieldCreatedByUserID:
 		return m.CreatedByUserID()
+	case platformappconnection.FieldDiscoveredRoutes:
+		return m.DiscoveredRoutes()
+	case platformappconnection.FieldBootstrapURL:
+		return m.BootstrapURL()
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		return m.BootstrapSecretCiphertext()
 	case platformappconnection.FieldRevokedAt:
 		return m.RevokedAt()
+	case platformappconnection.FieldLastAutoAuthenticatedAt:
+		return m.LastAutoAuthenticatedAt()
 	case platformappconnection.FieldCreatedAt:
 		return m.CreatedAt()
 	case platformappconnection.FieldUpdatedAt:
@@ -83162,8 +88789,16 @@ func (m *PlatformAppConnectionMutation) OldField(ctx context.Context, name strin
 		return m.OldLeaseExpiresAt(ctx)
 	case platformappconnection.FieldCreatedByUserID:
 		return m.OldCreatedByUserID(ctx)
+	case platformappconnection.FieldDiscoveredRoutes:
+		return m.OldDiscoveredRoutes(ctx)
+	case platformappconnection.FieldBootstrapURL:
+		return m.OldBootstrapURL(ctx)
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		return m.OldBootstrapSecretCiphertext(ctx)
 	case platformappconnection.FieldRevokedAt:
 		return m.OldRevokedAt(ctx)
+	case platformappconnection.FieldLastAutoAuthenticatedAt:
+		return m.OldLastAutoAuthenticatedAt(ctx)
 	case platformappconnection.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case platformappconnection.FieldUpdatedAt:
@@ -83359,12 +88994,40 @@ func (m *PlatformAppConnectionMutation) SetField(name string, value ent.Value) e
 		}
 		m.SetCreatedByUserID(v)
 		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		v, ok := value.([]map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiscoveredRoutes(v)
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBootstrapURL(v)
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBootstrapSecretCiphertext(v)
+		return nil
 	case platformappconnection.FieldRevokedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRevokedAt(v)
+		return nil
+	case platformappconnection.FieldLastAutoAuthenticatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastAutoAuthenticatedAt(v)
 		return nil
 	case platformappconnection.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -83485,8 +89148,20 @@ func (m *PlatformAppConnectionMutation) ClearedFields() []string {
 	if m.FieldCleared(platformappconnection.FieldLeaseExpiresAt) {
 		fields = append(fields, platformappconnection.FieldLeaseExpiresAt)
 	}
+	if m.FieldCleared(platformappconnection.FieldDiscoveredRoutes) {
+		fields = append(fields, platformappconnection.FieldDiscoveredRoutes)
+	}
+	if m.FieldCleared(platformappconnection.FieldBootstrapURL) {
+		fields = append(fields, platformappconnection.FieldBootstrapURL)
+	}
+	if m.FieldCleared(platformappconnection.FieldBootstrapSecretCiphertext) {
+		fields = append(fields, platformappconnection.FieldBootstrapSecretCiphertext)
+	}
 	if m.FieldCleared(platformappconnection.FieldRevokedAt) {
 		fields = append(fields, platformappconnection.FieldRevokedAt)
+	}
+	if m.FieldCleared(platformappconnection.FieldLastAutoAuthenticatedAt) {
+		fields = append(fields, platformappconnection.FieldLastAutoAuthenticatedAt)
 	}
 	return fields
 }
@@ -83538,8 +89213,20 @@ func (m *PlatformAppConnectionMutation) ClearField(name string) error {
 	case platformappconnection.FieldLeaseExpiresAt:
 		m.ClearLeaseExpiresAt()
 		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		m.ClearDiscoveredRoutes()
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		m.ClearBootstrapURL()
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		m.ClearBootstrapSecretCiphertext()
+		return nil
 	case platformappconnection.FieldRevokedAt:
 		m.ClearRevokedAt()
+		return nil
+	case platformappconnection.FieldLastAutoAuthenticatedAt:
+		m.ClearLastAutoAuthenticatedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown PlatformAppConnection nullable field %s", name)
@@ -83627,8 +89314,20 @@ func (m *PlatformAppConnectionMutation) ResetField(name string) error {
 	case platformappconnection.FieldCreatedByUserID:
 		m.ResetCreatedByUserID()
 		return nil
+	case platformappconnection.FieldDiscoveredRoutes:
+		m.ResetDiscoveredRoutes()
+		return nil
+	case platformappconnection.FieldBootstrapURL:
+		m.ResetBootstrapURL()
+		return nil
+	case platformappconnection.FieldBootstrapSecretCiphertext:
+		m.ResetBootstrapSecretCiphertext()
+		return nil
 	case platformappconnection.FieldRevokedAt:
 		m.ResetRevokedAt()
+		return nil
+	case platformappconnection.FieldLastAutoAuthenticatedAt:
+		m.ResetLastAutoAuthenticatedAt()
 		return nil
 	case platformappconnection.FieldCreatedAt:
 		m.ResetCreatedAt()

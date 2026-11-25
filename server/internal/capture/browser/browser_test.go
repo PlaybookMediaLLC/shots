@@ -3,10 +3,14 @@ package browser
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
-	_ "image/png"
+	"image/jpeg"
+	"image/png"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -114,6 +118,9 @@ func TestRecipeAcceptsOnlyTheTypedLanguage(t *testing.T) {
 		"unbounded model budget": func(r *Recipe) { r.Navigation = &Navigation{Objective: "Reports", MaxSteps: 2, CreditLimit: 100} },
 		"triple scale":           func(r *Recipe) { r.Viewport.Scale = 3 },
 		"unknown crop":           func(r *Recipe) { r.Crop = "element" },
+		"unknown color scheme":   func(r *Recipe) { r.ColorScheme = "sepia" },
+		"unknown mask style":     func(r *Recipe) { r.MaskStyle = "pixelate" },
+		"script optional mask":   func(r *Recipe) { r.OptionalMasks = []string{"a;alert(1)"} },
 	} {
 		recipe := validRecipe()
 		recipe.Steps = append([]Step{}, recipe.Steps...)
@@ -121,6 +128,14 @@ func TestRecipeAcceptsOnlyTheTypedLanguage(t *testing.T) {
 		if recipe.Validate() == nil {
 			t.Errorf("%s was accepted", name)
 		}
+	}
+	phase2 := validRecipe()
+	phase2.ColorScheme = ColorSchemeDark
+	phase2.MaskStyle = MaskStyleBlur
+	phase2.OptionalMasks = []string{".toast"}
+	phase2.VerifyWithVision = true
+	if err := phase2.Validate(); err != nil {
+		t.Fatalf("valid phase-2 recipe rejected: %v", err)
 	}
 	first, _ := validRecipe().Hash()
 	changed := validRecipe()
@@ -257,7 +272,7 @@ open.onsuccess = () => {
 </script></body>`)
 		case "/challenge":
 			fmt.Fprint(w, `<html><div id="captcha">Prove you are human</div></html>`)
-		case "/dashboard", "/hydrating-account", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail", "/feature-panel", "/member-list", "/below-fold":
+		case "/dashboard", "/hydrating-account", "/signed-in-tabs", "/assets", "/probe", "/away-link", "/features", "/feature-reports", "/feature-shell", "/feature-shell-detail", "/feature-panel", "/feature-autonomous", "/member-list", "/below-fold":
 			if !signed {
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
@@ -299,6 +314,16 @@ open.onsuccess = () => {
 					`<div id="export-panel" class="export-panel" role="dialog" hidden style="background:#00ee00;width:300px;height:120px"><h2>Export as CSV</h2></div>`
 			case "/signed-in-tabs":
 				extra = `<button id="plain">not a tab</button><button id="tab" role="tab" onclick="document.body.insertAdjacentHTML('beforeend','<div id=tabbed></div>')">Reports</button>`
+			case "/feature-autonomous":
+				extra = `<main><h1>Analytics</h1>` +
+					`<button role="tab" aria-selected="true" id="tab-overview">Overview</button>` +
+					`<button role="tab" aria-selected="false" id="tab-cohorts" onclick="this.setAttribute('aria-selected','true');document.querySelector('#tab-overview').setAttribute('aria-selected','false');document.querySelector('#cohorts-panel').hidden=false">Weekly Cohorts</button>` +
+					`<input id="cohort-filter" type="search" aria-label="Filter cohorts" placeholder="Filter cohorts…" oninput="document.querySelector('#filter-out').textContent='Matching: '+this.value">` +
+					`<input id="sensitive-search" type="search" aria-label="Search" placeholder="Enter API key or email">` +
+					`<button role="combobox" aria-haspopup="listbox" id="region-combo">Region</button>` +
+					`<button aria-label="Delete report" onclick="fetch('/delete')">×</button>` +
+					`<div id="cohorts-panel" hidden><h2>Cohort Heatmap</h2><div id="filter-out">Matching: all</div><span data-private="true">ceo@globex.test</span></div>` +
+					`<div id="below-fold-attr" style="margin-top:950px;height:120px"><h2>Release Attribution</h2></div></main>`
 			case "/assets":
 				extra = fmt.Sprintf(`<img src="https://other.example.test:%s/pixel.png"><iframe src="https://other.example.test:%s/frame"></iframe>
 <script>alert('blocking dialog');window.open('https://other.example.test:'+location.port+'/popup');fetch('https://other.example.test:%s/fetch').catch(()=>{});try{new WebSocket('wss://app.example.test:%s/socket')}catch(e){};try{new Worker('data:text/javascript,new WebSocket("wss://app.example.test:'+location.port+'/worker-socket")')}catch(e){};fetch('/mutate',{method:'POST'}).catch(()=>{});fetch('/graphql',{method:'POST'}).catch(()=>{})</script>`, a.port, a.port, a.port, a.port)
@@ -1086,4 +1111,389 @@ func TestProviderRefusalIsARetryableOutage(t *testing.T) {
 	if _, err := provider.Allocate(context.Background(), nil, time.Minute); err == nil {
 		t.Error("a session with no approved hosts was allocated")
 	}
+}
+
+func TestNavigationPathAllowsSafeQueriesAndBlocksSecrets(t *testing.T) {
+	origin := "https://app.example.com"
+	for _, tc := range []struct {
+		raw  string
+		want string
+		ok   bool
+	}{
+		{"https://app.example.com/analytics?tab=cohorts&view=weekly", "/analytics?tab=cohorts&view=weekly", true},
+		{"https://app.example.com/reports", "/reports", true},
+		{"https://app.example.com/analytics?token=secret", "", false},
+		{"https://app.example.com/analytics?access_token=abc", "", false},
+		{"https://app.example.com/analytics?state=xyz", "", false},
+		{"https://app.example.com/analytics?user=alice@example.com", "", false},
+		{"https://app.example.com/analytics?q=" + strings.Repeat("a", 65), "", false},
+		{"https://app.example.com/analytics?a=1&b=2&c=3&d=4&e=5&f=6&g=7", "", false},
+		{"https://app.example.com/analytics#section", "", false},
+		{"https://app.example.com/logout?next=/", "", false},
+		{"https://evil.example.com/analytics?tab=cohorts", "", false},
+	} {
+		got, ok := navigationPath(tc.raw, origin)
+		if ok != tc.ok || got != tc.want {
+			t.Errorf("navigationPath(%q) = (%q, %v), want (%q, %v)", tc.raw, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestStateMergePreviousAndBootstrapFilter(t *testing.T) {
+	hosts := []string{"app.example.com", "api.example.com"}
+	prev := &State{
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"a": "old"},
+			"https://api.example.com": {"b": "keep"},
+			"https://evil.example":    {"c": "drop"},
+		},
+	}
+	cur := &State{
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"a": "new"},
+		},
+	}
+	cur.MergePrevious(prev, hosts)
+	if cur.LocalStorage["https://app.example.com"]["a"] != "new" {
+		t.Fatalf("current origin overwritten: %+v", cur.LocalStorage)
+	}
+	if cur.LocalStorage["https://api.example.com"]["b"] != "keep" {
+		t.Fatalf("sibling approved origin lost: %+v", cur.LocalStorage)
+	}
+	if _, exists := cur.LocalStorage["https://evil.example"]; exists {
+		t.Fatal("unapproved origin leaked during MergePrevious")
+	}
+
+	target := Target{Origin: "https://app.example.com", Hosts: hosts, ProtectedPath: "/dashboard", ExpectedAccount: "demo@example.com"}
+	filtered, err := FilterBootstrapState(&State{
+		Cookies: []*proto.NetworkCookieParam{
+			{Name: "session", Value: "ok", Domain: "app.example.com"},
+			{Name: "idp", Value: "nope", Domain: "accounts.other.com"},
+		},
+		LocalStorage: map[string]map[string]string{
+			"https://app.example.com": {"k": "v"},
+			"https://evil.example":    {"x": "y"},
+		},
+	}, target)
+	if err != nil {
+		t.Fatalf("FilterBootstrapState: %v", err)
+	}
+	if len(filtered.Cookies) != 1 || filtered.Cookies[0].Name != "session" {
+		t.Fatalf("unexpected cookies: %+v", filtered.Cookies)
+	}
+	if len(filtered.LocalStorage) != 1 || filtered.LocalStorage["https://app.example.com"]["k"] != "v" {
+		t.Fatalf("unexpected localStorage: %+v", filtered.LocalStorage)
+	}
+	// Error & empty cases must fail with SessionRestoreFailed.
+	for name, raw := range map[string]*State{
+		"nil":           nil,
+		"empty name":    {Cookies: []*proto.NetworkCookieParam{{Name: "", Value: "v", Domain: "app.example.com"}}},
+		"http storage":  {LocalStorage: map[string]map[string]string{"http://app.example.com": {"k": "v"}}},
+		"all untrusted": {Cookies: []*proto.NetworkCookieParam{{Name: "s", Value: "v", Domain: "evil.example"}}},
+	} {
+		var failure *Failure
+		if _, err := FilterBootstrapState(raw, target); !errors.As(err, &failure) || failure.Code != SessionRestoreFailed {
+			t.Errorf("%s: got %v, want %s", name, err, SessionRestoreFailed)
+		}
+	}
+}
+
+type browserRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f browserRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestPhase3RecipeValidationSearchValueAndAgentRunner(t *testing.T) {
+	r := validRecipe()
+	r.SequenceShots = MaxSequenceShots
+	r.Navigation = &Navigation{Objective: "Find cohorts", MaxSteps: 3, CreditLimit: 5, UseVision: true, AllowSearchFill: true}
+	if err := r.Validate(); err != nil {
+		t.Fatalf("valid phase3 recipe failed: %v", err)
+	}
+	r.SequenceShots = MaxSequenceShots + 1
+	if err := r.Validate(); err == nil {
+		t.Fatal("expected error for sequenceShots > MaxSequenceShots")
+	}
+	r.SequenceShots = -1
+	if err := r.Validate(); err == nil {
+		t.Fatal("expected error for negative sequenceShots")
+	}
+
+	// validSearchValue blocks empty, oversized, control chars, emails, and URLs.
+	for _, good := range []string{"cohorts", "Q4 revenue", "invoice-2026"} {
+		if _, ok := validSearchValue(good); !ok {
+			t.Errorf("validSearchValue(%q) = false, want true", good)
+		}
+	}
+	for _, bad := range []string{"", "   ", "alice@example.com", "https://evil.example", "http://127.0.0.1", "line1\nline2", strings.Repeat("x", 81)} {
+		if _, ok := validSearchValue(bad); ok {
+			t.Errorf("validSearchValue(%q) = true, want false", bad)
+		}
+	}
+
+	// AgentRunnerFromEnvironment enforces HTTPS + token for non-loopback hosts.
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "http://agent.example.com")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "tok")
+	if AgentRunnerFromEnvironment(nil) != nil {
+		t.Fatal("non-loopback http:// agent URL should be rejected")
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "https://agent.example.com")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "")
+	if AgentRunnerFromEnvironment(nil) != nil {
+		t.Fatal("non-loopback https:// without token should be rejected")
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "tok")
+	if got := AgentRunnerFromEnvironment(nil); got == nil || got.AgentURL != "https://agent.example.com" {
+		t.Fatalf("expected valid https agent runner, got %+v", got)
+	}
+	t.Setenv("PLATFORM_CAPTURE_AGENT_URL", "http://127.0.0.1:9000/")
+	t.Setenv("PLATFORM_CAPTURE_AGENT_TOKEN", "")
+	if got := AgentRunnerFromEnvironment(nil); got == nil || got.AgentURL != "http://127.0.0.1:9000" {
+		t.Fatalf("expected valid loopback agent runner, got %+v", got)
+	}
+
+	// AgentRunner validates external PNGs + dimensions + actions + sequence + focus.
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 800, 600))); err != nil {
+		t.Fatal(err)
+	}
+	b64PNG := base64.StdEncoding.EncodeToString(pngBuf.Bytes())
+
+	var sawAuth string
+	var sawAccount string
+	agentClient := &http.Client{Transport: browserRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		sawAuth = req.Header.Get("Authorization")
+		var sent externalAgentRequest
+		_ = json.NewDecoder(req.Body).Decode(&sent)
+		sawAccount = sent.ExpectedAccount
+		body, _ := json.Marshal(externalAgentResponse{
+			ImageBase64:      b64PNG,
+			SourcePath:       "/analytics",
+			ObservedRevision: "abc123",
+			Focus:            &Focus{X: 0.1, Y: 0.2, W: 0.5, H: 0.4},
+			Sequence:         []externalAgentSequence{{ImageBase64: b64PNG}, {ImageBase64: "bad"}, {ImageBase64: b64PNG}, {ImageBase64: b64PNG}},
+			NavigationActions: []NavigationAction{
+				{Kind: "fill", Path: "/analytics"},
+				{Kind: "evil", Path: "/analytics"},
+				{Kind: "link", Path: "https://evil.example/steal"},
+			},
+		})
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(body)), Header: http.Header{}}, nil
+	})}
+	navRecipe := validRecipe()
+	navRecipe.SequenceShots = 3
+	navRecipe.Version = &VersionCheck{Path: "/api/version"}
+	navRecipe.Navigation = &Navigation{Objective: "Show analytics", MaxSteps: 3, CreditLimit: 5, UseVision: true}
+	target := Target{Origin: "https://app.example.com", Hosts: []string{"app.example.com"}, ProtectedPath: "/dashboard", ExpectedAccount: "demo@example.com"}
+	runner := &AgentRunner{AgentURL: "https://agent.internal", AgentToken: "secret-tok", HTTP: agentClient}
+	reserved := false
+	res, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:             target,
+		Recipe:             navRecipe,
+		ExpectedRevision:   "abc123",
+		ReserveExternalRun: func(context.Context) error { reserved = true; return nil },
+	})
+	if err != nil {
+		t.Fatalf("AgentRunner valid response failed: %v", err)
+	}
+	if !reserved || sawAuth != "Bearer secret-tok" || sawAccount != "demo@example.com" || res.SourcePath != "/analytics" || res.Focus == nil || len(res.Sequence) != 2 || len(res.NavigationActions) != 1 {
+		t.Fatalf("unexpected AgentRunner result: reserved=%v auth=%q acct=%q res=%+v", reserved, sawAuth, sawAccount, res)
+	}
+
+	// Mismatched ExpectedRevision returns WaitingForDeployment; missing Version returns DeploymentUnverified.
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:           target,
+		Recipe:           navRecipe,
+		ExpectedRevision: "different-sha",
+	}); err == nil {
+		t.Fatal("expected WaitingForDeployment on mismatched revision")
+	} else {
+		failed(t, err, WaitingForDeployment)
+	}
+	noVerRecipe := navRecipe
+	noVerRecipe.Version = nil
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:           target,
+		Recipe:           noVerRecipe,
+		ExpectedRevision: "abc123",
+	}); err == nil {
+		t.Fatal("expected DeploymentUnverified when ExpectedRevision has no Recipe.Version")
+	} else {
+		failed(t, err, DeploymentUnverified)
+	}
+
+	// ReserveExternalRun failure blocks external sidecar call.
+	if _, err := runner.Run(context.Background(), "sess-1", RunInput{
+		Target:             target,
+		Recipe:             navRecipe,
+		ReserveExternalRun: func(context.Context) error { return &Failure{Code: NavigationBudget} },
+	}); err == nil {
+		t.Fatal("expected NavigationBudget from ReserveExternalRun")
+	} else {
+		failed(t, err, NavigationBudget)
+	}
+
+	// Cancelled parent context returns ProviderUnavailable instead of falling back.
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := runner.Run(canceledCtx, "sess-1", RunInput{Target: target, Recipe: navRecipe}); err == nil {
+		t.Fatal("expected ProviderUnavailable on canceled ctx")
+	} else {
+		failed(t, err, ProviderUnavailable)
+	}
+
+	// Wrong-dimension PNG from agent must be rejected with ImageInvalid.
+	var smallBuf bytes.Buffer
+	_ = png.Encode(&smallBuf, image.NewRGBA(image.Rect(0, 0, 120, 80)))
+	smallBody, _ := json.Marshal(externalAgentResponse{ImageBase64: base64.StdEncoding.EncodeToString(smallBuf.Bytes())})
+	wrongDimRunner := &AgentRunner{AgentURL: "https://agent.internal", HTTP: &http.Client{Transport: browserRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(smallBody)), Header: http.Header{}}, nil
+	})}}
+	if _, err := wrongDimRunner.Run(context.Background(), "sess-1", RunInput{Target: target, Recipe: navRecipe}); err == nil {
+		t.Fatal("expected ImageInvalid for wrong viewport dimensions")
+	} else {
+		failed(t, err, ImageInvalid)
+	}
+
+	// Invalid PNG bytes from agent must be rejected with ImageInvalid (never passed through).
+	badClient := &http.Client{Transport: browserRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"imageBase64":"bm90LWEtcG5n"}`)), Header: http.Header{}}, nil
+	})}
+	badRunner := &AgentRunner{AgentURL: "https://agent.internal", HTTP: badClient}
+	if _, err := badRunner.Run(context.Background(), "sess-1", RunInput{
+		Target: target,
+		Recipe: navRecipe,
+	}); err == nil {
+		t.Fatal("expected AgentRunner to reject invalid image bytes")
+	} else {
+		failed(t, err, ImageInvalid)
+	}
+}
+
+// Phase 3 real-Chrome regression test: Set-of-Mark JPEG previews, safe search fill,
+// combobox & destructive icon-button exclusions, scroll action, blur masking,
+// dark color scheme, zero-duplicate pre-action sequence frames, and overlay cleanup.
+func TestRealBrowserPhase3AutonomousVisionFillSequenceAndScroll(t *testing.T) {
+	a := newProtectedApp(t)
+	state := signIn(t, a)
+	b := localBrowser(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	recipe := Recipe{
+		SchemaVersion: RecipeSchemaVersion,
+		Viewport:      Viewport{Width: 1024, Height: 700, Scale: 2},
+		Steps:         []Step{{Kind: StepNavigate, Path: "/feature-autonomous"}},
+		Markers:       []string{DefaultZeroConfigMarker},
+		OptionalMasks: []string{"[data-private]"},
+		MaskStyle:     MaskStyleBlur,
+		ColorScheme:   ColorSchemeDark,
+		SequenceShots: 3,
+		Navigation: &Navigation{
+			Objective:       "Open Weekly Cohorts, filter by Enterprise, scroll down, and capture",
+			MaxSteps:        5,
+			CreditLimit:     10,
+			UseVision:       true,
+			AllowSearchFill: true,
+		},
+	}
+	step := 0
+	res, err := Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: recipe,
+		State:  state,
+		NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			defer func() { step++ }()
+			if _, decErr := jpeg.DecodeConfig(bytes.NewReader(view.ViewportPNG)); decErr != nil {
+				return NavigationChoice{}, fmt.Errorf("step %d: expected JPEG SoM preview, got %w", step, decErr)
+			}
+			for _, c := range view.Controls {
+				lower := strings.ToLower(c.Label)
+				if strings.Contains(lower, "delete") || c.Label == "×" {
+					return NavigationChoice{}, fmt.Errorf("destructive icon button exposed under UseVision: %+v", c)
+				}
+				if strings.Contains(lower, "api key") || strings.Contains(lower, "email") || (c.Kind == "search" && lower == "search") {
+					return NavigationChoice{}, fmt.Errorf("sensitive search input exposed: %+v", c)
+				}
+				if c.Kind == "search" && strings.Contains(lower, "region") {
+					return NavigationChoice{}, fmt.Errorf("non-<input> combobox button tagged as search: %+v", c)
+				}
+			}
+			switch step {
+			case 0:
+				for _, c := range view.Controls {
+					if c.Kind == "tab" && c.Label == "Weekly Cohorts" {
+						id := c.ID
+						return NavigationChoice{Action: "select", ControlID: &id}, nil
+					}
+				}
+				return NavigationChoice{}, fmt.Errorf("Weekly Cohorts tab missing: %+v", view.Controls)
+			case 1:
+				for _, c := range view.Controls {
+					if c.Kind == "search" && strings.Contains(c.Label, "Filter cohorts") {
+						id := c.ID
+						return NavigationChoice{Action: "fill", ControlID: &id, Value: "Enterprise"}, nil
+					}
+				}
+				return NavigationChoice{}, fmt.Errorf("Filter cohorts search input missing: %+v", view.Controls)
+			case 2:
+				if !view.CanScroll {
+					return NavigationChoice{}, errors.New("expected CanScroll=true on /feature-autonomous")
+				}
+				return NavigationChoice{Action: "scroll", ControlID: new(int(-1))}, nil
+			default:
+				return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("autonomous phase3 run failed: %v", err)
+	}
+	if a.count("GET /delete") != 0 {
+		t.Fatal("destructive icon button was clicked")
+	}
+	if res.Width != 2048 || res.Height != 1400 || len(res.Sequence) != 2 {
+		t.Fatalf("dims=%dx%d seq=%d actions=%+v", res.Width, res.Height, len(res.Sequence), res.NavigationActions)
+	}
+	wantKinds := []string{"tab", "fill", "scroll", "frame"}
+	gotKinds := make([]string, 0, len(res.NavigationActions))
+	for _, act := range res.NavigationActions {
+		gotKinds = append(gotKinds, act.Kind)
+	}
+	if !slices.Equal(gotKinds, wantKinds) {
+		t.Fatalf("actions=%v, want %v", gotKinds, wantKinds)
+	}
+
+	// Zero actions must produce zero intermediate frames (no duplicate final frame).
+	zeroRes, err := Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: recipe,
+		State:  state,
+		NextNavigation: func(_ context.Context, _ NavigationObservation) (NavigationChoice, error) {
+			return NavigationChoice{Action: "capture", ControlID: new(int(-1))}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("zero-action run failed: %v", err)
+	}
+	if len(zeroRes.Sequence) != 0 {
+		t.Fatalf("expected 0 intermediate frames for 0-action capture, got %d", len(zeroRes.Sequence))
+	}
+
+	// AllowedPostPaths disables search fill controls.
+	writable := recipe
+	writable.AllowedPostPaths = []string{"/graphql"}
+	_, err = Run(ctx, b, RunInput{
+		Target: a.target(),
+		Recipe: writable,
+		State:  state,
+		NextNavigation: func(_ context.Context, view NavigationObservation) (NavigationChoice, error) {
+			for _, c := range view.Controls {
+				if c.Kind == "search" {
+					t.Fatalf("search control offered beside AllowedPostPaths: %+v", c)
+				}
+			}
+			return NavigationChoice{Action: "stop", ControlID: new(int(-1))}, nil
+		},
+	})
+	failed(t, err, NavigationFailed)
 }

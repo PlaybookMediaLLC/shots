@@ -54,10 +54,18 @@ export const productSurfaceRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Product surface not found.' })
       }
       if ('failure' in result) {
-        throw new TRPCError({
-          code: result.failure.status === 429 ? 'TOO_MANY_REQUESTS' : 'BAD_REQUEST',
-          message: result.failure.message,
-        })
+        const status = result.failure.status
+        const code =
+          status === 429
+            ? 'TOO_MANY_REQUESTS'
+            : status === 409
+              ? 'CONFLICT'
+              : status === 408 || status === 504
+                ? 'TIMEOUT'
+                : status >= 500
+                  ? 'INTERNAL_SERVER_ERROR'
+                  : 'BAD_REQUEST'
+        throw new TRPCError({ code, message: result.failure.message })
       }
       return 'job' in result ? { job: result.job } : { capture: result.capture }
     }),

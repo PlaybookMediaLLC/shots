@@ -40,6 +40,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureauthrecipeversion"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureemailauthconfig"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureinboundreceipt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
@@ -249,6 +253,14 @@ type Client struct {
 	CampaignRevision *CampaignRevisionClient
 	// CaptureAttempt is the client for interacting with the CaptureAttempt builders.
 	CaptureAttempt *CaptureAttemptClient
+	// CaptureAuthAttempt is the client for interacting with the CaptureAuthAttempt builders.
+	CaptureAuthAttempt *CaptureAuthAttemptClient
+	// CaptureAuthRecipeVersion is the client for interacting with the CaptureAuthRecipeVersion builders.
+	CaptureAuthRecipeVersion *CaptureAuthRecipeVersionClient
+	// CaptureEmailAuthConfig is the client for interacting with the CaptureEmailAuthConfig builders.
+	CaptureEmailAuthConfig *CaptureEmailAuthConfigClient
+	// CaptureInboundReceipt is the client for interacting with the CaptureInboundReceipt builders.
+	CaptureInboundReceipt *CaptureInboundReceiptClient
 	// CaptureJob is the client for interacting with the CaptureJob builders.
 	CaptureJob *CaptureJobClient
 	// CaptureRecipe is the client for interacting with the CaptureRecipe builders.
@@ -589,6 +601,10 @@ func (c *Client) init() {
 	c.CampaignPost = NewCampaignPostClient(c.config)
 	c.CampaignRevision = NewCampaignRevisionClient(c.config)
 	c.CaptureAttempt = NewCaptureAttemptClient(c.config)
+	c.CaptureAuthAttempt = NewCaptureAuthAttemptClient(c.config)
+	c.CaptureAuthRecipeVersion = NewCaptureAuthRecipeVersionClient(c.config)
+	c.CaptureEmailAuthConfig = NewCaptureEmailAuthConfigClient(c.config)
+	c.CaptureInboundReceipt = NewCaptureInboundReceiptClient(c.config)
 	c.CaptureJob = NewCaptureJobClient(c.config)
 	c.CaptureRecipe = NewCaptureRecipeClient(c.config)
 	c.ChannelConnection = NewChannelConnectionClient(c.config)
@@ -858,6 +874,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CampaignPost:                    NewCampaignPostClient(cfg),
 		CampaignRevision:                NewCampaignRevisionClient(cfg),
 		CaptureAttempt:                  NewCaptureAttemptClient(cfg),
+		CaptureAuthAttempt:              NewCaptureAuthAttemptClient(cfg),
+		CaptureAuthRecipeVersion:        NewCaptureAuthRecipeVersionClient(cfg),
+		CaptureEmailAuthConfig:          NewCaptureEmailAuthConfigClient(cfg),
+		CaptureInboundReceipt:           NewCaptureInboundReceiptClient(cfg),
 		CaptureJob:                      NewCaptureJobClient(cfg),
 		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
@@ -1054,6 +1074,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CampaignPost:                    NewCampaignPostClient(cfg),
 		CampaignRevision:                NewCampaignRevisionClient(cfg),
 		CaptureAttempt:                  NewCaptureAttemptClient(cfg),
+		CaptureAuthAttempt:              NewCaptureAuthAttemptClient(cfg),
+		CaptureAuthRecipeVersion:        NewCaptureAuthRecipeVersionClient(cfg),
+		CaptureEmailAuthConfig:          NewCaptureEmailAuthConfigClient(cfg),
+		CaptureInboundReceipt:           NewCaptureInboundReceiptClient(cfg),
 		CaptureJob:                      NewCaptureJobClient(cfg),
 		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
@@ -1241,35 +1265,36 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
-		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
-		c.ClaimPathBinding, c.ClaimSupport, c.ClaimSupportSet, c.ClaimVerification,
-		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
-		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
-		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
-		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
-		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
-		c.EnrichmentRecord, c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion,
-		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
-		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
-		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
-		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation,
-		c.KitArtifactClaim, c.KitArtifactRevision, c.KitExport, c.KitMember,
-		c.KitReviewDecision, c.KitRevision, c.KitSourcePin, c.LaunchRun,
-		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
-		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
-		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAppConnection,
-		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
-		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
-		c.PlatformDraftImport, c.PlatformFounderHubDevice,
-		c.PlatformFounderHubDeviceCommand, c.PlatformFounderHubRevision,
-		c.PlatformFounderHubSettings, c.PlatformFounderHubTemplate,
-		c.PlatformFounderHubUser, c.PlatformFounderHubWorkspace,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformOAuthAccessToken,
-		c.PlatformOAuthClient, c.PlatformOAuthConsent, c.PlatformOAuthJWK,
-		c.PlatformOAuthRefreshToken, c.PlatformSignupSource, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.CaptureAttempt, c.CaptureAuthAttempt, c.CaptureAuthRecipeVersion,
+		c.CaptureEmailAuthConfig, c.CaptureInboundReceipt, c.CaptureJob,
+		c.CaptureRecipe, c.ChannelConnection, c.ClaimPathBinding, c.ClaimSupport,
+		c.ClaimSupportSet, c.ClaimVerification, c.CommunicationAttempt,
+		c.CommunicationRecipient, c.ContentAngle, c.ContentBatch, c.ContentBatchItem,
+		c.ContentBatchRun, c.ContentDraft, c.ContentDraftFinisher,
+		c.ContentDraftRevision, c.ContentDraftSettings, c.ContentDraftTag,
+		c.Conversation, c.ConversationMessage, c.CreativeTemplate, c.CreativeVariant,
+		c.CustomerCommunication, c.DeploymentEvent, c.Design, c.EnrichmentRecord,
+		c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion, c.FrontendActivation,
+		c.FrontendObservation, c.FrontendSource, c.GitHubDeliveryRecovery,
+		c.GitHubInstallStart, c.GitHubInstallation, c.GitHubObservation,
+		c.GitHubProductionPolicy, c.GitHubRecoveryScan, c.IdealCustomerProfile,
+		c.IntegrationConnection, c.Invitation, c.KitArtifactClaim,
+		c.KitArtifactRevision, c.KitExport, c.KitMember, c.KitReviewDecision,
+		c.KitRevision, c.KitSourcePin, c.LaunchRun, c.LaunchRunStep, c.Member,
+		c.OnboardingRun, c.Organization, c.OrganizationEnterpriseSettings,
+		c.OutboxEvent, c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
+		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
+		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
+		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
+		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
+		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
+		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
@@ -1305,35 +1330,36 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
-		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
-		c.ClaimPathBinding, c.ClaimSupport, c.ClaimSupportSet, c.ClaimVerification,
-		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
-		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
-		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
-		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
-		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
-		c.EnrichmentRecord, c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion,
-		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
-		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
-		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
-		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation,
-		c.KitArtifactClaim, c.KitArtifactRevision, c.KitExport, c.KitMember,
-		c.KitReviewDecision, c.KitRevision, c.KitSourcePin, c.LaunchRun,
-		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
-		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
-		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAppConnection,
-		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
-		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
-		c.PlatformDraftImport, c.PlatformFounderHubDevice,
-		c.PlatformFounderHubDeviceCommand, c.PlatformFounderHubRevision,
-		c.PlatformFounderHubSettings, c.PlatformFounderHubTemplate,
-		c.PlatformFounderHubUser, c.PlatformFounderHubWorkspace,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformOAuthAccessToken,
-		c.PlatformOAuthClient, c.PlatformOAuthConsent, c.PlatformOAuthJWK,
-		c.PlatformOAuthRefreshToken, c.PlatformSignupSource, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.CaptureAttempt, c.CaptureAuthAttempt, c.CaptureAuthRecipeVersion,
+		c.CaptureEmailAuthConfig, c.CaptureInboundReceipt, c.CaptureJob,
+		c.CaptureRecipe, c.ChannelConnection, c.ClaimPathBinding, c.ClaimSupport,
+		c.ClaimSupportSet, c.ClaimVerification, c.CommunicationAttempt,
+		c.CommunicationRecipient, c.ContentAngle, c.ContentBatch, c.ContentBatchItem,
+		c.ContentBatchRun, c.ContentDraft, c.ContentDraftFinisher,
+		c.ContentDraftRevision, c.ContentDraftSettings, c.ContentDraftTag,
+		c.Conversation, c.ConversationMessage, c.CreativeTemplate, c.CreativeVariant,
+		c.CustomerCommunication, c.DeploymentEvent, c.Design, c.EnrichmentRecord,
+		c.EvidenceClearance, c.EvidenceSource, c.EvidenceVersion, c.FrontendActivation,
+		c.FrontendObservation, c.FrontendSource, c.GitHubDeliveryRecovery,
+		c.GitHubInstallStart, c.GitHubInstallation, c.GitHubObservation,
+		c.GitHubProductionPolicy, c.GitHubRecoveryScan, c.IdealCustomerProfile,
+		c.IntegrationConnection, c.Invitation, c.KitArtifactClaim,
+		c.KitArtifactRevision, c.KitExport, c.KitMember, c.KitReviewDecision,
+		c.KitRevision, c.KitSourcePin, c.LaunchRun, c.LaunchRunStep, c.Member,
+		c.OnboardingRun, c.Organization, c.OrganizationEnterpriseSettings,
+		c.OutboxEvent, c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
+		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
+		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
+		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
+		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
+		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
+		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.PostDeletion, c.ProductProfile, c.ProductSurface, c.Project,
@@ -1412,6 +1438,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CampaignRevision.mutate(ctx, m)
 	case *CaptureAttemptMutation:
 		return c.CaptureAttempt.mutate(ctx, m)
+	case *CaptureAuthAttemptMutation:
+		return c.CaptureAuthAttempt.mutate(ctx, m)
+	case *CaptureAuthRecipeVersionMutation:
+		return c.CaptureAuthRecipeVersion.mutate(ctx, m)
+	case *CaptureEmailAuthConfigMutation:
+		return c.CaptureEmailAuthConfig.mutate(ctx, m)
+	case *CaptureInboundReceiptMutation:
+		return c.CaptureInboundReceipt.mutate(ctx, m)
 	case *CaptureJobMutation:
 		return c.CaptureJob.mutate(ctx, m)
 	case *CaptureRecipeMutation:
@@ -5075,6 +5109,538 @@ func (c *CaptureAttemptClient) mutate(ctx context.Context, m *CaptureAttemptMuta
 		return (&CaptureAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CaptureAttempt mutation op: %q", m.Op())
+	}
+}
+
+// CaptureAuthAttemptClient is a client for the CaptureAuthAttempt schema.
+type CaptureAuthAttemptClient struct {
+	config
+}
+
+// NewCaptureAuthAttemptClient returns a client for the CaptureAuthAttempt from the given config.
+func NewCaptureAuthAttemptClient(c config) *CaptureAuthAttemptClient {
+	return &CaptureAuthAttemptClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `captureauthattempt.Hooks(f(g(h())))`.
+func (c *CaptureAuthAttemptClient) Use(hooks ...Hook) {
+	c.hooks.CaptureAuthAttempt = append(c.hooks.CaptureAuthAttempt, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `captureauthattempt.Intercept(f(g(h())))`.
+func (c *CaptureAuthAttemptClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureAuthAttempt = append(c.inters.CaptureAuthAttempt, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureAuthAttempt entity.
+func (c *CaptureAuthAttemptClient) Create() *CaptureAuthAttemptCreate {
+	mutation := newCaptureAuthAttemptMutation(c.config, OpCreate)
+	return &CaptureAuthAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureAuthAttempt entities.
+func (c *CaptureAuthAttemptClient) CreateBulk(builders ...*CaptureAuthAttemptCreate) *CaptureAuthAttemptCreateBulk {
+	return &CaptureAuthAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureAuthAttemptClient) MapCreateBulk(slice any, setFunc func(*CaptureAuthAttemptCreate, int)) *CaptureAuthAttemptCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureAuthAttemptCreateBulk{err: fmt.Errorf("calling to CaptureAuthAttemptClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureAuthAttemptCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureAuthAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureAuthAttempt.
+func (c *CaptureAuthAttemptClient) Update() *CaptureAuthAttemptUpdate {
+	mutation := newCaptureAuthAttemptMutation(c.config, OpUpdate)
+	return &CaptureAuthAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureAuthAttemptClient) UpdateOne(_m *CaptureAuthAttempt) *CaptureAuthAttemptUpdateOne {
+	mutation := newCaptureAuthAttemptMutation(c.config, OpUpdateOne, withCaptureAuthAttempt(_m))
+	return &CaptureAuthAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureAuthAttemptClient) UpdateOneID(id string) *CaptureAuthAttemptUpdateOne {
+	mutation := newCaptureAuthAttemptMutation(c.config, OpUpdateOne, withCaptureAuthAttemptID(id))
+	return &CaptureAuthAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureAuthAttempt.
+func (c *CaptureAuthAttemptClient) Delete() *CaptureAuthAttemptDelete {
+	mutation := newCaptureAuthAttemptMutation(c.config, OpDelete)
+	return &CaptureAuthAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureAuthAttemptClient) DeleteOne(_m *CaptureAuthAttempt) *CaptureAuthAttemptDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureAuthAttemptClient) DeleteOneID(id string) *CaptureAuthAttemptDeleteOne {
+	builder := c.Delete().Where(captureauthattempt.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureAuthAttemptDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureAuthAttempt.
+func (c *CaptureAuthAttemptClient) Query() *CaptureAuthAttemptQuery {
+	return &CaptureAuthAttemptQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureAuthAttempt},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureAuthAttempt entity by its id.
+func (c *CaptureAuthAttemptClient) Get(ctx context.Context, id string) (*CaptureAuthAttempt, error) {
+	return c.Query().Where(captureauthattempt.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureAuthAttemptClient) GetX(ctx context.Context, id string) *CaptureAuthAttempt {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureAuthAttemptClient) Hooks() []Hook {
+	return c.hooks.CaptureAuthAttempt
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureAuthAttemptClient) Interceptors() []Interceptor {
+	return c.inters.CaptureAuthAttempt
+}
+
+func (c *CaptureAuthAttemptClient) mutate(ctx context.Context, m *CaptureAuthAttemptMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureAuthAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureAuthAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureAuthAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureAuthAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureAuthAttempt mutation op: %q", m.Op())
+	}
+}
+
+// CaptureAuthRecipeVersionClient is a client for the CaptureAuthRecipeVersion schema.
+type CaptureAuthRecipeVersionClient struct {
+	config
+}
+
+// NewCaptureAuthRecipeVersionClient returns a client for the CaptureAuthRecipeVersion from the given config.
+func NewCaptureAuthRecipeVersionClient(c config) *CaptureAuthRecipeVersionClient {
+	return &CaptureAuthRecipeVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `captureauthrecipeversion.Hooks(f(g(h())))`.
+func (c *CaptureAuthRecipeVersionClient) Use(hooks ...Hook) {
+	c.hooks.CaptureAuthRecipeVersion = append(c.hooks.CaptureAuthRecipeVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `captureauthrecipeversion.Intercept(f(g(h())))`.
+func (c *CaptureAuthRecipeVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureAuthRecipeVersion = append(c.inters.CaptureAuthRecipeVersion, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureAuthRecipeVersion entity.
+func (c *CaptureAuthRecipeVersionClient) Create() *CaptureAuthRecipeVersionCreate {
+	mutation := newCaptureAuthRecipeVersionMutation(c.config, OpCreate)
+	return &CaptureAuthRecipeVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureAuthRecipeVersion entities.
+func (c *CaptureAuthRecipeVersionClient) CreateBulk(builders ...*CaptureAuthRecipeVersionCreate) *CaptureAuthRecipeVersionCreateBulk {
+	return &CaptureAuthRecipeVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureAuthRecipeVersionClient) MapCreateBulk(slice any, setFunc func(*CaptureAuthRecipeVersionCreate, int)) *CaptureAuthRecipeVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureAuthRecipeVersionCreateBulk{err: fmt.Errorf("calling to CaptureAuthRecipeVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureAuthRecipeVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureAuthRecipeVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureAuthRecipeVersion.
+func (c *CaptureAuthRecipeVersionClient) Update() *CaptureAuthRecipeVersionUpdate {
+	mutation := newCaptureAuthRecipeVersionMutation(c.config, OpUpdate)
+	return &CaptureAuthRecipeVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureAuthRecipeVersionClient) UpdateOne(_m *CaptureAuthRecipeVersion) *CaptureAuthRecipeVersionUpdateOne {
+	mutation := newCaptureAuthRecipeVersionMutation(c.config, OpUpdateOne, withCaptureAuthRecipeVersion(_m))
+	return &CaptureAuthRecipeVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureAuthRecipeVersionClient) UpdateOneID(id string) *CaptureAuthRecipeVersionUpdateOne {
+	mutation := newCaptureAuthRecipeVersionMutation(c.config, OpUpdateOne, withCaptureAuthRecipeVersionID(id))
+	return &CaptureAuthRecipeVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureAuthRecipeVersion.
+func (c *CaptureAuthRecipeVersionClient) Delete() *CaptureAuthRecipeVersionDelete {
+	mutation := newCaptureAuthRecipeVersionMutation(c.config, OpDelete)
+	return &CaptureAuthRecipeVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureAuthRecipeVersionClient) DeleteOne(_m *CaptureAuthRecipeVersion) *CaptureAuthRecipeVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureAuthRecipeVersionClient) DeleteOneID(id string) *CaptureAuthRecipeVersionDeleteOne {
+	builder := c.Delete().Where(captureauthrecipeversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureAuthRecipeVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureAuthRecipeVersion.
+func (c *CaptureAuthRecipeVersionClient) Query() *CaptureAuthRecipeVersionQuery {
+	return &CaptureAuthRecipeVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureAuthRecipeVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureAuthRecipeVersion entity by its id.
+func (c *CaptureAuthRecipeVersionClient) Get(ctx context.Context, id string) (*CaptureAuthRecipeVersion, error) {
+	return c.Query().Where(captureauthrecipeversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureAuthRecipeVersionClient) GetX(ctx context.Context, id string) *CaptureAuthRecipeVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureAuthRecipeVersionClient) Hooks() []Hook {
+	return c.hooks.CaptureAuthRecipeVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureAuthRecipeVersionClient) Interceptors() []Interceptor {
+	return c.inters.CaptureAuthRecipeVersion
+}
+
+func (c *CaptureAuthRecipeVersionClient) mutate(ctx context.Context, m *CaptureAuthRecipeVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureAuthRecipeVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureAuthRecipeVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureAuthRecipeVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureAuthRecipeVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureAuthRecipeVersion mutation op: %q", m.Op())
+	}
+}
+
+// CaptureEmailAuthConfigClient is a client for the CaptureEmailAuthConfig schema.
+type CaptureEmailAuthConfigClient struct {
+	config
+}
+
+// NewCaptureEmailAuthConfigClient returns a client for the CaptureEmailAuthConfig from the given config.
+func NewCaptureEmailAuthConfigClient(c config) *CaptureEmailAuthConfigClient {
+	return &CaptureEmailAuthConfigClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `captureemailauthconfig.Hooks(f(g(h())))`.
+func (c *CaptureEmailAuthConfigClient) Use(hooks ...Hook) {
+	c.hooks.CaptureEmailAuthConfig = append(c.hooks.CaptureEmailAuthConfig, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `captureemailauthconfig.Intercept(f(g(h())))`.
+func (c *CaptureEmailAuthConfigClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureEmailAuthConfig = append(c.inters.CaptureEmailAuthConfig, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureEmailAuthConfig entity.
+func (c *CaptureEmailAuthConfigClient) Create() *CaptureEmailAuthConfigCreate {
+	mutation := newCaptureEmailAuthConfigMutation(c.config, OpCreate)
+	return &CaptureEmailAuthConfigCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureEmailAuthConfig entities.
+func (c *CaptureEmailAuthConfigClient) CreateBulk(builders ...*CaptureEmailAuthConfigCreate) *CaptureEmailAuthConfigCreateBulk {
+	return &CaptureEmailAuthConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureEmailAuthConfigClient) MapCreateBulk(slice any, setFunc func(*CaptureEmailAuthConfigCreate, int)) *CaptureEmailAuthConfigCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureEmailAuthConfigCreateBulk{err: fmt.Errorf("calling to CaptureEmailAuthConfigClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureEmailAuthConfigCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureEmailAuthConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureEmailAuthConfig.
+func (c *CaptureEmailAuthConfigClient) Update() *CaptureEmailAuthConfigUpdate {
+	mutation := newCaptureEmailAuthConfigMutation(c.config, OpUpdate)
+	return &CaptureEmailAuthConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureEmailAuthConfigClient) UpdateOne(_m *CaptureEmailAuthConfig) *CaptureEmailAuthConfigUpdateOne {
+	mutation := newCaptureEmailAuthConfigMutation(c.config, OpUpdateOne, withCaptureEmailAuthConfig(_m))
+	return &CaptureEmailAuthConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureEmailAuthConfigClient) UpdateOneID(id string) *CaptureEmailAuthConfigUpdateOne {
+	mutation := newCaptureEmailAuthConfigMutation(c.config, OpUpdateOne, withCaptureEmailAuthConfigID(id))
+	return &CaptureEmailAuthConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureEmailAuthConfig.
+func (c *CaptureEmailAuthConfigClient) Delete() *CaptureEmailAuthConfigDelete {
+	mutation := newCaptureEmailAuthConfigMutation(c.config, OpDelete)
+	return &CaptureEmailAuthConfigDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureEmailAuthConfigClient) DeleteOne(_m *CaptureEmailAuthConfig) *CaptureEmailAuthConfigDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureEmailAuthConfigClient) DeleteOneID(id string) *CaptureEmailAuthConfigDeleteOne {
+	builder := c.Delete().Where(captureemailauthconfig.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureEmailAuthConfigDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureEmailAuthConfig.
+func (c *CaptureEmailAuthConfigClient) Query() *CaptureEmailAuthConfigQuery {
+	return &CaptureEmailAuthConfigQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureEmailAuthConfig},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureEmailAuthConfig entity by its id.
+func (c *CaptureEmailAuthConfigClient) Get(ctx context.Context, id string) (*CaptureEmailAuthConfig, error) {
+	return c.Query().Where(captureemailauthconfig.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureEmailAuthConfigClient) GetX(ctx context.Context, id string) *CaptureEmailAuthConfig {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureEmailAuthConfigClient) Hooks() []Hook {
+	return c.hooks.CaptureEmailAuthConfig
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureEmailAuthConfigClient) Interceptors() []Interceptor {
+	return c.inters.CaptureEmailAuthConfig
+}
+
+func (c *CaptureEmailAuthConfigClient) mutate(ctx context.Context, m *CaptureEmailAuthConfigMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureEmailAuthConfigCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureEmailAuthConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureEmailAuthConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureEmailAuthConfigDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureEmailAuthConfig mutation op: %q", m.Op())
+	}
+}
+
+// CaptureInboundReceiptClient is a client for the CaptureInboundReceipt schema.
+type CaptureInboundReceiptClient struct {
+	config
+}
+
+// NewCaptureInboundReceiptClient returns a client for the CaptureInboundReceipt from the given config.
+func NewCaptureInboundReceiptClient(c config) *CaptureInboundReceiptClient {
+	return &CaptureInboundReceiptClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `captureinboundreceipt.Hooks(f(g(h())))`.
+func (c *CaptureInboundReceiptClient) Use(hooks ...Hook) {
+	c.hooks.CaptureInboundReceipt = append(c.hooks.CaptureInboundReceipt, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `captureinboundreceipt.Intercept(f(g(h())))`.
+func (c *CaptureInboundReceiptClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureInboundReceipt = append(c.inters.CaptureInboundReceipt, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureInboundReceipt entity.
+func (c *CaptureInboundReceiptClient) Create() *CaptureInboundReceiptCreate {
+	mutation := newCaptureInboundReceiptMutation(c.config, OpCreate)
+	return &CaptureInboundReceiptCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureInboundReceipt entities.
+func (c *CaptureInboundReceiptClient) CreateBulk(builders ...*CaptureInboundReceiptCreate) *CaptureInboundReceiptCreateBulk {
+	return &CaptureInboundReceiptCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureInboundReceiptClient) MapCreateBulk(slice any, setFunc func(*CaptureInboundReceiptCreate, int)) *CaptureInboundReceiptCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureInboundReceiptCreateBulk{err: fmt.Errorf("calling to CaptureInboundReceiptClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureInboundReceiptCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureInboundReceiptCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureInboundReceipt.
+func (c *CaptureInboundReceiptClient) Update() *CaptureInboundReceiptUpdate {
+	mutation := newCaptureInboundReceiptMutation(c.config, OpUpdate)
+	return &CaptureInboundReceiptUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureInboundReceiptClient) UpdateOne(_m *CaptureInboundReceipt) *CaptureInboundReceiptUpdateOne {
+	mutation := newCaptureInboundReceiptMutation(c.config, OpUpdateOne, withCaptureInboundReceipt(_m))
+	return &CaptureInboundReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureInboundReceiptClient) UpdateOneID(id string) *CaptureInboundReceiptUpdateOne {
+	mutation := newCaptureInboundReceiptMutation(c.config, OpUpdateOne, withCaptureInboundReceiptID(id))
+	return &CaptureInboundReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureInboundReceipt.
+func (c *CaptureInboundReceiptClient) Delete() *CaptureInboundReceiptDelete {
+	mutation := newCaptureInboundReceiptMutation(c.config, OpDelete)
+	return &CaptureInboundReceiptDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureInboundReceiptClient) DeleteOne(_m *CaptureInboundReceipt) *CaptureInboundReceiptDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureInboundReceiptClient) DeleteOneID(id string) *CaptureInboundReceiptDeleteOne {
+	builder := c.Delete().Where(captureinboundreceipt.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureInboundReceiptDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureInboundReceipt.
+func (c *CaptureInboundReceiptClient) Query() *CaptureInboundReceiptQuery {
+	return &CaptureInboundReceiptQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureInboundReceipt},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureInboundReceipt entity by its id.
+func (c *CaptureInboundReceiptClient) Get(ctx context.Context, id string) (*CaptureInboundReceipt, error) {
+	return c.Query().Where(captureinboundreceipt.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureInboundReceiptClient) GetX(ctx context.Context, id string) *CaptureInboundReceipt {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureInboundReceiptClient) Hooks() []Hook {
+	return c.hooks.CaptureInboundReceipt
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureInboundReceiptClient) Interceptors() []Interceptor {
+	return c.inters.CaptureInboundReceipt
+}
+
+func (c *CaptureInboundReceiptClient) mutate(ctx context.Context, m *CaptureInboundReceiptMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureInboundReceiptCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureInboundReceiptUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureInboundReceiptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureInboundReceiptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureInboundReceipt mutation op: %q", m.Op())
 	}
 }
 
@@ -25398,14 +25964,16 @@ type (
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
-		ClaimPathBinding, ClaimSupport, ClaimSupportSet, ClaimVerification,
-		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
-		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
-		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
-		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
-		DeploymentEvent, Design, EnrichmentRecord, EvidenceClearance, EvidenceSource,
-		EvidenceVersion, FrontendActivation, FrontendObservation, FrontendSource,
+		CampaignRevision, CaptureAttempt, CaptureAuthAttempt, CaptureAuthRecipeVersion,
+		CaptureEmailAuthConfig, CaptureInboundReceipt, CaptureJob, CaptureRecipe,
+		ChannelConnection, ClaimPathBinding, ClaimSupport, ClaimSupportSet,
+		ClaimVerification, CommunicationAttempt, CommunicationRecipient, ContentAngle,
+		ContentBatch, ContentBatchItem, ContentBatchRun, ContentDraft,
+		ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
+		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
+		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
+		EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
+		FrontendActivation, FrontendObservation, FrontendSource,
 		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
 		IdealCustomerProfile, IntegrationConnection, Invitation, KitArtifactClaim,
@@ -25449,14 +26017,16 @@ type (
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
-		ClaimPathBinding, ClaimSupport, ClaimSupportSet, ClaimVerification,
-		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
-		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
-		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
-		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
-		DeploymentEvent, Design, EnrichmentRecord, EvidenceClearance, EvidenceSource,
-		EvidenceVersion, FrontendActivation, FrontendObservation, FrontendSource,
+		CampaignRevision, CaptureAttempt, CaptureAuthAttempt, CaptureAuthRecipeVersion,
+		CaptureEmailAuthConfig, CaptureInboundReceipt, CaptureJob, CaptureRecipe,
+		ChannelConnection, ClaimPathBinding, ClaimSupport, ClaimSupportSet,
+		ClaimVerification, CommunicationAttempt, CommunicationRecipient, ContentAngle,
+		ContentBatch, ContentBatchItem, ContentBatchRun, ContentDraft,
+		ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
+		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
+		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
+		EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
+		FrontendActivation, FrontendObservation, FrontendSource,
 		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
 		IdealCustomerProfile, IntegrationConnection, Invitation, KitArtifactClaim,

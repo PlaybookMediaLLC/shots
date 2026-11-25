@@ -309,6 +309,54 @@ func (f CaptureAttemptFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureAttemptMutation", m)
 }
 
+// The CaptureAuthAttemptFunc type is an adapter to allow the use of ordinary
+// function as CaptureAuthAttempt mutator.
+type CaptureAuthAttemptFunc func(context.Context, *ent.CaptureAuthAttemptMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureAuthAttemptFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureAuthAttemptMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureAuthAttemptMutation", m)
+}
+
+// The CaptureAuthRecipeVersionFunc type is an adapter to allow the use of ordinary
+// function as CaptureAuthRecipeVersion mutator.
+type CaptureAuthRecipeVersionFunc func(context.Context, *ent.CaptureAuthRecipeVersionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureAuthRecipeVersionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureAuthRecipeVersionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureAuthRecipeVersionMutation", m)
+}
+
+// The CaptureEmailAuthConfigFunc type is an adapter to allow the use of ordinary
+// function as CaptureEmailAuthConfig mutator.
+type CaptureEmailAuthConfigFunc func(context.Context, *ent.CaptureEmailAuthConfigMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureEmailAuthConfigFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureEmailAuthConfigMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureEmailAuthConfigMutation", m)
+}
+
+// The CaptureInboundReceiptFunc type is an adapter to allow the use of ordinary
+// function as CaptureInboundReceipt mutator.
+type CaptureInboundReceiptFunc func(context.Context, *ent.CaptureInboundReceiptMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureInboundReceiptFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureInboundReceiptMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureInboundReceiptMutation", m)
+}
+
 // The CaptureJobFunc type is an adapter to allow the use of ordinary
 // function as CaptureJob mutator.
 type CaptureJobFunc func(context.Context, *ent.CaptureJobMutation) (ent.Value, error)

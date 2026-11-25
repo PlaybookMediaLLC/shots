@@ -37,6 +37,8 @@ const (
 	OriginRefused        Code = "origin_refused"
 	RecipeInvalid        Code = "recipe_invalid"
 	ImageInvalid         Code = "image_invalid"
+	StorageLimit         Code = "storage_limit"
+	CaptureUnverified    Code = "capture_unverified"
 	PageFailed           Code = "page_failed"
 	ProviderUnavailable  Code = "provider_unavailable"
 )
@@ -234,12 +236,21 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
-	ready := false
-	defer func() {
-		if !ready {
-			_ = page.Close()
-		}
-	}()
+	s, stop, err := guard(ctx, browser, page, hosts, postPaths)
+	if err != nil {
+		_ = page.Close()
+		return nil, err
+	}
+	s.close = func() {
+		stop()
+		_ = page.Close()
+	}
+	return s, nil
+}
+
+// guard applies the capture policy to a tab, new or already open. stop ends
+// the policy's request handling and leaves the tab open.
+func guard(ctx context.Context, browser *rod.Browser, page *rod.Page, hosts, postPaths []string) (*scope, func(), error) {
 	s := &scope{page: page, context: browser}
 	for _, setup := range []func() error{
 		func() error { return proto.NetworkEnable{}.Call(page) },
@@ -250,7 +261,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 		},
 	} {
 		if err := setup(); err != nil {
-			return nil, &Failure{Code: ProviderUnavailable}
+			return nil, nil, &Failure{Code: ProviderUnavailable}
 		}
 	}
 	router := page.HijackRequests()
@@ -265,7 +276,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 		}
 		hijack.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
 	}); err != nil {
-		return nil, &Failure{Code: ProviderUnavailable}
+		return nil, nil, &Failure{Code: ProviderUnavailable}
 	}
 	go router.Run()
 	// A dialog would stall the page until its deadline; nothing here answers yes.
@@ -276,12 +287,7 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 	}, func(*proto.PageJavascriptDialogOpening) {
 		_ = proto.PageHandleJavaScriptDialog{Accept: false}.Call(page)
 	})()
-	s.close = func() {
-		_ = router.Stop()
-		_ = page.Close()
-	}
-	ready = true
-	return s, nil
+	return s, func() { _ = router.Stop() }, nil
 }
 
 func (s *scope) restore(state *State) error {
@@ -499,14 +505,25 @@ func (s *scope) settle(ctx context.Context) {
 		...Array.from(document.images).filter((i) => !i.complete).map((i) => new Promise((done) => { i.onload = i.onerror = done }))]).then(() => true)`)
 }
 
-func (s *scope) applyMasks(ctx context.Context, masks []string) error {
-	for _, selector := range masks {
-		painted, err := s.evalBool(ctx, `(selector) => {
+func (s *scope) applyMasks(ctx context.Context, masks []string, style string, required bool) error {
+	script := `(selector) => {
+		const found = Array.from(document.querySelectorAll(selector));
+		found.forEach((e) => { e.style.setProperty('background', '#000', 'important'); e.style.setProperty('color', '#000', 'important');
+			e.style.setProperty('filter', 'brightness(0)', 'important'); e.style.setProperty('border-color', '#000', 'important') });
+		return found.length > 0 }`
+	if style == MaskStyleBlur {
+		script = `(selector) => {
 			const found = Array.from(document.querySelectorAll(selector));
-			found.forEach((e) => { e.style.setProperty('background', '#000', 'important'); e.style.setProperty('color', '#000', 'important');
-				e.style.setProperty('filter', 'brightness(0)', 'important'); e.style.setProperty('border-color', '#000', 'important') });
-			return found.length > 0 }`, selector)
-		if err != nil || !painted {
+			found.forEach((e) => { e.style.setProperty('filter', 'blur(12px)', 'important');
+				e.style.setProperty('user-select', 'none', 'important') });
+			return found.length > 0 }`
+	}
+	for _, selector := range masks {
+		painted, err := s.evalBool(ctx, script, selector)
+		if err != nil {
+			return &Failure{Code: MaskMissing}
+		}
+		if required && !painted {
 			return &Failure{Code: MaskMissing}
 		}
 	}
@@ -516,11 +533,19 @@ func (s *scope) applyMasks(ctx context.Context, masks []string) error {
 // RunInput is one attempt at one recipe. ExpectedRevision is empty only for a
 // capture explicitly labeled as the current state.
 type RunInput struct {
-	Target           Target
-	Recipe           Recipe
-	State            *State
-	ExpectedRevision string
-	NextNavigation   NextNavigationAction
+	Target             Target
+	Recipe             Recipe
+	State              *State
+	ExpectedRevision   string
+	NextNavigation     NextNavigationAction
+	ReserveExternalRun func(context.Context) error
+}
+
+// SequenceShot is one intermediate masked frame captured during a multi-shot AI
+// navigation flow (e.g. before click -> menu open -> final state).
+type SequenceShot struct {
+	Image         []byte
+	Width, Height int
 }
 
 // RunResult is a verified image and, when the app rotated tokens, new state.
@@ -534,6 +559,8 @@ type RunResult struct {
 	NavigationActions []NavigationAction
 	// Focus is where the first marker sat in the captured viewport, as fractions.
 	Focus *Focus
+	// Sequence holds optional intermediate frames when Recipe.SequenceShots > 1.
+	Sequence []SequenceShot
 }
 
 // Focus is a box in fractions of the viewport, from its top left corner.
@@ -567,6 +594,13 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	scale := input.Recipe.Viewport.DeviceScale()
 	if err := s.page.Context(ctx).SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: input.Recipe.Viewport.Width, Height: input.Recipe.Viewport.Height, DeviceScaleFactor: float64(scale)}); err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
+	}
+	if input.Recipe.ColorScheme != "" {
+		if err := (proto.EmulationSetEmulatedMedia{
+			Features: []*proto.EmulationMediaFeature{{Name: "prefers-color-scheme", Value: input.Recipe.ColorScheme}},
+		}).Call(s.page.Context(ctx)); err != nil {
+			return nil, &Failure{Code: ProviderUnavailable}
+		}
 	}
 	if err := s.restore(input.State); err != nil {
 		return nil, err
@@ -604,7 +638,7 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 				return nil, err
 			}
 		}
-		if result.NavigationActions, err = s.navigateFeature(ctx, input); err != nil {
+		if result.NavigationActions, result.Sequence, err = s.navigateFeature(ctx, input); err != nil {
 			return nil, err
 		}
 		if err := s.checkIdentity(ctx, input.Target, requested); err != nil {
@@ -638,8 +672,13 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	if s.privateResponse.Load() {
 		return nil, &Failure{Code: OriginRefused}
 	}
-	if err := s.applyMasks(ctx, input.Recipe.Masks); err != nil {
+	if err := s.applyMasks(ctx, input.Recipe.Masks, input.Recipe.MaskStyle, true); err != nil {
 		return nil, err
+	}
+	if len(input.Recipe.OptionalMasks) > 0 {
+		if err := s.applyMasks(ctx, input.Recipe.OptionalMasks, input.Recipe.MaskStyle, false); err != nil {
+			return nil, err
+		}
 	}
 	here, err := s.location()
 	if err != nil || here.Scheme+"://"+here.Host != input.Target.Origin {
@@ -650,7 +689,9 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	if err != nil {
 		return nil, &Failure{Code: PageFailed}
 	}
-	result.Focus = box.focus()
+	if !crop {
+		result.Focus = box.focus()
+	}
 	request := &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng}
 	width, height := float64(input.Recipe.Viewport.Width), float64(input.Recipe.Viewport.Height)
 	if crop {
@@ -660,6 +701,8 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 		}
 		request.Clip, width, height = clip, clip.Width, clip.Height
 	}
+	// Belt-and-suspenders: strip any transient navigation overlays before final capture.
+	_, _ = s.page.Context(ctx).Eval(`() => document.querySelectorAll('[data-shots-som],[data-shots-seq-mask]').forEach(n => n.remove())`)
 	shot, err := s.page.Context(ctx).Screenshot(false, request)
 	if err != nil {
 		return nil, &Failure{Code: PageFailed}
@@ -671,8 +714,11 @@ func Run(ctx context.Context, browser *rod.Browser, input RunInput) (*RunResult,
 	result.Image, result.Width, result.Height = shot, config.Width, config.Height
 	result.RefusedRequests = int(s.refused.Load())
 	// A failed export keeps the state already stored; the capture still stands.
-	if rotated, err := exportState(ctx, s.context, s.page, input.Target); err == nil && !rotated.Same(input.State) {
-		result.State = rotated
+	if rotated, err := exportState(ctx, s.context, s.page, input.Target); err == nil {
+		rotated.MergePrevious(input.State, input.Target.Hosts)
+		if !rotated.Same(input.State) {
+			result.State = rotated
+		}
 	}
 	return result, nil
 }

@@ -119,8 +119,11 @@ restriction in its [API key documentation](https://better-auth.com/docs/plugins/
 - Use HTTPS-only secure cookies in production and fixed environment-specific
   base URLs and redirect targets.
 - Rate-limit sign-in, password reset, invitation, and SSO callback endpoints.
-- Require fresh sign-in plus TOTP for organization deletion, social connection
-  changes, SSO/SCIM changes, support-grant approval, and credential rotation.
+- Require fresh sign-in plus TOTP for organization deletion, SSO/SCIM changes,
+  support-grant approval, and credential rotation. A fresh sign-in is less than
+  15 minutes old.
+- Accept a sign-in up to 24 hours old, plus TOTP, to connect or reconnect a
+  social channel. A stolen session of that age can then connect a channel.
 - Revoke active sessions after password reset, role removal, support-grant
   revocation, or account-compromise response.
 - Make trusted devices visible and revocable in account security settings.

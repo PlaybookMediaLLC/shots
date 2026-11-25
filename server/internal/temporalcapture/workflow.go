@@ -19,13 +19,16 @@ import (
 )
 
 const (
-	TaskQueue          = "platform-capture"
-	JobWorkflowName    = "platform-capture-job-v1"
-	ConnectWorkflow    = "platform-capture-connection-v1"
-	RunActivity        = "platform-capture-run-v1"
-	CompleteActivity   = "platform-capture-complete-connection-v1"
-	maxJobRounds       = 200
-	activityHeartbeats = 30 * time.Second
+	TaskQueue                    = "platform-capture"
+	JobWorkflowName              = "platform-capture-job-v1"
+	ConnectWorkflow              = "platform-capture-connection-v1"
+	DeploymentCaptureWorkflow    = "platform-capture-deployment-v1"
+	RunActivity                  = "platform-capture-run-v1"
+	CompleteActivity             = "platform-capture-complete-connection-v1"
+	DeploymentCaptureActivity    = "platform-capture-deployment-run-v1"
+	maxJobRounds                 = 200
+	deploymentCaptureMaxAttempts = 4
+	activityHeartbeats           = 30 * time.Second
 )
 
 // Input names a job or connection; it is safe in workflow history.
@@ -63,6 +66,15 @@ func ConnectionWorkflow(ctx workflow.Context, input Input) error {
 	return workflow.ExecuteActivity(ctx, CompleteActivity, input).Get(ctx, nil)
 }
 
+// DeploymentWorkflow runs public & authenticated deployment captures off the
+// global outbox loop so one slow tenant cannot stall outbox delivery across
+// other workspaces, with bounded retries for transient screenshot provider errors.
+func DeploymentWorkflow(ctx workflow.Context, input Input) error {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: 10 * time.Minute, HeartbeatTimeout: activityHeartbeats,
+		RetryPolicy: &temporal.RetryPolicy{InitialInterval: 10 * time.Second, MaximumInterval: 2 * time.Minute, MaximumAttempts: deploymentCaptureMaxAttempts}})
+	return workflow.ExecuteActivity(ctx, DeploymentCaptureActivity, input).Get(ctx, nil)
+}
+
 // Activities adapts Temporal onto the product's capture operations.
 type Activities struct{ Store *product.Configuration }
 
@@ -90,6 +102,9 @@ func safeError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, product.ErrNotEligible) {
+		return temporal.NewNonRetryableApplicationError("Capture target is no longer eligible", "CaptureNotEligible", nil)
+	}
 	return temporal.NewApplicationError("Capture activity failed", "CaptureInfrastructure")
 }
 
@@ -106,12 +121,24 @@ func (a *Activities) Complete(ctx context.Context, input Input) error {
 	return safeError(a.Store.CompleteCaptureConnection(ctx, input.OrganizationID, input.ID))
 }
 
+// CaptureDeployment runs deployment surface capture inside Temporal. Non-final
+// attempts allow transient screenshot failures to trigger a retry; the final
+// attempt persists surface failures and finalizes the DeploymentEvent row.
+func (a *Activities) CaptureDeployment(ctx context.Context, input Input) error {
+	defer keepAlive(ctx)()
+	retryTransient := int(activity.GetInfo(ctx).Attempt) < deploymentCaptureMaxAttempts
+	return safeError(a.Store.RunDeploymentCapture(ctx, input.OrganizationID, input.ID, retryTransient))
+}
+
 // Register adds the capture workflows and activities to a worker.
 func Register(w worker.Worker, a *Activities) {
 	w.RegisterWorkflowWithOptions(JobWorkflow, workflow.RegisterOptions{Name: JobWorkflowName})
 	w.RegisterWorkflowWithOptions(ConnectionWorkflow, workflow.RegisterOptions{Name: ConnectWorkflow})
+	w.RegisterWorkflowWithOptions(DeploymentWorkflow, workflow.RegisterOptions{Name: DeploymentCaptureWorkflow})
 	w.RegisterActivityWithOptions(a.Run, activity.RegisterOptions{Name: RunActivity})
 	w.RegisterActivityWithOptions(a.Complete, activity.RegisterOptions{Name: CompleteActivity})
+	w.RegisterActivityWithOptions(a.CaptureDeployment, activity.RegisterOptions{Name: DeploymentCaptureActivity})
+	RegisterEmailAuth(w, a)
 }
 
 // Client starts capture workflows from the outbox. A lost acknowledgement finds
@@ -139,4 +166,10 @@ func (c *Client) StartCaptureConnection(ctx context.Context, org, connectionID s
 	_, err := c.Temporal.ExecuteWorkflow(ctx, client.StartWorkflowOptions{ID: "capture-connection-" + connectionID, TaskQueue: TaskQueue, WorkflowExecutionTimeout: 10 * time.Minute,
 		WorkflowIDConflictPolicy: enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING, WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE}, ConnectWorkflow, Input{OrganizationID: org, ID: connectionID})
 	return err
+}
+
+// StartDeploymentCapture starts one durable workflow per deployment event,
+// decoupling slow screenshot captures from the global outbox dispatcher.
+func (c *Client) StartDeploymentCapture(ctx context.Context, org, deploymentID string) error {
+	return c.start(ctx, "capture-deployment-"+deploymentID, DeploymentCaptureWorkflow, Input{OrganizationID: org, ID: deploymentID})
 }

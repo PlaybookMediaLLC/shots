@@ -11,7 +11,7 @@ import { captureScreenshot } from '@/lib/screenshot-service'
 import { readTenantObject } from '@/lib/storage/client'
 import { isRegisteredCaptureUrl } from '@/lib/launch/spec-schema'
 import { storeGeneratedAsset } from '@/lib/tenant/assets'
-import { queueSignedInCaptureAt } from '@/lib/tenant/product-surfaces'
+import { isCaptureAssetKey, resolveSignedInCaptureAt } from '@/lib/tenant/product-surfaces'
 import {
   composeProductShot,
   isNearlyBlank,
@@ -108,12 +108,21 @@ export function createCampaignStudioTools(
         SCREENSHOT_RATE_LIMIT
       )
       if (!limit.allowed) return failure('Screenshot capacity is exhausted; try again later.')
-      const signedIn = await queueSignedInCaptureAt(scope.tenant, url, scope.run.runId)
+      const signedIn = await resolveSignedInCaptureAt(scope.tenant, url, scope.run.runId, {
+        pollMs: 30_000,
+        signal: scope.run.signal,
+      })
       if (signedIn) {
+        if (signedIn.kind === 'existing' || signedIn.kind === 'captured') {
+          const kind = `capture-${device}`
+          await linkAsset(scope, signedIn.assetId, kind, url)
+          record.assets.push({ assetId: signedIn.assetId, kind })
+          return { assetId: signedIn.assetId, device, ok: true as const }
+        }
         return failure(
-          signedIn === 'queued'
-            ? 'This page is behind a login, so a signed-in capture was queued; it finishes after this step. Use another registered URL for now.'
-            : 'This page is behind a login, and its signed-in capture could not start. Use another registered URL.'
+          signedIn.kind === 'queued'
+            ? `This page is behind a login, so a signed-in capture (job ${signedIn.jobId}) is still running in the background. Use another registered URL or existing capture for now.`
+            : 'This page is behind a login, and its signed-in capture could not start or needs reconnection. Use another registered URL.'
         )
       }
       let bytes: Buffer
@@ -185,7 +194,19 @@ export function createCampaignStudioTools(
       const link = await orNull(
         backendSDK(scope.tenant).getCampaignAsset(scope.campaignId, input.captureAssetId)
       )
-      if (!link?.kind.startsWith('capture-') || link.assetStatus !== 'UPLOADED') {
+      const isAutomationCapture =
+        link?.kind === 'product-shot' &&
+        (await backendSDK(scope.tenant)
+          .findAssets({ ids: [input.captureAssetId] })
+          .then(({ assets }) =>
+            isCaptureAssetKey(assets.find((asset) => asset.id === input.captureAssetId)?.objectKey)
+          )
+          .catch(() => false))
+      if (
+        !link ||
+        (!link.kind.startsWith('capture-') && !isAutomationCapture) ||
+        link.assetStatus !== 'UPLOADED'
+      ) {
         return failure('Unknown captureAssetId. Use an id returned by captureProductPage.')
       }
       const family = getMockupDefinition(input.mockupId)?.family

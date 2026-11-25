@@ -18,6 +18,9 @@ export type CaptureConnection = {
   stateExpiresAt: string | null
   connectPhase: string | null
   failureCode: string | null
+  discoveredRoutes?: { path: string; label: string }[]
+  bootstrapUrl?: string | null
+  hasBootstrap?: boolean
   revokedAt: string | null
   createdAt: string
   updatedAt: string
@@ -33,6 +36,91 @@ export type CaptureConnectionInput = {
   protectedPath: string
   identitySelector: string
   expectedAccount: string
+  bootstrapUrl?: string
+  bootstrapSecret?: string
+}
+/** A new connection; with assignTestEmail Shots assigns the expected account. */
+export type CaptureConnectionCreate = Omit<CaptureConnectionInput, 'expectedAccount'> & {
+  expectedAccount: string
+  assignTestEmail?: boolean
+}
+/** A typed first-factor email sign-in (RFC 007A). */
+export type CaptureLoginRecipe = {
+  schemaVersion: 1
+  method: 'MAGIC_LINK' | 'EMAIL_CODE'
+  startPath: string
+  emailInput: string
+  requestChallenge: string
+  challengeConfirmation?: string
+  submitPaths: string[]
+  linkHosts?: string[]
+  linkPaths?: string[]
+  codeInput?: string
+  codeLength?: number
+  submitCode?: string
+}
+/** An email sign-in attempt's safe progress. */
+export type CaptureAuthAttempt = {
+  id: string
+  connectionId: string
+  mode: 'TEST' | 'AUTO_RECOVER'
+  state:
+    | 'ADMITTED'
+    | 'BROWSER_STARTING'
+    | 'CHALLENGE_REQUESTED'
+    | 'WAITING_FOR_EMAIL'
+    | 'EMAIL_MATCHED'
+    | 'APPLYING_CHALLENGE'
+    | 'VERIFYING'
+    | 'COMMITTING'
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'EXPIRED'
+    | 'CANCELLED'
+    | 'HUMAN_REQUIRED'
+  startedAt: string
+  deadlineAt: string
+  emailRequestedAt: string | null
+  emailReceivedAt: string | null
+  completedAt: string | null
+  failureCode: string | null
+  safeMessage: string
+}
+/** A connection's email sign-in setup. */
+export type CaptureEmailAuth = {
+  id: string
+  connectionId: string
+  method: 'MAGIC_LINK' | 'EMAIL_CODE'
+  status: 'DRAFT' | 'VERIFIED' | 'PAUSED' | 'REVOKED'
+  testEmail: string
+  expectedSenders: string[]
+  autoReconnect: boolean
+  revision: number
+  testedRevision: number | null
+  recipeVersion: number | null
+  recipe: CaptureLoginRecipe | null
+  lastTestedAt: string | null
+  lastSuccessAt: string | null
+  lastFailureCode: string | null
+  approvedByUserId: string | null
+  approvedAt: string | null
+  autoReconnectAvailable: boolean
+  latestAttempt: CaptureAuthAttempt | null
+  createdAt: string
+  updatedAt: string
+}
+/** A new login recipe version for the revision the owner last saw. */
+export type SaveCaptureEmailAuthRecipeInput = {
+  expectedRevision: number
+  recipe: CaptureLoginRecipe
+  expectedSenders: string[]
+}
+/** Resend's delivery as the web received it: the exact signed bytes and headers. */
+export type CaptureAuthInboundEmail = {
+  payload: string
+  svixId: string
+  svixTimestamp: string
+  svixSignature: string
 }
 /**
  * The sign-in browser's Live View link is a bearer credential: pass it to the
@@ -42,7 +130,7 @@ export type CaptureConnectStart = { intentId: string; liveViewUrl: string; expir
 /** A reviewed capture of one screen. The Go validator is the authority on what can run. */
 export type CaptureRecipeDefinition = {
   schemaVersion: 1
-  viewport: { width: number; height: number }
+  viewport: { width: number; height: number; scale?: 1 | 2 }
   steps: {
     kind: 'NAVIGATE' | 'WAIT_FOR' | 'SELECT_TAB'
     path?: string
@@ -52,9 +140,21 @@ export type CaptureRecipeDefinition = {
   markers: string[]
   forbidden?: string[]
   masks?: string[]
+  optionalMasks?: string[]
+  maskStyle?: 'solid' | 'blur'
+  colorScheme?: 'light' | 'dark'
+  verifyWithVision?: boolean
+  sequenceShots?: number
+  crop?: 'marker'
   version?: { path?: string; selector?: string }
   allowedPostPaths?: string[]
-  navigation?: { objective: string; maxSteps: number; creditLimit: number }
+  navigation?: {
+    objective: string
+    maxSteps: number
+    creditLimit: number
+    useVision?: boolean
+    allowSearchFill?: boolean
+  }
 }
 /** One immutable recipe version. */
 export type CaptureRecipe = {
@@ -100,6 +200,28 @@ export type CaptureJob = {
   attempts: number
   createdAt: string
   updatedAt: string
+  releaseChange?: string | null
+  navigationActions?: { kind: string; path: string }[]
+  focusBox?: { x: number; y: number; w: number; h: number }
+  sequenceAssetIds?: string[]
+}
+/** Plain-English input for zero-config AI capture authoring or 1-click auto-capture. */
+export type ProposeCaptureRecipeInput = {
+  connectionId: string
+  surfaceId: string
+  prompt: string
+  sequenceShots?: number
+}
+/** A validated, ready-to-save AI capture recipe proposed from a plain-English prompt. */
+export type ProposedCaptureRecipe = {
+  name: string
+  definition: CaptureRecipeDefinition
+  reasoning: string
+}
+/** Both the newly created zero-config AI recipe and its queued capture job. */
+export type AutoCaptureResult = {
+  recipe: CaptureRecipe
+  job: CaptureJob
 }
 /** Everything a member may read about this workspace's authenticated capture. */
 export type CaptureOverview = {

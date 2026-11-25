@@ -43,6 +43,18 @@ func (b Binding) associated() ([]byte, error) {
 	}{"shots.capture.session.v1", b})
 }
 
+func (b Binding) bootstrapAssociated() ([]byte, error) {
+	if b.Organization == "" || b.Connection == "" || b.Environment == "" {
+		return nil, ErrRefused
+	}
+	return json.Marshal(struct {
+		Purpose      string `json:"purpose"`
+		Organization string `json:"organization"`
+		Connection   string `json:"connection"`
+		Environment  string `json:"environment"`
+	}{"shots.capture.bootstrap.v1", b.Organization, b.Connection, b.Environment})
+}
+
 // Keys holds the writing key and any older keys still accepted for reading.
 type Keys struct {
 	current string
@@ -105,12 +117,27 @@ func (k *Keys) Seal(state []byte, binding Binding) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return k.sealWithAssociated(state, associated)
+}
+
+// SealBootstrap encrypts a connection's HMAC bootstrap secret under a distinct
+// purpose binding that is invariant across session generations and cannot open
+// as browser session state.
+func (k *Keys) SealBootstrap(secret []byte, binding Binding) (string, error) {
+	associated, err := binding.bootstrapAssociated()
+	if err != nil {
+		return "", err
+	}
+	return k.sealWithAssociated(secret, associated)
+}
+
+func (k *Keys) sealWithAssociated(plaintext, associated []byte) (string, error) {
 	aead := k.all[k.current]
 	nonce := make([]byte, aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return "", ErrUnavailable
 	}
-	sealed := aead.Seal(nonce, nonce, state, associated)
+	sealed := aead.Seal(nonce, nonce, plaintext, associated)
 	return prefix + k.current + "." + base64.RawURLEncoding.EncodeToString(sealed), nil
 }
 
@@ -120,6 +147,20 @@ func (k *Keys) Open(sealed string, binding Binding) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	return k.openWithAssociated(sealed, associated)
+}
+
+// OpenBootstrap decrypts a connection's bootstrap secret and reports whether
+// a newer key should re-encrypt it.
+func (k *Keys) OpenBootstrap(sealed string, binding Binding) ([]byte, bool, error) {
+	associated, err := binding.bootstrapAssociated()
+	if err != nil {
+		return nil, false, err
+	}
+	return k.openWithAssociated(sealed, associated)
+}
+
+func (k *Keys) openWithAssociated(sealed string, associated []byte) ([]byte, bool, error) {
 	rest, ok := strings.CutPrefix(sealed, prefix)
 	if !ok {
 		return nil, false, ErrRefused

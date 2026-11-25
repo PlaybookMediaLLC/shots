@@ -96,6 +96,17 @@ func (c *Configuration) releaseCaptureCandidates(ctx context.Context, org string
 			return nil, err
 		}
 		query.Where(platformappconnection.Environment(deployment.Environment))
+	} else if event.Snapshot.Family == automation.Published {
+		// Published releases target production when production connections exist,
+		// preventing AI from choosing a staging recipe for a production release.
+		hasProd, err := c.client.PlatformAppConnection.Query().Where(platformappconnection.OrganizationID(org), platformappconnection.SourceAppID(event.SourceAppID),
+			platformappconnection.StatusNEQ(platformappconnection.StatusREVOKED), platformappconnection.Environment("production")).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasProd {
+			query.Where(platformappconnection.Environment("production"))
+		}
 	}
 	connections, err := query.IDs(ctx)
 	if err != nil || len(connections) == 0 {

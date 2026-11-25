@@ -107,6 +107,22 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
     creditLimit: 6,
   })
 
+  // Zero-config AI capture authoring fills the form with no CSS selectors required,
+  // and auto-capture fails cleanly with 503 when no browser provider is configured.
+  await expect(page.getByRole('heading', { name: 'Capture with AI (zero config)' })).toBeVisible()
+  await page.getByLabel('What should AI capture?').fill('Show dark mode billing walkthrough')
+  await page.getByRole('button', { name: 'Fill form with AI', exact: true }).click()
+  await expect(screen.getByRole('textbox', { name: /^Name\b/ })).not.toHaveValue('')
+  await expect(screen.getByRole('textbox', { name: 'Element that proves the screen' })).toHaveValue(
+    'main, [role=main], body'
+  )
+  const autoUnavailable = await trpcMutation(page, 'capture.autoCapture', {
+    connectionId: saved?.id,
+    surfaceId: surface.id,
+    prompt: 'Show dark mode billing walkthrough',
+  })
+  expect(autoUnavailable.status).toBe(503)
+
   // Signing in needs the provider: a plain failure, and no browser or state.
   const connect = await trpcMutation(page, 'capture.connect', { id: saved?.id })
   expect(connect.status).toBe(503)
@@ -167,6 +183,18 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
       id: recipeRows.rows[0]?.id,
     })
     expect(archive.status).toBe(404)
+    const otherPropose = await trpcMutation(otherPage, 'capture.proposeRecipe', {
+      connectionId: saved?.id,
+      surfaceId: surface.id,
+      prompt: 'Try cross-tenant propose',
+    })
+    expect(otherPropose.status).toBe(404)
+    const otherAuto = await trpcMutation(otherPage, 'capture.autoCapture', {
+      connectionId: saved?.id,
+      surfaceId: surface.id,
+      prompt: 'Try cross-tenant auto-capture',
+    })
+    expect([404, 503]).toContain(otherAuto.status)
     const kept = await db.query(`SELECT status FROM platform_app_connection WHERE id=$1`, [
       saved?.id,
     ])

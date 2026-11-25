@@ -62,6 +62,8 @@ const (
 	FieldSurfaceCaptureID = "surfaceCaptureId"
 	// FieldAssetID holds the string denoting the asset_id field in the database.
 	FieldAssetID = "assetId"
+	// FieldSequenceAssetIds holds the string denoting the sequence_asset_ids field in the database.
+	FieldSequenceAssetIds = "sequenceAssetIds"
 	// FieldResumeCount holds the string denoting the resume_count field in the database.
 	FieldResumeCount = "resumeCount"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -99,6 +101,7 @@ var Columns = []string{
 	FieldRequestedByUserID,
 	FieldSurfaceCaptureID,
 	FieldAssetID,
+	FieldSequenceAssetIds,
 	FieldResumeCount,
 	FieldCreatedAt,
 	FieldUpdatedAt,

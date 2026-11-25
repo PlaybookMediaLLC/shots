@@ -313,3 +313,10 @@ test('worker render signatures verify only fresh, exact bodies', async () => {
     )
   )
 })
+
+test('producersOf lets create_canvas accept both create_release and create_campaign outputs', async () => {
+  const { producersOf } = await import('../lib/workflows/actions')
+  const producers = producersOf('create_canvas')
+  assert.ok(producers.includes('create_release'))
+  assert.ok(producers.includes('create_campaign'))
+})

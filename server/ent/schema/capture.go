@@ -52,7 +52,17 @@ func (PlatformAppConnection) Fields() []ent.Field {
 		field.Int64("lease_token").StorageKey("leaseToken").Default(0),
 		field.Time("lease_expires_at").StorageKey("leaseExpiresAt").Optional().Nillable(),
 		field.String("created_by_user_id").StorageKey("createdByUserId").Immutable(),
+		// DiscoveredRoutes are safe navigation links observed when a person signed in.
+		field.JSON("discovered_routes", []map[string]string{}).StorageKey("discoveredRoutes").Optional(),
+		// BootstrapURL and BootstrapSecretCiphertext enable optional customer-signed
+		// short-lived demo session bootstrap on an approved host.
+		field.String("bootstrap_url").StorageKey("bootstrapUrl").Optional().Nillable(),
+		field.String("bootstrap_secret_ciphertext").StorageKey("bootstrapSecretCiphertext").Optional().Nillable().Sensitive(),
 		field.Time("revoked_at").StorageKey("revokedAt").Optional().Nillable(),
+		// LastAutoAuthenticatedAt is the last automatic email sign-in. It never
+		// moves ValidatedAt, which stays the last human authorization and anchors
+		// the 30-day cap (RFC 007A section 7.5).
+		field.Time("last_auto_authenticated_at").StorageKey("lastAutoAuthenticatedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}
@@ -134,6 +144,7 @@ func (CaptureJob) Fields() []ent.Field {
 		field.String("requested_by_user_id").StorageKey("requestedByUserId").Optional().Nillable().Immutable(),
 		field.String("surface_capture_id").StorageKey("surfaceCaptureId").Optional().Nillable(),
 		field.String("asset_id").StorageKey("assetId").Optional().Nillable(),
+		field.JSON("sequence_asset_ids", []string{}).StorageKey("sequenceAssetIds").Optional(),
 		field.Int("resume_count").StorageKey("resumeCount").Default(0),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
@@ -178,6 +189,8 @@ func (CaptureAttempt) Fields() []ent.Field {
 		// NavigationActions are the observed controls AI navigation used: kinds and
 		// paths only, never page text.
 		field.JSON("navigation_actions", []map[string]string{}).StorageKey("navigationActions").Optional(),
+		// FocusBox is where the first visible marker sat in the captured viewport (0-1 fractions).
+		field.JSON("focus_box", map[string]float64{}).StorageKey("focusBox").Optional(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

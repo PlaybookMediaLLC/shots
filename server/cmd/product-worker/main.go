@@ -15,6 +15,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/emailauth"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/config"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -184,7 +185,20 @@ func main() {
 	}
 	captureProvider := browser.FromEnvironment()
 	if captureKeys != nil && captureProvider != nil {
-		automationStore.WithAuthenticatedCapture(browser.Runner{Provider: captureProvider}, captureKeys)
+		var runner product.CaptureRunner = browser.Runner{Provider: captureProvider}
+		if agentRunner := browser.AgentRunnerFromEnvironment(captureProvider); agentRunner != nil {
+			runner = agentRunner
+		}
+		automationStore.WithAuthenticatedCapture(runner, captureKeys)
+	}
+	// Unattended email sign-in (RFC 007A) runs its attempts on this worker.
+	emailAuth, err := emailauth.SettingsFromEnvironment()
+	if err != nil {
+		slog.Error("invalid capture email sign-in configuration", "error", err)
+		os.Exit(1)
+	}
+	if emailAuth != nil {
+		automationStore.WithEmailAuth(emailAuth)
 	}
 	if github != nil {
 		// render_code_visual reads a merged pull request's diff only where its owner allowed it.
@@ -229,7 +243,8 @@ func main() {
 		}
 		defer batchWorker.Stop()
 	}
-	if automationStore.CaptureAvailable() && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
+	deploymentCaptureEnabled := capture.FromEnvironment() != nil || automationStore.CaptureAvailable()
+	if deploymentCaptureEnabled && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
 		captureWorker := worker.New(temporalClient, temporalcapture.TaskQueue, worker.Options{
 			// Shared with design rendering's provider account: a low ceiling keeps
 			// capacity for renders, and a stalled page holds one slot, not the queue.
@@ -242,22 +257,24 @@ func main() {
 			os.Exit(1)
 		}
 		defer captureWorker.Stop()
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
+		if automationStore.CaptureAvailable() {
+			go func() {
+				ticker := time.NewTicker(time.Minute)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+					}
+					reclaimCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+					if err := automationStore.ReclaimCaptureResources(reclaimCtx); err != nil {
+						slog.Warn("capture cleanup did not finish")
+					}
+					cancel()
 				}
-				reclaimCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
-				if err := automationStore.ReclaimCaptureResources(reclaimCtx); err != nil {
-					slog.Warn("capture cleanup did not finish")
-				}
-				cancel()
-			}
-		}()
+			}()
+		}
 	}
 
 	if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
@@ -307,7 +324,9 @@ func main() {
 			events.WithAutomationRenderer(renderer)
 		}
 		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
-		events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
+		if deploymentCaptureEnabled {
+			events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
+		}
 		if github != nil {
 			events.WithGitHubApp(github)
 		}

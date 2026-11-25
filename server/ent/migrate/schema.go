@@ -774,6 +774,7 @@ var (
 		{Name: "refusedRequests", Type: field.TypeInt, Default: 0},
 		{Name: "assetId", Type: field.TypeString, Nullable: true},
 		{Name: "navigationActions", Type: field.TypeJSON, Nullable: true},
+		{Name: "focusBox", Type: field.TypeJSON, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -787,6 +788,176 @@ var (
 				Name:    "captureattempt_captureJobId_attemptNumber",
 				Unique:  true,
 				Columns: []*schema.Column{CaptureColumns[3], CaptureColumns[12]},
+			},
+		},
+	}
+	// CaptureAuthAttemptColumns holds the columns for the "capture_auth_attempt" table.
+	CaptureAuthAttemptColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "connectionId", Type: field.TypeString},
+		{Name: "configId", Type: field.TypeString},
+		{Name: "configRevision", Type: field.TypeInt},
+		{Name: "recipeVersionId", Type: field.TypeString},
+		{Name: "recipeHash", Type: field.TypeString},
+		{Name: "connectionGeneration", Type: field.TypeInt},
+		{Name: "mode", Type: field.TypeEnum, Enums: []string{"TEST", "AUTO_RECOVER"}},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"ADMITTED", "BROWSER_STARTING", "CHALLENGE_REQUESTED", "WAITING_FOR_EMAIL", "EMAIL_MATCHED", "APPLYING_CHALLENGE", "VERIFYING", "COMMITTING", "SUCCEEDED", "FAILED", "EXPIRED", "CANCELLED", "HUMAN_REQUIRED"}, Default: "ADMITTED"},
+		{Name: "browserSessionId", Type: field.TypeString, Nullable: true},
+		{Name: "browserClosedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "emailRequestedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "emailReceivedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "receiptId", Type: field.TypeString, Nullable: true},
+		{Name: "deadlineAt", Type: field.TypeTime},
+		{Name: "completedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "fenceToken", Type: field.TypeInt64, Default: 0},
+		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "triggerCaptureJobId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CaptureAuthAttemptTable holds the schema information for the "capture_auth_attempt" table.
+	CaptureAuthAttemptTable = &schema.Table{
+		Name:       "capture_auth_attempt",
+		Columns:    CaptureAuthAttemptColumns,
+		PrimaryKey: []*schema.Column{CaptureAuthAttemptColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "captureauthattempt_connectionId",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureAuthAttemptColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "\"state\" IN ('ADMITTED','BROWSER_STARTING','CHALLENGE_REQUESTED','WAITING_FOR_EMAIL','EMAIL_MATCHED','APPLYING_CHALLENGE','VERIFYING','COMMITTING')",
+				},
+			},
+			{
+				Name:    "captureauthattempt_organizationId_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureAuthAttemptColumns[1], CaptureAuthAttemptColumns[21]},
+			},
+			{
+				Name:    "captureauthattempt_connectionId_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureAuthAttemptColumns[2], CaptureAuthAttemptColumns[21]},
+			},
+		},
+	}
+	// CaptureAuthRecipeVersionColumns holds the columns for the "capture_auth_recipe_version" table.
+	CaptureAuthRecipeVersionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "connectionId", Type: field.TypeString},
+		{Name: "configId", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt},
+		{Name: "definition", Type: field.TypeJSON},
+		{Name: "definitionHash", Type: field.TypeString},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// CaptureAuthRecipeVersionTable holds the schema information for the "capture_auth_recipe_version" table.
+	CaptureAuthRecipeVersionTable = &schema.Table{
+		Name:       "capture_auth_recipe_version",
+		Columns:    CaptureAuthRecipeVersionColumns,
+		PrimaryKey: []*schema.Column{CaptureAuthRecipeVersionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "captureauthrecipeversion_configId_version",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureAuthRecipeVersionColumns[3], CaptureAuthRecipeVersionColumns[4]},
+			},
+		},
+	}
+	// CaptureEmailAuthConfigColumns holds the columns for the "capture_email_auth_config" table.
+	CaptureEmailAuthConfigColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "connectionId", Type: field.TypeString},
+		{Name: "environment", Type: field.TypeString},
+		{Name: "recipientLocalPart", Type: field.TypeString},
+		{Name: "recipientDomain", Type: field.TypeString},
+		{Name: "method", Type: field.TypeEnum, Enums: []string{"MAGIC_LINK", "EMAIL_CODE"}},
+		{Name: "recipeVersionId", Type: field.TypeString, Nullable: true},
+		{Name: "expectedSenders", Type: field.TypeJSON},
+		{Name: "autoReconnect", Type: field.TypeBool, Default: false},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "VERIFIED", "PAUSED", "REVOKED"}, Default: "DRAFT"},
+		{Name: "revision", Type: field.TypeInt, Default: 1},
+		{Name: "testedRevision", Type: field.TypeInt, Nullable: true},
+		{Name: "lastTestedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "lastSuccessAt", Type: field.TypeTime, Nullable: true},
+		{Name: "lastFailureCode", Type: field.TypeString, Nullable: true},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "approvedByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "approvedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CaptureEmailAuthConfigTable holds the schema information for the "capture_email_auth_config" table.
+	CaptureEmailAuthConfigTable = &schema.Table{
+		Name:       "capture_email_auth_config",
+		Columns:    CaptureEmailAuthConfigColumns,
+		PrimaryKey: []*schema.Column{CaptureEmailAuthConfigColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "captureemailauthconfig_connectionId",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureEmailAuthConfigColumns[2]},
+			},
+			{
+				Name:    "captureemailauthconfig_recipientLocalPart_recipientDomain",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureEmailAuthConfigColumns[4], CaptureEmailAuthConfigColumns[5]},
+			},
+			{
+				Name:    "captureemailauthconfig_organizationId_connectionId",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureEmailAuthConfigColumns[1], CaptureEmailAuthConfigColumns[2]},
+			},
+		},
+	}
+	// CaptureInboundReceiptColumns holds the columns for the "capture_inbound_receipt" table.
+	CaptureInboundReceiptColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "providerEventId", Type: field.TypeString},
+		{Name: "providerEmailId", Type: field.TypeString},
+		{Name: "recipientHash", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString, Nullable: true},
+		{Name: "configId", Type: field.TypeString, Nullable: true},
+		{Name: "attemptId", Type: field.TypeString, Nullable: true},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"RECEIVED", "ASSIGNED", "CONSUMED", "IGNORED", "FAILED"}, Default: "RECEIVED"},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "receivedAt", Type: field.TypeTime},
+		{Name: "processedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "expiresAt", Type: field.TypeTime},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// CaptureInboundReceiptTable holds the schema information for the "capture_inbound_receipt" table.
+	CaptureInboundReceiptTable = &schema.Table{
+		Name:       "capture_inbound_receipt",
+		Columns:    CaptureInboundReceiptColumns,
+		PrimaryKey: []*schema.Column{CaptureInboundReceiptColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "captureinboundreceipt_provider_providerEventId",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureInboundReceiptColumns[1], CaptureInboundReceiptColumns[2]},
+			},
+			{
+				Name:    "captureinboundreceipt_provider_providerEmailId",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureInboundReceiptColumns[1], CaptureInboundReceiptColumns[3]},
+			},
+			{
+				Name:    "captureinboundreceipt_attemptId",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureInboundReceiptColumns[7]},
+			},
+			{
+				Name:    "captureinboundreceipt_expiresAt",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureInboundReceiptColumns[12]},
 			},
 		},
 	}
@@ -817,6 +988,7 @@ var (
 		{Name: "requestedByUserId", Type: field.TypeString, Nullable: true},
 		{Name: "surfaceCaptureId", Type: field.TypeString, Nullable: true},
 		{Name: "assetId", Type: field.TypeString, Nullable: true},
+		{Name: "sequenceAssetIds", Type: field.TypeJSON, Nullable: true},
 		{Name: "resumeCount", Type: field.TypeInt, Default: 0},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -835,7 +1007,7 @@ var (
 			{
 				Name:    "capturejob_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[26]},
+				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[27]},
 			},
 		},
 	}
@@ -2770,7 +2942,11 @@ var (
 		{Name: "leaseToken", Type: field.TypeInt64, Default: 0},
 		{Name: "leaseExpiresAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "discoveredRoutes", Type: field.TypeJSON, Nullable: true},
+		{Name: "bootstrapUrl", Type: field.TypeString, Nullable: true},
+		{Name: "bootstrapSecretCiphertext", Type: field.TypeString, Nullable: true},
 		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "lastAutoAuthenticatedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -5550,6 +5726,10 @@ var (
 		CampaignPostTable,
 		CampaignRevisionTable,
 		CaptureTable,
+		CaptureAuthAttemptTable,
+		CaptureAuthRecipeVersionTable,
+		CaptureEmailAuthConfigTable,
+		CaptureInboundReceiptTable,
 		CaptureJobTable,
 		CaptureRecipeTable,
 		ChannelConnectionTable,
@@ -5781,6 +5961,18 @@ func init() {
 	}
 	CaptureTable.Annotation = &entsql.Annotation{
 		Table: "capture",
+	}
+	CaptureAuthAttemptTable.Annotation = &entsql.Annotation{
+		Table: "capture_auth_attempt",
+	}
+	CaptureAuthRecipeVersionTable.Annotation = &entsql.Annotation{
+		Table: "capture_auth_recipe_version",
+	}
+	CaptureEmailAuthConfigTable.Annotation = &entsql.Annotation{
+		Table: "capture_email_auth_config",
+	}
+	CaptureInboundReceiptTable.Annotation = &entsql.Annotation{
+		Table: "capture_inbound_receipt",
 	}
 	CaptureJobTable.Annotation = &entsql.Annotation{
 		Table: "capture_job",

@@ -5,16 +5,28 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { ScreenshotStudioBackendSDK } from '../../../packages/screenshot-studio-backend-sdk/src'
 import { SignInPanel } from '@/components/workflows/CaptureSignInPanel'
 import {
+  autoCaptureResultSchema,
+  captureAuthAttemptSchema,
+  captureConnectionCreateSchema,
   captureConnectionInputSchema,
+  captureLoginRecipeSchema,
   captureConnectStartSchema,
   captureOverviewSchema,
   captureRecipeInputSchema,
+  proposeCaptureRecipeInputSchema,
+  proposedCaptureRecipeSchema,
   type CaptureOverview,
 } from '@/lib/api/contracts/capture'
 import {
+  ACTIVE_AUTH_ATTEMPT_STATES,
+  DEFAULT_ZERO_CONFIG_MARKER,
+  emailAuthFailureMessage,
+  loginRecipeForm,
+  loginRecipeInput,
   activeRecipeForSurface,
   captureConnectionInput,
   captureInProgress,
+  captureJobFrames,
   captureNavigationSummary,
   captureRecipeInput,
   latestCaptureTest,
@@ -210,6 +222,25 @@ test('a recipe may capture at double resolution and crop to its element', () => 
   assert.deepEqual(sharp.definition.viewport, { height: 900, width: 1440, scale: 2 })
   assert.equal(sharp.definition.crop, 'marker')
   assert.equal(captureRecipeInputSchema.safeParse(sharp).success, true)
+  const phase2 = captureRecipeInput({
+    ...recipeForm,
+    colorScheme: 'dark',
+    maskStyle: 'blur',
+    optionalMasks: '.toast',
+    forbidden: '.error-banner',
+    allowedPostPaths: '/graphql',
+    versionPath: '',
+    versionSelector: 'meta[name=build]',
+    verifyWithVision: true,
+  })
+  assert.equal(phase2.definition.colorScheme, 'dark')
+  assert.equal(phase2.definition.maskStyle, 'blur')
+  assert.deepEqual(phase2.definition.optionalMasks, ['.toast'])
+  assert.deepEqual(phase2.definition.forbidden, ['.error-banner'])
+  assert.deepEqual(phase2.definition.allowedPostPaths, ['/graphql'])
+  assert.deepEqual(phase2.definition.version, { selector: 'meta[name=build]' })
+  assert.equal(phase2.definition.verifyWithVision, true)
+  assert.equal(captureRecipeInputSchema.safeParse(phase2).success, true)
   const tooSharp = {
     ...sharp,
     definition: { ...sharp.definition, viewport: { height: 900, width: 1440, scale: 3 } },
@@ -312,20 +343,235 @@ test('the SDK calls each capture route in the workspace scope', async () => {
   await sdk.startCaptureConnect('c/1')
   await sdk.refreshCaptureConnect('c/1')
   await sdk.finishCaptureConnect('c1', 'intent')
+  await sdk.bootstrapCaptureConnection('c/1')
   await sdk.revokeCaptureConnection('c1')
+  await sdk.proposeCaptureRecipe({
+    connectionId: 'c1',
+    surfaceId: 's1',
+    prompt: 'Show cohorts',
+  })
+  await sdk.autoCaptureFromPrompt({
+    connectionId: 'c1',
+    surfaceId: 's1',
+    prompt: 'Show cohorts',
+    sequenceShots: 3,
+  })
   await sdk.activateCaptureRecipe('r1')
   await sdk.archiveCaptureRecipe('r1')
   await sdk.requestCaptureJob('r1', { test: true })
+  await sdk.getCaptureJob('j/1')
   await sdk.cancelCaptureJob('j1')
   assert.deepEqual(requests, [
     'GET /v1/capture',
     'POST /v1/capture/connections/c%2F1/connect',
     'POST /v1/capture/connections/c%2F1/connect/refresh',
     'POST /v1/capture/connections/c1/connect/finish {"intentId":"intent"}',
+    'POST /v1/capture/connections/c%2F1/bootstrap',
     'POST /v1/capture/connections/c1/revoke',
+    'POST /v1/capture/recipes/propose {"connectionId":"c1","surfaceId":"s1","prompt":"Show cohorts"}',
+    'POST /v1/capture/auto {"connectionId":"c1","surfaceId":"s1","prompt":"Show cohorts","sequenceShots":3}',
     'POST /v1/capture/recipes/r1/activate',
     'POST /v1/capture/recipes/r1/archive',
     'POST /v1/capture/recipes/r1/jobs {"test":true}',
+    'GET /v1/capture/jobs/j%2F1',
     'POST /v1/capture/jobs/j1/cancel',
   ])
+})
+
+test('capture connection form encodes optional bootstrap fields and scroll navigation summaries', () => {
+  const withBootstrap = captureConnectionInputSchema.parse(
+    captureConnectionInput({
+      bootstrapSecret: '0123456789abcdef-secret',
+      bootstrapUrl: ' https://app.example.com/api/shots/bootstrap ',
+      environment: 'production',
+      expectedAccount: 'demo@example.com',
+      hosts: 'app.example.com',
+      identitySelector: '[data-account]',
+      loginHosts: '',
+      name: 'App',
+      origin: 'https://app.example.com',
+      protectedPath: '/dashboard',
+      sourceAppId: '',
+    })
+  )
+  assert.equal(withBootstrap.bootstrapUrl, 'https://app.example.com/api/shots/bootstrap')
+  assert.equal(withBootstrap.bootstrapSecret, '0123456789abcdef-secret')
+
+  assert.equal(
+    captureNavigationSummary({
+      navigationActions: [
+        { kind: 'link', path: '/analytics' },
+        { kind: 'fill', path: '/analytics' },
+        { kind: 'scroll', path: '/analytics' },
+        { kind: 'frame', path: '/analytics' },
+      ],
+    }),
+    'AI opened /analytics, then filtered on /analytics, then scrolled on /analytics, then framed the result on /analytics.'
+  )
+})
+
+test('zero-config AI capture defaults empty markers and validates vision, fill, sequence, and auto-capture contracts', () => {
+  const zeroConfig = captureRecipeInputSchema.parse(
+    captureRecipeInput({
+      ...recipeForm,
+      marker: '   ',
+      objective: 'Find the weekly cohort chart',
+      useVision: true,
+      allowSearchFill: true,
+      sequenceShots: '3',
+    })
+  )
+  assert.deepEqual(zeroConfig.definition.markers, [DEFAULT_ZERO_CONFIG_MARKER])
+  assert.equal(zeroConfig.definition.sequenceShots, 3)
+  assert.equal(zeroConfig.definition.navigation?.useVision, true)
+  assert.equal(zeroConfig.definition.navigation?.allowSearchFill, true)
+
+  assert.equal(
+    captureRecipeInputSchema.safeParse(
+      captureRecipeInput({ ...recipeForm, objective: 'Show cohorts', sequenceShots: '5' })
+    ).success,
+    false
+  )
+  // Without an AI objective, sequenceShots is omitted so stale values are never saved.
+  const withoutObjective = captureRecipeInputSchema.parse(
+    captureRecipeInput({ ...recipeForm, objective: ' ', sequenceShots: '3' })
+  )
+  assert.equal(withoutObjective.definition.sequenceShots, undefined)
+
+  const proposeInput = proposeCaptureRecipeInputSchema.parse({
+    connectionId: 'connection_1',
+    surfaceId: 'surface_1',
+    prompt: 'Show dark mode cohort chart',
+    sequenceShots: 3,
+  })
+  assert.equal(proposeInput.sequenceShots, 3)
+  for (const bad of [
+    { connectionId: 'c1', surfaceId: 's1', prompt: '   ' },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'x'.repeat(601) },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'ok', sequenceShots: 0 },
+    { connectionId: 'c1', surfaceId: 's1', prompt: 'ok', sequenceShots: 5 },
+  ]) {
+    assert.equal(proposeCaptureRecipeInputSchema.safeParse(bad).success, false)
+  }
+
+  const proposed = proposedCaptureRecipeSchema.parse({
+    name: 'Dark cohort chart',
+    reasoning: 'Matched /analytics from discovered routes.',
+    definition: zeroConfig.definition,
+  })
+  assert.equal(proposed.name, 'Dark cohort chart')
+
+  const auto = autoCaptureResultSchema.parse({
+    recipe,
+    job: { ...job, sequenceAssetIds: ['asset_1', 'asset_2', 'asset_3'] },
+  })
+  assert.deepEqual(auto.job.sequenceAssetIds, ['asset_1', 'asset_2', 'asset_3'])
+  assert.deepEqual(captureJobFrames(auto.job), ['asset_1', 'asset_2', 'asset_3'])
+  assert.deepEqual(captureJobFrames({ assetId: 'asset_only' }), ['asset_only'])
+  assert.deepEqual(captureJobFrames({ assetId: null }), [])
+})
+
+test('a connection may take a Shots test email address instead of an account', () => {
+  const form = {
+    assignTestEmail: true,
+    environment: 'staging' as const,
+    expectedAccount: '',
+    hosts: 'app.example.com',
+    identitySelector: '',
+    loginHosts: '',
+    name: 'Demo',
+    origin: 'https://app.example.com',
+    protectedPath: '/app',
+    sourceAppId: '',
+  }
+  const parsed = captureConnectionCreateSchema.safeParse(captureConnectionInput(form))
+  assert.ok(parsed.success)
+  assert.equal(parsed.data.assignTestEmail, true)
+  assert.equal(
+    captureConnectionCreateSchema.safeParse({
+      ...captureConnectionInput(form),
+      expectedAccount: 'me@x.com',
+    }).success,
+    false
+  )
+  assert.equal(
+    captureConnectionCreateSchema.safeParse({
+      ...captureConnectionInput(form),
+      assignTestEmail: false,
+    }).success,
+    false
+  )
+})
+
+test('a login recipe form sends only the chosen method’s fields', () => {
+  const link = loginRecipeInput({
+    ...loginRecipeForm(null),
+    codeInput: '#ignored',
+    emailInput: ' [data-testid=email] ',
+    expectedSenders: 'login@acme.test, @mail.acme.test',
+    linkHosts: 'auth.acme.test',
+    linkPaths: '/auth/callback',
+    requestChallenge: '#send',
+    submitPaths: '/api/auth/email',
+  })
+  assert.deepEqual(link.expectedSenders, ['login@acme.test', '@mail.acme.test'])
+  assert.equal(link.recipe.codeInput, undefined)
+  assert.equal(link.recipe.emailInput, '[data-testid=email]')
+  assert.ok(captureLoginRecipeSchema.safeParse(link.recipe).success)
+  const code = loginRecipeInput({
+    ...loginRecipeForm(null),
+    codeInput: '[data-testid=code]',
+    emailInput: '#email',
+    expectedSenders: 'login@acme.test',
+    linkHosts: 'ignored.acme.test',
+    method: 'EMAIL_CODE',
+    requestChallenge: '#send',
+    submitPaths: '/api/auth/email',
+  })
+  assert.equal(code.recipe.codeLength, 6)
+  assert.equal(code.recipe.linkHosts, undefined)
+  assert.ok(captureLoginRecipeSchema.safeParse(code.recipe).success)
+})
+
+test('email sign-in records parse and explain failures without content', () => {
+  const attempt = {
+    completedAt: null,
+    connectionId: 'c1',
+    deadlineAt: '2026-11-25T10:03:00Z',
+    emailReceivedAt: null,
+    emailRequestedAt: '2026-11-25T10:00:00Z',
+    failureCode: null,
+    id: 'a1',
+    mode: 'TEST',
+    safeMessage: 'Waiting.',
+    startedAt: '2026-11-25T10:00:00Z',
+    state: 'WAITING_FOR_EMAIL',
+  }
+  assert.ok(captureAuthAttemptSchema.safeParse(attempt).success)
+  assert.ok(ACTIVE_AUTH_ATTEMPT_STATES.has('WAITING_FOR_EMAIL'))
+  assert.equal(ACTIVE_AUTH_ATTEMPT_STATES.has('SUCCEEDED'), false)
+  assert.match(emailAuthFailureMessage('unsupported_factor'), /person must sign in/)
+  assert.match(emailAuthFailureMessage('something_new'), /something new/)
+})
+
+test('the SDK forwards Resend deliveries to the service route only', async () => {
+  const calls: { url: string; init: RequestInit | undefined }[] = []
+  const sdk = new ScreenshotStudioBackendSDK(
+    'https://backend.test',
+    'service',
+    { display: 'web', kind: 'service', organizationId: '', requestId: 'req-1' },
+    async (url, init) => {
+      calls.push({ init, url: String(url) })
+      return Response.json({ outcome: 'matched' })
+    }
+  )
+  const result = await sdk.receiveCaptureAuthEmail({
+    payload: '{"type":"email.received"}',
+    svixId: 'msg_1',
+    svixSignature: 'v1,abc',
+    svixTimestamp: '1',
+  })
+  assert.equal(result.outcome, 'matched')
+  assert.match(calls[0]!.url, /v1\/internal\/capture-auth\/resend$/)
+  assert.equal(JSON.parse(String(calls[0]!.init?.body)).payload, '{"type":"email.received"}')
 })
