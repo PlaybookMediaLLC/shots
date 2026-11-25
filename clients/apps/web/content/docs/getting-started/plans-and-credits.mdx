@@ -1,0 +1,45 @@
+---
+title: Plans & Credits
+description: Understand Shots workspace plans (Pro, Business, Enterprise), AI credits, monthly quotas, and credit packs.
+keywords:
+  - pricing
+  - plans
+  - billing
+  - credits
+  - quotas
+---
+
+Shots is a paid workspace platform with three plans: **Pro**, **Business**, and **Enterprise**. There is no free plan; a workspace without an active subscription retains only its owner seat and cannot access editors, campaigns, or API operations.
+
+## Plan Overview
+
+| Plan | Monthly price | Annual billing | Included highlights |
+| --- | --- | --- | --- |
+| **Pro** | $29/mo | 15% off billed annually | Full screenshot editor, Store Screenshots, Canvas, Code Studio, image/video tools, content drafts, campaigns, Automate workflows, and REST/MCP API access |
+| **Business** | $79/mo | 15% off billed annually | Higher monthly AI credits, scheduled posts, release emails, concurrent jobs, team seats, and storage quotas |
+| **Enterprise** | From $799/mo (billed annually) | Annual contract | SAML & OIDC SSO, SCIM provisioning, permission groups, white label, audit log retention & SIEM drains, legal hold, highest quotas, and self-hosting with Docker & Helm |
+
+Manage your subscription, payment method, and invoices in **Settings → Billing** (`/settings/billing`). Only workspace owners with `billing:manage` permission can modify billing settings.
+
+## AI Credits & Top-Up Packs
+
+AI-assisted operations—such as drafting a cited launch brief, generating a campaign plan, critiquing visuals, or running autonomous AI capture navigation—consume **AI credits**.
+
+- One AI credit corresponds to **$0.01** of list-price model spend.
+- Monthly plan credits reset at the start of each UTC calendar month.
+- Workspaces on any paid plan can purchase one-time **Launch credit packs** (`500 credits` for `$12`). Pack credits are spent **after** the monthly allowance and **do not expire**.
+
+## Metered Quotas & Enforcement
+
+Workspaces are metered across six quota dimensions:
+
+| Quota key | Scope |
+| --- | --- |
+| `ai:credits:monthly` | Monthly AI credit allowance plus non-expiring credit packs |
+| `posts:monthly` | Scheduled and published social posts per UTC month |
+| `emails:monthly` | Release email deliveries per UTC month |
+| `api:write:minute` | Write requests per minute on workspace API endpoints |
+| `jobs:concurrent` | Concurrent background capture, render, or generation jobs |
+| `storage:bytes` | Total workspace asset and project storage |
+
+When an API request exceeds a plan feature or quota, the server returns a structured JSON error (`403 workspace_feature_not_entitled` or `429` with quota details). See [Errors & Idempotency](/docs/api/errors).

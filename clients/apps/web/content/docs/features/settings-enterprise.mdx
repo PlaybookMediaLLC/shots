@@ -1,0 +1,28 @@
+---
+title: Enterprise Security & Developer Controls
+description: Configure SAML/OIDC SSO, SCIM provisioning, permission groups, white labeling, audit log SIEM drains, and developer API keys.
+keywords:
+  - enterprise
+  - sso
+  - scim
+  - permission groups
+  - white label
+  - audit log
+  - developer api
+---
+
+## Summary
+
+The **Advanced** settings group holds enterprise identity, access-control, compliance, branding, and developer configuration.
+
+## Sections
+
+| Section | Route | What it controls |
+| --- | --- | --- |
+| **Settings → SSO** | `/settings/sso` | SAML 2.0 and OIDC single sign-on connections, verified domains, and SCIM 2.0 user provisioning |
+| **Settings → Permission groups** | `/settings/permission-groups` | Subtractive access-control groups that restrict specific actions beyond a member's base role |
+| **Settings → White label** | `/settings/white-label` | Replace the Shots wordmark, logo, favicon, and accent colors inside the signed-in workspace |
+| **Settings → Audit log** | `/settings/audit-log` | Searchable append-only audit trail, retention policy (90-day default, extended on Enterprise), legal hold, and signed SIEM drains (Splunk, Datadog, custom HTTPS) |
+| **Settings → Developer API** | `/settings/developers` | Create and revoke workspace API keys (`X-API-Key`), configure outbound webhooks with HMAC secrets, and inspect debug logs |
+
+See [Enterprise SSO & Audit Drains](/docs/guides/enterprise-sso-and-audit) and [Authentication & Rate Limits](/docs/authentication).

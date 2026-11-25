@@ -1,0 +1,23 @@
+---
+title: Release Inbox & Qualification
+description: Collect incoming releases from GitHub, GitLab, webhooks, or manual entry, verify evidence, and decide what deserves a launch.
+keywords:
+  - release inbox
+  - qualification
+  - release lineage
+  - evidence
+---
+
+## Summary
+
+**Release inbox** (`/campaigns/releases`) is where incoming changes land before becoming a launch campaign. Not every merged pull request or internal refactor needs external communication; qualification lets a product owner inspect the evidence, merge or split related changes, and explicitly decide whether a release should be communicated.
+
+## Capabilities
+
+| Capability | Details |
+| --- | --- |
+| Multi-source intake | Receives changes from watched GitHub repositories, GitLab webhooks, generic webhooks, the REST API (`POST /api/v1/releases`), or manual release briefs |
+| Qualification workflow | Review a release at `/releases/[releaseId]` to confirm audience, rollout scope, limitations, and factual evidence before drafting materials |
+| Merge & split lineage | Combine multiple pull requests into one customer-facing release or split a broad release into focused updates while keeping full source lineage |
+| Source hygiene | External web sources are cleaned, labeled as untrusted evidence, and checked for prompt-injection text before any AI step reads them |
+| Fallback from Automate | When no active [Automate workflow](/docs/automate) matches an incoming event, the change waits safely in **Release inbox** for manual kickoff |

@@ -1,0 +1,39 @@
+---
+title: Workspace Setup
+description: Configure general workspace defaults, product pages, brand kits, team members, and publishing profiles.
+keywords:
+  - workspace setup
+  - settings
+  - onboarding
+  - brand kit
+---
+
+Before inviting teammates or enabling automated workflows, configure the workspace foundations in **Settings** (`/settings`).
+
+## Core Workspace Defaults
+
+Open **Settings → General** (`/settings`) to configure:
+
+- **Workspace name, slug, and logo** — identifies the workspace in the switcher, review links, and audit records.
+- **Time zone** — anchors default posting queues, calendar views, and scheduled delivery times.
+- **Release preferences** — sets default behavior for incoming releases and review expectations.
+
+## Product Knowledge & Surfaces
+
+Shots grounds launch copy and visuals in structured workspace context rather than guessing:
+
+1. **Settings → Product** (`/settings/product`): define what your product does, who it serves, and what claims campaigns are allowed to make.
+2. **Settings → Product pages** (`/settings/product-pages`): list the live product routes campaigns should capture, along with freshness status for each screen.
+3. **Settings → Brand voice & visual kits** (`/settings/brand-kit`): configure voice guidelines, banned terms, colors, typography, and visual templates.
+
+## Team Access & Roles
+
+Open **Settings → Members** (`/settings/members`) to invite teammates and assign one of Shots' workspace roles (`owner`, `admin`, `creator`, `approver`, `publisher`, `writer_publisher`, or `viewer`).
+
+On Enterprise workspaces, you can also configure **Settings → Permission groups** to subtract specific capabilities from selected members, **Settings → SSO** for SAML/OIDC and SCIM provisioning, and **Settings → Audit log** for SIEM drains. See [Roles & Permissions](/docs/reference/roles-and-permissions).
+
+## Publishing Profiles & Integrations
+
+- Connect social accounts in **Settings → Channels** (`/settings/channels`).
+- Organize accounts into publishing identities in **Settings → Profiles** (`/settings/publishing-brands`), where each profile carries its own posting schedule, defaults, and writing assistant preferences.
+- Connect GitHub repositories under **Automate → Repositories** (`/workflows/sources`) or set up API keys and webhooks under **Settings → Developer API** (`/settings/developers`).

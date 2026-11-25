@@ -1,0 +1,29 @@
+---
+title: Publish, Calendar & Bulk Tools
+description: Write, collaborate on, schedule, and publish social posts and threads across your connected profiles.
+keywords:
+  - publish
+  - calendar
+  - drafts
+  - scheduling
+  - bulk tools
+  - link checks
+---
+
+## Summary
+
+**Publish** (`/publish`) is Shots' social writing, scheduling, and delivery workspace. Posts are organized by **Profile** (also called a social set in the API), letting teams publish as founders, company handles, or client brands from one place.
+
+## Sub-Views in Publish
+
+| View | Route | What it does |
+| --- | --- | --- |
+| **Posts** | `/publish`, `/publish/[draftId]` | Compose single posts or multi-part threads with rich media, mentions lookup, tags, pin/scratchpad properties, revision recovery, and threaded team comments |
+| **Calendar** | `/publish/calendar` | Drag-and-drop editorial calendar with queue slots, scheduled posts, and internal calendar notes |
+| **Bulk tools** | `/publish/batches`, `/publish/batches/[batchId]` | Import and manage batch drafts and bulk media posts |
+| **Analyze** | `/publish/analyze` | Review post performance, observations, and best posting times — see [Publish Analytics](/docs/features/analytics) |
+| **Link checks** | `/publish/link-checks` | Verify how URLs in your posts resolve as link cards (`og:title`, `og:image`, and broken-page warnings) before publishing |
+
+## Durable Delivery Semantics
+
+Scheduled posts run on Temporal workflows that survive server restarts and transient provider rate limits. Each delivery records per-account receipts and live links. If a social platform returns an ambiguous response, Shots marks the delivery for human verification rather than risking a duplicate post.

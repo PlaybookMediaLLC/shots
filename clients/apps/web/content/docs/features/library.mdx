@@ -1,0 +1,30 @@
+---
+title: Library & Assets
+description: Browse, filter, and reuse saved screenshots, canvases, story sets, store screenshots, code images, uploaded assets, and brand media.
+keywords:
+  - library
+  - assets
+  - projects
+  - media
+  - brand assets
+---
+
+## Summary
+
+**Library** (`/library`) is the workspace repository for everything you have created or uploaded. It unifies editable visual projects and reusable media assets behind one set of filters.
+
+## Library Views
+
+| Category | Route | Contents |
+| --- | --- | --- |
+| **Screenshots** | `/library` | Saved Screenshot Editor projects |
+| **Canvas** | `/library?type=canvas` | Saved Canvas boards |
+| **Story Sets** | `/library?type=story` | Multi-slide carousels and story sets |
+| **Store screenshots** | `/library?type=store` | App Store and Google Play screenshot sets |
+| **Code images** | `/library?type=code` | Saved Code Studio projects |
+| **Assets** | `/library?view=assets` | Uploaded images, videos, and captured product screenshots with alt text |
+| **Brand assets** | `/library?view=brand` | Workspace logos, marks, and brand-kit media |
+
+## Private Workspace Storage
+
+Every uploaded asset and rendered artifact is stored privately per workspace and accessed through short-lived signed URLs (`POST /api/v1/assets/upload-url`, `GET /api/v1/assets/{assetId}/download-url`). Assets support alt-text updates for accessible social publishing and can be referenced across campaigns, drafts, and MCP tools.

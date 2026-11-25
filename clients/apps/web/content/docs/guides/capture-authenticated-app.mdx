@@ -1,0 +1,37 @@
+---
+title: Capture Authenticated Apps
+description: Set up signed-in browser capture with demo credentials, unattended email sign-in, and zero-config AI vision navigation.
+keywords:
+  - signed-in capture
+  - authenticated capture
+  - autonomous ai capture
+  - magic link
+  - email otp
+---
+
+Many meaningful product updates live behind a login wall. Shots lets owners and admins configure **Signed-in capture** (`/workflows/connections`) so campaigns and workflows can screenshot authenticated screens automatically without manual uploads.
+
+## Recommended Practice: Use a Dedicated Demo Account
+
+Always create a dedicated, least-privilege demo or staging account populated with realistic synthetic data—never personal credentials or production customer data.
+
+## Step 1: Create a Signed-In Connection
+
+Open **Automate → Signed-in capture** (`/workflows/connections`) and add a connection for your application's base URL. Choose the sign-in method your app supports:
+
+1. **Email & password:** Provide the login URL and encrypted demo account credentials. Shots signs in automatically inside an isolated Chromium session.
+2. **Unattended email sign-in (magic link or OTP):** Provision a workspace-scoped `@capture` inbox address backed by Resend. Register that address as a demo user in your app. When a capture runs, Shots submits the email, waits for the verification link or OTP code to arrive, and completes sign-in automatically.
+3. **Interactive session capture:** Sign in once through a guided session capture when your app uses a custom login flow; Shots monitors session health and alerts you if re-authentication is required.
+
+## Step 2: Register Product Pages & Capture Goals
+
+Open **Settings → Product pages** (`/settings/product-pages`) and add the routes you want Shots to keep fresh.
+
+With **Zero-Config Autonomous AI Capture**, you do not need CSS selectors or brittle Playwright scripts:
+
+- Describe the screen or UI state you want in plain language (for example, *"Open the Analytics tab, switch the range to 30 days, and expand the conversion chart"*).
+- For multi-screen features, define a **capture sequence** so Shots steps through each view in order during one browser session.
+
+## Step 3: Verify & Attach to Campaigns
+
+Run a test capture directly from the connection or product page view to inspect the resulting screenshot and step trace. Verified captures save automatically to **Library → Assets** and are reused whenever a campaign or Automate workflow references that product page.

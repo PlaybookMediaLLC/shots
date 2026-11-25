@@ -1,0 +1,43 @@
+---
+title: Enterprise SSO & Audit Drains
+description: Configure SAML/OIDC single sign-on, SCIM provisioning, subtractive permission groups, white labeling, and SIEM audit log drains.
+keywords:
+  - enterprise
+  - sso
+  - saml
+  - oidc
+  - scim
+  - siem
+  - audit log
+---
+
+Enterprise workspaces include dedicated identity, access-control, compliance, and branding controls under **Settings** (`/settings`).
+
+## 1. Configure SAML 2.0 or OIDC SSO
+
+Open **Settings → SSO** (`/settings/sso`):
+
+1. Verify your organization's email domain(s).
+2. Register your identity provider (Okta, Microsoft Entra ID, Google Workspace, or any standard SAML 2.0 / OIDC IdP).
+3. Test sign-in with an admin account before enforcing SSO for all members.
+
+For password-based accounts without SSO, members can enroll TOTP two-factor authentication under **Settings → Security** (`/settings/security`).
+
+## 2. Enable SCIM 2.0 Provisioning
+
+From **Settings → SSO**, generate a SCIM bearer token and configure your IdP to automatically provision, update, and deprovision workspace members as people join or leave your company.
+
+## 3. Apply Permission Groups
+
+Shots roles define baseline capabilities (`owner`, `admin`, `creator`, `approver`, `publisher`, `writer_publisher`, `viewer`). On Enterprise plans, **Settings → Permission groups** (`/settings/permission-groups`) lets admins create **subtractive** restriction groups that deny specific permissions beyond a member's base role—groups only subtract and never widen access.
+
+## 4. Stream Audit Logs to Your SIEM
+
+Open **Settings → Audit log** (`/settings/audit-log`):
+
+- Browse and filter the append-only audit trail (with hashed IPs and 90-day default retention, extendable with legal hold).
+- Configure signed HTTPS audit log drains to **Splunk**, **Datadog**, or any custom SIEM webhook endpoint.
+
+## 5. Customize Workspace Branding
+
+Open **Settings → White label** (`/settings/white-label`) to configure your organization's name, logo, favicon, and accent palette across the signed-in app.

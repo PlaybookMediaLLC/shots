@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { needsSignIn } from '@/lib/auth/sign-in-gate'
+import { getDocsPageEntries } from '@/lib/docs/source'
 import { platformPagePathSchema } from '@/lib/marketing/platform-pages'
 import { SITE_URL } from '@/lib/seo/metadata'
 import { LAST_UPDATED_ISO } from '@/lib/seo/changelog'
@@ -34,10 +35,6 @@ const STATIC_PATHS = [
   '/guides',
   '/changelog',
 
-  '/docs',
-  '/docs/authentication',
-  '/docs/agents',
-  '/docs/automate',
   '/developers',
   '/api-reference',
 
@@ -56,11 +53,14 @@ function lastModifiedFor(path: string): string {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const paths = [
-    ...STATIC_PATHS,
-    ...platformPagePathSchema.options,
-    ...TOOLS.map((tool) => tool.slug),
-    ...getAllComparisonSlugs().map((slug) => `/compare/${slug}`),
-    ...guides.map((guide) => `/guides/${guide.slug}`),
+    ...new Set([
+      ...STATIC_PATHS,
+      ...getDocsPageEntries().map((entry) => entry.url),
+      ...platformPagePathSchema.options,
+      ...TOOLS.map((tool) => tool.slug),
+      ...getAllComparisonSlugs().map((slug) => `/compare/${slug}`),
+      ...guides.map((guide) => `/guides/${guide.slug}`),
+    ]),
   ]
 
   // Pages behind sign-in redirect crawlers, so they stay out of the sitemap.
