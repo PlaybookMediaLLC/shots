@@ -105,6 +105,18 @@ func (f AssetFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AssetMutation", m)
 }
 
+// The AssistantThreadFunc type is an adapter to allow the use of ordinary
+// function as AssistantThread mutator.
+type AssistantThreadFunc func(context.Context, *ent.AssistantThreadMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AssistantThreadFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AssistantThreadMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AssistantThreadMutation", m)
+}
+
 // The AudienceSubscriberFunc type is an adapter to allow the use of ordinary
 // function as AudienceSubscriber mutator.
 type AudienceSubscriberFunc func(context.Context, *ent.AudienceSubscriberMutation) (ent.Value, error)

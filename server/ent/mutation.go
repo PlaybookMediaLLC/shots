@@ -20,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/approval"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/assistantthread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/audiencesubscriber"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdrain"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdraindelivery"
@@ -227,6 +228,7 @@ const (
 	TypeApikey                          = "Apikey"
 	TypeApproval                        = "Approval"
 	TypeAsset                           = "Asset"
+	TypeAssistantThread                 = "AssistantThread"
 	TypeAudienceSubscriber              = "AudienceSubscriber"
 	TypeAuditDrain                      = "AuditDrain"
 	TypeAuditDrainDelivery              = "AuditDrainDelivery"
@@ -8543,6 +8545,624 @@ func (m *AssetMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Asset edge %s", name)
+}
+
+// AssistantThreadMutation represents an operation that mutates the AssistantThread nodes in the graph.
+type AssistantThreadMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *string
+	organization_id *string
+	user_id         *string
+	title           *string
+	entries         *json.RawMessage
+	appendentries   json.RawMessage
+	created_at      *time.Time
+	updated_at      *time.Time
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*AssistantThread, error)
+	predicates      []predicate.AssistantThread
+}
+
+var _ ent.Mutation = (*AssistantThreadMutation)(nil)
+
+// assistantthreadOption allows management of the mutation configuration using functional options.
+type assistantthreadOption func(*AssistantThreadMutation)
+
+// newAssistantThreadMutation creates new mutation for the AssistantThread entity.
+func newAssistantThreadMutation(c config, op Op, opts ...assistantthreadOption) *AssistantThreadMutation {
+	m := &AssistantThreadMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAssistantThread,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAssistantThreadID sets the ID field of the mutation.
+func withAssistantThreadID(id string) assistantthreadOption {
+	return func(m *AssistantThreadMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AssistantThread
+		)
+		m.oldValue = func(ctx context.Context) (*AssistantThread, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AssistantThread.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAssistantThread sets the old AssistantThread of the mutation.
+func withAssistantThread(node *AssistantThread) assistantthreadOption {
+	return func(m *AssistantThreadMutation) {
+		m.oldValue = func(context.Context) (*AssistantThread, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AssistantThreadMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AssistantThreadMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of AssistantThread entities.
+func (m *AssistantThreadMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AssistantThreadMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AssistantThreadMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AssistantThread.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *AssistantThreadMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *AssistantThreadMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *AssistantThreadMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *AssistantThreadMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *AssistantThreadMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *AssistantThreadMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetTitle sets the "title" field.
+func (m *AssistantThreadMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *AssistantThreadMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *AssistantThreadMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetEntries sets the "entries" field.
+func (m *AssistantThreadMutation) SetEntries(jm json.RawMessage) {
+	m.entries = &jm
+	m.appendentries = nil
+}
+
+// Entries returns the value of the "entries" field in the mutation.
+func (m *AssistantThreadMutation) Entries() (r json.RawMessage, exists bool) {
+	v := m.entries
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEntries returns the old "entries" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldEntries(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEntries is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEntries requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEntries: %w", err)
+	}
+	return oldValue.Entries, nil
+}
+
+// AppendEntries adds jm to the "entries" field.
+func (m *AssistantThreadMutation) AppendEntries(jm json.RawMessage) {
+	m.appendentries = append(m.appendentries, jm...)
+}
+
+// AppendedEntries returns the list of values that were appended to the "entries" field in this mutation.
+func (m *AssistantThreadMutation) AppendedEntries() (json.RawMessage, bool) {
+	if len(m.appendentries) == 0 {
+		return nil, false
+	}
+	return m.appendentries, true
+}
+
+// ResetEntries resets all changes to the "entries" field.
+func (m *AssistantThreadMutation) ResetEntries() {
+	m.entries = nil
+	m.appendentries = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AssistantThreadMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AssistantThreadMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AssistantThreadMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AssistantThreadMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AssistantThreadMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AssistantThread entity.
+// If the AssistantThread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AssistantThreadMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AssistantThreadMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the AssistantThreadMutation builder.
+func (m *AssistantThreadMutation) Where(ps ...predicate.AssistantThread) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AssistantThreadMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AssistantThreadMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AssistantThread, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AssistantThreadMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AssistantThreadMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AssistantThread).
+func (m *AssistantThreadMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AssistantThreadMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.organization_id != nil {
+		fields = append(fields, assistantthread.FieldOrganizationID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, assistantthread.FieldUserID)
+	}
+	if m.title != nil {
+		fields = append(fields, assistantthread.FieldTitle)
+	}
+	if m.entries != nil {
+		fields = append(fields, assistantthread.FieldEntries)
+	}
+	if m.created_at != nil {
+		fields = append(fields, assistantthread.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, assistantthread.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AssistantThreadMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case assistantthread.FieldOrganizationID:
+		return m.OrganizationID()
+	case assistantthread.FieldUserID:
+		return m.UserID()
+	case assistantthread.FieldTitle:
+		return m.Title()
+	case assistantthread.FieldEntries:
+		return m.Entries()
+	case assistantthread.FieldCreatedAt:
+		return m.CreatedAt()
+	case assistantthread.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AssistantThreadMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case assistantthread.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case assistantthread.FieldUserID:
+		return m.OldUserID(ctx)
+	case assistantthread.FieldTitle:
+		return m.OldTitle(ctx)
+	case assistantthread.FieldEntries:
+		return m.OldEntries(ctx)
+	case assistantthread.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case assistantthread.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown AssistantThread field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AssistantThreadMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case assistantthread.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case assistantthread.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case assistantthread.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case assistantthread.FieldEntries:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEntries(v)
+		return nil
+	case assistantthread.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case assistantthread.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AssistantThread field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AssistantThreadMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AssistantThreadMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AssistantThreadMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown AssistantThread numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AssistantThreadMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AssistantThreadMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AssistantThreadMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown AssistantThread nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AssistantThreadMutation) ResetField(name string) error {
+	switch name {
+	case assistantthread.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case assistantthread.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case assistantthread.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case assistantthread.FieldEntries:
+		m.ResetEntries()
+		return nil
+	case assistantthread.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case assistantthread.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AssistantThread field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AssistantThreadMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AssistantThreadMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AssistantThreadMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AssistantThreadMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AssistantThreadMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AssistantThreadMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AssistantThreadMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AssistantThread unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AssistantThreadMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AssistantThread edge %s", name)
 }
 
 // AudienceSubscriberMutation represents an operation that mutates the AudienceSubscriber nodes in the graph.

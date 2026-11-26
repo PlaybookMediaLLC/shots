@@ -30,6 +30,9 @@ type Approval func(*sql.Selector)
 // Asset is the predicate function for asset builders.
 type Asset func(*sql.Selector)
 
+// AssistantThread is the predicate function for assistantthread builders.
+type AssistantThread func(*sql.Selector)
+
 // AudienceSubscriber is the predicate function for audiencesubscriber builders.
 type AudienceSubscriber func(*sql.Selector)
 

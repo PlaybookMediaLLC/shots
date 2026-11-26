@@ -114,6 +114,10 @@ type ConfigurationStore interface {
 	GetConversation(context.Context, product.Actor, string) (*product.ConversationDetail, error)
 	AppendConversationMessage(context.Context, product.Actor, string, product.AppendConversationMessageInput) (*product.ConversationMessageRecord, error)
 	UpdateConversation(context.Context, product.Actor, string, product.UpdateConversationInput) (*product.ConversationRecord, error)
+	ListAssistantThreads(context.Context, product.Actor) ([]product.AssistantThreadRecord, error)
+	GetAssistantThread(context.Context, product.Actor, string) (*product.AssistantThreadRecord, error)
+	SaveAssistantThread(context.Context, product.Actor, string, product.SaveAssistantThreadInput) (*product.AssistantThreadRecord, error)
+	DeleteAssistantThread(context.Context, product.Actor, string) error
 	ListAuditDrains(context.Context, product.Actor) ([]product.AuditDrainRecord, error)
 	CreateAuditDrain(context.Context, product.Actor, product.CreateAuditDrainInput, product.AuditRequest) (*product.AuditDrainRecord, error)
 	DeleteAuditDrain(context.Context, product.Actor, string, product.AuditRequest) error
@@ -363,6 +367,7 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerStoreScreenshots(mux)
 		s.registerLaunch(mux)
 		s.registerConversations(mux)
+		s.registerAssistantThreads(mux)
 		s.registerPlatformControls(mux)
 		s.registerPermissionGroups(mux)
 		s.registerGitHub(mux)
