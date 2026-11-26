@@ -68,6 +68,23 @@ test(
 )
 
 test(
+  'a refused AI request says why and leaves the post as it was',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    const editor = await start(page, 'We shipped faster exports')
+    await page.route('**/api/ai/document?**', (route) =>
+      route.fulfill({ json: { error: 'Too many AI requests.' }, status: 429 })
+    )
+    await page.keyboard.press('ControlOrMeta+j')
+    await prompt(page).fill('Write a closing line')
+    await page.keyboard.press('Enter')
+    await expect(page.getByText('Too many AI requests.')).toBeVisible()
+    await expect(editor).toContainText('We shipped faster exports')
+  }
+)
+
+test(
   'typing offers an inline suggestion that Tab accepts',
   { tag: '@journey' },
   async ({ page, startWorkspace }) => {

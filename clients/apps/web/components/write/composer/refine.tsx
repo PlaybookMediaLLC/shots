@@ -140,6 +140,7 @@ export function RefineProvider({
 }) {
   const { mod } = useKeys()
   const [busy, setBusy] = React.useState(false)
+  const running = React.useRef(false)
   const [review, setReview] = React.useState<{
     action: RefineAction
     prompt?: string
@@ -148,7 +149,8 @@ export function RefineProvider({
   } | null>(null)
   const open = (where?: string) => {
     const current = editor.current
-    if (!current) return
+    // A read-only editor loads no AI plugin.
+    if (!current?.plugins.aiChat) return
     if (where?.startsWith('post-')) {
       const [, end] = postRanges(current.children)[Number(where.slice(5)) - 1] ?? [0, 0]
       if (end) current.tf.select(current.api.end([end - 1])!)
@@ -165,6 +167,11 @@ export function RefineProvider({
   const run = async ({ action, prompt: instruction, scope: asked, target }: RefineRun) => {
     const current = editor.current
     if (!current) return
+    // A second run would charge again and replace the first answer's review.
+    if (running.current) {
+      toast.info('The AI is still rewriting. Wait for it to finish.')
+      return
+    }
     const post = caretPost(current)
     const selected = Boolean(current.selection && !current.api.isCollapsed())
     const within = asked ?? (selected ? 'selection' : 'post')
@@ -202,7 +209,9 @@ export function RefineProvider({
       return
     }
     const writes = request.kind === 'version' ? request.target : channel
+    running.current = true
     setBusy(true)
+    const waiting = toast.loading('Rewriting…')
     try {
       const answer = await call<{ texts: string[] }>('/api/v1/content-drafts/refine', {
         body: {
@@ -220,6 +229,8 @@ export function RefineProvider({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The AI could not answer.')
     } finally {
+      toast.dismiss(waiting)
+      running.current = false
       setBusy(false)
     }
   }

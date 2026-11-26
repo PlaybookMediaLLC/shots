@@ -6,15 +6,15 @@ import {
   AIChatPlugin,
   AIPlugin,
   applyAISuggestions,
-  rejectAISuggestions,
   streamInsertChunk,
   useChatChunk,
 } from "@platejs/ai/react";
-import { type Descendant, KEYS, PathApi } from "platejs";
-import { usePluginOption } from "platejs/react";
+import { KEYS, PathApi } from "platejs";
+import { type PlateEditor, usePluginOption } from "platejs/react";
 import type React from "react";
 import { useEffect } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
+import { aiWriter, discardOwnAI, recordAISuggestions } from "./ai-ownership";
 import { AIMenu } from "../ui/ai-menu";
 import { AIAnchorElement, AILeaf } from "../ui/ai-node";
 import { CursorOverlayKit } from "./cursor-overlay-kit";
@@ -25,7 +25,9 @@ const applyStreamingEdit = (
   content: string,
   split: boolean
 ): void => {
-  withAIBatch(editor, () => applyAISuggestions(editor, content), { split });
+  recordAISuggestions(editor as PlateEditor, () =>
+    withAIBatch(editor, () => applyAISuggestions(editor, content), { split })
+  );
 };
 
 export const aiChatPlugin = AIChatPlugin.extend({
@@ -109,6 +111,7 @@ export const aiChatPlugin = AIChatPlugin.extend({
               streamInsertChunk(editor, chunk, {
                 textProps: {
                   ai: true,
+                  aiBy: aiWriter(editor).id,
                 },
               });
 
@@ -135,29 +138,12 @@ export const aiChatPlugin = AIChatPlugin.extend({
 });
 
 /**
- * Takes back what the AI has written and the writer has not accepted: its
- * blocks, its text and its pending suggestions. Upstream undoes the last
- * history batch instead. In a shared document that history also holds what was
- * typed just before, so discarding erased the writer's own words.
+ * Discarding takes back this editor's own unaccepted AI text. Upstream undoes
+ * the last history batch, which in a shared document also held typed words.
  */
 const DiscardingAIPlugin = AIPlugin.withComponent(AILeaf).extendTransforms(
   ({ editor }) => ({
-    undo: () => {
-      editor.tf.withoutNormalizing(() => {
-        const written = (node: Descendant): boolean =>
-          "text" in node
-            ? Boolean(node.ai) || node.text === ""
-            : node.children.every(written);
-        const marked = (node: Descendant): boolean =>
-          "text" in node ? Boolean(node.ai) : node.children.some(marked);
-        for (let index = editor.children.length - 1; index >= 0; index -= 1) {
-          const block = editor.children[index]!;
-          if (marked(block) && written(block)) editor.tf.removeNodes({ at: [index] });
-        }
-        editor.tf.removeNodes({ at: [], match: (node) => Boolean(node.ai) });
-        if (editor.plugins[KEYS.suggestion]) rejectAISuggestions(editor);
-      });
-    },
+    undo: () => discardOwnAI(editor),
   })
 );
 

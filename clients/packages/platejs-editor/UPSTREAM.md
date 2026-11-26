@@ -153,9 +153,10 @@ Post editor (the Write brief: one look with the app, a social slash menu):
 - `src/ui/ai-menu.tsx`: the menu's items show before the first request (upstream
   hid them until an answer existed); "Review and comment" is new; the prompt box
   has no focus outline of its own.
-- `src/components/use-chat.ts`: `data-comment` and `data-reviewed` parts become
+- `src/components/use-chat.ts`: a failed request shows its reason; `data-comment` and `data-reviewed` parts become
   comment events and a notice.
-- `src/plugins/ai-kit.tsx`: discarding removes the AI's unaccepted text. Upstream
+- `src/plugins/ai-kit.tsx`, `src/plugins/ai-ownership.ts` (new): discarding
+  removes only this editor's unaccepted AI text, by an `aiBy` stamp. Upstream
   undid the last history batch, which in a shared document also erased typing.
 
 ## Pulling a later fix from oppulence-canvas

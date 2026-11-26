@@ -44,6 +44,7 @@ import {
 } from "../lib/editor-services";
 import { cn } from "../lib/utils";
 
+import { keepOwnAI } from "../plugins/ai-ownership";
 import { AIChatEditor } from "./ai-chat-editor";
 import { Button } from "./button";
 import {
@@ -295,6 +296,8 @@ const aiChatItems = {
     value: "accept",
     onSelect: ({ editor }) => {
       emitQuality(editor, "accepted");
+      // Kept text is the writer's now: the discard that follows must miss it.
+      keepOwnAI(editor);
       editor.getTransforms(AIChatPlugin).aiChat.accept();
       if (editor.selection) {
         editor.tf.focus({ at: editor.api.end(editor.selection) });

@@ -129,6 +129,17 @@ const requestToolName = (
 const unconfiguredFetch: typeof globalThis.fetch = () =>
   Promise.reject(new Error("AI assistance is not available in this editor."));
 
+/** The route's `error` text when it sent one, else a plain sentence. */
+const failureMessage = (error: Error): string => {
+  try {
+    const body = JSON.parse(error.message) as { error?: unknown };
+    if (typeof body.error === "string") return body.error;
+  } catch {
+    // Not the route's JSON: a network or stream failure.
+  }
+  return "The AI could not answer. Try again.";
+};
+
 export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   const { editor, setOption } = useEditorPlugin(AIChatPlugin);
   const [input, setInput] = useState("");
@@ -174,6 +185,11 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   );
   const chat = useBaseChat<EditorUIMessage>({
     id: "editor",
+    onError: (error) => {
+      // The half-written answer goes, and the writer learns why.
+      toast.error(failureMessage(error));
+      editor.getApi(AIChatPlugin).aiChat.hide();
+    },
     onData: (part) => {
       if (part.type === "data-comment") {
         const comment = EditorReviewCommentSchema.safeParse(part.data);
