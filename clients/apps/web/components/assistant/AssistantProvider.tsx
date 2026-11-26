@@ -10,8 +10,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AbilityRun, AssistantAbility } from '@/lib/assistant/ability'
-import type { PageEntity } from '@/lib/assistant/page-context'
+import type {
+  AbilityRun,
+  AssistantAbility,
+  AssistantPresentationMode,
+  AssistantQuickAction,
+} from '@/lib/assistant/ability'
+import type { AssistantSurfaceKind, PageEntity } from '@/lib/assistant/page-context'
 
 /** What a page adds to the address and title the bar already knows. */
 export type PageContextPart = { facts?: string[]; entities?: PageEntity[] }
@@ -85,18 +90,22 @@ export function useAssistantRegistry(): RegistryState | null {
 
 /**
  * Tell the assistant what this page shows: short facts and the items open
- * on it. Kept while the calling component is mounted.
+ * on it. Kept while the calling component is mounted and `active` is true.
  */
-export function useAssistantPage(part: PageContextPart) {
+export function useAssistantPage(part: PageContextPart, active = true) {
   const setPart = useContext(Actions)?.setPart
   const key = useId()
   // Re-registers only when the content changes, not on every render.
   const json = JSON.stringify(part)
   useEffect(() => {
     if (!setPart) return
+    if (!active) {
+      setPart(key, null)
+      return
+    }
     setPart(key, JSON.parse(json) as PageContextPart)
     return () => setPart(key, null)
-  }, [setPart, key, json])
+  }, [setPart, key, json, active])
 }
 
 /** {@link useAssistantPage} for server pages: renders nothing. */
@@ -106,40 +115,79 @@ export function AssistantPageContext(part: PageContextPart) {
 }
 
 /**
- * Offer an ability on this page while the calling component is mounted; null
- * offers none. Only its description re-registers; `run` always calls the
- * latest one, so it may close over fresh state.
+ * Offer an ability on this page while the calling component is mounted and
+ * `active` is true; null offers none. Only its description re-registers; `run`
+ * always calls the latest closure, so it reads fresh state.
  */
-export function useAssistantAbility(ability: AssistantAbility | null) {
+export function useAssistantAbility(ability: AssistantAbility | null, active = true) {
   const setAbility = useContext(Actions)?.setAbility
   const key = useId()
   const latest = useRef(ability)
   useEffect(() => {
     latest.current = ability
   })
-  const id = ability?.id
+  const id = active ? ability?.id : undefined
   const label = ability?.label ?? ''
   const placeholder = ability?.placeholder ?? ''
   const priority = ability?.priority ?? 0
   const prominent = ability?.prominent ?? false
-  // A string, so a fresh array with the same asks does not re-register.
+  const surface: AssistantSurfaceKind | undefined = ability?.surface
+  const preferredMode: AssistantPresentationMode | undefined = ability?.preferredMode
+  const selection = ability?.selection ?? null
+  const target = ability?.target
+  // Serialised, so fresh arrays with identical values do not re-register.
   const suggestions = JSON.stringify(ability?.suggestions ?? [])
+  const quickActions = JSON.stringify(ability?.quickActions ?? [])
+  const prompts = JSON.stringify(ability?.prompts ?? [])
+  const setupHref = ability?.setupLink?.href
+  const setupLabel = ability?.setupLink?.label
   useEffect(() => {
-    if (!setAbility || !id) return
+    if (!setAbility) return
+    if (!id) {
+      setAbility(key, null)
+      return
+    }
+    const parsedQuickActions = JSON.parse(quickActions) as AssistantQuickAction[]
     setAbility(key, {
       id,
       label,
       placeholder,
+      ...(preferredMode ? { preferredMode } : {}),
       priority,
       prominent,
-      suggestions: JSON.parse(suggestions) as string[],
+      ...(parsedQuickActions.length > 0 ? { quickActions: parsedQuickActions } : {}),
+      ...(prompts !== '[]'
+        ? { prompts: JSON.parse(prompts) as NonNullable<AssistantAbility['prompts']> }
+        : {}),
+      ...(setupHref && setupLabel ? { setupLink: { href: setupHref, label: setupLabel } } : {}),
       run: (run: AbilityRun) => {
         if (!latest.current) throw new Error('This is no longer available here.')
         return latest.current.run(run)
       },
+      ...(selection !== null ? { selection } : {}),
+      suggestions: JSON.parse(suggestions) as string[],
+      ...(surface ? { surface } : {}),
+      ...(target ? { target } : {}),
     })
     return () => setAbility(key, null)
-  }, [setAbility, key, id, label, placeholder, priority, prominent, suggestions])
+  }, [
+    setAbility,
+    key,
+    id,
+    label,
+    placeholder,
+    preferredMode,
+    priority,
+    prominent,
+    prompts,
+    quickActions,
+    setupHref,
+    setupLabel,
+    selection,
+    suggestions,
+    surface,
+    target,
+  ])
 }
 
 /**

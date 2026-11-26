@@ -20,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/approval"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/assistantthread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/audiencesubscriber"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdrain"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdraindelivery"
@@ -262,6 +263,7 @@ func checkColumn(t, c string) error {
 			apikey.Table:                          apikey.ValidColumn,
 			approval.Table:                        approval.ValidColumn,
 			asset.Table:                           asset.ValidColumn,
+			assistantthread.Table:                 assistantthread.ValidColumn,
 			audiencesubscriber.Table:              audiencesubscriber.ValidColumn,
 			auditdrain.Table:                      auditdrain.ValidColumn,
 			auditdraindelivery.Table:              auditdraindelivery.ValidColumn,

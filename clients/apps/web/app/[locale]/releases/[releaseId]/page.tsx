@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Suspense } from 'react'
 import { ReleaseQualificationSection } from '@/components/releases/ReleaseQualificationSection'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import { CampaignStatusPill } from '@/components/campaigns/CampaignStatusPill'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Group, Page, Pill, type PillTone, Row, Section } from '@/components/platform-ui'
@@ -93,6 +94,10 @@ export default async function ReleasePage({
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization.name}
     >
+      <AssistantPageContext
+        entities={[{ id: release.id, name: release.title, type: 'release' }]}
+        facts={[`A release, status ${status.label}. Its evidence and approvals are decided on this page.`]}
+      />
       <Page
         title={release.title}
         width="md"

@@ -6,7 +6,7 @@ import { editorAskHref } from '@/lib/ai/editor-ask'
 
 /**
  * Create's assistant ability: describe a visual, and a new screenshot opens
- * with the editor's copilot holding the request (EditorAiPanel reads `ask`).
+ * with the editor's copilot holding the request (the assistant bar reads `ask`).
  * Rendered only for members who may edit.
  */
 export function CreateVisualAbility() {

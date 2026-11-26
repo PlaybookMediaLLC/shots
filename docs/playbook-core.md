@@ -306,19 +306,23 @@ product shots and Directions is hidden.
 
 ### In-editor AI
 
-The editor has an AI panel (the **AI** button, or ⌘K) for signed-in workspace
-members when `OPENROUTER_API_KEY` is set. It is built on the same design layer
-as the campaign agent:
+Signed-in workspace members get one assistant on every page and editor when
+`OPENROUTER_API_KEY` is set. Open it with **Ask AI**, ⌘J, or the editor's
+**AI** button. It is built on the same design layer as the campaign agent:
 
-- **Copilot.** A conversation that edits the live canvas. `/api/ai/editor` runs
-  the model; the editing tools (`inspectCanvas`, `applyChanges`,
-  `undoLastChange`) have no server `execute`, so each call returns to the
-  browser. There it runs through the editor's own store actions
-  (`applyDesignChanges`), and the result goes back with a canvas snapshot so
-  the model checks its work. Each change is one undo step. The route charges
-  `ai:credits:monthly` for each round trip's model calls, caps round trips per
-  request, accepts only user/assistant/tool messages, and drops all but the
-  newest snapshot to bound cost.
+- **One turn route.** `POST /api/ai/assistant` streams newline-delimited lines:
+  text, tool steps, then the reply. The model gets the workspace tools and the
+  tools of the open surface. Surface tools have no server `execute`. Each call
+  returns to the browser, which runs it with the editor's own actions and sends
+  the result back. Surface tools need `artifact:edit`. Every round trip is rate
+  limited and charged to `ai:credits:monthly`.
+- **Surfaces.** The screenshot editor, Canvas, Store screenshots, Story Sets,
+  Code Studio and the post composer each register their tools. Typed command
+  schemas limit what the model may change. None of them deletes work.
+- **Saved chats.** Go keeps the words and links of each person's last 30
+  chats in a workspace (`assistant_thread`). Cards and Undo are not saved.
+- **Attachments.** A message may carry up to three inline images. The server
+  refuses a file that names an address. A voice memo becomes text to review.
 - **Scoped commands.** ⌘K opens the copilot on the selected text, device,
   overlay, annotation, or main image, and the agent changes only that element.
   Selection is read from the stores and from the DOM markers the canvas

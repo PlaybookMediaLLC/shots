@@ -23,6 +23,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/approval"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/assistantthread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/audiencesubscriber"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdrain"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdraindelivery"
@@ -219,6 +220,8 @@ type Client struct {
 	Approval *ApprovalClient
 	// Asset is the client for interacting with the Asset builders.
 	Asset *AssetClient
+	// AssistantThread is the client for interacting with the AssistantThread builders.
+	AssistantThread *AssistantThreadClient
 	// AudienceSubscriber is the client for interacting with the AudienceSubscriber builders.
 	AudienceSubscriber *AudienceSubscriberClient
 	// AuditDrain is the client for interacting with the AuditDrain builders.
@@ -584,6 +587,7 @@ func (c *Client) init() {
 	c.Apikey = NewApikeyClient(c.config)
 	c.Approval = NewApprovalClient(c.config)
 	c.Asset = NewAssetClient(c.config)
+	c.AssistantThread = NewAssistantThreadClient(c.config)
 	c.AudienceSubscriber = NewAudienceSubscriberClient(c.config)
 	c.AuditDrain = NewAuditDrainClient(c.config)
 	c.AuditDrainDelivery = NewAuditDrainDeliveryClient(c.config)
@@ -857,6 +861,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Apikey:                          NewApikeyClient(cfg),
 		Approval:                        NewApprovalClient(cfg),
 		Asset:                           NewAssetClient(cfg),
+		AssistantThread:                 NewAssistantThreadClient(cfg),
 		AudienceSubscriber:              NewAudienceSubscriberClient(cfg),
 		AuditDrain:                      NewAuditDrainClient(cfg),
 		AuditDrainDelivery:              NewAuditDrainDeliveryClient(cfg),
@@ -1057,6 +1062,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Apikey:                          NewApikeyClient(cfg),
 		Approval:                        NewApprovalClient(cfg),
 		Asset:                           NewAssetClient(cfg),
+		AssistantThread:                 NewAssistantThreadClient(cfg),
 		AudienceSubscriber:              NewAudienceSubscriberClient(cfg),
 		AuditDrain:                      NewAuditDrainClient(cfg),
 		AuditDrainDelivery:              NewAuditDrainDeliveryClient(cfg),
@@ -1261,9 +1267,9 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AccountDeletionRequest, c.AgentAuthorization, c.AnalyticsAccount,
 		c.AnalyticsPost, c.AnalyticsSnapshot, c.Apikey, c.Approval, c.Asset,
-		c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery, c.AuditLog,
-		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
-		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
+		c.AssistantThread, c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery,
+		c.AuditLog, c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent,
+		c.BrandKit, c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
 		c.CaptureAttempt, c.CaptureAuthAttempt, c.CaptureAuthRecipeVersion,
 		c.CaptureEmailAuthConfig, c.CaptureInboundReceipt, c.CaptureJob,
@@ -1326,9 +1332,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AccountDeletionRequest, c.AgentAuthorization, c.AnalyticsAccount,
 		c.AnalyticsPost, c.AnalyticsSnapshot, c.Apikey, c.Approval, c.Asset,
-		c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery, c.AuditLog,
-		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
-		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
+		c.AssistantThread, c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery,
+		c.AuditLog, c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent,
+		c.BrandKit, c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
 		c.CaptureAttempt, c.CaptureAuthAttempt, c.CaptureAuthRecipeVersion,
 		c.CaptureEmailAuthConfig, c.CaptureInboundReceipt, c.CaptureJob,
@@ -1404,6 +1410,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Approval.mutate(ctx, m)
 	case *AssetMutation:
 		return c.Asset.mutate(ctx, m)
+	case *AssistantThreadMutation:
+		return c.AssistantThread.mutate(ctx, m)
 	case *AudienceSubscriberMutation:
 		return c.AudienceSubscriber.mutate(ctx, m)
 	case *AuditDrainMutation:
@@ -2848,6 +2856,139 @@ func (c *AssetClient) mutate(ctx context.Context, m *AssetMutation) (Value, erro
 		return (&AssetDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Asset mutation op: %q", m.Op())
+	}
+}
+
+// AssistantThreadClient is a client for the AssistantThread schema.
+type AssistantThreadClient struct {
+	config
+}
+
+// NewAssistantThreadClient returns a client for the AssistantThread from the given config.
+func NewAssistantThreadClient(c config) *AssistantThreadClient {
+	return &AssistantThreadClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `assistantthread.Hooks(f(g(h())))`.
+func (c *AssistantThreadClient) Use(hooks ...Hook) {
+	c.hooks.AssistantThread = append(c.hooks.AssistantThread, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `assistantthread.Intercept(f(g(h())))`.
+func (c *AssistantThreadClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AssistantThread = append(c.inters.AssistantThread, interceptors...)
+}
+
+// Create returns a builder for creating a AssistantThread entity.
+func (c *AssistantThreadClient) Create() *AssistantThreadCreate {
+	mutation := newAssistantThreadMutation(c.config, OpCreate)
+	return &AssistantThreadCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AssistantThread entities.
+func (c *AssistantThreadClient) CreateBulk(builders ...*AssistantThreadCreate) *AssistantThreadCreateBulk {
+	return &AssistantThreadCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AssistantThreadClient) MapCreateBulk(slice any, setFunc func(*AssistantThreadCreate, int)) *AssistantThreadCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AssistantThreadCreateBulk{err: fmt.Errorf("calling to AssistantThreadClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AssistantThreadCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AssistantThreadCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AssistantThread.
+func (c *AssistantThreadClient) Update() *AssistantThreadUpdate {
+	mutation := newAssistantThreadMutation(c.config, OpUpdate)
+	return &AssistantThreadUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AssistantThreadClient) UpdateOne(_m *AssistantThread) *AssistantThreadUpdateOne {
+	mutation := newAssistantThreadMutation(c.config, OpUpdateOne, withAssistantThread(_m))
+	return &AssistantThreadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AssistantThreadClient) UpdateOneID(id string) *AssistantThreadUpdateOne {
+	mutation := newAssistantThreadMutation(c.config, OpUpdateOne, withAssistantThreadID(id))
+	return &AssistantThreadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AssistantThread.
+func (c *AssistantThreadClient) Delete() *AssistantThreadDelete {
+	mutation := newAssistantThreadMutation(c.config, OpDelete)
+	return &AssistantThreadDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AssistantThreadClient) DeleteOne(_m *AssistantThread) *AssistantThreadDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AssistantThreadClient) DeleteOneID(id string) *AssistantThreadDeleteOne {
+	builder := c.Delete().Where(assistantthread.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AssistantThreadDeleteOne{builder}
+}
+
+// Query returns a query builder for AssistantThread.
+func (c *AssistantThreadClient) Query() *AssistantThreadQuery {
+	return &AssistantThreadQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAssistantThread},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AssistantThread entity by its id.
+func (c *AssistantThreadClient) Get(ctx context.Context, id string) (*AssistantThread, error) {
+	return c.Query().Where(assistantthread.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AssistantThreadClient) GetX(ctx context.Context, id string) *AssistantThread {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AssistantThreadClient) Hooks() []Hook {
+	return c.hooks.AssistantThread
+}
+
+// Interceptors returns the client interceptors.
+func (c *AssistantThreadClient) Interceptors() []Interceptor {
+	return c.inters.AssistantThread
+}
+
+func (c *AssistantThreadClient) mutate(ctx context.Context, m *AssistantThreadMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AssistantThreadCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AssistantThreadUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AssistantThreadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AssistantThreadDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AssistantThread mutation op: %q", m.Op())
 	}
 }
 
@@ -25960,19 +26101,19 @@ func (c *WorkspaceSettingsClient) mutate(ctx context.Context, m *WorkspaceSettin
 type (
 	hooks struct {
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
-		AnalyticsSnapshot, Apikey, Approval, Asset, AudienceSubscriber, AuditDrain,
-		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
-		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
-		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, CaptureAttempt, CaptureAuthAttempt, CaptureAuthRecipeVersion,
-		CaptureEmailAuthConfig, CaptureInboundReceipt, CaptureJob, CaptureRecipe,
-		ChannelConnection, ClaimPathBinding, ClaimSupport, ClaimSupportSet,
-		ClaimVerification, CommunicationAttempt, CommunicationRecipient, ContentAngle,
-		ContentBatch, ContentBatchItem, ContentBatchRun, ContentDraft,
-		ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
-		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
-		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
-		EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
+		AnalyticsSnapshot, Apikey, Approval, Asset, AssistantThread,
+		AudienceSubscriber, AuditDrain, AuditDrainDelivery, AuditLog, AuditOutbox,
+		AuditRetentionPolicy, BillingEntitlementEvent, BrandKit, BrandProfile,
+		CalendarMutation, CalendarNote, Campaign, CampaignAsset, CampaignPlan,
+		CampaignPost, CampaignRevision, CaptureAttempt, CaptureAuthAttempt,
+		CaptureAuthRecipeVersion, CaptureEmailAuthConfig, CaptureInboundReceipt,
+		CaptureJob, CaptureRecipe, ChannelConnection, ClaimPathBinding, ClaimSupport,
+		ClaimSupportSet, ClaimVerification, CommunicationAttempt,
+		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
+		ContentBatchRun, ContentDraft, ContentDraftFinisher, ContentDraftRevision,
+		ContentDraftSettings, ContentDraftTag, Conversation, ConversationMessage,
+		CreativeTemplate, CreativeVariant, CustomerCommunication, DeploymentEvent,
+		Design, EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
 		FrontendActivation, FrontendObservation, FrontendSource,
 		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
@@ -26013,19 +26154,19 @@ type (
 	}
 	inters struct {
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
-		AnalyticsSnapshot, Apikey, Approval, Asset, AudienceSubscriber, AuditDrain,
-		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
-		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
-		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, CaptureAttempt, CaptureAuthAttempt, CaptureAuthRecipeVersion,
-		CaptureEmailAuthConfig, CaptureInboundReceipt, CaptureJob, CaptureRecipe,
-		ChannelConnection, ClaimPathBinding, ClaimSupport, ClaimSupportSet,
-		ClaimVerification, CommunicationAttempt, CommunicationRecipient, ContentAngle,
-		ContentBatch, ContentBatchItem, ContentBatchRun, ContentDraft,
-		ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
-		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
-		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
-		EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
+		AnalyticsSnapshot, Apikey, Approval, Asset, AssistantThread,
+		AudienceSubscriber, AuditDrain, AuditDrainDelivery, AuditLog, AuditOutbox,
+		AuditRetentionPolicy, BillingEntitlementEvent, BrandKit, BrandProfile,
+		CalendarMutation, CalendarNote, Campaign, CampaignAsset, CampaignPlan,
+		CampaignPost, CampaignRevision, CaptureAttempt, CaptureAuthAttempt,
+		CaptureAuthRecipeVersion, CaptureEmailAuthConfig, CaptureInboundReceipt,
+		CaptureJob, CaptureRecipe, ChannelConnection, ClaimPathBinding, ClaimSupport,
+		ClaimSupportSet, ClaimVerification, CommunicationAttempt,
+		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
+		ContentBatchRun, ContentDraft, ContentDraftFinisher, ContentDraftRevision,
+		ContentDraftSettings, ContentDraftTag, Conversation, ConversationMessage,
+		CreativeTemplate, CreativeVariant, CustomerCommunication, DeploymentEvent,
+		Design, EnrichmentRecord, EvidenceClearance, EvidenceSource, EvidenceVersion,
 		FrontendActivation, FrontendObservation, FrontendSource,
 		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,

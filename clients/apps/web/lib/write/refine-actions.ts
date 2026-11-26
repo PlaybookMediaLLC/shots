@@ -102,19 +102,3 @@ const FENCE_TAGS =
 export function fenced(content: string): string {
   return content.replace(FENCE_TAGS, '')
 }
-
-/** A line a model sometimes puts before its answer, such as "Here's the rewrite:". */
-const PREAMBLE =
-  /^\s*(?:sure[,.!]?\s*)?(?:here(?:'s| is| are)\b[^\n]*\b(?:posts?|rewrite|rewritten|version|thread|tweets?)\b[^\n]*|(?:rewritten|shortened|revised) (?:posts?|version|thread)\b[^\n]*):\s*\n+/i
-
-/**
- * The posts in a model's answer: separated by a line holding only `---`,
- * without an introduction the model added before them.
- */
-export function assistPosts(text: string): string[] {
-  return text
-    .replace(PREAMBLE, '')
-    .split(/\n\s*---\s*\n/)
-    .map((post) => post.trim())
-    .filter(Boolean)
-}

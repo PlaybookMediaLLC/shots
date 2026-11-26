@@ -3,7 +3,9 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4Content,
   LanguageModelV4GenerateResult,
+  LanguageModelV4StreamPart,
 } from '@ai-sdk/provider'
+import { simulateReadableStream } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { testHooksAllowed } from '@/lib/e2e-hooks'
 
@@ -921,8 +923,112 @@ function scriptAssistant(system: string, text: string, results: ToolResult[]): L
   return [{ text: `You are on ${page}. Your workspace has ${count}${items[0] ? `; the newest is ${items[0].name}` : ''}.`, type: 'text' }]
 }
 
+/** What the scripted model does on each editing surface when asked in these words. */
+const STUDIO_EDITS: {
+  tool: string
+  inspect?: string
+  id?: RegExp
+  ask: RegExp
+  done: string
+  input: (id: string) => unknown
+}[] = [
+  {
+    ask: /rename the first artboard/i,
+    done: 'Renamed the artboard.',
+    id: /\\*"id\\*":\\*"([A-Za-z0-9_-]+)/,
+    input: (id) => ({
+      commands: [{ id, name: 'Assistant hero', type: 'rename-artboard' }],
+      summary: 'Renamed the first artboard',
+    }),
+    inspect: 'inspectBoard',
+    tool: 'editBoard',
+  },
+  {
+    ask: /rewrite the first story headline/i,
+    done: 'Rewrote the headline.',
+    id: /\\*"stories\\*":\[\{\\*"id\\*":\\*"([A-Za-z0-9_-]+)/,
+    input: (storyId) => ({
+      commands: [{ field: 'headline', storyId, type: 'story-copy', value: 'Assistant headline' }],
+      summary: 'Rewrote the first headline',
+    }),
+    inspect: 'inspectStorySet',
+    tool: 'editStorySet',
+  },
+  {
+    ask: /caption the first slide/i,
+    done: 'Captioned the slide.',
+    input: () => ({
+      commands: [{ patch: { caption: 'Assistant caption' }, slide: 0, type: 'update-slide' }],
+      summary: 'Captioned the first slide',
+    }),
+    tool: 'editCodeScene',
+  },
+  {
+    ask: /make the card dark/i,
+    done: 'Made the card dark.',
+    input: () => ({
+      commands: [{ theme: 'dark', type: 'style' }],
+      summary: 'Made the card dark',
+    }),
+    tool: 'editTweet',
+  },
+  {
+    ask: /apply the launch preset/i,
+    done: 'Applied the preset.',
+    input: () => ({ name: 'Launch' }),
+    tool: 'applySavedPreset',
+  },
+  {
+    ask: /apply the missing brand kit/i,
+    done: 'The brand kit request is finished.',
+    input: () => ({ kitName: 'Missing' }),
+    tool: 'applyBrandKit',
+  },
+  {
+    ask: /translate my slides into german and french/i,
+    done: 'Translation finished.',
+    input: () => ({ locales: ['de-DE', 'fr-FR'] }),
+    tool: 'translateStoreLocales',
+  },
+  {
+    ask: /offer a closing post/i,
+    done: 'Offered a closing post.',
+    input: () => ({
+      mode: 'new-post',
+      summary: 'A closing post',
+      text: 'Try it and tell us what you think.',
+    }),
+    tool: 'proposeDraftText',
+  },
+]
+
+/** A generated answer as the stream the same model would send. */
+function toStream(result: LanguageModelV4GenerateResult) {
+  const parts = result.content.flatMap((part, index): LanguageModelV4StreamPart[] => {
+    if (part.type !== 'text') return [part as LanguageModelV4StreamPart]
+    const id = String(index)
+    return [
+      { id, type: 'text-start' },
+      { delta: part.text, id, type: 'text-delta' },
+      { id, type: 'text-end' },
+    ]
+  })
+  return {
+    stream: simulateReadableStream<LanguageModelV4StreamPart>({
+      chunks: [
+        { type: 'stream-start', warnings: [] },
+        ...parts,
+        { finishReason: result.finishReason, type: 'finish', usage: result.usage },
+      ],
+    }),
+  }
+}
+
 export function createScriptedModel(modelId: string): LanguageModelV4 {
-  return new MockLanguageModelV4({
+  const model: MockLanguageModelV4 = new MockLanguageModelV4({
+    // Streaming callers get the same scripted answer, as one chunk per part.
+    doStream: async (options: LanguageModelV4CallOptions): Promise<ReturnType<typeof toStream>> =>
+      toStream(await model.doGenerate(options)),
     doGenerate: async (options) => {
       // Credential-free E2E protocol fixture, not an audio recognition model.
       if (systemText(options).startsWith('Transcribe this voice memo faithfully')) {
@@ -970,11 +1076,70 @@ export function createScriptedModel(modelId: string): LanguageModelV4 {
           return respond(toolCalls([{ input: { count, instruction: '' }, toolName: 'showVariants' }]))
         }
       }
+      const lastAsk = text.split('\n\n').at(-1) ?? ''
+      // Studio edits: one inspect where ids are needed, one typed command, then a sentence.
+      const studio = STUDIO_EDITS.find(
+        (item) => names.includes(item.tool) && item.ask.test(lastAsk)
+      )
+      if (studio) {
+        if (results.some((result) => result.toolName === studio.tool))
+          return respond([{ text: studio.done, type: 'text' }])
+        const seen = results.find((result) => result.toolName === studio.inspect)
+        if (studio.inspect && !seen)
+          return respond(toolCalls([{ input: {}, toolName: studio.inspect }]))
+        // The first id the inspect tool reported: an artboard's, or a story's.
+        const id = studio.id
+          ? JSON.stringify(seen?.output ?? '').match(studio.id)?.[1]
+          : undefined
+        return respond(toolCalls([{ input: studio.input(id ?? ''), toolName: studio.tool }]))
+      }
+      if (names.includes('reviewDesign') && /\b(review|critique|audit)\b/i.test(lastAsk)) {
+        if (!results.some((result) => result.toolName === 'reviewDesign'))
+          return respond(toolCalls([{ input: {}, toolName: 'reviewDesign' }]))
+        return respond([{ text: 'I reviewed the design and added suggestions below.', type: 'text' }])
+      }
+      if (names.includes('showCaptions') && /\b(captions?|social copy|write copy)\b/i.test(lastAsk)) {
+        if (!results.some((result) => result.toolName === 'showCaptions'))
+          return respond(toolCalls([{ input: { notes: '' }, toolName: 'showCaptions' }]))
+        return respond([{ text: 'I prepared social captions below.', type: 'text' }])
+      }
+      if (names.includes('scanRedactions') && /\b(redact|blur|pii|personal details|sensitive)\b/i.test(lastAsk)) {
+        if (!results.some((result) => result.toolName === 'scanRedactions'))
+          return respond(toolCalls([{ input: {}, toolName: 'scanRedactions' }]))
+        return respond([{ text: 'I opened the redaction scanner below so you can review findings.', type: 'text' }])
+      }
       // The editor copilot asked for a change: one real, valid edit (more room), then done.
-      if (names.includes('applyChanges') && /\b(bold|bolder|punchier|spacing|room)\b/i.test(text.split('\n\n').at(-1) ?? '')) {
+      if (names.includes('applyChanges') && /\b(bold|bolder|punchier|spacing|room)\b/i.test(lastAsk)) {
         if (!results.some((result) => result.toolName === 'applyChanges'))
           return respond(toolCalls([{ input: { changes: { canvas: { padding: 72 } }, summary: 'Gave the design more room' }, toolName: 'applyChanges' }]))
         return respond([{ text: 'Done.', type: 'text' }])
+      }
+      if (names.includes('dispatchStoreCommands') && /\bduplicate\b/i.test(lastAsk)) {
+        if (results.some((result) => result.toolName === 'dispatchStoreCommands'))
+          return respond([{ text: 'Duplicated the slide.', type: 'text' }])
+        const seen = results.find((result) => result.toolName === 'inspectStoreSet')
+        if (!seen) return respond(toolCalls([{ input: {}, toolName: 'inspectStoreSet' }]))
+        const slideId = JSON.stringify(seen.output).match(/activeSlideId[\\"]*:[\\"]*([A-Za-z0-9_-]+)/)?.[1]
+        const input = {
+          commands: [{ slideIds: [slideId], type: 'slides.duplicate' }],
+          summary: 'Duplicated the open slide',
+        }
+        return respond(toolCalls([{ input, toolName: 'dispatchStoreCommands' }]))
+      }
+      if (names.includes('inspectStoreSet') && /\b(store|slides?|screenshots?|compliance)\b/i.test(lastAsk)) {
+        if (!results.some((result) => result.toolName === 'inspectStoreSet'))
+          return respond(toolCalls([{ input: {}, toolName: 'inspectStoreSet' }]))
+        return respond([{ text: 'I inspected your App Store screenshot set.', type: 'text' }])
+      }
+      if (names.includes('proposeSuggestion')) {
+        if (results.some((result) => result.toolName === 'proposeSuggestion'))
+          return respond([{ text: 'Proposed the improvements.', type: 'text' }])
+        const input = {
+          changes: { canvas: { padding: 96 } },
+          reason: 'The screenshot sits close to the edges.',
+          title: 'Add breathing room',
+        }
+        return respond(toolCalls([{ input, toolName: 'proposeSuggestion' }]))
       }
       if (names.includes('proposeVariant')) {
         const done = results.filter((result) => result.toolName === 'proposeVariant').length
@@ -1005,4 +1170,5 @@ export function createScriptedModel(modelId: string): LanguageModelV4 {
     modelId: `scripted/${modelId}`,
     provider: 'scripted',
   })
+  return model
 }

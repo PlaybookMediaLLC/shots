@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import type { Metadata } from 'next'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { WorkflowDefinitionEditor } from '@/components/workflows/WorkflowDefinitionEditor'
@@ -15,6 +16,7 @@ export default async function WorkflowPage({ params }: WorkflowPageProps) {
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization.name}
     >
+      <AssistantPageContext facts={['Editing one automation workflow.']} />
       <WorkflowDefinitionEditor
         canManage={access.canManage}
         id={workflowId}

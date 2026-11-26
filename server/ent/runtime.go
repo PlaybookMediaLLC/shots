@@ -14,6 +14,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/approval"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/assistantthread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/audiencesubscriber"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdrain"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditdraindelivery"
@@ -277,6 +278,18 @@ func init() {
 	asset.DefaultUpdatedAt = assetDescUpdatedAt.Default.(func() time.Time)
 	// asset.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	asset.UpdateDefaultUpdatedAt = assetDescUpdatedAt.UpdateDefault.(func() time.Time)
+	assistantthreadFields := schema.AssistantThread{}.Fields()
+	_ = assistantthreadFields
+	// assistantthreadDescCreatedAt is the schema descriptor for created_at field.
+	assistantthreadDescCreatedAt := assistantthreadFields[5].Descriptor()
+	// assistantthread.DefaultCreatedAt holds the default value on creation for the created_at field.
+	assistantthread.DefaultCreatedAt = assistantthreadDescCreatedAt.Default.(func() time.Time)
+	// assistantthreadDescUpdatedAt is the schema descriptor for updated_at field.
+	assistantthreadDescUpdatedAt := assistantthreadFields[6].Descriptor()
+	// assistantthread.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	assistantthread.DefaultUpdatedAt = assistantthreadDescUpdatedAt.Default.(func() time.Time)
+	// assistantthread.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	assistantthread.UpdateDefaultUpdatedAt = assistantthreadDescUpdatedAt.UpdateDefault.(func() time.Time)
 	audiencesubscriberFields := schema.AudienceSubscriber{}.Fields()
 	_ = audiencesubscriberFields
 	// audiencesubscriberDescCreatedAt is the schema descriptor for created_at field.

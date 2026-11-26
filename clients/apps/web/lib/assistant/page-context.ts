@@ -15,6 +15,22 @@ export const pageEntitySchema = z.object({
   name: z.string().trim().max(200).optional(),
 })
 
+/** Which interactive editing surface is currently active on the page. */
+export const assistantSurfaceSchema = z.enum([
+  'none',
+  'screenshot-editor',
+  'store-screenshots',
+  'canvas',
+  'creative-sets',
+  'code-studio',
+  'write-composer',
+  'tweet-image',
+  'campaign',
+])
+
+/** Active editing surface kind. */
+export type AssistantSurfaceKind = z.infer<typeof assistantSurfaceSchema>
+
 /** The page the assistant is asked from. */
 export const pageContextSchema = z.object({
   /** The address without its locale, such as `/canvas/c123`. */
@@ -23,6 +39,10 @@ export const pageContextSchema = z.object({
   title: z.string().max(200),
   /** The product area: `home`, `create`, `campaigns`, … */
   area: z.string().max(40),
+  /** Active editing surface, when inside an editor or studio. */
+  surface: assistantSurfaceSchema.optional(),
+  /** Currently selected element or text label, when scoped. */
+  selection: z.string().max(200).nullable().optional(),
   /** Short statements about what the page shows right now. */
   facts: z.array(z.string().max(300)).max(12).default([]),
   entities: z.array(pageEntitySchema).max(8).default([]),
@@ -43,6 +63,8 @@ const line = (value: string) => value.replace(/[<>]/g, '').replace(/\s+/g, ' ').
 export function describePage(page: PageContext): string {
   const parts = [
     `Page: ${line(page.title) || 'Untitled'} (${line(page.path) || '/'}, area: ${line(page.area) || 'unknown'})`,
+    ...(page.surface && page.surface !== 'none' ? [`Active surface: ${line(page.surface)}`] : []),
+    ...(page.selection ? [`Selected element: ${line(page.selection)}`] : []),
     ...page.entities.map(
       (entity) =>
         `Open ${line(entity.type)}: ${entity.name ? `"${line(entity.name)}" ` : ''}(id ${line(entity.id)})`

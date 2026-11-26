@@ -64,7 +64,14 @@ function Counter({ length, limit }: { length: number; limit: number }) {
  * rather than generic marketing copy. The profile is the one the post
  * dialog posts from, so the voice and the account agree.
  */
-export function CaptionsPanel({ disabled }: { disabled: boolean }) {
+export function CaptionsPanel({
+  disabled,
+  initialNotes = '',
+}: {
+  disabled: boolean
+  /** Optional guidance passed by the assistant's showCaptions tool. */
+  initialNotes?: string
+}) {
   const trpcClient = useTRPCClient()
   const canStartPost = useCanStartPost()
   const { defaultSetId, sets } = usePublishSets(true)
@@ -79,7 +86,7 @@ export function CaptionsPanel({ disabled }: { disabled: boolean }) {
     const existing = captionChannelSchema.options.filter((channel) => saved?.captions[channel])
     return existing.length ? existing : DEFAULT_CHANNELS
   })
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(initialNotes)
   const [loading, setLoading] = useState(false)
   // Edits stay local while typing and are saved on blur: one undo step per edit, not per key.
   const [copy, setDraft] = useState<DesignCopy>(saved ?? { captions: {} })
@@ -108,7 +115,7 @@ export function CaptionsPanel({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm">
+    <div className="space-y-3 p-3 text-sm">
       <p className="text-muted-foreground">
         Alt text and captions for each platform, from what the design shows. Review them before
         posting: AI can misread an image.

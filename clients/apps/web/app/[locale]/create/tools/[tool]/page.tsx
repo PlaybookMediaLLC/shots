@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
 import { headers } from 'next/headers'
@@ -59,6 +60,7 @@ export default async function InAppToolPage({ params }: ToolPageProps) {
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization?.name}
     >
+      <AssistantPageContext facts={[`The ${entry.title} image tool. Images stay on this device.`]} />
       <Page title="Image tools" description="Edit images on this device. Nothing is uploaded.">
         <div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
           <nav

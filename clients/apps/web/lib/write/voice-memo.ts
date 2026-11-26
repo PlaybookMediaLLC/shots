@@ -3,8 +3,9 @@ import { draftChannelSchema } from './document'
 
 /** An ephemeral audio attachment; only its reviewed text can enter the draft. */
 export const voiceMemoSchema = z.strictObject({
-  draftId: z.string().min(1).max(128),
-  channel: draftChannelSchema,
+  /** The draft the memo is for; the assistant's composer sends neither. */
+  draftId: z.string().min(1).max(128).optional(),
+  channel: draftChannelSchema.optional(),
   mediaType: z.enum(['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/ogg']),
   audio: z
     .string()

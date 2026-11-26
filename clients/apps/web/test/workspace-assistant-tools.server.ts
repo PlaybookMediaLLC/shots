@@ -280,3 +280,124 @@ test('startWork opens only work a lookup found, with the change ready for its AI
     ]
   )
 })
+
+test('findPages gates campaign pages behind the workspace campaign entitlement', async (t) => {
+  mockFeatures(t, [])
+  const withoutCampaigns = setup('creator')
+  const restricted = await withoutCampaigns.tools.findPages.execute({ query: 'campaign' }, options)
+  assert.ok(restricted.ok)
+  assert.equal(
+    restricted.pages.some((page) => page.href.startsWith('/campaigns')),
+    false
+  )
+
+  mockFeatures(t, ['campaign:workflow'])
+  const withCampaigns = setup('creator')
+  const allowed = await withCampaigns.tools.findPages.execute({ query: 'campaign' }, options)
+  assert.ok(allowed.ok)
+  assert.ok(allowed.pages.some((page) => page.href.startsWith('/campaigns')))
+})
+
+test('getIdealCustomerProfile, listBrandKits, and searchWorkspaceAssets expose workspace data', async (t) => {
+  const env = { ...process.env }
+  process.env.PUBLISHING_API_URL = 'http://backend.test:8082'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'private-test-token'
+  t.after(() => {
+    for (const key of ['PUBLISHING_API_URL', 'PUBLISHING_SERVICE_TOKEN'])
+      if (env[key] === undefined) delete process.env[key]
+      else process.env[key] = env[key]
+  })
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const url = new URL(String(input instanceof Request ? input.url : input))
+    if (url.pathname === '/v1/ideal-customer-profile') {
+      return Response.json({
+        idealCustomerProfile: {
+          createdAt: '2026-11-01T00:00:00Z',
+          id: 'icp_1',
+          lockedFields: [],
+          organizationId: 'org_1',
+          source: 'manual',
+          summary: 'Product engineering leads shipping SaaS releases weekly.',
+          updatedAt: '2026-11-02T00:00:00Z',
+        },
+      })
+    }
+    if (url.pathname === '/v1/brand-kits') {
+      return Response.json({
+        brandKits: [
+          {
+            createdAt: '2026-11-01T00:00:00Z',
+            definition: {
+              colors: { accent: '#6366f1', background: '#09090b', text: '#fafafa' },
+              typography: { headingFamily: 'inter' },
+            },
+            id: 'kit_1',
+            name: 'Primary Dark',
+            status: 'PUBLISHED',
+            version: 2,
+          },
+        ],
+      })
+    }
+    if (url.pathname === '/v1/assets') {
+      return Response.json({
+        assets: [
+          {
+            altText: 'Product dashboard screenshot',
+            classification: 'input',
+            contentType: 'image/png',
+            createdAt: '2026-11-02T00:00:00Z',
+            fileName: 'dashboard.png',
+            height: 900,
+            id: 'asset_1',
+            width: 1440,
+          },
+        ],
+        nextCursor: null,
+      })
+    }
+    return Response.json({ error: `unexpected path ${url.pathname}` }, { status: 404 })
+  })
+
+  const { state, tools } = setup('viewer')
+  const icp = await tools.getIdealCustomerProfile.execute({}, options)
+  assert.ok(icp.ok)
+  assert.equal(icp.idealCustomerProfile?.id, 'icp_1')
+
+  const kits = await tools.listBrandKits.execute({}, options)
+  assert.ok(kits.ok)
+  assert.equal(kits.brandKits.length, 1)
+  assert.equal(kits.brandKits[0]?.name, 'Primary Dark')
+  assert.equal(kits.brandKits[0]?.accent, '#6366f1')
+
+  const assets = await tools.searchWorkspaceAssets.execute({ search: 'dashboard' }, options)
+  assert.ok(assets.ok)
+  assert.equal(assets.assets.length, 1)
+  assert.equal(assets.assets[0]?.id, 'asset_1')
+  assert.ok(state.known.has('/library'))
+})
+
+test('a viewer cannot draft a capture recipe, and a plan without posts reads no analytics', async (t) => {
+  const { asked } = mockFeatures(t, [])
+  const { tools } = setup('viewer')
+  const recipe = await tools.proposeCaptureRecipe.execute({}, options)
+  assert.equal(recipe.ok, false)
+  const analytics = await tools.getSocialAnalyticsSummary.execute({ days: 28 }, options)
+  assert.equal(analytics.ok, false)
+  // The refused recipe asked the backend nothing.
+  assert.deepEqual(asked, ['content:drafts'])
+})
+
+test('release details for a release the backend does not have are refused, with no link', async (t) => {
+  mockFeatures(t, [])
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ error: 'Release not found.' }, { status: 404 })
+  )
+  const { state, tools } = setup('viewer')
+  const result = await tools.getReleaseDetails.execute(
+    { releaseId: '0f8b6f0e-6c55-4a53-9a0c-3d3f4b1c2a10' },
+    options
+  )
+  assert.equal(result.ok, false)
+  assert.ok(!state.known.has('/releases/0f8b6f0e-6c55-4a53-9a0c-3d3f4b1c2a10'))
+})

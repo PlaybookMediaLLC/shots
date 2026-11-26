@@ -51,6 +51,7 @@ import {
   type Treatment,
 } from '@/lib/creative-sets/document'
 import { CreativeSetSession } from '@/lib/creative-sets/session'
+import { useStorySetAbility } from './useStorySetAbility'
 import {
   localTextBrandFields,
   resetTextBrandField,
@@ -384,6 +385,7 @@ function SetWorkspace({
       window.removeEventListener('beforeunload', leave)
     }
   }, [session, canEdit, flushActive])
+  useStorySetAbility({ activeOutputId: active.id, canEdit, flush: flushActive, session })
   function run(command: SetCommand) {
     try {
       flushActive()

@@ -119,6 +119,7 @@ export const editorAiRouter = router({
         count: variantCountSchema.default(4),
         document: designDocumentSchema,
         instruction: z.string().trim().max(300).optional(),
+        snapshot: snapshotSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -133,6 +134,7 @@ export const editorAiRouter = router({
             brand,
             count: input.count,
             instruction: input.instruction,
+            snapshot: input.snapshot ?? null,
             voice,
           })
         ),

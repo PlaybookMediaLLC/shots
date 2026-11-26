@@ -928,16 +928,107 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The bar is the field: its input drops the shell's control fill and ring. */
+/* The bar is the field: its input/textarea drops the shell's control fill and ring. */
 .assistant-bar [data-slot='input'],
-.assistant-bar [data-slot='input']:focus-visible {
-  height: 32px;
+.assistant-bar [data-slot='input']:focus-visible,
+.assistant-bar [data-slot='textarea'],
+.assistant-bar [data-slot='textarea']:focus-visible {
+  min-height: 32px;
+  max-height: 120px;
   flex: 1;
-  padding-inline: 0;
+  resize: none;
+  padding: 5px 0;
   border-color: transparent;
   background-color: transparent;
   box-shadow: none;
   font-size: 0.875rem;
+  line-height: 1.4;
+}
+/* No ring on the field itself: the composer box around it shows focus (:focus-within above).
+   Forced-colour modes keep the system outline. */
+@media (forced-colors: none) {
+  .platform-shell .assistant .assistant-bar [data-slot='textarea']:focus-visible {
+    outline: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
+/* Docked side inspector mode (default on editors, toggleable on any page). */
+.assistant.assistant-dock {
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(380px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-radius: 16px;
+  background: var(--background);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 6%),
+    0 18px 44px -16px rgb(0 0 0 / 28%);
+  transform: none;
+}
+.assistant-slot[data-placement='end'] .assistant.assistant-dock {
+  width: min(380px, calc(100% - 24px));
+  min-width: 0;
+}
+.assistant-bar.assistant-bar-dock {
+  align-items: flex-end;
+  padding: 6px 6px 6px 12px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+/* Quick action chips (Review, Variants, Captions, AI BG, Redact). */
+.assistant-quick-action {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  color: color-mix(in srgb, var(--foreground) 84%, transparent);
+  font-size: 0.71875rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+.assistant-quick-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--foreground) 20%, transparent);
+  background: color-mix(in srgb, var(--foreground) 7%, var(--background));
+  color: var(--foreground);
+}
+.assistant-quick-action:disabled {
+  opacity: 0.45;
+}
+/* An open side panel takes its own column: the page narrows, and nothing sits under it. */
+@media (min-width: 768px) {
+  .platform-shell :has(> .assistant-slot > .assistant-dock) {
+    padding-inline-end: calc(380px + 24px);
+  }
+}
+@media (max-width: 767px) {
+  /* On a phone the composer needs the room the context chip takes. */
+  .assistant-bar .assistant-context {
+    display: none;
+  }
+  .assistant.assistant-dock {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    height: min(74dvh, 560px);
+    max-height: calc(100% - 16px);
+  }
 }
 /* One-click asks over an empty bar: quiet pills that lift on hover. */
 .assistant-suggestions {

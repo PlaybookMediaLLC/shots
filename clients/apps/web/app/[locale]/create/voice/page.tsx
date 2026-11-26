@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -18,6 +19,7 @@ export default async function VoiceNotesPage({ params }: { params: Promise<{ loc
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization?.name}
     >
+      <AssistantPageContext facts={["The member's voice notes."]} />
       <Page
         title="Voice notes"
         description="Notes you recorded in the Shots app. Only you can see them, until you make a draft from one."

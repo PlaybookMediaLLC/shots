@@ -154,7 +154,8 @@ import {
 } from './schedule'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { BackupsBrowser, ShareDialog } from './share-backups'
-import { AssistantPanel } from './assistant'
+import { openAssistant, useAssistantStore } from '@/components/assistant/assistant-store'
+import { useWriteAbility } from './useWriteAbility'
 import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
 import { IncomingMedia } from './incoming-media'
@@ -197,7 +198,7 @@ const DraftEditor = dynamic(() => import('@/components/drafts/DraftEditor'), {
 type PublishAction = 'publish' | 'queue' | 'schedule'
 
 /** The panels beside the draft. */
-type Panel = 'properties' | 'preview' | 'comments' | 'assistant' | 'options'
+type Panel = 'properties' | 'preview' | 'comments' | 'options'
 
 /** The dialogs the composer opens. */
 type Dialog =
@@ -400,12 +401,12 @@ export function WriteComposer({
     [split]
   )
   const [tab, setTab] = React.useState<DraftChannel>(() => primaryChannel(initial.primaryPlatform))
+  const assistantOpen = useAssistantStore((state) => state.open)
   const [panel, setPanel] = React.useState<Panel | null>(() => {
     const asked = params.get('panel')
     return asked === 'properties' ||
       asked === 'preview' ||
-      asked === 'comments' ||
-      asked === 'assistant'
+      asked === 'comments'
       ? asked
       : null
   })
@@ -479,11 +480,7 @@ export function WriteComposer({
   const channels = tabChannels(accounts, enabled, primary)
   // A switched-off platform keeps its tab, so it can be read and switched back on.
   const active = allChannels(accounts, primary).includes(tab) ? tab : primary
-  // The editor's AI writes in this draft's voice for the platform on screen.
-  const services = React.useMemo(
-    () => platformEditorServices(trpcClient, aiEnabled, { channel: active, draftId: initial.id }),
-    [trpcClient, aiEnabled, active, initial.id]
-  )
+  const services = React.useMemo(() => platformEditorServices(trpcClient), [trpcClient])
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = {
     article: document.article,
@@ -1217,6 +1214,21 @@ export function WriteComposer({
   }
   // A post that is live everywhere does not change with this text, so it is not editable.
   const canEditText = canEdit && !locked
+  useWriteAbility({
+    canManageSets,
+    hasImage: document.value.some((node) =>
+      attachmentsIn(node).some((media) => media.type === 'img')
+    ),
+    openOnArrival: params.get('panel') === 'assistant',
+    openWithPrompt: params.get('prompt'),
+    setId: set?.id ?? null,
+    canEditText: canEditText && (active === primary || versionFor(document.versions, active).mode === 'manual'),
+    channel: active,
+    draftId: initial.id,
+    editor,
+    posts: activePublication.serialized.posts.map((post) => post.caption),
+    title: document.title,
+  })
   // The schedule dock and its fix list show to someone who can publish this post now.
   const showSchedule =
     canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
@@ -1433,24 +1445,6 @@ export function WriteComposer({
         users={{ [user.id]: user.name }}
         versions={document.versions}
       />
-    ) : sidePanel === 'assistant' ? (
-      <AssistantPanel
-        channel={active}
-        hasImage={document.value.some((node) =>
-          attachmentsIn(node).some((media) => media.type === 'img')
-        )}
-        onInsert={
-          canEditText && (active === primary || versionOfTab.mode === 'manual')
-            ? (text) => {
-                if (editor.current) appendPost(editor.current, text)
-              }
-            : undefined
-        }
-        draftId={initial.id}
-        openWithPrompt={params.get('prompt') ?? undefined}
-        posts={activePublication.serialized.posts.map((post) => post.caption)}
-        set={set}
-      />
     ) : null
   // shortcut: compares each queued post's first text and thread length with the current
   // version, not reply text or media; store a content hash on the post to catch those too.
@@ -1588,11 +1582,11 @@ export function WriteComposer({
                   />
                   {aiEnabled ? (
                     <PanelButton
-                      active={panel === 'assistant'}
+                      active={assistantOpen}
                       className="hidden md:inline-flex"
                       icon={<Sparkles aria-hidden className="size-4" />}
                       label="Assistant"
-                      onClick={() => togglePanel('assistant')}
+                      onClick={() => openAssistant()}
                     />
                   ) : null}
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
@@ -1745,7 +1739,7 @@ export function WriteComposer({
                       {aiEnabled ? (
                         <DropdownMenuItem
                           className="md:hidden"
-                          onSelect={() => togglePanel('assistant')}
+                          onSelect={() => openAssistant()}
                         >
                           Assistant
                         </DropdownMenuItem>
@@ -2397,7 +2391,6 @@ export function WriteComposer({
               'sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 self-start overflow-y-auto border-l border-border animate-in fade-in duration-150',
               split ? 'max-w-[70%]' : 'max-w-[48vw]',
               // The assistant fills the column (its max height caps it) so its message box sits at the foot.
-              sidePanel === 'assistant' && 'flex h-screen flex-col'
             )}
             ref={fitToScroller}
             data-composer-panel
@@ -2790,7 +2783,6 @@ function rememberWorkspaceShare(split: boolean, width: number, body: HTMLElement
 
 /** Panel titles. */
 const PANEL_TITLES: Record<Panel, string> = {
-  assistant: 'Writing assistant',
   comments: 'Comments',
   options: 'Post options',
   preview: 'Preview',

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { openRouterBaseURL } from '@/lib/ai/models/provider'
 import sharp from 'sharp'
 import { z } from 'zod'
 import { aiCreditMeter } from '@/lib/ai/metering'
@@ -56,7 +57,7 @@ export async function callImageModel(prompt: string, aspect: string): Promise<Bu
   const key = process.env.OPENROUTER_API_KEY
   if (!key) throw new BackgroundGenerationError('AI is not configured for this environment.')
   const record = await aiCreditMeter.admit()
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch(`${openRouterBaseURL() ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
     body: JSON.stringify({
       image_config: { aspect_ratio: aspect },
       messages: [{ content: prompt, role: 'user' }],
