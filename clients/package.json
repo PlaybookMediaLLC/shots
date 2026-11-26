@@ -17,6 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "test:server": "npm run test:server -w screenshot-studio",
+    "ai:emulate": "emulate start --service ai --port 4014 --seed ../dev/emulate-ai.yaml --base-url http://host.docker.internal:4014",
     "quality:check": "npm run format:check && npm run lint -- --max-warnings=0 && npm run typecheck && npm run test && npm run test:server",
     "commitlint": "commitlint",
     "prepare": "git config core.hooksPath .githooks || true"

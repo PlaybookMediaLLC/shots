@@ -36,6 +36,8 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NODE_ENV: development
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # A local model emulator in place of OpenRouter (docs/ai-emulator.md).
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
       # Notion and Figma delivery. Slack credentials are backend-only.
       INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
       SLACK_CLIENT_ID: ''
