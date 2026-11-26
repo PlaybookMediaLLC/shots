@@ -968,9 +968,8 @@
   border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
   border-radius: 16px;
   background: var(--background);
-  box-shadow:
-    0 2px 6px rgb(0 0 0 / 6%),
-    0 18px 44px -16px rgb(0 0 0 / 28%);
+  /* It sits beside the page, not over it, so it casts no shadow. */
+  box-shadow: none;
   transform: none;
 }
 .assistant-slot[data-placement='end'] .assistant.assistant-dock {
@@ -1031,6 +1030,10 @@
   }
 }
 /* One-click asks over an empty bar: quiet pills that lift on hover. */
+/* The side panel is flat: no button in it casts a shadow. Focus keeps its ring. */
+.assistant-dock .assistant-suggestion:not(:focus-visible) {
+  box-shadow: none;
+}
 .assistant-suggestions {
   display: flex;
   flex-wrap: wrap;
