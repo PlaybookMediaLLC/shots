@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
+import { AIChatPlugin } from '@shots/platejs-editor/@platejs/ai/react'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
@@ -13,8 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
 import { caretPost, postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
@@ -95,26 +94,15 @@ export type RefineRun = {
   target?: DraftChannel
 }
 
-/** Refine for the version open: every AI entry point (menus, ⌘J, the slash menu) uses this. */
+/** The version open’s AI: the editor’s menu, and Refine’s reviewed rewrites. */
 export type RefineApi = {
   busy: boolean
-  /** Open the menu at a trigger: `toolbar`, `selection` or `post-<n>`; ⌘J opens it at the caret's post. */
+  /** Open the editor’s AI menu: at the caret or selection, or at the end of `post-<n>`. */
   open: (at?: string) => void
   run: (request: RefineRun) => void
 }
 
-type RefineState = RefineApi & {
-  at: string | null
-  close: () => void
-  hasSelection: boolean
-  prompt: string
-  register: (at: string) => () => void
-  scope: RefineScope
-  setPrompt: (prompt: string) => void
-  setScope: (scope: RefineScope) => void
-}
-
-const RefineContext = React.createContext<RefineState | null>(null)
+const RefineContext = React.createContext<RefineApi | null>(null)
 
 /** The version open's Refine, or null when AI is off. */
 export function useRefine(): RefineApi | null {
@@ -127,6 +115,7 @@ export function useRefine(): RefineApi | null {
  * another platform's own text, written from a review the writer accepted.
  */
 export function RefineProvider({
+  apiRef,
   channel,
   children,
   draftId,
@@ -136,6 +125,8 @@ export function RefineProvider({
   onVersion,
   versionBase,
 }: {
+  /** Receives this provider’s API, for the editor’s AI menu actions. */
+  apiRef?: React.MutableRefObject<RefineApi | null>
   channel: DraftChannel
   children: React.ReactNode
   /** The draft, whose set's writing context guides Refine. */
@@ -148,9 +139,6 @@ export function RefineProvider({
   versionBase: (target: DraftChannel) => PlateBody
 }) {
   const { mod } = useKeys()
-  const [at, setAt] = React.useState<string | null>(null)
-  const [scope, setScope] = React.useState<RefineScope>('post')
-  const [prompt, setPrompt] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [review, setReview] = React.useState<{
     action: RefineAction
@@ -158,15 +146,17 @@ export function RefineProvider({
     request: Request
     texts: string[]
   } | null>(null)
-  const [hasSelection, setHasSelection] = React.useState(false)
-  const triggers = React.useRef(new Set<string>())
   const open = (where?: string) => {
     const current = editor.current
-    const selected = Boolean(current?.selection && !current.api.isCollapsed())
-    const post = current ? `post-${caretPost(current)}` : 'toolbar'
-    setHasSelection(selected)
-    setScope(selected ? 'selection' : 'post')
-    setAt(where ?? (triggers.current.has(post) ? post : 'toolbar'))
+    if (!current) return
+    if (where?.startsWith('post-')) {
+      const [, end] = postRanges(current.children)[Number(where.slice(5)) - 1] ?? [0, 0]
+      if (end) current.tf.select(current.api.end([end - 1])!)
+    } else if (!current.selection) {
+      current.tf.select(current.api.end([])!)
+    }
+    current.tf.focus()
+    current.getApi(AIChatPlugin).aiChat.show()
   }
   useShortcuts([
     { inEditor: true, key: 'j', label: 'Ask AI', mod: true, run: () => open() },
@@ -175,9 +165,9 @@ export function RefineProvider({
   const run = async ({ action, prompt: instruction, scope: asked, target }: RefineRun) => {
     const current = editor.current
     if (!current) return
-    const post = at?.startsWith('post-') ? Number(at.slice(5)) : caretPost(current)
+    const post = caretPost(current)
     const selected = Boolean(current.selection && !current.api.isCollapsed())
-    const within = asked ?? (at ? scope : selected ? 'selection' : 'post')
+    const within = asked ?? (selected ? 'selection' : 'post')
     let request: Request
     if (target && target !== channel) {
       const base = versionBase(target)
@@ -219,14 +209,13 @@ export function RefineProvider({
           action,
           channel: writes,
           limit: writes === channel ? limit : limitFor(writes),
-          prompt: action === 'custom' ? (instruction ?? prompt) : undefined,
+          prompt: action === 'custom' ? instruction : undefined,
           draftId,
           scope: request.kind === 'version' ? 'draft' : within,
           texts,
         },
         method: 'POST',
       })
-      setAt(null)
       setReview({ action, prompt: instruction, request, texts: answer.texts })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The AI could not answer.')
@@ -280,22 +269,8 @@ export function RefineProvider({
     setReview(null)
     toast.success(`Applied. Undo (${mod}Z) brings your version back.`)
   }
-  const state: RefineState = {
-    at,
-    busy,
-    close: () => setAt(null),
-    hasSelection,
-    open,
-    prompt,
-    register: (where) => {
-      triggers.current.add(where)
-      return () => triggers.current.delete(where)
-    },
-    run: (request) => void run(request),
-    scope,
-    setPrompt,
-    setScope,
-  }
+  const state: RefineApi = { busy, open, run: (request) => void run(request) }
+  if (apiRef) apiRef.current = state
   const reviewChannel = review?.request.kind === 'version' ? review.request.target : channel
   const reviewLimit = reviewChannel === channel ? limit : limitFor(reviewChannel)
   return (
@@ -394,106 +369,5 @@ export function RefineProvider({
         </Dialog>
       ) : null}
     </RefineContext.Provider>
-  )
-}
-
-/**
- * The Refine menu, opened from `children` (a trigger button) at `at`. Pick
- * the scope, write an instruction, or choose a preset; the review follows.
- */
-export function RefineMenu({
-  align = 'start',
-  at,
-  children,
-  side = 'top',
-}: {
-  align?: 'start' | 'center' | 'end'
-  at: string
-  children: React.ReactElement
-  side?: 'top' | 'bottom'
-}) {
-  const refine = React.useContext(RefineContext)
-  const register = refine?.register
-  React.useEffect(() => register?.(at), [at, register])
-  if (!refine) return null
-  const { busy, hasSelection, prompt, scope, setPrompt, setScope } = refine
-  return (
-    <Popover
-      onOpenChange={(next) => (next ? refine.open(at) : refine.close())}
-      open={refine.at === at}
-    >
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent
-        align={align}
-        // Taller than the space above or below on a laptop: it scrolls rather than leaving the screen.
-        className="grid max-h-[var(--radix-popover-content-available-height)] w-80 gap-2 overflow-y-auto p-3"
-        data-testid="refine-menu"
-        onCloseAutoFocus={(event) => event.preventDefault()}
-        side={side}
-      >
-        <fieldset className="flex flex-wrap gap-1" aria-label="What to refine">
-          {(
-            [
-              ['selection', 'Selection'],
-              ['post', 'This post'],
-              ['draft', 'Every post'],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              aria-pressed={scope === value}
-              className={cn(scope === value && 'bg-accent text-accent-foreground')}
-              disabled={value === 'selection' && !hasSelection}
-              key={value}
-              onClick={() => setScope(value)}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              {label}
-            </Button>
-          ))}
-        </fieldset>
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (prompt.trim()) refine.run({ action: 'custom', prompt, scope })
-          }}
-        >
-          <Input
-            aria-label="Refine instruction"
-            autoFocus
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Tell the AI what to change…"
-            value={prompt}
-          />
-          <Button disabled={busy || !prompt.trim()} size="sm" type="submit">
-            Go
-          </Button>
-        </form>
-        <div className="grid grid-cols-2 gap-1">
-          {(Object.keys(REFINE_LABELS) as (keyof typeof REFINE_LABELS)[])
-            .filter((action) => action !== 'custom')
-            .map((action) => (
-              <Button
-                className="h-auto justify-start whitespace-normal py-1.5 text-left"
-                disabled={busy}
-                key={action}
-                onClick={() => refine.run({ action, scope })}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                {REFINE_LABELS[action]}
-              </Button>
-            ))}
-        </div>
-        <p className="text-caption text-muted-foreground">
-          {busy
-            ? 'Rewriting…'
-            : 'Uses your workspace’s AI credits. You see the result before anything changes.'}
-        </p>
-      </PopoverContent>
-    </Popover>
   )
 }

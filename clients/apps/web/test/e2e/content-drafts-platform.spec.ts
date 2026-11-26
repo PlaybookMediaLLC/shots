@@ -326,10 +326,7 @@ test(
     // AI: the scripted model answers, Accept puts the answer in, and Undo takes it back.
     await page.getByTestId('platform-tab-x').click()
     await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
-    await page
-      .getByTestId('refine-menu')
-      .getByRole('button', { name: 'Rewrite as a thread start' })
-      .click()
+    await page.getByRole('option', { exact: true, name: 'Rewrite as a thread start' }).click()
     const review = page.getByTestId('refine-review')
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await review.getByRole('button', { name: 'Accept' }).click()

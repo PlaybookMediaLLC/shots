@@ -168,7 +168,9 @@ import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
 import type { GoogleDriveConfig } from '@/lib/write/google-drive'
-import { RefineMenu, RefineProvider } from './refine'
+import { type RefineApi, RefineProvider } from './refine'
+import { EditorAIHostPlugin } from './ai-review'
+import { REFINE_LABELS } from '@/lib/write/refine-actions'
 import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
 import { ComposerToolbar } from './composer-toolbar'
 import { SelectionToolbarPlugin } from './selection-toolbar'
@@ -223,6 +225,7 @@ const WRITE_PLUGINS: unknown[] = [
   ...SocialMentionInputPlugins,
   SlashMenuPlugin,
   SelectionToolbarPlugin,
+  EditorAIHostPlugin,
   ...HashtagPlugins,
   ...QuietShortcutPlugins,
   PlainPastePlugin,
@@ -480,7 +483,40 @@ export function WriteComposer({
   const channels = tabChannels(accounts, enabled, primary)
   // A switched-off platform keeps its tab, so it can be read and switched back on.
   const active = allChannels(accounts, primary).includes(tab) ? tab : primary
-  const services = React.useMemo(() => platformEditorServices(trpcClient), [trpcClient])
+  // The editor's AI menu lists Refine's reviewed rewrites beside its own streamed ones.
+  const refineApi = React.useRef<RefineApi | null>(null)
+  const services = React.useMemo(() => {
+    if (!aiEnabled) return platformEditorServices(trpcClient)
+    const presets = (Object.keys(REFINE_LABELS) as (keyof typeof REFINE_LABELS)[]).filter(
+      (action) => action !== 'custom'
+    )
+    const actions = [
+      ...presets.map((action) => ({
+        group: 'Rewrite and review',
+        label: REFINE_LABELS[action],
+        onSelect: () => refineApi.current?.run({ action }),
+      })),
+      ...presets.map((action) => ({
+        group: 'Every post',
+        label: `Every post: ${REFINE_LABELS[action]}`,
+        onSelect: () => refineApi.current?.run({ action, scope: 'draft' as const }),
+      })),
+      ...channels
+        .filter((other) => other !== active)
+        .map((other) => ({
+          group: 'Other platforms',
+          label: `Rewrite for ${CHANNEL_META[other].label}`,
+          onSelect: () =>
+            refineApi.current?.run({
+              action: 'custom',
+              prompt: `Rewrite this for ${CHANNEL_META[other].label}, in its style and within its limits.`,
+              target: other,
+            }),
+        })),
+    ]
+    return platformEditorServices(trpcClient, { actions, channel: active, draftId: initial.id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- channels is derived anew each render.
+  }, [trpcClient, aiEnabled, active, initial.id, channels.join()])
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = {
     article: document.article,
@@ -1270,11 +1306,11 @@ export function WriteComposer({
           </DropdownMenuItem>
         ) : null,
       refine: aiEnabled
-        ? (number: number, button: React.ReactElement) => (
-            <RefineMenu align="end" at={`post-${number}`} side="bottom">
-              {button}
-            </RefineMenu>
-          )
+        ? (number: number, button: React.ReactElement) =>
+            React.cloneElement(button as React.ReactElement<React.DOMAttributes<Element>>, {
+              onClick: () => refineApi.current?.open(`post-${number}`),
+              onMouseDown: (event) => event.preventDefault(),
+            })
         : undefined,
       settings: canEditText
       ? ({
@@ -2650,6 +2686,7 @@ export function WriteComposer({
         <PostSettingRequestContext.Provider value={postSetting}>
           {aiEnabled ? (
             <RefineProvider
+              apiRef={refineApi}
               channel={active}
               draftId={initial.id}
               editor={editor}

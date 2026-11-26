@@ -16,7 +16,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import {
+  dispatchEditorAIComment,
+  EditorReviewCommentSchema,
   type EditorToolName,
   EditorToolNameSchema,
 } from "../lib/ai-editor";
@@ -55,6 +58,8 @@ type EditorChatData = {
     comment: string;
     content: string;
   };
+  /** How many comments a review sent. */
+  reviewed?: number;
   toolName: EditorToolName;
 };
 
@@ -170,6 +175,21 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   const chat = useBaseChat<EditorUIMessage>({
     id: "editor",
     onData: (part) => {
+      if (part.type === "data-comment") {
+        const comment = EditorReviewCommentSchema.safeParse(part.data);
+        if (comment.success) {
+          dispatchEditorAIComment({ ...comment.data, editorId: String(editor.id) });
+        }
+      }
+      if (part.type === "data-reviewed") {
+        const count = Number(part.data) || 0;
+        toast(
+          count
+            ? `The review added ${count} ${count === 1 ? "comment" : "comments"}.`
+            : "The review found nothing to change."
+        );
+        editor.getApi(AIChatPlugin).aiChat.hide({ undo: false });
+      }
       if (part.type === "data-toolName") {
         const toolName = EditorToolNameSchema.safeParse(part.data);
         if (toolName.success) setOption("toolName", toolName.data);

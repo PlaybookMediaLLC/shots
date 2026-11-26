@@ -4,6 +4,7 @@ import { join, relative } from 'node:path'
 import test from 'node:test'
 import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { voiceInstructions } from '../lib/write/voice'
+import { platformEditorServices } from '@/lib/editor/services'
 
 /**
  * One brand voice for all AI writing (RFC 024): every model call that writes
@@ -31,6 +32,7 @@ const VOICED_SURFACES: Record<string, string> = {
   'lib/link-preview/suggest.ts': 'share titles and descriptions',
   'lib/ai/agents/editor-assist.ts': 'design versions, which may add a subheadline',
   'lib/ai/assistant/turn.ts': 'text the assistant writes onto an open editing surface',
+  'lib/ai/document/chat.ts': 'the post editor’s AI menu, review and inline suggestions',
 }
 
 /** Where a surface's caller loads the voice it passes in. */
@@ -157,4 +159,13 @@ test('the voice block carries every field of the merged context', () => {
     at = next
   }
   assert.equal(block.match(/<\/writing_context>/g)?.length, 1)
+})
+
+test('the post editor sends its AI requests for the draft and platform being edited', () => {
+  const draftId = 'clf0f1a2c3d4e5f6'
+  const services = platformEditorServices({} as never, { channel: 'linkedin', draftId })
+  const query = `channel=linkedin&draftId=${draftId}`
+  assert.equal(services.ai?.chat?.api, `/api/ai/document?${query}`)
+  assert.equal(services.ai?.copilot?.api, `/api/ai/document/copilot?${query}`)
+  assert.equal(platformEditorServices({} as never).ai, undefined)
 })

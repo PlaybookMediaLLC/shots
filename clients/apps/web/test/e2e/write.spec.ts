@@ -377,7 +377,7 @@ test(
 
     // Refine: the answer is previewed; Reject leaves the text as it was.
     await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
-    await page.getByTestId('refine-menu').getByRole('button', { name: 'Fix grammar' }).click()
+    await page.getByRole('option', { exact: true, name: 'Fix grammar' }).click()
     const review = page.getByTestId('refine-review')
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await snap(page, 'write-refine-review')
@@ -387,7 +387,7 @@ test(
 
     // Accept applies it as one change, and Undo takes it back.
     await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
-    await page.getByTestId('refine-menu').getByRole('button', { name: 'Make it punchier' }).click()
+    await page.getByRole('option', { exact: true, name: 'Make it punchier' }).click()
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await review.getByRole('button', { name: 'Accept' }).click()
     await expect(editor).toContainText('we shipped the new editor today (refined)')
@@ -396,15 +396,12 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // Try again asks the same thing again, not the empty instruction box.
+    // Try again asks the same thing again.
     await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
-    const menu = page.getByTestId('refine-menu')
-    await menu.getByLabel('Refine instruction').fill('Make it friendlier')
-    await menu.getByRole('button', { name: 'Go', exact: true }).click()
-    await expect(review).toContainText('Make it friendlier')
+    await page.getByRole('option', { exact: true, name: 'Condense' }).click()
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await review.getByRole('button', { name: 'Try again' }).click()
-    await expect(review).toContainText('Make it friendlier', { timeout: 60_000 })
+    await expect(review).toContainText('Condense', { timeout: 60_000 })
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await review.getByRole('button', { name: 'Reject' }).click()
     await expect(editor).not.toContainText('(refined)')
@@ -540,14 +537,13 @@ test('an old draft’s code block and heading keep the kit’s layout, and markd
           .size
     )
   expect(colours).toBe(1)
-  // Its block menu leaves out Ask AI: Write's editor has no AI plugin, so the item threw.
-  // Comment stays: Write loads the comment plugin.
+  // Its block menu offers Ask AI and Comment: Write loads both plugins.
   await editor.getByText('const answer = 42', { exact: true }).hover()
   await editor.getByRole('button', { name: 'Block actions' }).click()
   const actions = page.getByRole('listbox')
   await expect(actions.getByRole('option', { name: /^Delete/ })).toBeVisible()
   await expect(actions.getByRole('option', { name: /^Comment/ })).toBeVisible()
-  await expect(actions.getByRole('option', { name: /Ask AI/ })).toHaveCount(0)
+  await expect(actions.getByRole('option', { name: /^Ask AI/ })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(actions).toHaveCount(0)
   // The heading's text flows as one paragraph; the kit's flex row would set the bold run beside it.

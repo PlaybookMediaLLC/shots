@@ -146,6 +146,18 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   generate, and more"), which does not contain its visible text, and that
   text is hidden on narrow screens.
 
+## The editor's AI (RFC 025)
+
+- `src/lib/editor-services.tsx`: `ai.actions` lists the host's own AI actions in
+  the AI menu.
+- `src/ui/ai-menu.tsx`: the menu's items show before the first request (upstream
+  hid them until an answer existed); "Review and comment" is new; the prompt box
+  has no focus outline of its own.
+- `src/components/use-chat.ts`: `data-comment` and `data-reviewed` parts become
+  comment events and a notice.
+- `src/plugins/ai-kit.tsx`: discarding removes the AI's unaccepted text. Upstream
+  undid the last history batch, which in a shared document also erased typing.
+
 ## Pulling a later fix from oppulence-canvas
 
 1. In oppulence-canvas:
