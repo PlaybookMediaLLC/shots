@@ -28,8 +28,8 @@ function Mark({ label, nodeType, shortcut }: { label: string; nodeType: string; 
 }
 
 /**
- * The bar over selected text: Bold, Italic, Link, Rewrite and Comment. Rewrite
- * opens Refine on the selection at the post, as ⌘J does.
+ * The bar over selected text: Bold, Italic, Link, Ask AI and Comment. Ask AI
+ * opens the editor's AI menu on the selection, as ⌘J does.
  */
 function SelectionTools() {
   const editor = useEditorRef()
@@ -45,10 +45,10 @@ function SelectionTools() {
       <ToolbarGroup>
         {refine ? (
           <ToolbarButton
-            aria-label="Rewrite selection"
+            aria-label="Ask AI about the selection"
             onClick={() => refine.open()}
             onMouseDown={(event) => event.preventDefault()}
-            tooltip={`Rewrite selection (${mod}J)`}
+            tooltip={`Ask AI (${mod}J)`}
           >
             <SparkleIcon aria-hidden className="text-primary" />
           </ToolbarButton>

@@ -40,7 +40,7 @@ import { DescribeImages } from './describe-images'
 import { insertAttachments } from '@/lib/write/media-operations'
 import { ComposerEmojiPicker } from './emoji-picker'
 import { MediaTools } from './media-tools'
-import { RefineMenu, useRefine } from './refine'
+import { useRefine } from './refine'
 import { MentionPicker } from './social-mention'
 import { FinisherDialog } from './version-options'
 
@@ -197,15 +197,14 @@ export function ComposerToolbar({
         </PopoverContent>
       </Popover>
       {refine ? (
-        <RefineMenu at="toolbar">
-          <ToolbarButton
-            aria-label="Ask AI"
-            onMouseDown={(event) => event.preventDefault()}
-            tooltip={`Ask AI (${keys.mod}J)`}
-          >
-            <SparkleIcon aria-hidden className="text-primary" />
-          </ToolbarButton>
-        </RefineMenu>
+        <ToolbarButton
+          aria-label="Ask AI"
+          onClick={() => refine.open()}
+          onMouseDown={(event) => event.preventDefault()}
+          tooltip={`Ask AI (${keys.mod}J)`}
+        >
+          <SparkleIcon aria-hidden className="text-primary" />
+        </ToolbarButton>
       ) : null}
       {coarse ? (
         // On touch, the same rows as a sheet from the bottom, above the keyboard.

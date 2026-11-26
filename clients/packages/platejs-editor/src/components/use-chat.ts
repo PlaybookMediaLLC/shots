@@ -16,7 +16,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import {
+  dispatchEditorAIComment,
+  EditorReviewCommentSchema,
   type EditorToolName,
   EditorToolNameSchema,
 } from "../lib/ai-editor";
@@ -55,6 +58,8 @@ type EditorChatData = {
     comment: string;
     content: string;
   };
+  /** How many comments a review sent. */
+  reviewed?: number;
   toolName: EditorToolName;
 };
 
@@ -124,6 +129,17 @@ const requestToolName = (
 const unconfiguredFetch: typeof globalThis.fetch = () =>
   Promise.reject(new Error("AI assistance is not available in this editor."));
 
+/** The route's `error` text when it sent one, else a plain sentence. */
+const failureMessage = (error: Error): string => {
+  try {
+    const body = JSON.parse(error.message) as { error?: unknown };
+    if (typeof body.error === "string") return body.error;
+  } catch {
+    // Not the route's JSON: a network or stream failure.
+  }
+  return "The AI could not answer. Try again.";
+};
+
 export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   const { editor, setOption } = useEditorPlugin(AIChatPlugin);
   const [input, setInput] = useState("");
@@ -169,7 +185,27 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   );
   const chat = useBaseChat<EditorUIMessage>({
     id: "editor",
+    onError: (error) => {
+      // The half-written answer goes, and the writer learns why.
+      toast.error(failureMessage(error));
+      editor.getApi(AIChatPlugin).aiChat.hide();
+    },
     onData: (part) => {
+      if (part.type === "data-comment") {
+        const comment = EditorReviewCommentSchema.safeParse(part.data);
+        if (comment.success) {
+          dispatchEditorAIComment({ ...comment.data, editorId: String(editor.id) });
+        }
+      }
+      if (part.type === "data-reviewed") {
+        const count = Number(part.data) || 0;
+        toast(
+          count
+            ? `The review added ${count} ${count === 1 ? "comment" : "comments"}.`
+            : "The review found nothing to change."
+        );
+        editor.getApi(AIChatPlugin).aiChat.hide({ undo: false });
+      }
       if (part.type === "data-toolName") {
         const toolName = EditorToolNameSchema.safeParse(part.data);
         if (toolName.success) setOption("toolName", toolName.data);

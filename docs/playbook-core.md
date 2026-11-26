@@ -321,6 +321,9 @@ Signed-in workspace members get one assistant on every page and editor when
   schemas limit what the model may change. None of them deletes work.
 - **Saved chats.** Go keeps the words and links of each person's last 30
   chats in a workspace (`assistant_thread`). Cards and Undo are not saved.
+- **The post editor** also has its own AI menu on ⌘J
+  ([RFC 025](rfcs/025-write-workspace.md#mentions-media-and-ai)). There, ⌘J
+  opens that menu; **Ask AI** in the sidebar opens the assistant.
 - **Attachments.** A message may carry up to three inline images. The server
   refuses a file that names an address. A voice memo becomes text to review.
 - **Scoped commands.** ⌘K opens the copilot on the selected text, device,

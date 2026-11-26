@@ -233,7 +233,14 @@ counted one page of liking users and never passed 100.
 - **Alt text** is kept on the image asset (up to 1,000 characters) and sent
   with it: X sets it with `POST /2/media/metadata` after the upload finishes
   and before the post exists; LinkedIn sends `altText` on image content.
-- **Refine** works on an explicit scope (the selection, the post at the caret,
+- **The editor's AI menu** opens with ⌘J, **Ask AI**, or a space on an empty
+  line. It writes into the post as it answers, and the writer accepts or
+  discards the text. It also reviews a post and leaves comment threads on the
+  passages it quotes. While the writer types, it offers an inline suggestion
+  that Tab accepts. `POST /api/ai/document` and its `/copilot` route serve it,
+  with `artifact:edit`, the workspace AI switch, a rate limit and AI credits.
+  The menu never opens on a selection that crosses posts.
+- **Refine** (listed in that menu) works on an explicit scope (the selection, the post at the caret,
   or every post of the open version) with twelve actions or the writer's own
   instruction. The server answers one text per text, each within the
   platform's limit, or fails; the composer previews the answer and applies it

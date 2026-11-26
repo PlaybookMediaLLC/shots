@@ -38,8 +38,13 @@ import {
   editorActionForTool,
   type EditorAIQualityEventDetail,
 } from "../lib/ai-editor";
+import {
+  type EditorAIAction,
+  useEditorServices,
+} from "../lib/editor-services";
 import { cn } from "../lib/utils";
 
+import { keepOwnAI } from "../plugins/ai-ownership";
 import { AIChatEditor } from "./ai-chat-editor";
 import { Button } from "./button";
 import {
@@ -291,6 +296,8 @@ const aiChatItems = {
     value: "accept",
     onSelect: ({ editor }) => {
       emitQuality(editor, "accepted");
+      // Kept text is the writer's now: the discard that follows must miss it.
+      keepOwnAI(editor);
       editor.getTransforms(AIChatPlugin).aiChat.accept();
       if (editor.selection) {
         editor.tf.focus({ at: editor.api.end(editor.selection) });
@@ -553,6 +560,20 @@ Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
       );
     },
   },
+  reviewPost: {
+    icon: <MessageSquareTextIcon />,
+    label: "Review and comment",
+    value: "reviewPost",
+    onSelect: ({ editor }) => {
+      ignoreAiMenuPromise(
+        editor.getApi(AIChatPlugin).aiChat.submit("", {
+          mode: "chat",
+          prompt: "Review this draft and comment on what to improve",
+          toolName: "comment",
+        })
+      );
+    },
+  },
   reviewSelection: {
     icon: <MessageSquareTextIcon />,
     label: "Review selection",
@@ -685,6 +706,7 @@ const menuStateItems = {
         aiChatItems.continueWrite,
         aiChatItems.summarize,
         aiChatItems.explain,
+        aiChatItems.reviewPost,
       ],
     },
   ],
@@ -749,9 +771,17 @@ function AIMenuItems() {
     return filterMenuGroups(items, searchValue) || items;
   }, [menuState, searchValue]);
 
-  if (!aiEditor) {
-    return null;
-  }
+  const hostActions = useEditorServices().ai?.actions;
+  const hostGroups = useMemo(() => {
+    if (!menuState.endsWith("Command")) return [];
+    const wanted = searchValue.trim().toLowerCase();
+    const groups = new Map<string, EditorAIAction[]>();
+    for (const action of hostActions ?? []) {
+      if (wanted && !action.label.toLowerCase().includes(wanted)) continue;
+      groups.set(action.group, [...(groups.get(action.group) ?? []), action]);
+    }
+    return [...groups];
+  }, [hostActions, menuState, searchValue]);
 
   return (
     <>
@@ -784,11 +814,26 @@ function AIMenuItems() {
                 icon={menuItem.icon}
                 key={item.value}
                 label={menuItem.label}
-                onClick={() => menuItem.onSelect?.({ aiEditor, editor })}
+                onClick={() => menuItem.onSelect?.({ aiEditor: aiEditor!, editor })}
                 shortcutEnter
               />
             );
           })}
+        </MenuGroup>
+      ))}
+      {hostGroups.map(([label, actions]) => (
+        <MenuGroup key={label} label={label}>
+          {actions.map((action) => (
+            <MenuItem
+              key={action.label}
+              label={action.label}
+              onClick={() => {
+                editor.getApi(AIChatPlugin).aiChat.hide();
+                action.onSelect();
+              }}
+              shortcutEnter
+            />
+          ))}
         </MenuGroup>
       ))}
     </>
@@ -886,7 +931,8 @@ function AIMenuCombobox({
   return (
     <ComboboxInput autoFocus autoSelect="always">
       <TextareaAutosize
-        className="grow"
+        // The menu around it marks focus; the host's unlayered focus outline needs the `!`.
+        className="grow border-transparent! ring-0! outline-hidden! focus-visible:outline-hidden!"
         data-plate-focus
         onChange={(event) => setInput(event.target.value)}
         onKeyDown={(e) => {

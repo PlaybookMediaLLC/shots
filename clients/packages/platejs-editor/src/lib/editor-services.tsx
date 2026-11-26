@@ -37,7 +37,17 @@ export interface EditorAIEndpoint {
   fetch?: typeof globalThis.fetch;
 }
 
+/** One AI action the host adds to the AI menu, beside the editor's own. */
+export interface EditorAIAction {
+  /** The menu heading the action sits under. */
+  group: string;
+  label: string;
+  onSelect: () => void;
+}
+
 export interface EditorAIServices {
+  /** Host actions listed in the AI menu before a request is sent. */
+  actions?: readonly EditorAIAction[];
   /** Streams AI SDK UI messages for the AI menu (generate, edit, comment). */
   chat?: EditorAIEndpoint;
   /** Answers `{ prompt }` with `{ text }` for inline ghost-text completion. */
