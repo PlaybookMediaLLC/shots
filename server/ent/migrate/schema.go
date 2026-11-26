@@ -280,6 +280,29 @@ var (
 			},
 		},
 	}
+	// AssistantThreadColumns holds the columns for the "assistant_thread" table.
+	AssistantThreadColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString},
+		{Name: "entries", Type: field.TypeJSON},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// AssistantThreadTable holds the schema information for the "assistant_thread" table.
+	AssistantThreadTable = &schema.Table{
+		Name:       "assistant_thread",
+		Columns:    AssistantThreadColumns,
+		PrimaryKey: []*schema.Column{AssistantThreadColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "assistantthread_organizationId_userId_updatedAt",
+				Unique:  false,
+				Columns: []*schema.Column{AssistantThreadColumns[1], AssistantThreadColumns[2], AssistantThreadColumns[6]},
+			},
+		},
+	}
 	// AudienceSubscriberColumns holds the columns for the "audience_subscriber" table.
 	AudienceSubscriberColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -5709,6 +5732,7 @@ var (
 		ApikeyTable,
 		ApprovalTable,
 		AssetTable,
+		AssistantThreadTable,
 		AudienceSubscriberTable,
 		AuditDrainTable,
 		AuditDrainDeliveryTable,
@@ -5910,6 +5934,9 @@ func init() {
 	}
 	AssetTable.Annotation = &entsql.Annotation{
 		Table: "asset",
+	}
+	AssistantThreadTable.Annotation = &entsql.Annotation{
+		Table: "assistant_thread",
 	}
 	AudienceSubscriberTable.Annotation = &entsql.Annotation{
 		Table: "audience_subscriber",

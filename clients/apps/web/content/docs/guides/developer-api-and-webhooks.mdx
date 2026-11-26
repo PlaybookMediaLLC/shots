@@ -1,0 +1,51 @@
+---
+title: Developer API & Webhooks
+description: Send releases from CI/CD pipelines, verify signed inbound and outbound webhooks, and call the REST API safely with idempotency keys.
+keywords:
+  - developer api
+  - ci cd
+  - webhooks
+  - openapi
+  - idempotency
+---
+
+This guide shows how engineering teams connect CI/CD pipelines and internal tools to Shots.
+
+## 1. Create a Scoped Workspace API Key
+
+Open **Settings → Developer API** (`/settings/developers`) and create an API key with only the scopes your integration requires:
+
+- `release:create` — submit release briefs from CI/CD and start draft campaigns
+- `artifact:read` — read releases, campaigns, schedules, and call editor utilities (`/api/screenshot`, `/api/export`)
+- `upload:sign` and `asset:write` — upload build screenshots or release media
+- `source:write` — register or update release-intake sources
+
+Never embed API keys in client-side code. Store them in your CI secret manager (for example, `SHOTS_API_KEY`).
+
+## 2. Send a Release From CI With Idempotency
+
+Always send an `Idempotency-Key` header (such as the git tag or release SHA) on `POST /api/v1/releases` so CI retries never create duplicate releases:
+
+```bash
+curl -X POST https://shots.playbookmedia.io/api/v1/releases \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -H "Idempotency-Key: release-v2.4.0" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "v2.4.0 — Unattended Email Sign-In for Capture",
+    "benefitStatement": "Capture authenticated product screens without manual logins.",
+    "description": "Added automatic magic-link and OTP email authentication for signed-in capture.",
+    "sourceUrls": ["https://github.com/acme/app/releases/tag/v2.4.0"]
+  }'
+```
+
+## 3. Configure Webhooks
+
+- **Inbound release webhooks:** Register a source app to receive signed GitHub, GitLab, or generic JSON payloads at `/api/webhooks/source/{sourceAppId}`.
+- **Outbound workspace webhooks:** Configure destinations in **Settings → Developer API** to notify Slack bots or internal systems when releases, approvals, or deliveries change state. Always verify the HMAC signature before trusting a payload.
+
+## 4. Explore the Live OpenAPI Contract
+
+- Interactive API Explorer: [/api-reference](/api-reference)
+- OpenAPI 3.1 JSON Schema: [/openapi.json](/openapi.json)
+- Full API Reference Docs: [API Overview](/docs/api)

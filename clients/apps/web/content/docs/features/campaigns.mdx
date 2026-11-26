@@ -1,0 +1,30 @@
+---
+title: Campaigns & Launch Briefs
+description: Turn a qualified software release into a cited launch brief, campaign plan, branded visuals, and channel copy.
+keywords:
+  - campaigns
+  - launch brief
+  - launch spec
+  - campaign plan
+  - release kit
+---
+
+## Summary
+
+**Campaigns** (`/campaigns`) orchestrates the full path from a shipped release to an approved multi-channel launch. Every campaign moves through four explicit, reviewable stages so nothing goes out based on unverified claims.
+
+## Campaign Stages
+
+| Stage | Route | What happens |
+| --- | --- | --- |
+| **Launch spec** | `/campaigns/[campaignId]/spec` | Shots reads the release notes, PRs, and attached sources to draft a structured launch brief. Every claim cites its source; unsupported claims surface as open questions for a human to confirm. |
+| **Campaign plan** | `/campaigns/[campaignId]/plan` | Defines target channels (X, LinkedIn, Instagram, Product Hunt, changelog, release email), messaging angles, visual capture hints, and a teaser / launch day / follow-up timeline. |
+| **Assets** | `/campaigns/[campaignId]/assets` | Captures live product screens (or uses uploaded visuals), frames them in the Shots editor with your brand kit, critiques output quality, and stores editable layers. |
+| **Copy & review** | `/campaigns/[campaignId]/copy` | Drafts channel-specific copy checked against character limits, banned hype words, unknown links, and citation integrity. Revisions arrive as diffs until applied. |
+
+## Sub-Views
+
+- **All campaigns (`/campaigns`):** Active and historical launch campaigns.
+- **Release inbox (`/campaigns/releases`):** Incoming releases and merged pull requests waiting for qualification.
+- **Deliveries (`/campaigns/deliveries`):** Per-channel delivery receipts and status across scheduled campaign posts.
+- **Archived (`/campaigns?status=ARCHIVED`):** Completed or retired campaigns kept for historical reference.

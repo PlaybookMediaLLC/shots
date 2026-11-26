@@ -74,6 +74,14 @@ import {
 } from './github-production.ts'
 export * from './github-production.ts'
 import { socialObservationSchema } from './social-analytics.ts'
+
+/** One saved assistant thread; a list leaves `entries` out. */
+export type BackendAssistantThread = {
+  id: string
+  title: string
+  entries?: unknown[]
+  updatedAt: string
+}
 export * from './social-analytics.ts'
 import {
   workspaceMemberSchema,
@@ -5946,6 +5954,29 @@ export class ScreenshotStudioBackendSDK {
       `v1/conversations/${encodeURIComponent(conversationId)}`,
       { body: input, method: 'PATCH' }
     )
+  }
+
+  /** The signed-in person's saved assistant threads, newest first. */
+  async listAssistantThreads() {
+    return this.request<{ threads: BackendAssistantThread[] }>('v1/assistant-threads')
+  }
+
+  async getAssistantThread(id: string) {
+    return this.request<BackendAssistantThread>(`v1/assistant-threads/${encodeURIComponent(id)}`)
+  }
+
+  /** Create or replace one of the person's threads. */
+  async saveAssistantThread(id: string, input: { title: string; entries: unknown[] }) {
+    return this.request<BackendAssistantThread>(`v1/assistant-threads/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PUT',
+    })
+  }
+
+  async deleteAssistantThread(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/assistant-threads/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
   }
 
   async getCampaignAsset(campaignId: string, assetId: string) {

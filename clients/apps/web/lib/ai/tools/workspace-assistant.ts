@@ -9,14 +9,20 @@ import { defineTool, type ToolRun } from '@/lib/ai/tools/executor'
 import { marketingTools } from '@/lib/ai/tools/marketing'
 import { marketingServices } from '@/lib/ai/tools/marketing-services'
 import { accessAllows } from '@/lib/auth/permissions'
+import { brandKitLibrary } from '@/lib/brand/kit'
 import { CANVAS_RECIPES, canvasRecipeSchema } from '@/lib/canvas/recipes'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 import { WorkspaceEntitlementError, requireWorkspaceFeature } from '@/lib/tenant/entitlements'
 import { PLATFORM_DESTINATIONS } from '@/lib/platform/navigation'
+import { listAssets } from '@/lib/tenant/assets'
 import { listCampaigns } from '@/lib/tenant/campaigns'
 import { listCanvases } from '@/lib/tenant/canvases'
+import { listBrandKits } from '@/lib/tenant/configuration'
 import { listContentDraftPostsBetween, listContentDrafts } from '@/lib/tenant/content-drafts'
+import { getIdealCustomerProfile } from '@/lib/tenant/ideal-customer-profile'
 import { listProjects } from '@/lib/tenant/projects'
+import { getRelease } from '@/lib/tenant/releases'
+import { backendSDK } from '@/lib/backend/sdk'
 import { draftHref, draftName } from '@/lib/write/library'
 import { listedStatus, postState } from '@/lib/content-drafts/post-status'
 import { palettePages, searchPages } from '@/components/platform-shell/palette-pages'
@@ -241,9 +247,10 @@ export function workspaceAssistantTools(run: ToolRun, state: AssistantTurnState)
       'Find pages of this app by what they are for ("brand colours", "scheduled posts", ' +
       '"connect GitHub"). Returns page names and addresses; with no words, every page.',
     effect: 'read',
-    execute: ({ query }) => {
+    execute: async ({ query }) => {
+      const campaignsEnabled = await allowed('campaign:workflow')
       const pages = palettePages({
-        campaignsEnabled: true,
+        campaignsEnabled,
         canManage: accessAllows(access, 'workspace:update'),
         draftsEnabled: contentDraftsEnabled(),
         sectionLabel: (key) => PLATFORM_DESTINATIONS.find((item) => item.key === key)?.label ?? key,
@@ -262,7 +269,170 @@ export function workspaceAssistantTools(run: ToolRun, state: AssistantTurnState)
     maxCallsPerRun: 4,
     name: 'findPages',
     permission: 'workspace:read',
-    timeoutMs: 5_000,
+    timeoutMs: 10_000,
+  })
+
+  const getWorkspaceIcp = defineTool(run, {
+    description:
+      "Read the workspace's ideal customer profile (audience, roles, pains, buying criteria and objections) so copy and visuals speak to the right buyers.",
+    effect: 'read',
+    execute: async () => {
+      const profile = await getIdealCustomerProfile(access)
+      if (!profile) {
+        return {
+          idealCustomerProfile: null,
+          note: 'No ideal customer profile has been saved for this workspace yet.',
+          ok: true as const,
+        }
+      }
+      return { idealCustomerProfile: profile, ok: true as const }
+    },
+    inputSchema: z.object({}),
+    maxCallsPerRun: 2,
+    name: 'getIdealCustomerProfile',
+    permission: 'workspace:read',
+    timeoutMs: 10_000,
+  })
+
+  const listWorkspaceBrandKits = defineTool(run, {
+    description:
+      "List the workspace's active visual brand kits (id, name, colors, accent, fonts, logo count) so you can inspect or apply them to a design.",
+    effect: 'read',
+    execute: async () => {
+      const stored = await listBrandKits(access)
+      const kits = brandKitLibrary(stored).map((kit) => ({
+        accent: kit.accent,
+        colors: kit.colors,
+        id: kit.id,
+        logoCount: kit.logos.length,
+        name: kit.name,
+        primaryFont: kit.primaryFont,
+        secondaryFont: kit.secondaryFont,
+        version: kit.version,
+      }))
+      return { brandKits: kits, ok: true as const }
+    },
+    inputSchema: z.object({}),
+    maxCallsPerRun: 2,
+    name: 'listBrandKits',
+    permission: 'workspace:read',
+    timeoutMs: 10_000,
+  })
+
+  const searchWorkspaceAssets = defineTool(run, {
+    description:
+      "Search the workspace's asset library for images or media (screenshots, logos, exports, uploads) by filename or classification so you can reference or insert them.",
+    effect: 'read',
+    execute: async ({ search, type }) => {
+      const { assets } = await listAssets(access, {
+        search: search || undefined,
+        sort: 'newest',
+        take: 10,
+        type: type ?? 'image',
+      })
+      state.known.add('/library')
+      return {
+        assets: assets.map((asset) => ({
+          classification: asset.classification ?? null,
+          fileName: asset.fileName ?? null,
+          height: asset.height ?? null,
+          id: asset.id,
+          mediaType: asset.mediaType,
+          projectName: asset.projectName ?? null,
+          width: asset.width ?? null,
+        })),
+        ok: true as const,
+      }
+    },
+    inputSchema: z.object({
+      search: z.string().trim().max(120).optional(),
+      type: z.enum(['all', 'image', 'video']).optional(),
+    }),
+    maxCallsPerRun: 4,
+    name: 'searchWorkspaceAssets',
+    permission: 'artifact:read',
+    timeoutMs: 15_000,
+  })
+
+  const getReleaseDetails = defineTool(run, {
+    description:
+      'Read one release: its title, status, summary and sources. The open release id is in the page context. This is guidance only; it never decides whether a release is ready.',
+    effect: 'read',
+    execute: async ({ releaseId }) => {
+      const release = await getRelease(access, releaseId)
+      if (!release) return { error: 'No such release in this workspace.', ok: false as const }
+      state.known.add(`/releases/${release.id}`)
+      return {
+        note: 'Summarise only these facts. Readiness and approval are decided by people.',
+        ok: true as const,
+        release,
+      }
+    },
+    inputSchema: z.object({ releaseId: z.uuid() }),
+    maxCallsPerRun: 2,
+    name: 'getReleaseDetails',
+    permission: 'artifact:read',
+    timeoutMs: 10_000,
+  })
+
+  const getSocialAnalyticsSummary = defineTool(run, {
+    description:
+      'Read stored social metrics of one publishing profile (social set) for the past days. Without a socialSetId, lists the profiles.',
+    effect: 'read',
+    execute: async ({ days, socialSetId }) => {
+      if (!(await allowed('content:drafts')))
+        return { error: 'Posts are not on for this workspace.', ok: false as const }
+      const backend = backendSDK(access)
+      if (!socialSetId) {
+        const { items } = await backend.listSocialSets()
+        return { ok: true as const, socialSets: items.map(({ id, name }) => ({ id, name })) }
+      }
+      const to = new Date()
+      const { items } = await backend.listSocialAnalytics({
+        from: new Date(to.getTime() - days * 86_400_000).toISOString(),
+        socialSetId,
+        to: to.toISOString(),
+      })
+      state.known.add('/publish/analyze')
+      return { observations: items.slice(0, 40), ok: true as const, total: items.length }
+    },
+    inputSchema: z.object({
+      days: z.number().int().min(1).max(90).default(28),
+      socialSetId: z.string().max(80).optional(),
+    }),
+    maxCallsPerRun: 3,
+    name: 'getSocialAnalyticsSummary',
+    permission: 'artifact:read',
+    timeoutMs: 15_000,
+  })
+
+  const proposeCaptureRecipe = defineTool(run, {
+    description:
+      'Draft a signed-in capture recipe from plain words, for the person to review on the capture page. Nothing is saved or run. Without ids, lists the connections to choose from.',
+    effect: 'read',
+    execute: async ({ connectionId, prompt, surfaceId }) => {
+      const backend = backendSDK(access)
+      state.known.add('/workflows/connections')
+      if (!connectionId || !surfaceId || !prompt) {
+        const { connections } = await backend.captureOverview()
+        return {
+          connections,
+          note: 'Surface ids come from listProductSurfaces.',
+          ok: true as const,
+        }
+      }
+      const { proposal } = await backend.proposeCaptureRecipe({ connectionId, prompt, surfaceId })
+      return { ok: true as const, proposal }
+    },
+    inputSchema: z.object({
+      connectionId: z.string().max(80).optional(),
+      prompt: z.string().trim().max(500).optional(),
+      surfaceId: z.string().max(80).optional(),
+    }),
+    maxCallsPerRun: 2,
+    name: 'proposeCaptureRecipe',
+    permission: 'artifact:edit',
+    timeoutMs: 60_000,
   })
 
   const draftPost = defineTool(run, {
@@ -386,12 +556,18 @@ export function workspaceAssistantTools(run: ToolRun, state: AssistantTurnState)
     draftPost,
     findPages,
     getBrand,
+    getIdealCustomerProfile: getWorkspaceIcp,
     getProduct,
+    getReleaseDetails,
+    getSocialAnalyticsSummary,
+    proposeCaptureRecipe,
+    listBrandKits: listWorkspaceBrandKits,
     listCampaigns: listWorkspaceCampaigns,
     listProductSurfaces,
     listRecentWork,
     listScheduledPosts,
     offerLink,
+    searchWorkspaceAssets,
     startWork,
   }
 }

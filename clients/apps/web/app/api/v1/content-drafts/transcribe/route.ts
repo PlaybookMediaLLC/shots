@@ -11,7 +11,10 @@ export const POST = route(transcribeContract, {
   handler: async ({ access, body }) => {
     const unavailable = await aiUnavailable(access)
     if (unavailable) return unavailable
-    if (!(await writingContext(access, body.draftId, body.channel)))
+    if (
+      body.draftId &&
+      !(body.channel && (await writingContext(access, body.draftId, body.channel)))
+    )
       return errorResponse(404, 'Draft not found.')
     const audio = Buffer.from(body.audio, 'base64')
     try {

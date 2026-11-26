@@ -6,6 +6,7 @@ import {
   renderNotFoundMarkdown,
 } from '@/lib/agents/site-content'
 import { llmsTxt } from '@/lib/agents/llms'
+import { getDocsMarkdown } from '@/lib/docs/source'
 
 function markdownResponse(body: string, status: number, canonical: string): Response {
   return new Response(body, {
@@ -25,6 +26,10 @@ export function agentMarkdownResponse(path: string): Response {
   const page = findAgentPage(pathname)
 
   if (!page) {
+    const doc = getDocsMarkdown(pathname)
+    if (doc) {
+      return markdownResponse(doc.content, 200, canonical)
+    }
     return markdownResponse(renderNotFoundMarkdown(pathname), 404, canonical)
   }
 

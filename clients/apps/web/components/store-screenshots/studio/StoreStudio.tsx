@@ -50,6 +50,7 @@ import { useEditorShortcuts } from './shortcuts'
 import { Sidebar } from './sidebar/Sidebar'
 import { SlideThumbnail } from './SlideThumbnail'
 import { StudioHeader } from './StudioHeader'
+import { useStoreStudioAbility } from './useStoreStudioAbility'
 import type { StoreApi } from 'zustand/vanilla'
 import { Input } from '@/components/ui/input'
 import { TRPCClientError } from '@trpc/client'
@@ -121,6 +122,7 @@ function EditorLayout({
   const backgroundInputRef = React.useRef<HTMLInputElement>(null)
   const deviceTargetRef = React.useRef<{ slideId: string; layerId: string } | null>(null)
   const issueCount = useHeaderIssues(store, dialog)
+  useStoreStudioAbility(store, issueCount)
   const documentId = useStore(store, (state) => state.document.id)
   const isMobile = useIsMobile()
   const [mobilePanel, setMobilePanel] = React.useState<'tools' | 'inspector'>('tools')

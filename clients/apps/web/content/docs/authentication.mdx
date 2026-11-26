@@ -1,0 +1,80 @@
+---
+title: Shots API Authentication
+description: Authentication, API key scopes, signed-in sessions, and rate limits for Shots editor utilities and /api/v1 workspace endpoints.
+keywords:
+  - Shots API authentication
+  - Shots API key
+  - X-API-Key
+  - rate limits
+  - scopes
+---
+
+Shots has two API surfaces. Editor utility endpoints such as `/api/screenshot` require a signed-in session or a workspace API key with the `artifact:read` scope, and per-IP limits apply on top. Versioned `/api/v1` tenant endpoints require a workspace API key with the declared scope or a signed-in user session with the matching permission.
+
+Create and manage workspace API keys in **Settings → Developer API** (`/settings/developers`).
+
+## Editor Utility Endpoints
+
+Utility endpoints accept either a signed-in session cookie (used by the browser editor) or a workspace API key with the `artifact:read` scope in the `X-API-Key` header.
+
+- A request with neither credential returns `401` with code `unauthorized`.
+- There is no free plan: a workspace without an active paid subscription receives `403` with code `workspace_feature_not_entitled`.
+
+```bash
+curl -X POST https://shots.playbookmedia.io/api/screenshot \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+```
+
+## Tenant API Credentials (`/api/v1`)
+
+Calls to `/api/v1/*` operate strictly within one workspace. Machine callers send an organization key in `X-API-Key`; browser callers may use their signed-in session. The server verifies workspace membership, role permission, subtractive permission groups, API-key scope, plan feature entitlement, and metered quotas on every request.
+
+```bash
+curl https://shots.playbookmedia.io/api/v1/releases \
+  -H "X-API-Key: $SHOTS_API_KEY"
+```
+
+## Workspace API Key Scopes
+
+Every API key carries an explicit set of scopes. Keys can never approve posts—human approval always requires a signed-in member session.
+
+<ApiKeyScopesTable />
+
+## Rate Limits
+
+| Endpoint | Limit | Notes |
+| --- | --- | --- |
+| `POST /api/screenshot` | 20 requests per minute per IP | Returns `429` with `Retry-After` and `X-RateLimit-*` headers |
+| `POST /api/export` | Unmetered per-IP | Bounded by request body size and server processing time |
+| `GET /api/tweet/{id}` | Unmetered per-IP | Bounded by the upstream syndication API |
+| `GET /api/image-proxy` | Unmetered per-IP | Restricted to an allowlist of Twitter media hosts |
+| `/api/v1/*` writes | Plan-based `api:write:minute` quota | Enforced per workspace in Redis |
+| MCP server calls | 60 calls per minute per key | Same scope, plan, and quota checks as `/api/v1` |
+
+## Handling `429` Responses
+
+When a rate limit is exceeded, the response carries `Retry-After` (in seconds) alongside `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`. Wait for `Retry-After` before retrying:
+
+```json
+{
+  "error": "Rate limit exceeded. Please try again later.",
+  "code": "rate_limited",
+  "message": "Rate limit exceeded. Please try again later.",
+  "hint": "Wait 42 seconds, then retry. This endpoint allows 20 requests per minute per IP address.",
+  "status": 429,
+  "documentation": "https://shots.playbookmedia.io/docs#errors",
+  "retryAfter": 42
+}
+```
+
+## Credentialed Maintenance Endpoints
+
+Internal cache-maintenance endpoints require a maintainer secret and are deliberately excluded from the public [OpenAPI specification](/openapi.json).
+
+## Next Steps
+
+- [API Overview](/docs/api)
+- [Errors & Idempotency](/docs/api/errors)
+- [Connect AI Agents (MCP)](/docs/agents)

@@ -1,0 +1,24 @@
+---
+title: Product Terminology
+description: Canonical definitions for the core concepts across the Shots workspace, UI, and API.
+keywords:
+  - terminology
+  - glossary
+  - definitions
+---
+
+Shots uses consistent terms across the web app, Automate workflows, API, and MCP tools.
+
+| Term | Meaning |
+| --- | --- |
+| **Workspace** | The tenant organization boundary that owns members, roles, brand kits, releases, campaigns, assets, social accounts, billing, and audit logs. |
+| **Release** | A shipped software change entering Shots via GitHub, GitLab, a webhook, the REST API, or manual entry. |
+| **Qualification** | The review step where an owner verifies facts, audience, rollout scope, and limitations for a release—or decides it does not need external communication. |
+| **Launch spec (Launch brief)** | The structured, source-cited factual specification for a campaign. Claims without supporting evidence surface as open questions. |
+| **Release kit** | The versioned set of verified, role-specific launch deliverables grounded in a qualified release. |
+| **Campaign** | A multi-channel launch effort containing a launch spec, campaign plan, branded assets, and channel posts moving through review and delivery. |
+| **Profile (Social set)** | A publishing identity (person or company) grouping connected social channels, posting queue slots, time zone, and writing defaults. In API endpoints, profiles are referred to as `social-sets`. |
+| **Content draft** | A standalone post or multi-part thread created in **Publish** (or via API/MCP) with media, tags, comments, and optional scheduling. |
+| **Brand kit** | A workspace's brand voice rules, banned terms, colors, typography, logos, and visual defaults applied across editors and campaigns. |
+| **Product page** | A registered live URL in **Settings → Product pages** that Shots monitors and captures for launch visuals. |
+| **Workflow (Automate)** | A versioned automation rule triggered by a repository or deployment event that creates campaign drafts for human review. |

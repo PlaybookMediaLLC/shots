@@ -55,13 +55,13 @@ test(
     await page.getByRole('button', { exact: true, name: 'Add Text' }).first().click()
     await expect(page.getByText('4:3', { exact: true }).first()).toBeVisible()
 
-    // "Give me four versions" opens four complete versions beside the original.
+    // "Give me four versions" opens four complete versions beside the original in the unified assistant.
     await page.getByRole('button', { name: 'Open the AI copilot' }).click()
-    const panel = page.getByRole('region', { name: 'AI copilot' })
-    await panel.getByLabel('Ask the copilot').fill('Give me four versions of this design')
-    await panel.getByLabel('Ask the copilot').press('Enter')
-    // The request prefills Variants; spending credits still takes an explicit click.
-    await panel.getByRole('button', { name: 'Make 4 versions' }).click()
+    const panel = page.getByRole('region', { name: 'Assistant' })
+    await panel.getByLabel('Ask the assistant').fill('Give me four versions of this design')
+    await panel.getByLabel('Ask the assistant').press('Enter')
+    // The request prefills Variants inline; spending credits still takes an explicit click.
+    await panel.getByRole('button', { name: 'Make 4 versions' }).click({ timeout: 60_000 })
     const versions = panel.getByRole('list', { name: 'Versions' })
     await expect(versions.getByRole('button', { name: /^Inspect / })).toHaveCount(4, {
       timeout: 90_000,
@@ -87,14 +87,16 @@ test(
 
     // Captions: alt text and one caption per platform, editable and kept with the design.
     await panel.getByRole('button', { exact: true, name: 'Captions' }).click()
-    await panel.getByRole('button', { name: 'Write alt text and captions' }).click()
+    await panel
+      .getByRole('button', { name: 'Write alt text and captions' })
+      .click({ timeout: 60_000 })
     const x = panel.getByLabel('X caption')
     await expect(x).toHaveValue(/Meet/, { timeout: 60_000 })
     await expect(panel.getByLabel('LinkedIn caption')).toHaveValue(/Meet/)
     await expect(panel.getByLabel('Instagram caption')).toHaveValue(/#launch/)
     await x.fill('Meet the new dashboard.')
     await x.blur()
-    await panel.getByRole('button', { name: 'Close' }).click()
+    await panel.getByRole('button', { name: 'Hide the assistant' }).click()
     await page.getByRole('button', { exact: true, name: 'Share' }).click()
     await expect(
       page.getByRole('dialog', { name: 'Share design' }).getByLabel('Alt text')

@@ -88,6 +88,17 @@ export const LAUNCH_AI_RATE_LIMIT: RateLimitPolicy = {
 }
 
 /**
+ * Interactive assistant turns (workspace + in-editor tool steps) per workspace.
+ * Separate from `LAUNCH_AI_RATE_LIMIT` so interactive editing never starves
+ * background launch generation, while still capping burst spend.
+ */
+export const ASSISTANT_AI_RATE_LIMIT: RateLimitPolicy = {
+  maxRequests: 120,
+  name: 'assistant-ai',
+  windowMs: 60_000,
+}
+
+/**
  * Link previews fetch an arbitrary public page plus its robots.txt, sitemap,
  * favicon, and images, so each workspace gets a budget that covers a batch
  * check or a CI run but not a crawler.

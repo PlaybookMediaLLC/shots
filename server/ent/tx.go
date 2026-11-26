@@ -28,6 +28,8 @@ type Tx struct {
 	Approval *ApprovalClient
 	// Asset is the client for interacting with the Asset builders.
 	Asset *AssetClient
+	// AssistantThread is the client for interacting with the AssistantThread builders.
+	AssistantThread *AssistantThreadClient
 	// AudienceSubscriber is the client for interacting with the AudienceSubscriber builders.
 	AudienceSubscriber *AudienceSubscriberClient
 	// AuditDrain is the client for interacting with the AuditDrain builders.
@@ -513,6 +515,7 @@ func (tx *Tx) init() {
 	tx.Apikey = NewApikeyClient(tx.config)
 	tx.Approval = NewApprovalClient(tx.config)
 	tx.Asset = NewAssetClient(tx.config)
+	tx.AssistantThread = NewAssistantThreadClient(tx.config)
 	tx.AudienceSubscriber = NewAudienceSubscriberClient(tx.config)
 	tx.AuditDrain = NewAuditDrainClient(tx.config)
 	tx.AuditDrainDelivery = NewAuditDrainDeliveryClient(tx.config)

@@ -188,12 +188,14 @@ test(
     await expect(page.locator('[data-element-type="badge"]')).toHaveCount(2)
     await savePreset(page, 'Announcement')
 
-    // Four Copilot variants; pick one.
+    // Four Copilot variants in the unified assistant; pick one.
     await page.getByRole('button', { name: 'Open the AI copilot' }).click()
-    const panel = page.getByRole('region', { name: 'AI copilot' })
-    await panel.getByLabel('Ask the copilot').fill('Give me four versions of this design')
-    await panel.getByLabel('Ask the copilot').press('Enter')
-    await panel.getByRole('button', { name: 'Make 4 versions', exact: true }).click()
+    const panel = page.getByRole('region', { name: 'Assistant' })
+    await panel.getByLabel('Ask the assistant').fill('Give me four versions of this design')
+    await panel.getByLabel('Ask the assistant').press('Enter')
+    await panel.getByRole('button', { name: 'Make 4 versions', exact: true }).click({
+      timeout: 60_000,
+    })
     const versions = panel.getByRole('list', { name: 'Versions' })
     await expect(versions.getByRole('button', { name: /^Inspect / })).toHaveCount(4, {
       timeout: 120_000,
@@ -206,7 +208,7 @@ test(
     // The chosen version keeps the composition: three screens, the headline, both badges.
     await expect(page.locator('#image-render-card [data-device-id]')).toHaveCount(3)
     await expect(page.locator('[data-element-type="badge"]')).toHaveCount(2)
-    await panel.getByRole('button', { name: 'Close' }).click()
+    await panel.getByRole('button', { name: 'Hide the assistant' }).click()
 
     // Export it in two sizes.
     await page.getByRole('button', { exact: true, name: 'Export' }).click()

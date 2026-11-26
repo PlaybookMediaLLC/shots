@@ -1,7 +1,7 @@
 import { apiRequest, draftEditor, expect, expectSaved, test } from './framework'
 
 test(
-  'prompt examples and reviewed voice notes enter the existing editable assistant workflow',
+  'prompt examples and reviewed voice notes enter the editable assistant composer',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     const errors: string[] = []
@@ -19,20 +19,21 @@ test(
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
     await app.open(`/publish/${id}?panel=assistant`)
-    const panel = page.getByTestId('assistant-panel')
-    await panel.getByText('Writing prompts and examples', { exact: true }).click()
-    await panel.getByRole('button', { name: 'Share a lesson', exact: true }).click()
-    await expect(panel.getByLabel('Ask the assistant')).toHaveValue(/Ask what happened/)
+    const panel = page.getByRole('region', { name: 'Assistant' })
+    const box = panel.getByRole('textbox', { name: 'Ask the assistant' })
+    await panel.getByRole('combobox', { name: 'Prompt library' }).click()
+    await page.getByRole('option', { name: 'Share a lesson', exact: true }).click()
+    await expect(box).toHaveValue(/Ask what happened/)
     await expect(draftEditor(page)).toContainText('Original evidence')
     await expect(page.getByTestId('post-header')).toHaveCount(1)
-    await panel.getByText('Voice memo', { exact: true }).click()
-    await panel.getByLabel('Voice memo audio').setInputFiles({
+    await box.fill('')
+    const attach = panel.getByLabel('Attach an image or voice memo file')
+    await attach.setInputFiles({
       name: 'bad.wav',
       mimeType: 'audio/wav',
       buffer: Buffer.from('not an audio recording'),
     })
-    await panel.getByRole('button', { name: 'Transcribe audio', exact: true }).click()
-    await expect(panel.getByRole('alert')).toContainText('does not match')
+    await expect(page.getByText(/does not match/)).toBeVisible()
     // A valid silent WAV exercises upload/protocol wiring against the explicitly scripted
     // AI model. This is not evidence of live speech recognition accuracy.
     const wav = Buffer.alloc(16044)
@@ -49,19 +50,13 @@ test(
     wav.writeUInt16LE(16, 34)
     wav.write('data', 36)
     wav.writeUInt32LE(16000, 40)
-    await panel
-      .getByLabel('Voice memo audio')
-      .setInputFiles({ name: 'memo.wav', mimeType: 'audio/wav', buffer: wav })
-    await panel.getByRole('button', { name: 'Transcribe audio', exact: true }).click()
-    const transcript = panel.getByLabel('Review voice transcript')
-    await expect(transcript).toHaveValue(/Today we shipped/, { timeout: 60_000 })
-    await transcript.fill('We shipped an improvement, and the results still need review.')
-    await panel.getByRole('button', { name: 'Use reviewed transcript', exact: true }).click()
-    await expect(panel.getByLabel('Ask the assistant')).toHaveValue(/results still need review/)
-    await expect(page.getByTestId('assistant-assistant')).toHaveCount(0)
-    await panel.getByRole('button', { name: 'Send', exact: true }).click()
-    await expect(page.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })
-    await panel.getByRole('button', { name: 'Add as a new post', exact: true }).click()
+    await attach.setInputFiles({ name: 'memo.wav', mimeType: 'audio/wav', buffer: wav })
+    // The transcript lands in the composer to review; nothing is sent by itself.
+    await expect(box).toHaveValue(/Today we shipped/, { timeout: 60_000 })
+    await expect(panel.getByRole('button', { name: 'Accept' })).toHaveCount(0)
+    await box.fill('Offer a closing post. We shipped it, and the results still need review.')
+    await box.press('Enter')
+    await panel.getByRole('button', { name: 'Accept' }).click({ timeout: 60_000 })
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expectSaved(page)
     await app.reload()
@@ -118,10 +113,12 @@ test(
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
     await app.open(`/publish/${id}?panel=assistant`)
-    const panel = page.getByTestId('assistant-panel')
-    await panel.getByLabel('Ask the assistant').fill('Suggest one concrete improvement.')
-    await panel.getByRole('button', { name: 'Send', exact: true }).click()
-    await expect(page.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })
+    const panel = page.getByRole('region', { name: 'Assistant' })
+    await expect(panel.getByRole('link', { name: 'Style guide and samples' })).toBeVisible()
+    const box = panel.getByRole('textbox', { name: 'Ask the assistant' })
+    await box.fill('Suggest one concrete improvement.')
+    await box.press('Enter')
+    await expect(panel.getByText(/^You are on /)).toBeVisible({ timeout: 60_000 })
     await expect(draftEditor(page)).toContainText('A specific lesson')
     const audio = Buffer.from('RIFF0000WAVEfmt fixture audio').toString('base64')
     for (const [endpoint, body] of [

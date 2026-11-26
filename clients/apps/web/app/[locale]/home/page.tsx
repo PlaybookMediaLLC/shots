@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { platformHref } from '@/lib/platform/navigation'
@@ -112,6 +113,7 @@ export default async function HomePage({
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization?.name}
     >
+      <AssistantPageContext facts={["Home: what needs attention and recent work."]} />
       <Page
         title="Home"
         description={

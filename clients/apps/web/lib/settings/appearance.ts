@@ -25,6 +25,7 @@ export const THEMED_ROUTE_PREFIXES = [
   '/activity',
   '/assets',
   '/campaigns',
+  '/docs',
   '/drafts',
   '/p',
   '/projects',

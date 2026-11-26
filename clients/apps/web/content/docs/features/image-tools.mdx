@@ -1,0 +1,28 @@
+---
+title: Image & Video Tools
+description: In-browser utilities to compress, convert, resize, crop, rotate, remove backgrounds, and compress videos without uploading source media.
+keywords:
+  - image tools
+  - compress image
+  - convert image
+  - remove background
+  - compress video
+---
+
+## Summary
+
+**Image & Video Tools** (`/create/tools` and `/create?view=tools`) are built directly into every paid Shots workspace. Every tool decodes, processes, and re-encodes media locally inside the browser tab using Canvas, Web Workers, WebGPU/WASM, or FFmpeg WASM—source files are not uploaded to a remote server, and exports have no watermark.
+
+## Available Tools
+
+| Tool | In-app route | What it does |
+| --- | --- | --- |
+| **Compress** | `/create/tools/compress-image` | Reduce file size across four quality levels with live before/after byte comparisons |
+| **Convert** | `/create/tools/convert-image` | Convert between PNG, JPG, WebP, and AVIF in batch |
+| **Resize** | `/create/tools/resize-image` | Set exact pixel dimensions or percentage scaling with aspect-ratio lock |
+| **Crop** | `/create/tools/crop-image` | Interactive frame crop or exact pixel coordinates with social ratio presets |
+| **Rotate** | `/create/tools/rotate-image` | Quarter-turn rotation and horizontal/vertical mirroring in bulk |
+| **Remove background** | `/create/tools/remove-background` | On-device AI background removal (BiRefNet-lite on WebGPU with WebAssembly fallback) up to 50 MB |
+| **Compress video** | `/create/tools/compress-video` | Local FFmpeg WASM compression (MP4, MOV, WebM, MKV up to 1 GB) by quality tier or exact target MB |
+
+Multiple outputs from batch image jobs download together as a single ZIP archive.

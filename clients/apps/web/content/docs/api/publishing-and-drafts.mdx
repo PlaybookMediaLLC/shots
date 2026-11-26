@@ -1,0 +1,35 @@
+---
+title: Publishing & Drafts API
+description: Create and update content drafts, publish or schedule posts, read calendar deliveries, manage profiles, and work with voice notes.
+keywords:
+  - /api/v1/content-drafts
+  - /api/v1/posts
+  - /api/v1/scheduled-posts
+  - /api/v1/social-sets
+---
+
+The publishing API mirrors the **Publish** workspace and powers both custom integrations and the [Shots MCP server](/docs/agents).
+
+Inspect exact payloads and schemas in [/api-reference](/api-reference).
+
+## Content Drafts & Comments
+
+| Domain | Scope / Auth | Capabilities |
+| --- | --- | --- |
+| Content drafts | `artifact:read` / `draft:write` | List, read, create, update (with optimistic version checks), duplicate, copy, recover revisions, plan dates, update tags/pin/scratchpad, and delete unscheduled drafts |
+| Draft comments | `artifact:read` / `draft:comment` | List filtered comment threads, add or reply to comments, edit your own comments, and resolve discussions (never approves or publishes) |
+| Draft activity | `artifact:read` | Read draft timeline events without exposing private comment text |
+
+## Posts, Scheduling & Profiles
+
+| Domain | Scope / Auth | Capabilities |
+| --- | --- | --- |
+| Direct posts (`createPost`) | `post:publish` or session | Create and schedule or publish a post or thread to shared profile accounts (respects workspace approval policies) |
+| Scheduled posts | `artifact:read` / `post:schedule` | List the publishing schedule, schedule human-approved campaign posts with visuals, and cancel scheduled deliveries |
+| Delete published posts | `post:delete` or session | Remove Shots-published posts (including thread parts and replies) from their platform; every delete is audited |
+| Profiles (`social-sets`) | `artifact:read` / `queue:write` | List visible profiles, inspect queue settings, update future posting-slot defaults, look up mentions, and query `bestPostingTimes` |
+| Calendar & link checks | `artifact:read` or session | Read deliveries in a bounded date range, manage calendar notes, and fetch URL link preview metadata |
+
+## Code Projects & Voice Notes
+
+Authenticated workspace operations also expose programmatic creation and rendering for **Code Studio** projects (`/api/v1/code-projects`) and **Voice Notes** (`/api/v1/voice-*`). See [/api-reference](/api-reference) for every operation contract.

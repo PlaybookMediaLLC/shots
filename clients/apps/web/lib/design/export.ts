@@ -353,9 +353,13 @@ export function describeSelection(): { kind: string; label: string } | null {
   const image = useImageStore.getState()
   // Text selection lives in the canvas component; the selected text layer
   // marks itself in the DOM, which is enough to scope an edit to it.
-  const selectedText = document.querySelector<HTMLElement>(
-    '[data-text-overlay-id][data-export-clean-outline="true"]'
-  )?.dataset.textOverlayId
+  // The server renders the editor too, and has no selection to find.
+  const selectedText =
+    typeof document === 'undefined'
+      ? undefined
+      : document.querySelector<HTMLElement>(
+          '[data-text-overlay-id][data-export-clean-outline="true"]'
+        )?.dataset.textOverlayId
   if (selectedText) {
     const index = image.textOverlays.findIndex((text) => text.id === selectedText)
     if (index >= 0) {
@@ -372,6 +376,24 @@ export function describeSelection(): { kind: string; label: string } | null {
       return {
         kind: 'device',
         label: `devices.mockups[${index}] (${image.mockups[index]!.definitionId})`,
+      }
+    }
+  }
+  if (image.selectedElementId) {
+    const index = image.elements.findIndex((element) => element.id === image.selectedElementId)
+    if (index >= 0) {
+      return {
+        kind: 'element',
+        label: `elements[${index}] (${image.elements[index]!.type})`,
+      }
+    }
+  }
+  if (image.selectedBlurId) {
+    const index = image.blurRegions.findIndex((region) => region.id === image.selectedBlurId)
+    if (index >= 0) {
+      return {
+        kind: 'redaction',
+        label: `redactions[${index}] (${image.blurRegions[index]!.style ?? 'blur'})`,
       }
     }
   }

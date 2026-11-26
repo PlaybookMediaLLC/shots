@@ -1,0 +1,47 @@
+# Scripted replies for local development without model tokens (docs/ai-emulator.md).
+# The first matching rule wins. A request that matches none gets its own words back.
+ai:
+  strict: false
+  timing:
+    ttftMs: 150
+    chunkDelayMs: 25
+  rules:
+    - id: after-tool
+      match: { hasToolResult: true }
+      reply: [{ type: text, text: Done. I made that change. }]
+    - id: screenshot-editor
+      match: { textContains: padding, tool: applyChanges }
+      reply:
+        - type: tool_call
+          name: applyChanges
+          arguments: { changes: { canvas: { padding: 96 } }, summary: Gave the design more room }
+    - id: code-caption
+      match: { textContains: caption, tool: editCodeScene }
+      reply:
+        - type: tool_call
+          name: editCodeScene
+          arguments:
+            commands: [{ type: update-slide, slide: 0, patch: { caption: A caption from the emulator } }]
+            summary: Captioned the first slide
+    - id: tweet-dark
+      match: { textContains: dark, tool: editTweet }
+      reply:
+        - type: tool_call
+          name: editTweet
+          arguments: { commands: [{ type: style, theme: dark }], summary: Made the card dark }
+    - id: write-offer
+      match: { textContains: offer, tool: proposeDraftText }
+      reply:
+        - type: tool_call
+          name: proposeDraftText
+          arguments: { mode: new-post, summary: A closing post, text: Try it and tell us what you think. }
+    - id: brand
+      match: { textContains: brand, tool: getBrand }
+      reply: [{ type: tool_call, name: getBrand, arguments: {} }]
+    - id: cut-off
+      match: { textContains: cutoff, stream: true }
+      fault: { afterChunks: 2, kind: disconnect }
+      reply: [{ type: text, text: This reply stops part way through to show how a broken stream looks. }]
+    - id: rate-limit
+      match: { textContains: ratelimit }
+      error: { status: 429, message: Emulated rate limit. }

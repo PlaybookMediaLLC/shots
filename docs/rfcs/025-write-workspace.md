@@ -238,9 +238,11 @@ counted one page of liking users and never passed 100.
   instruction. The server answers one text per text, each within the
   platform's limit, or fails; the composer previews the answer and applies it
   only on Accept, as one change Undo takes back, and refuses if the text
-  changed meanwhile. The **writing assistant** talks about the draft in the
-  set's voice (style guide, audience, and samples saved on the set). Both use
-  the workspace's AI credits.
+  changed meanwhile. The **Shots assistant** (Ask AI, or **Assistant** in the
+  composer) talks about the draft in the set's voice (style guide, audience, and
+  samples saved on the set). It offers text as a card, and the draft changes only
+  on Accept. Its composer holds the writing prompts, and it turns a voice memo
+  into text to review. Both use the workspace's AI credits.
 
 ## Provider capabilities
 

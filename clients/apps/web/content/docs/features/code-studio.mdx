@@ -1,0 +1,31 @@
+---
+title: Code Studio
+description: Turn code snippets, diffs, GitHub pull requests, and scripted terminal sessions into syntax-highlighted images, carousels, and animated videos.
+keywords:
+  - code studio
+  - code image
+  - syntax highlighting
+  - github diff
+  - terminal
+---
+
+## Summary
+
+**Code Studio** (`/create/code`, also accessible at `/code`) transforms source code, diffs, GitHub pull requests, commits, gists, or scripted terminal sessions into polished visuals for changelogs, docs, and social announcements.
+
+Rendering runs in the browser; code is stored only when you save a project to your workspace, and GitHub links are fetched only when you explicitly import them.
+
+## Capabilities
+
+| Capability | Details |
+| --- | --- |
+| Syntax themes | Built-in syntax themes plus custom themes generated automatically from your workspace brand kit |
+| Focus & annotations | Highlight specific lines, blur surrounding context, render git diffs, add file tabs, and include attribution footers |
+| GitHub import | Paste a GitHub file URL (including line ranges), pull request, commit, or gist to import directly |
+| Terminal frames | Style CLI commands and output inside crisp terminal windows |
+| Multi-format export | Export PNGs, multi-slide carousels, LinkedIn PDFs, or animated code videos (MP4, WebM, GIF in 9:16, 1:1, and 16:9) |
+| Post this | One-click handoff to a **Publish** draft with the rendered visual attached and the source code preserved as alt text |
+
+## Programmatic Rendering
+
+Code projects also support workspace API endpoints (`POST /api/v1/code-projects`, `GET /api/v1/code-projects/{projectId}`, and render endpoints) documented in [/api-reference](/api-reference).

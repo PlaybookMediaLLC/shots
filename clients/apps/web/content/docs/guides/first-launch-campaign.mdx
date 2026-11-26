@@ -1,0 +1,45 @@
+---
+title: Run Your First Launch Campaign
+description: Turn a shipped release into a cited launch brief, on-brand visuals, and human-approved posts across your channels.
+keywords:
+  - first launch
+  - campaign guide
+  - launch brief
+  - approvals
+---
+
+This guide takes you from a completed product change to an approved, scheduled launch campaign.
+
+## Prerequisites
+
+- An active Shots workspace on Pro, Business, or Enterprise.
+- Basic product context filled in under **Settings → Product**.
+- At least one brand kit configured under **Settings → Brand voice & visual kits**.
+
+## Step 1: Create or Qualify the Release
+
+You can start a campaign in two ways:
+
+- **From Release inbox (`/campaigns/releases`):** Select an incoming GitHub pull request or release event, verify the evidence and rollout scope, and click **Start campaign**.
+- **Manually (`/campaigns/new`):** Paste your release notes, changelog bullet points, or PR links directly.
+
+## Step 2: Review the Cited Launch Spec
+
+Shots drafts a structured launch brief at `/campaigns/[campaignId]/spec`. Every factual claim links back to a numbered source from the release.
+
+- Confirm or answer any **Open questions** where the source material did not state an answer explicitly.
+- Edit any wording directly; Shots preserves version history so downstream deliverables stay bound to the verified facts.
+
+## Step 3: Approve the Campaign Plan & Visuals
+
+1. Open **Plan** (`/campaigns/[campaignId]/plan`) to choose channels (X, LinkedIn, Instagram, Product Hunt, changelog, release email) and adjust the teaser, launch day, and follow-up cadence.
+2. Open **Assets** (`/campaigns/[campaignId]/assets`) to inspect captured product screenshots and rendered editor cards. Click any visual to tweak framing, shadows, or overlays in the [Screenshot Editor](/docs/features/create).
+
+## Step 4: Review Copy, Approve, and Schedule
+
+Open **Copy** (`/campaigns/[campaignId]/copy`):
+
+- Resolve any copy-check warnings (character limits, banned hype words, unknown links, or uncited claims).
+- Submit drafts for review (`READY_FOR_REVIEW`).
+- A signed-in teammate with `release:approve` permission approves individual posts or the entire launch batch in one click.
+- Schedule approved posts to your connected profiles and track live receipts under **Campaigns → Deliveries** (`/campaigns/deliveries`).

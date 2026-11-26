@@ -1,0 +1,36 @@
+---
+title: Social Publishing & Approvals
+description: Connect social channels, organize publishing profiles and posting queues, and enforce team approval rules.
+keywords:
+  - publishing
+  - social channels
+  - profiles
+  - queues
+  - approvals
+---
+
+Use **Settings → Channels**, **Settings → Profiles**, and **Publish** to run a reliable multi-account publishing workflow with clear ownership and zero accidental sends.
+
+## 1. Connect Social Channels
+
+Open **Settings → Channels** (`/settings/channels`) and authorize the accounts your workspace posts from (such as X, LinkedIn, Instagram, Bluesky, or Mastodon).
+
+## 2. Group Accounts Into Profiles
+
+Open **Settings → Profiles** (`/settings/publishing-brands`) to organize channels into publishing identities (for example, a founder profile and a company profile):
+
+- **General:** Profile name, visibility (shared profiles can be used by team members and scoped AI agents; private profiles stay restricted), and defaults.
+- **Scheduling:** Configure recurring posting-slot queues and the profile time zone.
+- **New draft:** Set default platforms and thread behavior for new drafts.
+- **Writing Assistant:** Tune profile-specific drafting preferences.
+
+## 3. Collaborate, Review, and Approve
+
+1. Draft posts or threads in **Publish** (`/publish`) and attach visuals from **Create** or **Library**.
+2. Use **Publish → Link checks** (`/publish/link-checks`) to confirm link previews render cleanly.
+3. Exchange threaded feedback in draft comments before moving posts into review.
+4. Ensure teammates who review hold the `approver`, `admin`, or `owner` role (which include `release:approve`). Only a signed-in person can approve; API keys and MCP agents can draft or submit for review, and `post:publish` remains off by default.
+
+## 4. Monitor Deliveries & Posting Times
+
+Track scheduled items on **Publish → Calendar** (`/publish/calendar`), check per-account delivery links in **Campaigns → Deliveries** (`/campaigns/deliveries`), and review engagement trends under **Publish → Analyze** (`/publish/analyze`).

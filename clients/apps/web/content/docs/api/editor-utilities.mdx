@@ -1,0 +1,72 @@
+---
+title: Editor Utilities API
+description: Capture live web page screenshots, optimize exported images with Sharp, resolve public tweets, and proxy approved Twitter media.
+keywords:
+  - /api/screenshot
+  - /api/export
+  - /api/tweet
+  - /api/image-proxy
+---
+
+Editor utility endpoints power Shots' browser studios and are available to programmatic callers with a workspace API key (`artifact:read` scope) in `X-API-Key` or a signed-in user session on an active paid plan.
+
+## `POST /api/screenshot` (`captureScreenshot`)
+
+Renders the target URL and returns a base64-encoded PNG. Results are cached per URL, device type (`desktop` `1920x1080` or `mobile` `375x667`), and `colorScheme` (`light` or `dark`). Limited to 20 requests per minute per IP.
+
+```bash
+curl -X POST https://shots.playbookmedia.io/api/screenshot \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "deviceType": "desktop",
+    "colorScheme": "light",
+    "forceRefresh": false
+  }'
+```
+
+Response:
+
+```json
+{
+  "screenshot": "iVBORw0KGgoAAAANSUhEUg...",
+  "url": "https://example.com",
+  "cached": false,
+  "strategy": "microlink",
+  "deviceType": "desktop",
+  "colorScheme": "light"
+}
+```
+
+## `POST /api/export` (`optimizeExportImage`)
+
+Accepts a raw image as `multipart/form-data` and returns optimized binary image bytes using Sharp (MozJPEG for `jpeg`, libwebp for `webp`, adaptive filtering for `png`). `qualityPreset` accepts `high`, `medium`, or `low`.
+
+```bash
+curl -X POST https://shots.playbookmedia.io/api/export \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -F "image=@shot.png" \
+  -F "format=webp" \
+  -F "qualityPreset=high" \
+  -o shot.webp
+```
+
+## `GET /api/tweet/{id}` (`getTweet`)
+
+Returns the public tweet payload for a numeric status ID so it can be rendered as a visual card.
+
+```bash
+curl https://shots.playbookmedia.io/api/tweet/1234567890123456789 \
+  -H "X-API-Key: $SHOTS_API_KEY"
+```
+
+## `GET /api/image-proxy` (`proxyTwitterImage`)
+
+Streams an approved Twitter-hosted image through same-origin headers so it can be drawn onto a browser canvas without tainting it. Only `pbs.twimg.com`, `abs.twimg.com`, `ton.twitter.com`, and `video.twimg.com` are permitted; other hosts return `403 forbidden_domain`.
+
+```bash
+curl "https://shots.playbookmedia.io/api/image-proxy?url=https://pbs.twimg.com/media/EXAMPLE.jpg" \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -o media.jpg
+```

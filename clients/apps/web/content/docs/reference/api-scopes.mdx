@@ -1,0 +1,24 @@
+---
+title: API Key Scopes
+description: Complete reference of every workspace API key scope supported by the Shots REST API and MCP server.
+keywords:
+  - api scopes
+  - permissions
+  - bearer token
+  - X-API-Key
+---
+
+Workspace API keys and OAuth-connected AI agents operate strictly within the scopes granted when the key was created in **Settings → Developer API** or **Settings → AI agents**.
+
+## All Supported Scopes
+
+This table is generated directly from Shots' server-enforced scope registry:
+
+<ApiKeyScopesTable />
+
+## Scope Selection Guidance
+
+- Start with read-only (`artifact:read`) when testing a new integration.
+- For CI/CD release intake, combine `release:create`, `upload:sign`, and `asset:write`.
+- Reserve `post:publish` and `post:delete` for explicitly trusted automation; on OAuth consent screens, these two scopes are never pre-selected even when a client requests them.
+- Rotate or revoke keys immediately in **Settings → Developer API** or **Settings → AI agents** if a credential is exposed.

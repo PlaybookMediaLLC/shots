@@ -1,5 +1,4 @@
 import type { EditorServices, EditorUploadFile } from '@shots/platejs-editor/lib'
-import type { DraftChannel } from '@/lib/write/document'
 import { type SaveToWorkspaceInput, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { assetContentUrl } from './asset-url'
 
@@ -26,23 +25,7 @@ export function workspaceUploadFile(trpcClient: TrpcClient): EditorUploadFile {
   }
 }
 
-/**
- * Uploads and AI wired to the platform for the document editor. With a draft,
- * the AI writes in that draft's voice for the platform being edited.
- */
-export function platformEditorServices(
-  trpcClient: TrpcClient,
-  aiEnabled: boolean,
-  voice: { channel: DraftChannel; draftId: string }
-): EditorServices {
-  const query = `?${new URLSearchParams(voice)}`
-  return {
-    ai: aiEnabled
-      ? {
-          chat: { api: `/api/ai/document${query}` },
-          copilot: { api: `/api/ai/document/copilot${query}` },
-        }
-      : undefined,
-    uploadFile: workspaceUploadFile(trpcClient),
-  }
+/** Uploads wired to the platform for the document editor. AI is the assistant's job. */
+export function platformEditorServices(trpcClient: TrpcClient): EditorServices {
+  return { uploadFile: workspaceUploadFile(trpcClient) }
 }

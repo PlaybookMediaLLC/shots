@@ -1,0 +1,33 @@
+---
+title: Signed-In & Autonomous AI Capture
+description: Capture fresh screenshots of authenticated web apps automatically using unattended sign-in and AI vision-guided browser navigation.
+keywords:
+  - signed-in capture
+  - authenticated capture
+  - ai capture
+  - vision capture
+  - email auth
+  - magic link
+  - otp
+---
+
+## Summary
+
+**Signed-in capture** (`/workflows/connections`, visible to workspace owners and admins) lets Shots capture real screenshots of pages behind login—dashboards, settings screens, modals, and interactive workflows—without manual screenshot uploads.
+
+## Capture Capabilities
+
+| Mode | How it works |
+| --- | --- |
+| **Zero-Config Autonomous AI Capture** | Give Shots a target URL and a plain-English goal (for example, *"Open the billing tab and expand the usage breakdown"*). A vision-guided browser agent inspects live screenshots, clicks, types, scrolls, waits, and captures the exact state automatically—no CSS selectors or brittle Playwright scripts required. |
+| **Multi-Step Capture Sequences** | Define ordered steps across multiple views or modal states in a single browser session to produce a coordinated visual pack for a release. |
+| **Unattended Email Sign-In** | For apps using passwordless magic links or email OTP codes, Shots provisions a dedicated `@capture` inbound address via Resend, triggers sign-in automatically, reads the verification email, and completes login unattended. |
+| **Password & Custom Auth Flows** | Store encrypted test-account credentials (using a dedicated non-privileged demo account) or reuse persisted browser sessions with automatic health checks and re-authentication on expiry. |
+
+## Safety & Isolation
+
+- Every capture runs inside an isolated ephemeral Chromium browser context; sessions are scoped strictly to one workspace.
+- Public-address SSRF checks prevent capture jobs from reaching internal cloud metadata or private network endpoints.
+- Captured images are stored privately in your workspace's **Library** and linked back to the release or product page that requested them.
+
+See the step-by-step setup guide in [Capture Authenticated Apps](/docs/guides/capture-authenticated-app).

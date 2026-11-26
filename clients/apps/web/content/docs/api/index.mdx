@@ -1,0 +1,52 @@
+---
+title: Shots API Reference
+description: HTTP API documentation for Shots editor utilities, versioned /api/v1 workspace operations, webhooks, errors, and the MCP server.
+keywords:
+  - Shots API
+  - REST API
+  - OpenAPI
+  - endpoints
+---
+
+Shots exposes two authenticated HTTP surfaces: **editor utility endpoints** (`/api/screenshot`, `/api/export`, `/api/tweet/{id}`, `/api/image-proxy`) and **versioned workspace endpoints** under `/api/v1`.
+
+```text
+https://shots.playbookmedia.io
+```
+
+Every failing request returns the shared JSON error envelope. The live interactive reference is served at [/api-reference](/api-reference), and the machine-readable OpenAPI 3.1 contract generated from the same Zod schemas that validate live requests lives at [/openapi.json](/openapi.json).
+
+## Start Here
+
+- [Authentication & Rate Limits](/docs/authentication)
+- [Errors & Idempotency](/docs/api/errors)
+- [Connect AI Agents (MCP)](/docs/agents)
+
+## API Domains
+
+- [Editor Utilities API](/docs/api/editor-utilities)
+- [Releases & Campaigns API](/docs/api/releases-and-campaigns)
+- [Publishing & Drafts API](/docs/api/publishing-and-drafts)
+- [Webhooks](/docs/api/webhooks)
+
+## Quickstart Request
+
+Create a workspace API key in **Settings → Developer API** (`/settings/developers`), then capture a live URL and write the PNG to disk:
+
+```bash
+curl -s -X POST https://shots.playbookmedia.io/api/screenshot \
+  -H "X-API-Key: $SHOTS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}' \
+  | jq -r .screenshot | base64 -d > shot.png
+```
+
+## Markdown Content Negotiation
+
+Every public page on this site serves Markdown to clients that request it via `Accept: text/markdown`. Responses set `Content-Type: text/markdown; charset=utf-8` and `Vary: Accept, Accept-Encoding`. Requests accepting neither `text/html` nor `text/markdown` receive `406`, and unknown paths return `404` with guidance on where to look next.
+
+```bash
+curl -H "Accept: text/markdown" https://shots.playbookmedia.io/docs
+```
+
+AI agents can also read [/llms.txt](/llms.txt) and [/llms-full.txt](/llms-full.txt) for a complete Markdown index of Shots.

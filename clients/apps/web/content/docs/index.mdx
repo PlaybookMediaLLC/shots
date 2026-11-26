@@ -1,0 +1,81 @@
+---
+title: Documentation
+description: "Product and API documentation for Shots: turn releases into cited launch briefs, on-brand visuals, approved posts, and automated workflows."
+keywords:
+  - Shots documentation
+  - Shots API
+  - release readiness
+  - screenshot editor
+  - MCP server
+---
+
+Shots is the release-readiness and visual launch platform for software teams. It connects what you ship—releases, pull requests, and production deployments—to cited launch briefs, real product screenshots, on-brand visuals, human approvals, and scheduled publishing.
+
+## Start Here
+
+To set up a live Shots workspace, follow this order:
+
+1. [Getting Started](/docs/getting-started) — understand how workspaces, releases, and approvals fit together.
+2. [Workspace Setup](/docs/getting-started/workspace-setup) — configure your product profile, product pages, brand kit, and team roles.
+3. [Quickstart](/docs/getting-started/quickstart) — turn your first shipped change into a cited launch brief and branded visuals.
+4. [Automate Your Launches](/docs/automate) — watch a GitHub repository or deployment host so future releases draft automatically.
+5. [Connect AI Agents](/docs/agents) — give Claude Code, Cursor, Codex, or ChatGPT scoped access over MCP.
+
+## Product Areas
+
+<Cards>
+  <Card title="Home" description="Resume active launches, drafts, and workspace work." href="/docs/features/home" />
+  <Card title="Create & Screenshot Editor" description="Beautify screenshots with backgrounds, browser mockups, 3D transforms, and animations." href="/docs/features/create" />
+  <Card title="Store Screenshots" description="Design App Store and Google Play screenshot sets with localization." href="/docs/features/store-screenshots" />
+  <Card title="Canvas & Story Sets" description="Multi-layer infinite canvas and multi-frame launch carousels." href="/docs/features/canvas" />
+  <Card title="Code Studio" description="Turn code snippets, diffs, PRs, and terminal runs into images, carousels, or videos." href="/docs/features/code-studio" />
+  <Card title="Image & Video Tools" description="In-browser compress, convert, resize, crop, rotate, background removal, and video compression." href="/docs/features/image-tools" />
+  <Card title="Voice Notes" description="Capture audio notes and turn transcripts into publishable drafts." href="/docs/features/voice-notes" />
+  <Card title="Library & Assets" description="Organize saved visuals, reusable uploads, and brand assets." href="/docs/features/library" />
+  <Card title="Campaigns & Launch Briefs" description="Cited launch specs, campaign plans, visuals, and channel copy." href="/docs/features/campaigns" />
+  <Card title="Release Inbox & Qualification" description="Qualify shipped changes, verify evidence, and track release lineage." href="/docs/features/release-inbox" />
+  <Card title="Approvals & Guardrails" description="Server-enforced human approvals, role separation, and copy checks." href="/docs/features/approvals" />
+  <Card title="Publish & Calendar" description="Schedule posts and threads across social profiles with link checks and bulk tools." href="/docs/features/publish" />
+  <Card title="Publish Analytics" description="Review delivery performance, observations, and best posting times." href="/docs/features/analytics" />
+  <Card title="Automate Workflows" description="Trigger launch campaigns from GitHub releases, pull requests, and deployments." href="/docs/features/automate-workflows" />
+  <Card title="Signed-In & AI Capture" description="Capture screenshots behind login with unattended email auth and autonomous AI navigation." href="/docs/features/signed-in-capture" />
+  <Card title="Activity & Audit Trail" description="Inspect workspace history, approvals, and delivery logs." href="/docs/features/activity" />
+</Cards>
+
+## Operator Guides
+
+<Cards>
+  <Card title="Run Your First Launch Campaign" description="Go from release notes to cited brief, visuals, and approved posts." href="/docs/guides/first-launch-campaign" />
+  <Card title="Automate Your Launches" description="Watch a repository, pick a workflow template, test drafts, and activate." href="/docs/automate" />
+  <Card title="Capture Authenticated Apps" description="Configure signed-in capture, unattended email auth, and AI vision navigation." href="/docs/guides/capture-authenticated-app" />
+  <Card title="Brand Kits & Consistent Visuals" description="Apply brand voice, colors, typography, and logos across every visual." href="/docs/guides/brand-kit-and-visuals" />
+  <Card title="Social Publishing & Approvals" description="Set up publishing profiles, posting queues, and mandatory human sign-off." href="/docs/guides/social-publishing-and-approvals" />
+  <Card title="Code Studio & Store Sets" description="Build developer code visuals and App Store / Google Play packs." href="/docs/guides/code-and-store-visuals" />
+  <Card title="Enterprise SSO & Audit Drains" description="Configure SAML/OIDC SSO, SCIM provisioning, permission groups, and SIEM exports." href="/docs/guides/enterprise-sso-and-audit" />
+  <Card title="Developer API & Webhooks" description="Send releases from CI/CD, verify webhook signatures, and use the OpenAPI spec." href="/docs/guides/developer-api-and-webhooks" />
+</Cards>
+
+## API Reference
+
+Shots exposes authenticated editor utility endpoints (`/api/screenshot`, `/api/export`, `/api/tweet/{id}`, `/api/image-proxy`) and versioned workspace endpoints under `/api/v1`. The interactive reference lives at [/api-reference](/api-reference) and the machine-readable OpenAPI 3.1 contract lives at [/openapi.json](/openapi.json).
+
+- [API Overview](/docs/api)
+- [Authentication & Rate Limits](/docs/authentication)
+- [Editor Utilities API](/docs/api/editor-utilities)
+- [Releases & Campaigns API](/docs/api/releases-and-campaigns)
+- [Publishing & Drafts API](/docs/api/publishing-and-drafts)
+- [Webhooks](/docs/api/webhooks)
+- [Errors & Idempotency](/docs/api/errors)
+- [Connect AI Agents (MCP)](/docs/agents)
+
+## Errors
+
+Every failing HTTP request returns a consistent JSON error envelope containing a stable machine-readable `code`, human-readable `error` and `message`, a recovery `hint`, the HTTP `status`, and a `documentation` link. See [Errors & Idempotency](/docs/api/errors) for the complete status and error code table, including rate-limit (`429`), entitlement (`403`), and quota responses.
+
+## Related Sections
+
+- [Getting Started](/docs/getting-started)
+- [Features](/docs/features)
+- [Guides](/docs/guides)
+- [API Reference](/docs/api)
+- [Reference](/docs/reference)
