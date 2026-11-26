@@ -99,6 +99,7 @@ export function CanvasWorkspace({
   }, [flushNative])
   const actions = useCanvasActions(session, flush)
   useCanvasCopilot({
+    session,
     activeId,
     artboards: state.document.artboards,
     canvas: { id: session.record.id, name: session.record.name },

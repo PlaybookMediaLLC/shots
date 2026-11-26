@@ -3,8 +3,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import test from 'node:test'
 import type { WritingContext } from 'screenshot-studio-backend-sdk'
-import { documentVoiceQuerySchema } from '../lib/api/contracts/ai'
-import { platformEditorServices } from '../lib/editor/services'
 import { voiceInstructions } from '../lib/write/voice'
 
 /**
@@ -28,12 +26,11 @@ const VOICED_SURFACES: Record<string, string> = {
   'lib/ai/agents/captions.ts': 'editor captions per platform',
   'lib/ai/agents/grid-lines.ts': 'grid video headlines',
   'lib/ai/store-screenshots/copy.ts': 'store screenshot and Story Set headlines',
-  'lib/ai/document/chat.ts': 'document AI menu and inline completions',
   'lib/write/refine.ts': 'Refine and the writing assistant',
   'lib/write/code-caption.ts': 'code image captions',
   'lib/link-preview/suggest.ts': 'share titles and descriptions',
-  'app/api/ai/editor/route.ts': 'text the editor copilot writes onto the canvas',
   'lib/ai/agents/editor-assist.ts': 'design versions, which may add a subheadline',
+  'lib/ai/assistant/turn.ts': 'text the assistant writes onto an open editing surface',
 }
 
 /** Where a surface's caller loads the voice it passes in. */
@@ -42,7 +39,7 @@ const VOICE_LOADERS = [
   'lib/trpc/routers/creative-set.ts',
   'app/api/store-screenshots/copy/route.ts',
   'app/api/link-preview/suggestions/route.ts',
-  'app/api/ai/editor/route.ts',
+  'lib/ai/assistant/turn.ts',
 ]
 
 /** Files that mention a model call without making one for copy. */
@@ -59,8 +56,6 @@ const UNVOICED_SURFACES: Record<string, string> = {
     'A translation keeps the source copy, which already has the voice.',
   'lib/ai/launch/spec.ts': 'The spec records facts from sources; copy is written from it.',
   'lib/ai/launch/critique.ts': 'A review scores a render; it writes no copy.',
-  'lib/ai/assistant/turn.ts':
-    'The workspace assistant answers the person in the app; it writes no public copy.',
 }
 
 function sourceFiles(dir: string): string[] {
@@ -162,21 +157,4 @@ test('the voice block carries every field of the merged context', () => {
     at = next
   }
   assert.equal(block.match(/<\/writing_context>/g)?.length, 1)
-})
-
-test("the document editor asks for its draft's voice, and the boundary checks what it names", () => {
-  const draftId = 'clf0f1a2c3d4e5f6'
-  const services = platformEditorServices({} as never, true, { channel: 'linkedin', draftId })
-  assert.equal(services.ai?.chat?.api, `/api/ai/document?channel=linkedin&draftId=${draftId}`)
-  assert.equal(
-    services.ai?.copilot?.api,
-    `/api/ai/document/copilot?channel=linkedin&draftId=${draftId}`
-  )
-  assert.deepEqual(documentVoiceQuerySchema.parse({ channel: 'linkedin', draftId }), {
-    channel: 'linkedin',
-    draftId,
-  })
-  // An id or channel the backend would not know is refused before any lookup.
-  assert.equal(documentVoiceQuerySchema.safeParse({ draftId: '../admin' }).success, false)
-  assert.equal(documentVoiceQuerySchema.safeParse({ channel: 'myspace' }).success, false)
 })

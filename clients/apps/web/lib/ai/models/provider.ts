@@ -1,4 +1,5 @@
 import { createOpenRouter, type OpenRouterChatSettings } from '@openrouter/ai-sdk-provider'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 const OPENAI_MODEL_PREFIX = 'openai/'
 const ANTHROPIC_MODEL_PREFIX = 'anthropic/'
@@ -33,8 +34,18 @@ export function openRouterSettings(modelId: string): OpenRouterChatSettings {
   }
 }
 
+/**
+ * A local stand-in provider (docs/ai-emulator.md), from OPENROUTER_BASE_URL.
+ * Prompts carry customer data, so the override works only where test hooks may:
+ * a developer's machine or the end-to-end stack, never a deployment.
+ */
+export function openRouterBaseURL(): string | undefined {
+  const override = process.env.OPENROUTER_BASE_URL?.trim()
+  return override && testHooksAllowed() ? override : undefined
+}
+
 /** Shared OpenRouter provider. Credentials are read from OPENROUTER_API_KEY. */
-export const openRouterProvider = createOpenRouter()
+export const openRouterProvider = createOpenRouter({ baseURL: openRouterBaseURL() })
 
 /** Resolves an existing language model through OpenRouter. */
 export function openRouterLanguageModel(modelId: string) {

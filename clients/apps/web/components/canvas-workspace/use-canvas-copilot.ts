@@ -1,13 +1,25 @@
 'use client'
 
 import { useEffect, useMemo, useRef } from 'react'
-import type { ModelMessage } from 'ai'
 import { useAssistantAbility, useAssistantPage } from '@/components/assistant/AssistantProvider'
-import { runEditorCopilot } from '@/components/editor-ai/useEditorCopilot'
+import {
+  type ClientToolExecutor,
+  runUnifiedAssistant,
+} from '@/components/assistant/run-unified-assistant'
+import { commandExecutor } from '@/components/assistant/use-surface-ability'
+import { applyToSession } from '@/lib/assistant/surface-edits'
+import {
+  createScreenshotEditorToolExecutor,
+  SCREENSHOT_EDITOR_CLIENT_TOOLS,
+} from '@/components/editor-ai/useScreenshotEditorAbility'
+import { boardEditSchema } from '@/lib/assistant/surface-commands'
+import { applyCanvasCommand, type CanvasCommand } from '@/lib/canvas/commands'
 import type { Artboard } from '@/lib/canvas/document'
+import type { CanvasSession } from '@/lib/canvas/session'
 import { artboardRect } from '@/lib/canvas/document'
 import { readingOrder } from '@/lib/canvas/layout'
 import { useCanvasUi } from '@/lib/canvas/ui-store'
+import { useTRPCClient } from '@/lib/trpc/react'
 import {
   ACROSS_ARTBOARDS,
   ACROSS_ARTBOARDS_MAX,
@@ -25,6 +37,7 @@ import {
  * closes, and leaves undo to the canvas's ⌘Z.
  */
 export function useCanvasCopilot({
+  session,
   canvas,
   artboards,
   activeId,
@@ -33,6 +46,7 @@ export function useCanvasCopilot({
   enabled,
   onEdit,
 }: {
+  session: CanvasSession
   canvas: { id: string; name: string }
   artboards: Artboard[]
   activeId: string | null
@@ -44,7 +58,34 @@ export function useCanvasCopilot({
   enabled: boolean
   onEdit: (id: string) => void
 }) {
+  const trpcClient = useTRPCClient()
+  const boardTool = commandExecutor<CanvasCommand>({
+    apply: (commands) => applyToSession(session, applyCanvasCommand, commands),
+    editSchema: boardEditSchema,
+    editTool: 'editBoard',
+    inspect: () =>
+      session.snapshot().document.artboards.map((item) => ({
+        id: item.id,
+        name: item.name,
+        ...artboardRect(item),
+      })),
+    inspectTool: 'inspectBoard',
+  })
+  const board = useRef(boardTool)
+  useEffect(() => {
+    board.current = boardTool
+  })
   const selection = useCanvasUi((ui) => ui.selection)
+  const executeClientTool = useMemo(
+    (): ClientToolExecutor => {
+      const artboard = createScreenshotEditorToolExecutor(trpcClient, { canUndo: false })
+      return (call, context) =>
+        call.toolName === 'inspectBoard' || call.toolName === 'editBoard'
+          ? board.current(call, context)
+          : artboard(call, context)
+    },
+    [trpcClient]
+  )
   const order = useMemo(
     () => readingOrder(artboards.map((item) => ({ id: item.id, rect: artboardRect(item) }))),
     [artboards]
@@ -117,6 +158,8 @@ export function useCanvasCopilot({
               : `Ask AI to change artboard ${number}`,
           priority: 10,
           prominent: true,
+          surface: 'canvas',
+          ...(activeId ? { target: activeId } : {}),
           suggestions: [
             'Make the headline punchier',
             'Try a bolder background',
@@ -124,7 +167,7 @@ export function useCanvasCopilot({
               ? ['Make the headline punchier on every artboard']
               : ['Give the screenshot a soft shadow']),
           ],
-          run: async ({ ask, memory, push, signal }) => {
+          run: async ({ ask, images, memory, page, push, signal, stream }) => {
             // "every artboard", "all the slides", "each page": the request runs on each in turn,
             // up to a cap, so a misread request cannot run on (and charge for) a whole deck.
             const across = ACROSS_ARTBOARDS.test(ask)
@@ -149,27 +192,30 @@ export function useCanvasCopilot({
               signal.addEventListener('abort', stop)
               running.current = { id, controller }
               // Memory follows one artboard, so one's edits never steer another's.
-              if (remembered.current !== id) memory.current = []
+              // A resumed chat has memory before any artboard ran; keep it.
+              if (remembered.current !== null && remembered.current !== id) memory.current = []
               remembered.current = id
-              // The copilot reports its own failures; a failed or stopped artboard ends the run.
-              let failed = false
               try {
-                await runEditorCopilot({
-                  canUndo: false,
-                  memory: memory as { current: ModelMessage[] },
+                await runUnifiedAssistant({
+                  ask,
+                  images,
+                  clientTools: [...SCREENSHOT_EDITOR_CLIENT_TOOLS, 'inspectBoard', 'editBoard'],
+                  executeClientTool,
+                  memory,
+                  page,
                   push: (entry) => {
-                    if (entry.kind === 'error') failed = true
-                    push(entry.kind === 'change' ? { kind: 'change', text: entry.summary } : entry)
+                    // Cards act on the live editor, so each stays with its artboard.
+                    push({ ...entry, target: id })
                   },
                   selection: null,
                   signal: controller.signal,
-                  text: ask,
+                  stream,
                 })
               } finally {
                 signal.removeEventListener('abort', stop)
                 if (running.current?.controller === controller) running.current = null
               }
-              if (failed || controller.signal.aborted) return
+              if (controller.signal.aborted) return
             }
             if (ids.length > 1) push({ kind: 'note', text: `Done: ${ids.length} artboards.` })
           },

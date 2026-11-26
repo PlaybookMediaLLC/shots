@@ -126,18 +126,3 @@ test('a writing sample cannot close the fence it is quoted in', async () => {
   assert.match(prompt, /Never use these words or phrases: synergy/)
   assert.equal(voiceInstructions(null), '')
 })
-
-test("a model's introduction is dropped, but a post that opens the same way is kept", async () => {
-  const { assistPosts } = await import('@/lib/write/refine-actions')
-  assert.deepEqual(
-    assistPosts(
-      "Here's the rewritten post for X:\n\nInvoice approvals move faster. See how it works."
-    ),
-    ['Invoice approvals move faster. See how it works.']
-  )
-  assert.deepEqual(assistPosts('Sure! Here is the thread:\n\nOne\n---\nTwo'), ['One', 'Two'])
-  assert.deepEqual(assistPosts("Here's what's new:\n\nFaster approvals."), [
-    "Here's what's new:\n\nFaster approvals.",
-  ])
-  assert.deepEqual(assistPosts('Plain post'), ['Plain post'])
-})

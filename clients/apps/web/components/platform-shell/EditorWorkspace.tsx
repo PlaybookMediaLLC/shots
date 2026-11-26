@@ -7,6 +7,7 @@ import { EditorLayout } from '@/components/editor/EditorLayout'
 import { StoreWorkspaceLoading } from '@/components/store-screenshots/StoreWorkspaceLoading'
 import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { withoutLocale } from '@/lib/settings/appearance'
+import { EditorActiveProvider } from './EditorActiveContext'
 
 const StoreStudio = dynamic(
   () =>
@@ -40,11 +41,15 @@ function Workspace() {
   return (
     <>
       <Activity mode={appStore ? 'hidden' : 'visible'}>
-        <EditorLayout />
+        <EditorActiveProvider active={!appStore}>
+          <EditorLayout />
+        </EditorActiveProvider>
       </Activity>
       <Activity mode={appStore ? 'visible' : 'hidden'}>
         {visitedStore ? (
-          <StoreStudio basePath={basePath} projectId={projectId || undefined} />
+          <EditorActiveProvider active={appStore}>
+            <StoreStudio basePath={basePath} projectId={projectId || undefined} />
+          </EditorActiveProvider>
         ) : null}
       </Activity>
     </>

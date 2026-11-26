@@ -13,6 +13,7 @@ import { billingRouter } from './routers/billing'
 import { campaignRouter } from './routers/campaign'
 import { captureRouter } from './routers/capture'
 import { brandKitRouter, brandProfileRouter, sourceAppRouter } from './routers/configuration'
+import { assistantThreadRouter } from './routers/assistant-thread'
 import { conversationRouter } from './routers/conversation'
 import { creativeTemplateRouter, creativeVariantRouter } from './routers/creative'
 import { designRouter } from './routers/design'
@@ -44,6 +45,7 @@ export const appRouter = router({
   capture: captureRouter,
   channelConnection: channelConnectionRouter,
   codeProject: codeProjectRouter,
+  assistantThread: assistantThreadRouter,
   conversation: conversationRouter,
   creativeTemplate: creativeTemplateRouter,
   creativeVariant: creativeVariantRouter,

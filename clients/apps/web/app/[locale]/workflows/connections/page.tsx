@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import { automateLinks } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -15,6 +16,7 @@ export default async function ConnectionsPage({ params }: { params: Promise<{ lo
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization.name}
     >
+      <AssistantPageContext facts={['Signed-in capture: connected app sessions and capture recipes. Recipes are authored in this page.']} />
       <Page
         title="Signed-in capture"
         description="Screenshot the screens behind your app's sign-in, from a session you connect."

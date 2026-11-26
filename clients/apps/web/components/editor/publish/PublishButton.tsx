@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getAspectRatioPreset } from '@/lib/aspect-ratio-utils'
-import { useHydratedSession } from '@/lib/auth/client'
+import { authClient, useHydratedSession } from '@/lib/auth/client'
 import { DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
 import { canExportMotion } from '@/lib/editor/canvas-content'
 import { safeBaseName } from '@/lib/export/naming'
@@ -128,7 +128,10 @@ export function PublishButton({
         }
       }
       requestKey.current = crypto.randomUUID()
-      if (workspaceId) lastDraftByWorkspace.set(workspaceId, draftId)
+      // A quick Publish can run before the session has loaded; wait for it, or the draft is forgotten.
+      const workspace =
+        workspaceId || (await authClient.getSession()).data?.session.activeOrganizationId
+      if (workspace) lastDraftByWorkspace.set(workspace, draftId)
       const preset = getAspectRatioPreset(design.selectedAspectRatio)
       startIncomingMedia(draftId, publishKindLabel(what, design.slideCount), (onProgress) =>
         preparePublication(what, {

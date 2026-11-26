@@ -124,7 +124,10 @@ export async function PlatformShell({
                 <PendingDraftInput />
                 {/* The AI chat bar sits over the page unless the page gives it a slot of its own. */}
                 <AssistantSlot fallback />
-                <AssistantBar canEdit={assistantCanEdit} paidPlan={platformAccess.paidPlan}
+                <AssistantBar
+                  canEdit={assistantCanEdit}
+                  organizationId={access?.organization?.id ?? null}
+                  paidPlan={platformAccess.paidPlan}
                   posts={platformAccess.draftsEnabled && platformAccess.draftsPlan}
                 />
               </div>
@@ -136,8 +139,12 @@ export async function PlatformShell({
               >
                 {children}
                 <PendingDraftInput variant="editor" />
-                {/* Full-bleed editors show the bar only in a slot of their own, as the canvas gives. */}
-                <AssistantBar canEdit={assistantCanEdit} paidPlan={platformAccess.paidPlan}
+                {/* Unified Shots Assistant sits over every editor unless the editor provides a custom slot. */}
+                <AssistantSlot fallback />
+                <AssistantBar
+                  canEdit={assistantCanEdit}
+                  organizationId={access?.organization?.id ?? null}
+                  paidPlan={platformAccess.paidPlan}
                   posts={platformAccess.draftsEnabled && platformAccess.draftsPlan}
                 />
               </div>

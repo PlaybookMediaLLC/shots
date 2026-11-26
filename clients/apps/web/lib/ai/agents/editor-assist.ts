@@ -153,17 +153,25 @@ export async function proposeVariants(
     brand?: VariantBrand | null
     count: number
     instruction?: string
+    /** Optional 480px canvas JPEG snapshot so variants react to the visual screenshot. */
+    snapshot?: string | null
     /** A version may add a subheadline: words on the canvas, in the brand voice. */
     voice: WritingContext | null
   }
 ): Promise<Variant[]> {
   const variants: Variant[] = []
+  const promptText = `${designContext(document)}\n\nPropose ${options.count} versions.${
+    options.instruction ? ` The user asked: ${options.instruction}` : ''
+  }${options.brand ? brandConstraint(options.brand) : ''}`
   await generateText({
     messages: [
       {
-        content: `${designContext(document)}\n\nPropose ${options.count} versions.${
-          options.instruction ? ` The user asked: ${options.instruction}` : ''
-        }${options.brand ? brandConstraint(options.brand) : ''}`,
+        content: options.snapshot
+          ? [
+              { text: promptText, type: 'text' },
+              { data: options.snapshot, mediaType: 'image/jpeg', type: 'file' as const },
+            ]
+          : promptText,
         role: 'user',
       },
     ],

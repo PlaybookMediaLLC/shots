@@ -16,6 +16,8 @@ import type { DesignChanges, DesignDocument } from '@/lib/design/document'
 import { exportDesignDocument } from '@/lib/design/export'
 import { patchFromModel } from '@/lib/design/model-changes'
 import { applyStoredDocument } from '@/lib/design/open-design'
+import { captureCanvasSnapshot } from '@/lib/design/snapshot'
+import { useCardState } from '@/components/assistant/assistant-store'
 import { rememberUploadedSources } from '@/lib/design/upload-sources'
 import { useImageStore } from '@/lib/store'
 import { UseInPostButton } from '@/components/workspace/SaveToWorkspaceButton'
@@ -23,7 +25,7 @@ import { usePostHandoff } from '@/lib/editor/post-handoff'
 import { useCanStartPost } from '@/lib/platform/can-start-post'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
-import { type VariantsRequest, withoutImageSources } from './useEditorCopilot'
+import { withoutImageSources } from '@/lib/design/without-image-sources'
 import { Textarea } from '@/components/ui/textarea'
 
 /** A version: its changes, and a preview of them on the design as it was when it was made. */
@@ -42,29 +44,32 @@ const LARGE = { format: 'jpeg', maxWidth: 1200, quality: 'high' } as const
  */
 export function VariantsPanel({
   disabled,
-  hidden,
-  onRequestHandled,
-  request,
+  initialCount,
+  initialInstruction,
+  stateKey,
 }: {
   disabled: boolean
-  /** Hidden rather than unmounted, so the versions survive switching tabs. */
-  hidden: boolean
-  onRequestHandled: () => void
-  request: (VariantsRequest & { id: number }) | null
+  /** What the assistant was asked for; making the versions still takes a click. */
+  initialCount: number
+  initialInstruction: string
+  /** Where this card's versions are kept while the panel is hidden. */
+  stateKey: string
 }) {
   const trpcClient = useTRPCClient()
   const canStartPost = useCanStartPost()
   const [estimate, setEstimate] = useState<{ lower: number; upper: number } | null>(null)
   const [estimateError, setEstimateError] = useState(false)
-  const [instruction, setInstruction] = useState('')
-  const [count, setCount] = useState(4)
+  const [instruction, setInstruction] = useCardState(`${stateKey}:instruction`, initialInstruction)
+  const [count, setCount] = useCardState(`${stateKey}:count`, initialCount)
   const [loading, setLoading] = useState(false)
-  const [original, setOriginal] = useState<DesignDocument | null>(null)
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [{ candidates, original }, setResult] = useCardState<{
+    candidates: Candidate[]
+    original: DesignDocument | null
+  }>(`${stateKey}:result`, { candidates: [], original: null })
   const [inspecting, setInspecting] = useState<Candidate | null>(null)
 
   useEffect(() => {
-    if (hidden || disabled) return
+    if (disabled) return
     let active = true
     setEstimate(null)
     setEstimateError(false)
@@ -73,21 +78,23 @@ export function VariantsPanel({
       () => { if (active) setEstimateError(true) }
     )
     return () => { active = false }
-  }, [count, disabled, hidden, trpcClient])
+  }, [count, disabled, trpcClient])
 
   const generate = useCallback(
     async (wanted: number, words: string) => {
       setLoading(true)
       try {
-        // The model sees the design without local images; each version is
-        // built on the full design here, so it keeps the user's screenshot.
+        // The model sees the design without local images, plus a compact vision snapshot;
+        // each version is built on the full design here, so it keeps the user's screenshot.
         const base = exportDesignDocument({ keepLocalSources: true })
         const view = exportDesignDocument()
+        const snapshot = (await captureCanvasSnapshot(480)) ?? undefined
         const { variants } = await trpcClient.editorAi.variants.mutate({
           brandKitId: useImageStore.getState().brand?.kitId,
           count: wanted,
           document: view,
           instruction: words.trim() || undefined,
+          snapshot,
         })
         const built = variants.flatMap((variant) => {
           const changes = withoutImageSources(variant.changes)
@@ -104,8 +111,7 @@ export function VariantsPanel({
             return []
           }
         })
-        setOriginal(base)
-        setCandidates(built)
+        setResult({ candidates: built, original: base })
         if (built.length === 0) toast.error('No versions came back. Try again.')
         else if (built.length < wanted)
           toast.message(`${built.length} of ${wanted} versions came back.`)
@@ -117,7 +123,7 @@ export function VariantsPanel({
         setLoading(false)
       }
     },
-    [trpcClient]
+    [setResult, trpcClient]
   )
 
   // The post dialog renders each version as it is previewed here, so what
@@ -129,16 +135,6 @@ export function VariantsPanel({
     )
   }, [candidates])
   useEffect(() => () => usePostHandoff.getState().setVersions([]), [])
-
-  // The copilot's "give me four versions" arrives here.
-  // Handled once: the request is cleared, so a remount never runs it again.
-  useEffect(() => {
-    if (!request) return
-    onRequestHandled()
-    setCount(request.count)
-    setInstruction(request.instruction)
-    setCandidates([])
-  }, [generate, onRequestHandled, request])
 
   async function apply(candidate: Candidate) {
     try {
@@ -161,7 +157,7 @@ export function VariantsPanel({
   }
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm" hidden={hidden}>
+    <div className="space-y-3 p-3 text-sm">
       <p className="text-muted-foreground">
         Complete versions of this design to compare. Your design does not change until you apply
         one.

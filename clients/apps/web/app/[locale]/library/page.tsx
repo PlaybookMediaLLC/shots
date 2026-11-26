@@ -1,3 +1,4 @@
+import { AssistantPageContext } from '@/components/assistant/AssistantProvider'
 import { LIBRARY_LINKS } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
@@ -38,6 +39,7 @@ export default async function LibraryPage({ params, searchParams }: LibraryPageP
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization?.name}
     >
+      <AssistantPageContext facts={[`Library, ${view} view${query.type ? ` (${query.type})` : ''}.`]} />
       <Page title="Library" description="Everything your team has made.">
         <AreaNavigation label="Library" items={LIBRARY_LINKS} />
         {view === 'assets' ? (

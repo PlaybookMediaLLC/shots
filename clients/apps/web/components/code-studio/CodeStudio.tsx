@@ -58,6 +58,7 @@ import { zipFiles } from '@/lib/export/zip'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { useCodeStudioAbility } from './useCodeStudioAbility'
 import { useSceneCapture } from './capture'
 import { CodeInspector } from './CodeInspector'
 import { CodeScene, type SceneEditing } from './CodeScene'
@@ -529,6 +530,14 @@ function Workspace({
   const logo = document.style.footer.logo
   const logoUrl = logo ? assetContentUrl(logo.slice('asset:'.length)) : undefined
   const renderVideo = useVideoRenderer(document, capture, logoUrl)
+  useCodeStudioAbility({
+    canEdit,
+    document,
+    name: name || 'Untitled code project',
+    onChange,
+    projectId,
+    slide: current,
+  })
 
   React.useEffect(() => {
     if (canEdit) void loadBrandKits(client).catch(() => undefined)

@@ -271,6 +271,11 @@ test('X OAuth start binds its one-use callback to the active workspace', async (
     await expect(xRow.getByTestId('channel-account')).toContainText(
       /Active|Needs reconnect|Disconnected/
     )
+    // The OAuth return can open the new account's profile-assignment menu.
+    await page.keyboard.press('Escape')
+    await expect(
+      page.getByRole('menu', { name: 'Fixture X profile: account actions' })
+    ).toBeHidden()
     await expect(xRow.getByRole('link', { name: 'Connect X', exact: true })).toHaveCount(0)
     for (const width of [584, 1440]) {
       await page.setViewportSize({ width, height: 900 })

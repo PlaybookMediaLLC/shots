@@ -39,6 +39,7 @@ import {
   type TweetTheme,
 } from './TweetCard';
 import { Input } from '@/components/ui/input'
+import { useTweetAbility } from './useTweetAbility'
 
 const HASH_WRITE_DELAY = 400;
 const FETCH_TIMEOUT_MS = 20000;
@@ -404,6 +405,13 @@ export function TweetImageEditor() {
     [update],
   );
   const onPaddingChange = React.useCallback((padding: number) => update({ padding }), [update]);
+
+  // Fork: the platform assistant's tools for this editor.
+  useTweetAbility({
+    style: { padding: state.padding as 16 | 32 | 64 | 128, showBackground: state.showBackground, theme: state.theme },
+    text: tweet.text,
+    update,
+  });
 
   const frameTotal = TWEET_WIDTH + state.padding * 2;
   const mobileScale = isMobile && stageWidth > 0 && stageWidth < frameTotal

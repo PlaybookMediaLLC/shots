@@ -409,29 +409,20 @@ test(
     await review.getByRole('button', { name: 'Reject' }).click()
     await expect(editor).not.toContainText('(refined)')
 
-    // The writing assistant helps at once; its voice setup is offered later, never as a gate.
+    // The writing assistant helps at once; its voice setup is a link, never a gate.
     await page.getByRole('button', { name: 'Assistant', exact: true }).click()
-    await expect(page.getByTestId('assistant-setup')).toHaveCount(0)
-    const assistant = page.getByTestId('assistant-panel')
-    await assistant.getByRole('button', { name: /stronger hooks/ }).click()
-    await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })
+    const assistant = page.getByRole('region', { name: 'Assistant' })
+    await expect(assistant.getByRole('link', { name: 'Style guide and samples' })).toBeVisible()
+    await assistant.getByRole('textbox', { name: 'Ask the assistant' }).fill('Offer a closing post')
+    await page.keyboard.press('Enter')
+    const accept = assistant.getByRole('button', { name: 'Accept' })
+    await expect(accept).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('post-header')).toHaveCount(1)
     await snap(page, 'write-assistant')
-    await assistant.getByRole('button', { name: 'Add as a new post' }).click()
+    await accept.click()
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expectSaved(page)
-    // After three answers with no style guide, the assistant offers its voice setup.
-    await expect(assistant.getByRole('button', { name: 'Set up its voice' })).toHaveCount(0)
-    for (const [index, question] of ['Make it shorter.', 'Add a question at the end.'].entries()) {
-      await assistant.getByLabel('Ask the assistant').fill(question)
-      await assistant.getByRole('button', { name: 'Send', exact: true }).click()
-      await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(index + 2, {
-        timeout: 60_000,
-      })
-    }
-    await assistant.getByRole('button', { name: 'Set up its voice' }).click()
-    await expect(page.getByTestId('assistant-setup')).toBeVisible()
-    await page.getByRole('button', { name: 'Skip for now', exact: true }).click()
-    await expect(page.getByTestId('assistant-panel')).toBeVisible()
+    await assistant.getByRole('button', { name: 'Hide the assistant' }).click()
 
     // The review names every account and the follow-ups; Auto-DM is off, with why.
     await page.getByTestId('publish-button').click()
