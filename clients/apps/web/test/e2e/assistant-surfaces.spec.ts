@@ -327,3 +327,61 @@ test(
     expect(calls).toBe(2)
   }
 )
+
+test(
+  'only the newest change offers Undo, and it refuses once the person has edited since',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    await app.openEditor()
+    const preset = await trpcMutation(page, 'creativeTemplate.create', {
+      definition: { document: { image: { src: null }, version: 2 }, kind: 'design-preset' },
+      name: 'Launch',
+    })
+    expect(preset.status).toBe(200)
+    await app.openEditor()
+    await dropScreenshot(page)
+    await page.getByRole('button', { name: 'Open the AI copilot' }).click()
+    const assistant = await askAndFinish(page, 'Give the design more room', 'Done.')
+    await askAndFinish(page, 'Apply the launch preset', 'Applied the preset.')
+    await expect(assistant.getByText('Gave the design more room')).toBeVisible()
+    const undo = assistant.getByRole('button', { name: 'Undo' })
+    await expect(undo).toHaveCount(1)
+
+    // A later edit by hand: the assistant's Undo must not take that back instead.
+    await page.getByRole('button', { exact: true, name: 'Add Text' }).first().click()
+    const texts = page.locator('[data-html-canvas="true"] [data-text-overlay-id]')
+    await expect(texts).toHaveCount(1)
+    await undo.click()
+    await expect(page.getByText('Newer edits exist. Press ⌘Z to undo them first.')).toBeVisible()
+    await expect(texts).toHaveCount(1)
+  }
+)
+
+test(
+  'opening another design in the same editor starts a new conversation',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    await app.openEditor()
+    await page.getByRole('button', { exact: true, name: 'Add Text' }).first().click()
+    await page.getByRole('button', { name: 'Save as project' }).click()
+    await page.getByLabel('Project name').fill('First design')
+    await page.getByRole('button', { name: 'Save project' }).click()
+    await expect(page.getByRole('button', { name: 'Project First design: Saved' })).toBeVisible({
+      timeout: 30_000,
+    })
+    await page.getByRole('button', { name: 'Open the AI copilot' }).click()
+    const assistant = await askAndFinish(page, 'Give the design more room', 'Done.')
+
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('button', { exact: true, name: 'New' })
+      .click()
+    await page.getByRole('menuitem', { exact: true, name: 'Screenshot' }).click()
+    await expect(page.getByRole('button', { name: 'Save as project' })).toBeVisible()
+    const box = assistant.getByRole('textbox', { name: 'Ask the assistant' })
+    if (!(await box.isVisible()))
+      await page.getByRole('button', { name: 'Open the AI copilot' }).click()
+    await expect(box).toBeVisible()
+    await expect(assistant.getByText('Give the design more room')).toHaveCount(0)
+  }
+)
