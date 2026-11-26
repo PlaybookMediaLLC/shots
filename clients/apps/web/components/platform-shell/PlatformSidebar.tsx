@@ -194,7 +194,14 @@ function Navigation({
   const voice = useVoiceSettings(area === 'create' && paidPlan)
   // As in Polar, settings swap the destinations for their own sections.
   if (area === 'settings') {
-    return <SettingsNav collapsed={collapsed} onNavigate={onNavigate} />
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <AssistantLauncher collapsed={collapsed} onNavigate={onNavigate} />
+        <div className="min-h-0 flex-1">
+          <SettingsNav collapsed={collapsed} onNavigate={onNavigate} />
+        </div>
+      </div>
+    )
   }
   const navGroup = (group: NavGroup) => (
     <div className="grid gap-0.5">

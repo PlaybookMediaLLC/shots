@@ -944,6 +944,15 @@
   font-size: 0.875rem;
   line-height: 1.4;
 }
+/* No ring on the field itself: the composer box around it shows focus (:focus-within above).
+   Forced-colour modes keep the system outline. */
+@media (forced-colors: none) {
+  .platform-shell .assistant .assistant-bar [data-slot='textarea']:focus-visible {
+    outline: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
 /* Docked side inspector mode (default on editors, toggleable on any page). */
 .assistant.assistant-dock {
   top: 12px;
@@ -1000,7 +1009,17 @@
 .assistant-quick-action:disabled {
   opacity: 0.45;
 }
+/* An open side panel takes its own column: the page narrows, and nothing sits under it. */
+@media (min-width: 768px) {
+  .platform-shell :has(> .assistant-slot > .assistant-dock) {
+    padding-inline-end: calc(380px + 24px);
+  }
+}
 @media (max-width: 767px) {
+  /* On a phone the composer needs the room the context chip takes. */
+  .assistant-bar .assistant-context {
+    display: none;
+  }
   .assistant.assistant-dock {
     top: auto;
     right: 8px;

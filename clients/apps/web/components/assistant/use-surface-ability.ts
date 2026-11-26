@@ -5,7 +5,6 @@ import type { z } from 'zod'
 import type {
   AssistantAbility,
   AssistantEntry,
-  AssistantPresentationMode,
   AssistantQuickAction,
 } from '@/lib/assistant/ability'
 import type { AssistantSurfaceKind, PageEntity } from '@/lib/assistant/page-context'
@@ -62,7 +61,6 @@ export function useSurfaceAbility({
   executeClientTool,
   label,
   placeholder,
-  preferredMode = 'dock',
   quickActions,
   selection = null,
   surface,
@@ -78,7 +76,6 @@ export function useSurfaceAbility({
   executeClientTool: ClientToolExecutor
   label: string
   placeholder: string
-  preferredMode?: AssistantPresentationMode
   quickActions: readonly AssistantQuickAction[]
   selection?: string | null
   surface: AssistantSurfaceKind
@@ -94,7 +91,7 @@ export function useSurfaceAbility({
       id: `${surface}:${entity.id}`,
       label,
       placeholder,
-      preferredMode,
+      preferredMode: 'dock',
       priority: 10,
       prompts,
       quickActions,

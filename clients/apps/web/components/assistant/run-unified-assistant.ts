@@ -16,6 +16,21 @@ const MAX_ROUND_TRIPS = 16
 
 /** Human-friendly status labels for tools executed during an assistant turn. */
 export const TOOL_ACTIVITY_LABELS: Record<string, string> = {
+  applySavedPreset: 'Applying saved preset',
+  editBoard: 'Updating the board',
+  editCodeScene: 'Updating the code scene',
+  editStorySet: 'Updating the Story Set',
+  editTweet: 'Restyling the card',
+  getReleaseDetails: 'Reading the release',
+  getSocialAnalyticsSummary: 'Reading post metrics',
+  inspectBoard: 'Reading the board',
+  inspectCodeScene: 'Reading the code scene',
+  inspectDraft: 'Reading the draft',
+  inspectStorySet: 'Reading the Story Set',
+  inspectTweet: 'Reading the card',
+  preparePost: 'Preparing a post',
+  proposeCaptureRecipe: 'Drafting a capture recipe',
+  proposeDraftText: 'Writing a suggestion',
   applyBrandKit: 'Applying brand kit',
   applyChanges: 'Updating design',
   captureIntoCanvas: 'Capturing URL into canvas',

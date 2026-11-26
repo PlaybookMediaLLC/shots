@@ -237,3 +237,93 @@ test(
     await expect(page.getByRole('menuitem', { name: 'No saved chats yet' })).toBeVisible()
   }
 )
+
+test('an unknown brand kit name changes nothing', { tag: '@journey' }, async ({ app, page }) => {
+  await app.openEditor()
+  const kit = await trpcMutation(page, 'brandKit.create', {
+    definition: {
+      colors: { accent: '#ff3300', background: '#ffffff', text: '#111111' },
+      schemaVersion: 1,
+      typography: { headingFamily: 'inter' },
+    },
+    name: 'Real kit',
+    publish: true,
+  })
+  expect(kit.status, JSON.stringify(kit.body)).toBe(200)
+  await app.openEditor()
+  await dropScreenshot(page)
+  await page.getByRole('button', { name: 'Open the AI copilot' }).click()
+  const assistant = await askAndFinish(
+    page,
+    'Apply the missing brand kit',
+    'The brand kit request is finished.'
+  )
+  await expect(assistant.getByText('Applying brand kit')).toBeVisible()
+  await expect(assistant.getByText(/Applied brand kit/)).toHaveCount(0)
+})
+
+test(
+  'a variants card on Canvas stays with its artboard',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    await app.open('/home')
+    const created = await trpcMutation(page, 'canvas.create', {
+      document: canvasDocumentSchema.parse({
+        artboards: [
+          blankArtboard('wide-16x9', { x: 0, y: 0 }),
+          blankArtboard('wide-16x9', { x: 2400, y: 0 }),
+        ],
+        kind: 'canvas',
+        version: 1,
+      }),
+      id: newCreativeSetId(),
+      name: 'Variant board',
+    })
+    await app.open(`/canvas/${(created.body as { id: string }).id}`)
+    await openAssistantOn(page)
+    const assistant = await ask(page, 'Give me four versions of this design')
+    const make = assistant.getByRole('button', { name: 'Make 4 versions' })
+    await expect(make).toBeVisible({ timeout: 90_000 })
+    await expect(assistant.getByRole('button', { name: 'Stop' })).toHaveCount(0)
+    // Closing the artboard leaves the card with nothing of its own to act on.
+    await page.getByRole('button', { exact: true, name: 'Done' }).click()
+    await expect(make).toHaveCount(0)
+    await expect(
+      assistant.getByText('Open the artboard this card was made for to use it.')
+    ).toBeVisible()
+  }
+)
+
+test(
+  'a translation that fails part way keeps the language already translated',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    let calls = 0
+    // The provider answers the first language and fails the second.
+    await page.route('**/api/store-screenshots/translate', async (route) => {
+      calls += 1
+      if (calls > 1) return route.fulfill({ json: { error: 'Provider failed.' }, status: 500 })
+      const { items } = route.request().postDataJSON() as { items: { id: string }[] }
+      await route.fulfill({
+        json: { translations: items.map((item) => ({ id: item.id, text: 'Hallo' })) },
+      })
+    })
+    await app.open('/create/store')
+    await page.getByRole('button', { name: 'Use the sample set' }).click()
+    await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
+    await page.getByRole('tab', { exact: true, name: 'Languages' }).click()
+    for (const language of ['German', 'French']) {
+      await page.getByRole('combobox', { name: 'Add a language' }).click()
+      await page.getByRole('option', { exact: true, name: language }).click()
+      await page.getByRole('button', { exact: true, name: 'Add' }).click()
+    }
+    await openAssistantOn(page)
+    const assistant = await askAndFinish(
+      page,
+      'Translate my slides into German and French',
+      'Translation finished.'
+    )
+    await expect(assistant.getByText(/Translated \d+ text entries across 1 locale/)).toBeVisible()
+    expect(calls).toBe(2)
+  }
+)

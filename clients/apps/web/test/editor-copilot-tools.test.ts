@@ -61,6 +61,11 @@ test('describeToolActivity returns readable labels and recentMessages preserves 
   assert.deepEqual(recentMessages(msgs, 3), msgs.slice(2))
 })
 
+test('every tool the browser can run has a readable activity label', () => {
+  const unnamed = editorClientToolNames.filter((name) => describeToolActivity(name) === name)
+  assert.deepEqual(unnamed, [])
+})
+
 test('the tweet tools refuse a padding the editor does not offer', async () => {
   const schema = asSchema(createEditorCopilotTools(['editTweet']).editTweet!.inputSchema)
   const check = (padding: number) =>

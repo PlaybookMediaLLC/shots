@@ -611,9 +611,9 @@ export function AssistantBar({
           {entries.length === 0 ? (
             <li className="space-y-3 py-2 text-[0.8125rem] text-muted-foreground">
               <p>
-                Ask me to edit this design directly, apply your brand kit, review layout and
-                contrast, generate variants or captions, or look up anything in your workspace.
-                Every canvas edit is one ⌘Z.
+                {ability.surface === 'screenshot-editor'
+                  ? 'Ask me to edit this design directly, apply your brand kit, review layout and contrast, generate variants or captions, or look up anything in your workspace. Every canvas edit is one ⌘Z.'
+                  : 'Ask me about what is open here, or look up anything in your workspace.'}
               </p>
               {suggestions.length > 0 ? (
                 <div

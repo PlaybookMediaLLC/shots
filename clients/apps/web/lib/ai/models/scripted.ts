@@ -979,6 +979,18 @@ const STUDIO_EDITS: {
     tool: 'applySavedPreset',
   },
   {
+    ask: /apply the missing brand kit/i,
+    done: 'The brand kit request is finished.',
+    input: () => ({ kitName: 'Missing' }),
+    tool: 'applyBrandKit',
+  },
+  {
+    ask: /translate my slides into german and french/i,
+    done: 'Translation finished.',
+    input: () => ({ locales: ['de-DE', 'fr-FR'] }),
+    tool: 'translateStoreLocales',
+  },
+  {
     ask: /offer a closing post/i,
     done: 'Offered a closing post.',
     input: () => ({

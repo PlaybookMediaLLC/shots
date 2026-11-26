@@ -150,7 +150,6 @@ export function useWriteAbility({
     ],
     label: 'Post draft',
     placeholder: 'Ask to tighten, adapt, or continue this draft',
-    preferredMode: 'bar',
     quickActions: [
       { id: 'tighten', label: 'Tighten', prompt: 'Tighten the first post for this platform.' },
       { id: 'hooks', label: 'Hooks', prompt: 'Offer a stronger opening post.' },
