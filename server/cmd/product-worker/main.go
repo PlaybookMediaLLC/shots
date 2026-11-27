@@ -312,12 +312,10 @@ func main() {
 	if cfg.RunMaintenance {
 		retentionSQL := db.SQL
 		if cfg.AuditRetentionDatabaseURL != cfg.DatabaseURL {
-			retention, err := database.OpenWithOptions(ctx, cfg.AuditRetentionDatabaseURL, database.PoolConfig{
-				MaxOpenConns:    2,
-				MaxIdleConns:    1,
-				ConnMaxLifetime: 30 * time.Minute,
-				ConnMaxIdleTime: 5 * time.Minute,
-			})
+			retentionPool := database.PoolConfigFromEnv(2, 1)
+			retentionPool.MaxOpenConns = 2
+			retentionPool.MaxIdleConns = 1
+			retention, err := database.OpenWithOptions(ctx, cfg.AuditRetentionDatabaseURL, retentionPool)
 			if err != nil {
 				slog.Error("audit retention database unavailable")
 				os.Exit(1)

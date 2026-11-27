@@ -6,16 +6,18 @@ FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 ARG GO_BUILD_TAGS=""
-# Share compiled packages across commands without exporting them in image layers.
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/social-migrate ./cmd/social-migrate
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/social-credentials ./cmd/social-credentials
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/platform-migrate ./cmd/platform-migrate
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -tags "$GO_BUILD_TAGS" -trimpath -ldflags="-s -w" -o /out/publishing-orchestrator ./cmd/product-worker
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -tags "$GO_BUILD_TAGS" -trimpath -ldflags="-s -w" -o /out/publishing-backend ./cmd/product-api
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/combined-backend ./cmd/combined
+# Share Go module and build caches across binaries without exporting them into image layers.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/social-migrate ./cmd/social-migrate && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/social-credentials ./cmd/social-credentials && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/platform-migrate ./cmd/platform-migrate && \
+    CGO_ENABLED=0 go build -tags "$GO_BUILD_TAGS" -trimpath -ldflags="-s -w" -o /out/publishing-orchestrator ./cmd/product-worker && \
+    CGO_ENABLED=0 go build -tags "$GO_BUILD_TAGS" -trimpath -ldflags="-s -w" -o /out/publishing-backend ./cmd/product-api && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/combined-backend ./cmd/combined
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/social-migrate /social-migrate
@@ -25,6 +27,7 @@ COPY --from=build /out/publishing-orchestrator /publishing-orchestrator
 COPY --from=build /out/publishing-backend /publishing-backend
 COPY --from=build /out/combined-backend /combined-backend
 # The commit the image is built from; telemetry reports it as service.version.
+# Keep after COPY layers so per-commit SHA updates never invalidate binary layers.
 ARG SERVICE_VERSION=dev
 ENV TZ=UTC SERVICE_VERSION=$SERVICE_VERSION
 EXPOSE 3000

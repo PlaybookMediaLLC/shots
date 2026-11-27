@@ -3,10 +3,6 @@ FROM node:22.23.4-bookworm-slim AS base
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends --yes openssl \
-    && rm -rf /var/lib/apt/lists/*
-
 # Build from the repository root:
 #   docker build --file clients/apps/web/Dockerfile .
 FROM base AS dependencies
@@ -65,6 +61,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    NODE_OPTIONS=--max-old-space-size=640 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 

@@ -86,6 +86,11 @@ spec:
       containers:
         - name: postgres
           image: {{ .Values.local.postgres.image | quote }}
+          args:
+            - -c
+            - statement_timeout=30000
+            - -c
+            - idle_in_transaction_session_timeout=30000
           ports:
             - name: postgres
               containerPort: 5432
@@ -149,7 +154,7 @@ spec:
       containers:
         - name: redis
           image: {{ .Values.local.redis.image | quote }}
-          args: ["--appendonly", "yes"]
+          args: ["--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru"]
           ports:
             - name: redis
               containerPort: 6379

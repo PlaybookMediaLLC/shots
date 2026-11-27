@@ -22,6 +22,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --workspace @shots/collab-server
 FROM node:22.23.4-bookworm-slim
 
 ENV NODE_ENV=production \
+    NODE_OPTIONS=--max-old-space-size=640 \
     PORT=1234
 
 WORKDIR /app
