@@ -142,19 +142,49 @@ export type WriterTokens = {
   set: (documentName: string, token: string) => Promise<void>;
 };
 
-/** Writer tokens for a single replica. */
-export function memoryWriterTokens(): WriterTokens {
-  const tokens = new Map<string, string>();
+/** How long a writer token is kept: the backend's store grace for a token. */
+const WRITER_TOKEN_TTL_SECONDS = 12 * 60 * 60;
+const WRITER_TOKEN_TTL_MS = WRITER_TOKEN_TTL_SECONDS * 1_000;
+const MEMORY_WRITER_TOKEN_LIMIT = 5_000;
+const KNOWN_ORG_EPOCH_LIMIT = 5_000;
+const MAX_EPOCH_QUERY_ORGS = 500;
+const MAX_CONCURRENT_RECHECKS = 10;
+
+/** Redis Pub/Sub channel carrying epoch bump notifications from the Go backend. */
+export const COLLAB_EPOCH_CHANNEL = "shots-collab:epoch:events";
+
+/** Writer tokens for a single replica, bounded by LRU capacity and TTL. */
+export function memoryWriterTokens(
+  maxEntries = MEMORY_WRITER_TOKEN_LIMIT
+): WriterTokens {
+  const tokens = new Map<string, { token: string; expiresAt: number }>();
   return {
-    get: async (documentName) => tokens.get(documentName),
+    get: async (documentName) => {
+      const entry = tokens.get(documentName);
+      if (!entry) return undefined;
+      if (entry.expiresAt <= Date.now()) {
+        tokens.delete(documentName);
+        return undefined;
+      }
+      // Refresh LRU position.
+      tokens.delete(documentName);
+      tokens.set(documentName, entry);
+      return entry.token;
+    },
     set: async (documentName, token) => {
-      tokens.set(documentName, token);
+      tokens.delete(documentName);
+      tokens.set(documentName, {
+        token,
+        expiresAt: Date.now() + WRITER_TOKEN_TTL_MS,
+      });
+      while (tokens.size > maxEntries) {
+        const oldest = tokens.keys().next().value;
+        if (oldest === undefined) break;
+        tokens.delete(oldest);
+      }
     },
   };
 }
-
-/** How long a writer token is kept: the backend's store grace for a token. */
-const WRITER_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
 /** Writer tokens shared by every replica through Redis. */
 export function redisWriterTokens(redis: {
@@ -188,6 +218,7 @@ const contextSchema = z.object({
   grant: collabGrantSchema,
   token: z.string().min(1),
   admitted: checkSchema.optional(),
+  admittedSeq: z.number().optional(),
 });
 type Context = z.infer<typeof contextSchema>;
 
@@ -196,121 +227,327 @@ type Connection = connectedPayload["connection"];
 /**
  * The Hocuspocus hooks that route every decision through the backend.
  *
- * A connection is authorized when it opens (onAuthenticate). After that it is
- * authorized again only when access may have changed: the backend publishes a
- * count per workspace, and one for every workspace, that moves with each
- * change that can take access away (a removed or demoted member, an ended
- * session, a replaced or deleted draft). Each frame reads the current counts
- * before using cached access; polling every `pollMs` also closes idle revoked
- * connections. Any connection is re-checked after `recheckMs` regardless.
+ * A connection is authorized when it opens (onAuthenticate). When Redis Pub/Sub
+ * epoch pushes are live (`isPushLive`), every frame verifies against the local
+ * push-updated epoch map in O(1) with a non-overlapping fallback poll. Without
+ * live push, concurrent frame checks coalesce per workspace into a single
+ * backend epoch read. Any connection is re-checked after `recheckMs` regardless.
  */
 export function collabHooks(
   backend: CollabBackend,
   log: Log,
   writers: WriterTokens = memoryWriterTokens(),
   {
-    pollMs = 1_000,
+    isPushLive,
+    onShutdown,
+    pollMs = isPushLive ? 5_000 : 1_000,
     recheckMs = 60_000,
-  }: { pollMs?: number; recheckMs?: number } = {}
+  }: {
+    isPushLive?: () => boolean;
+    onShutdown?: () => Promise<void> | void;
+    pollMs?: number;
+    recheckMs?: number;
+  } = {}
 ) {
-  const known = { global: 0, organizations: new Map<string, number>() };
+  const known = {
+    bumpSeq: 0,
+    global: 0,
+    organizations: new Map<string, number>(),
+  };
+  const setKnownOrg = (organizationId: string, epoch: number) => {
+    known.organizations.delete(organizationId);
+    known.organizations.set(organizationId, epoch);
+    while (known.organizations.size > KNOWN_ORG_EPOCH_LIMIT) {
+      const oldest = known.organizations.keys().next().value;
+      if (oldest === undefined) break;
+      if (open.has(oldest)) {
+        // Keep active workspaces pinned in the map.
+        const active = known.organizations.get(oldest)!;
+        known.organizations.delete(oldest);
+        known.organizations.set(oldest, active);
+        if (known.organizations.size <= open.size) break;
+        continue;
+      }
+      known.organizations.delete(oldest);
+    }
+  };
   const checks = new WeakMap<Connection, Check>();
+  const inFlightChecks = new WeakMap<
+    Connection,
+    { key: string; promise: Promise<void> }
+  >();
   type Open = {
     connection: Connection;
     context: unknown;
     documentName: string;
   };
   const open = new Map<string, Set<Open>>();
-  let timer: ReturnType<typeof setInterval> | null = null;
+  const inFlightEpochs = new Map<string, Promise<CollabEpochs>>();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pollPromise: Promise<boolean> | null = null;
+  let destroyed = false;
+
   const unchanged = (check: Check | undefined, next: Check) =>
     !!check &&
     check.global === next.global &&
     check.organization === next.organization &&
     Date.now() - check.at < recheckMs;
+
+  const readEpochsCoalesced = (
+    organizationId: string
+  ): Promise<CollabEpochs> => {
+    const existing = inFlightEpochs.get(organizationId);
+    if (existing) return existing;
+    const beforeSeq = known.bumpSeq;
+    const promise = backend
+      .epochs([organizationId])
+      .then((counts) => {
+        if (known.bumpSeq === beforeSeq) {
+          if (counts.global !== known.global) {
+            known.global = counts.global;
+            known.bumpSeq += 1;
+          }
+          const orgCount = counts.organizations[organizationId] ?? 0;
+          if (orgCount !== (known.organizations.get(organizationId) ?? 0)) {
+            setKnownOrg(organizationId, orgCount);
+            known.bumpSeq += 1;
+          }
+        }
+        return counts;
+      })
+      .finally(() => {
+        inFlightEpochs.delete(organizationId);
+      });
+    inFlightEpochs.set(organizationId, promise);
+    return promise;
+  };
+
   const currentAccess = async (
     value: unknown,
     documentName: string,
     connection: Connection
   ) => {
     const { grant: original, token } = contextSchema.parse(value);
-    // Polling alone leaves a window for revoked edits and private outgoing frames.
-    const counts = await backend.epochs([original.organizationId]);
-    // Taken before the request: a change published while it runs is seen next time.
-    const next: Check = {
-      global: counts.global,
-      organization: counts.organizations[original.organizationId] ?? 0,
-      at: Date.now(),
-    };
+    let next: Check;
+    if (isPushLive?.()) {
+      next = {
+        global: known.global,
+        organization: known.organizations.get(original.organizationId) ?? 0,
+        at: Date.now(),
+      };
+    } else {
+      const counts = await readEpochsCoalesced(original.organizationId);
+      next = {
+        global: counts.global,
+        organization: counts.organizations[original.organizationId] ?? 0,
+        at: Date.now(),
+      };
+    }
     if (unchanged(checks.get(connection), next)) return;
-    log("collab.recheck", { documentName, organizationId: original.organizationId });
-    const grant = await backend.authorize(token, documentName);
-    if (
-      grant.draftId !== original.draftId ||
-      grant.organizationId !== original.organizationId ||
-      grant.user.id !== original.user.id ||
-      grant.kind !== original.kind
-    ) {
-      throw new CollabBackendError("Collaboration authority changed.", 403);
+    const checkKey = `${next.global}:${next.organization}`;
+    const existing = inFlightChecks.get(connection);
+    if (existing && existing.key === checkKey) {
+      return existing.promise;
     }
-    // A delayed grant must never undo an already observed demotion. A later
-    // upgrade takes effect on a new connection with a newly issued token.
-    connection.readOnly =
-      connection.readOnly ||
-      grant.kind === "creative-set" ||
-      grant.access !== "write";
-    checks.set(connection, next);
-  };
-  const recheck = ({ connection, context, documentName }: Open) => {
-    currentAccess(context, documentName, connection).catch((error: unknown) => {
-      log("collab.revoked", {
+    const verify = (async () => {
+      log("collab.recheck", {
         documentName,
-        status: error instanceof CollabBackendError ? error.status : 0,
+        organizationId: original.organizationId,
       });
-      connection.close({
-        code: 4403,
-        reason: "Document access is no longer available.",
-      });
+      const grant = await backend.authorize(token, documentName);
+      if (
+        grant.draftId !== original.draftId ||
+        grant.organizationId !== original.organizationId ||
+        grant.user.id !== original.user.id ||
+        grant.kind !== original.kind
+      ) {
+        throw new CollabBackendError("Collaboration authority changed.", 403);
+      }
+      // A delayed grant must never undo an already observed demotion. A later
+      // upgrade takes effect on a new connection with a newly issued token.
+      connection.readOnly =
+        connection.readOnly ||
+        grant.kind === "creative-set" ||
+        grant.access !== "write";
+      checks.set(connection, next);
+    })().finally(() => {
+      if (inFlightChecks.get(connection)?.promise === verify) {
+        inFlightChecks.delete(connection);
+      }
     });
+    inFlightChecks.set(connection, { key: checkKey, promise: verify });
+    return verify;
   };
-  const poll = async () => {
-    if (open.size === 0) {
-      if (timer) clearInterval(timer);
-      timer = null;
-      return;
+
+  const recheckEntries = (entries: Open[]) => {
+    if (entries.length === 0) return;
+    let index = 0;
+    const workers = Math.min(MAX_CONCURRENT_RECHECKS, entries.length);
+    const worker = async () => {
+      while (index < entries.length && !destroyed) {
+        const entry = entries[index++];
+        if (!entry) break;
+        try {
+          await currentAccess(
+            entry.context,
+            entry.documentName,
+            entry.connection
+          );
+        } catch (error: unknown) {
+          log("collab.revoked", {
+            documentName: entry.documentName,
+            status: error instanceof CollabBackendError ? error.status : 0,
+          });
+          entry.connection.close({
+            code: 4403,
+            reason: "Document access is no longer available.",
+          });
+        }
+      }
+    };
+    for (let i = 0; i < workers; i++) {
+      void worker();
     }
-    try {
-      const counts = await backend.epochs([...open.keys()]);
-      const moved = new Set<string>();
-      if (counts.global !== known.global) {
+  };
+
+  const recheckOrgs = (moved: Set<string>) => {
+    if (moved.size === 0) return;
+    const toRecheck: Open[] = [];
+    for (const id of moved) {
+      for (const entry of open.get(id) ?? []) toRecheck.push(entry);
+    }
+    recheckEntries(toRecheck);
+  };
+
+  const applyEpoch = (organizationId: string, epoch: number) => {
+    if (destroyed) return;
+    const moved = new Set<string>();
+    if (organizationId === "") {
+      if (epoch !== known.global) {
+        known.global = epoch;
+        known.bumpSeq += 1;
         for (const id of open.keys()) moved.add(id);
       }
-      known.global = counts.global;
-      for (const [id, count] of Object.entries(counts.organizations)) {
-        if ((known.organizations.get(id) ?? 0) !== count) moved.add(id);
-        known.organizations.set(id, count);
+    } else {
+      const current = known.organizations.get(organizationId) ?? 0;
+      if (epoch !== current || !open.has(organizationId)) {
+        // Always advance bumpSeq even when no connection is tracked yet so an
+        // in-flight onAuthenticate/onLoadDocument for this org invalidates.
+        known.bumpSeq += 1;
+        setKnownOrg(organizationId, epoch);
+        if (open.has(organizationId)) {
+          moved.add(organizationId);
+        }
       }
-      // Pushed revocation: an idle reader loses access without waiting for a frame.
-      for (const id of moved)
-        for (const entry of open.get(id) ?? []) recheck(entry);
-    } catch (error) {
-      log("collab.epochs_failed", {
-        status: error instanceof CollabBackendError ? error.status : 0,
-      });
     }
+    recheckOrgs(moved);
   };
+
+  const schedulePoll = () => {
+    if (destroyed || open.size === 0 || timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      void poll();
+    }, pollMs);
+    timer.unref?.();
+  };
+
+  const poll = async (): Promise<boolean> => {
+    if (destroyed) {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      return false;
+    }
+    if (open.size === 0) {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      return true;
+    }
+    if (pollPromise) return pollPromise;
+    const run = (async (): Promise<boolean> => {
+      let ok = true;
+      try {
+        const orgIds = [...open.keys()];
+        const moved = new Set<string>();
+        for (
+          let start = 0;
+          start < orgIds.length;
+          start += MAX_EPOCH_QUERY_ORGS
+        ) {
+          const chunk = orgIds.slice(start, start + MAX_EPOCH_QUERY_ORGS);
+          const beforeSeq = known.bumpSeq;
+          const counts = await backend.epochs(chunk);
+          // Skip regressing local epochs if a Pub/Sub push landed while this
+          // HTTP poll was in flight.
+          if (known.bumpSeq !== beforeSeq) continue;
+          if (counts.global !== known.global) {
+            known.global = counts.global;
+            known.bumpSeq += 1;
+            for (const id of open.keys()) moved.add(id);
+          }
+          for (const [id, count] of Object.entries(counts.organizations)) {
+            if ((known.organizations.get(id) ?? 0) !== count) {
+              moved.add(id);
+              known.bumpSeq += 1;
+            }
+            if (open.has(id)) setKnownOrg(id, count);
+          }
+        }
+        // Pushed revocation: an idle reader loses access without waiting for a frame.
+        recheckOrgs(moved);
+      } catch (error) {
+        ok = false;
+        log("collab.epochs_failed", {
+          status: error instanceof CollabBackendError ? error.status : 0,
+        });
+      } finally {
+        pollPromise = null;
+        schedulePoll();
+      }
+      return ok;
+    })();
+    pollPromise = run;
+    return run;
+  };
+
+  /** Runs a guaranteed fresh epoch sync after a Pub/Sub reconnect. */
+  const syncEpochs = async (): Promise<boolean> => {
+    if (destroyed) return false;
+    if (pollPromise) await pollPromise;
+    if (destroyed) return false;
+    if (open.size === 0) {
+      // Refresh global epoch even when no rooms are open yet so first
+      // connections start from the backend's current global counter.
+      try {
+        const beforeSeq = known.bumpSeq;
+        const counts = await backend.epochs([]);
+        if (known.bumpSeq === beforeSeq) {
+          known.global = counts.global;
+        }
+        return true;
+      } catch (error) {
+        log("collab.epochs_failed", {
+          status: error instanceof CollabBackendError ? error.status : 0,
+        });
+        return false;
+      }
+    }
+    return poll();
+  };
+
   const track = (entry: Open, organizationId: string) => {
     const entries = open.get(organizationId) ?? new Set<Open>();
     entries.add(entry);
     open.set(organizationId, entries);
     entry.connection.onClose(() => {
       entries.delete(entry);
-      if (entries.size === 0) open.delete(organizationId);
+      if (entries.size === 0) {
+        open.delete(organizationId);
+      }
     });
-    if (!timer) {
-      timer = setInterval(() => void poll(), pollMs);
-      timer.unref?.();
-    }
+    schedulePoll();
   };
+
   const protect = (
     value: unknown,
     documentName: string,
@@ -320,7 +557,11 @@ export function collabHooks(
       currentAccess(value, documentName, connection)
     );
   };
+
   return {
+    applyEpoch,
+    syncEpochs,
+
     async onAuthenticate({
       connectionConfig,
       documentName,
@@ -334,19 +575,26 @@ export function collabHooks(
         throw new Error("Unknown document.");
       }
       try {
-        // The counts as they stand before the request: a change published while
-        // it runs moves the workspace past this, so the next message re-checks.
-        const before = {
-          at: Date.now(),
-          global: known.global,
-          organizations: new Map(known.organizations),
-        };
+        // Snapshot a monotonic bump sequence before authorizing so any epoch
+        // movement while authorize or onLoadDocument is in flight forces a
+        // fresh re-check without cloning the entire organizations map.
+        const beforeAt = Date.now();
+        const beforeSeq = known.bumpSeq;
+        const beforeGlobal = known.global;
         const grant = await backend.authorize(token, documentName);
-        const admitted: Check = {
-          at: before.at,
-          global: before.global,
-          organization: before.organizations.get(grant.organizationId) ?? 0,
-        };
+        const admitted: Check =
+          known.bumpSeq === beforeSeq
+            ? {
+                at: beforeAt,
+                global: beforeGlobal,
+                organization:
+                  known.organizations.get(grant.organizationId) ?? 0,
+              }
+            : {
+                at: 0,
+                global: -1,
+                organization: -1,
+              };
         connectionConfig.readOnly =
           grant.kind === "creative-set" || grant.access !== "write";
         log("collab.admitted", {
@@ -355,7 +603,7 @@ export function collabHooks(
           organizationId: grant.organizationId,
           userId: grant.user.id,
         });
-        return { grant, token, admitted };
+        return { grant, token, admitted, admittedSeq: beforeSeq };
       } catch (error) {
         log("collab.refused", {
           documentName,
@@ -367,15 +615,24 @@ export function collabHooks(
     },
 
     async connected({ context, documentName, connection }: connectedPayload) {
-      const { admitted, grant } = contextSchema.parse(context);
-      if (admitted) checks.set(connection, admitted);
+      const { admitted, admittedSeq, grant } = contextSchema.parse(context);
       track({ connection, context, documentName }, grant.organizationId);
+      if (admitted) {
+        checks.set(
+          connection,
+          admittedSeq !== undefined && known.bumpSeq !== admittedSeq
+            ? { at: 0, global: -1, organization: -1 }
+            : admitted
+        );
+      }
       protect(context, documentName, connection);
     },
 
     async onDestroy() {
-      if (timer) clearInterval(timer);
+      destroyed = true;
+      if (timer) clearTimeout(timer);
       timer = null;
+      await onShutdown?.();
     },
 
     async beforeHandleMessage({
@@ -396,10 +653,9 @@ export function collabHooks(
       const syncType = message.readVarUint();
       if (syncType !== 1 && syncType !== 2) return;
       const { token } = contextSchema.parse(context);
-      // Read the shared store: another replica may have changed the writer.
-      if ((await writers.get(documentName)) !== token) {
-        await writers.set(documentName, token);
-      }
+      // Record the latest writer directly (single SET RTT; avoids stale
+      // cross-replica cache suppression).
+      await writers.set(documentName, token);
     },
 
     async onLoadDocument({
@@ -418,28 +674,47 @@ export function collabHooks(
     async onStoreDocument({ document, documentName }: onStoreDocumentPayload) {
       const draftId = draftIdOf(documentName);
       if (!draftId) return;
-      try {
-        const token = await writers.get(documentName);
-        if (!token) return;
-        await backend.store(draftId, token, Y.encodeStateAsUpdate(document));
-        log("collab.stored", { documentName });
-      } catch (error) {
-        log("collab.store_failed", {
-          documentName,
-          status: error instanceof CollabBackendError ? error.status : 0,
-        });
-        for (const connection of document.getConnections()) {
-          connection.close({
-            code: 1013,
-            reason: "Document save unavailable. Reconnect to retry.",
-          });
+      const retryDelays = [250, 750];
+      let lastError: unknown;
+      for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+        try {
+          const token = await writers.get(documentName);
+          if (!token) return;
+          await backend.store(draftId, token, Y.encodeStateAsUpdate(document));
+          log("collab.stored", { documentName });
+          return;
+        } catch (error) {
+          lastError = error;
+          const status = error instanceof CollabBackendError ? error.status : 0;
+          // Never retry definitive authorization refusals.
+          if (
+            status === 401 ||
+            status === 403 ||
+            status === 404 ||
+            attempt === retryDelays.length
+          ) {
+            break;
+          }
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryDelays[attempt])
+          );
         }
-        // Hocuspocus's debounced store does not handle rejected Error objects.
-        // Its silent rejection convention skips afterStoreDocument without an
-        // unhandled rejection taking down every room. The client's existing
-        // local Yjs persistence resubmits pending edits after fresh admission.
-        throw null;
       }
+      log("collab.store_failed", {
+        documentName,
+        status: lastError instanceof CollabBackendError ? lastError.status : 0,
+      });
+      for (const connection of document.getConnections()) {
+        connection.close({
+          code: 1013,
+          reason: "Document save unavailable. Reconnect to retry.",
+        });
+      }
+      // Hocuspocus's debounced store does not handle rejected Error objects.
+      // Its silent rejection convention skips afterStoreDocument without an
+      // unhandled rejection taking down every room. The client's existing
+      // local Yjs persistence resubmits pending edits after fresh admission.
+      throw null;
     },
 
     async onRequest({ request, response }: onRequestPayload) {

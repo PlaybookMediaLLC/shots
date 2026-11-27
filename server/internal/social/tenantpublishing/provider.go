@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/notifications"
@@ -56,6 +57,9 @@ type Publisher struct {
 	// channels and refresh renew expiring credentials (RefreshSocialTokens).
 	channels *socialent.Client
 	refresh  *socialintegration.RefreshIntegrationService
+
+	refreshMu       sync.Mutex
+	refreshCooldown map[string]refreshBackoff
 }
 
 func New(bindings BindingLookup, socialClient *socialent.Client, signer MediaSigner, lifecycle ...managedslack.Lifecycle) *Publisher {

@@ -15,7 +15,7 @@ func (s *Service) Maintain(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `DELETE FROM platform_notification_delivery d WHERE NOT EXISTS(SELECT 1 FROM outbox_event e WHERE e.id=d.event_id AND e."organizationId"=d."organizationId")`); err != nil {
+	if _, err = tx.ExecContext(ctx, `DELETE FROM platform_notification_delivery WHERE id IN (SELECT d.id FROM platform_notification_delivery d WHERE NOT EXISTS(SELECT 1 FROM outbox_event e WHERE e.id=d.event_id AND e."organizationId"=d."organizationId") ORDER BY d.id LIMIT 500 FOR UPDATE SKIP LOCKED)`); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE platform_notification_delivery SET encrypted_payload='' WHERE status='UNCERTAIN' AND send_started_at<now()-interval '24 hours' AND encrypted_payload<>''`); err != nil {

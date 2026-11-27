@@ -101,12 +101,13 @@ type SeenResult struct {
 	UnseenCount int `json:"unseenCount"`
 }
 type Service struct {
-	DB        *sql.DB
-	auth      *publishing.Repository
-	HTTP      *http.Client
-	SlackBase string
-	EmailBase string
-	Send      func(context.Context, Delivery, Envelope) (Outcome, error)
+	DB              *sql.DB
+	auth            *publishing.Repository
+	HTTP            *http.Client
+	SlackBase       string
+	EmailBase       string
+	Send            func(context.Context, Delivery, Envelope) (Outcome, error)
+	DispatchWorkers int
 }
 
 func New(db *sql.DB, client *ent.Client) *Service {
@@ -146,6 +147,7 @@ func defaultPreferences() Preferences {
 
 type queryer interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
 func policy(ctx context.Context, db queryer, org string) (Policy, error) {
@@ -184,22 +186,51 @@ func preferences(ctx context.Context, db queryer, org, user string) (Preferences
 	if err != nil {
 		return p, err
 	}
-	var overrides map[string]Channels
-	if err = json.Unmarshal(raw, &overrides); err != nil {
+	if err = applyPreferenceRow(&p, raw, sets, setChannels); err != nil {
 		return p, err
+	}
+	return p, nil
+}
+
+func applyPreferenceRow(p *Preferences, raw, sets, setChannels []byte) error {
+	var overrides map[string]Channels
+	if err := json.Unmarshal(raw, &overrides); err != nil {
+		return err
 	}
 	for k, v := range overrides {
 		p.Events[k] = v
 	}
 	if len(sets) > 0 {
-		if err = json.Unmarshal(sets, &p.SocialSets); err != nil {
-			return p, err
+		if err := json.Unmarshal(sets, &p.SocialSets); err != nil {
+			return err
 		}
 	}
-	if err = json.Unmarshal(setChannels, &p.SocialSetChannels); err != nil {
-		return p, err
+	return json.Unmarshal(setChannels, &p.SocialSetChannels)
+}
+
+func preferencesBatch(ctx context.Context, db queryer, org string, users []string) (map[string]Preferences, error) {
+	out := make(map[string]Preferences, len(users))
+	if len(users) == 0 {
+		return out, nil
 	}
-	return p, nil
+	rows, err := db.QueryContext(ctx, `SELECT "userId",events,generation,social_sets,social_set_channels,slack_enabled FROM platform_notification_preference WHERE "organizationId"=$1 AND "userId"=ANY($2)`, org, users)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID string
+		var raw, sets, setChannels []byte
+		p := defaultPreferences()
+		if err = rows.Scan(&userID, &raw, &p.Generation, &sets, &setChannels, p.SlackEnabled); err != nil {
+			return nil, err
+		}
+		if err = applyPreferenceRow(&p, raw, sets, setChannels); err != nil {
+			return nil, err
+		}
+		out[userID] = p
+	}
+	return out, rows.Err()
 }
 
 // emailWanted reads the person's email master switch (RFC 024); off, no
@@ -211,6 +242,53 @@ func emailWanted(ctx context.Context, db queryer, user string) (bool, error) {
 		return true, nil
 	}
 	return on, err
+}
+
+func emailWantedBatch(ctx context.Context, db queryer, users []string) (map[string]bool, error) {
+	out := make(map[string]bool, len(users))
+	if len(users) == 0 {
+		return out, nil
+	}
+	rows, err := db.QueryContext(ctx, `SELECT "userId","emailNotifications" FROM user_preference WHERE "userId"=ANY($1)`, users)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID string
+		var on bool
+		if err = rows.Scan(&userID, &on); err != nil {
+			return nil, err
+		}
+		out[userID] = on
+	}
+	return out, rows.Err()
+}
+
+func personalSlackBatch(ctx context.Context, db queryer, org string, users []string) (map[string]*SlackConnection, error) {
+	out := make(map[string]*SlackConnection, len(users))
+	if len(users) == 0 {
+		return out, nil
+	}
+	rows, err := db.QueryContext(ctx, `SELECT c."userId",c.id,c.slack_user_id,i.team_id,i.team_name,i.app_id,i.health,i.scopes FROM platform_slack_personal_connection c JOIN platform_slack_installation i ON i.id=c.installation_id JOIN member m ON m.id=c.member_id AND m."organizationId"=c."organizationId" AND m."userId"=c."userId" WHERE c."organizationId"=$1 AND c."userId"=ANY($2)`, org, users)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID string
+		var c SlackConnection
+		var raw []byte
+		if err = rows.Scan(&userID, &c.ID, &c.SlackUserID, &c.TeamID, &c.TeamName, &c.AppID, &c.Health, &raw); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(raw, &c.Scopes); err != nil {
+			return nil, err
+		}
+		conn := c
+		out[userID] = &conn
+	}
+	return out, rows.Err()
 }
 
 // socialSetOf names the social set a resource row belongs to, if any.
@@ -462,25 +540,40 @@ func (s *Service) resourceRole(ctx context.Context, org, user string) (string, e
 	return role, err
 }
 
-// resourceReads answers a feed page's resource rows and social sets from a few
-// batched queries. A nil value, or anything it did not load, reads the database.
+// resourceReads answers a feed page's or fanout's resource rows and social sets
+// from a few batched queries. A nil value, or anything it did not load, reads the database.
 type resourceReads struct {
-	rows map[string]map[string][]byte // table, then id: the row, absent when missing
-	sets map[string]*feedSet          // id: the set, nil when missing or deleted
+	rows             map[string]map[string][]byte      // table, then id: the row, absent when missing
+	sets             map[string]*feedSet               // id: the set, nil when missing or deleted
+	conns            map[string]map[string]*connRecord // table, then id: connection owner & set
+	releaseCampaigns map[string]string                 // releaseId -> latest campaignId
+	memberIDs        map[string]string                 // userId -> memberId
 }
 
 type feedSet struct{ name, visibility, owner string }
+type connRecord struct{ owner, setID string }
 
 // loadResourceReads reads every table row and social set the items reference.
-func loadResourceReads(ctx context.Context, db *sql.DB, org string, items []Item) (*resourceReads, error) {
-	reads := &resourceReads{rows: map[string]map[string][]byte{}, sets: map[string]*feedSet{}}
+func loadResourceReads(ctx context.Context, db queryer, org string, items []Item) (*resourceReads, error) {
+	reads := &resourceReads{
+		rows:             map[string]map[string][]byte{},
+		sets:             map[string]*feedSet{},
+		conns:            map[string]map[string]*connRecord{},
+		releaseCampaigns: map[string]string{},
+	}
 	ids := map[string][]string{}
+	connIDs := map[string][]string{}
 	for _, item := range items {
+		if item.resourceType == "integration_connection" || item.resourceType == "channel_connection" {
+			connIDs[item.resourceType] = append(connIDs[item.resourceType], item.resourceID)
+			continue
+		}
 		if table, ok := resourceTables[item.resourceType]; ok {
 			ids[table] = append(ids[table], item.resourceID)
 		}
 	}
 	setIDs := []string{}
+	releaseIDs := []string{}
 	for table, tableIDs := range ids {
 		reads.rows[table] = map[string][]byte{}
 		rows, err := db.QueryContext(ctx, `SELECT id, to_jsonb(r) - 'document' FROM `+table+` r WHERE id = ANY($1) AND "organizationId"=$2`, tableIDs, org)
@@ -496,9 +589,62 @@ func loadResourceReads(ctx context.Context, db *sql.DB, org string, items []Item
 			}
 			reads.rows[table][id] = raw
 			var row map[string]any
-			if json.Unmarshal(raw, &row) == nil && socialSetOf(row) != "" {
-				setIDs = append(setIDs, socialSetOf(row))
+			if json.Unmarshal(raw, &row) == nil {
+				if sid := socialSetOf(row); sid != "" {
+					setIDs = append(setIDs, sid)
+				}
+				if table == "release_spec" {
+					if rid := textValue(row, "releaseId"); rid != "" {
+						releaseIDs = append(releaseIDs, rid)
+					}
+				}
 			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	for table, tableIDs := range connIDs {
+		reads.conns[table] = map[string]*connRecord{}
+		rows, err := db.QueryContext(ctx, `SELECT id, "createdByUserId", COALESCE(to_jsonb(c)->>'socialSetId','') FROM `+table+` c WHERE id = ANY($1) AND "organizationId"=$2`, tableIDs, org)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id, setID string
+			var owner sql.NullString
+			if err = rows.Scan(&id, &owner, &setID); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			reads.conns[table][id] = &connRecord{owner: owner.String, setID: setID}
+			if setID != "" {
+				setIDs = append(setIDs, setID)
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(releaseIDs) > 0 {
+		for _, rid := range releaseIDs {
+			reads.releaseCampaigns[rid] = ""
+		}
+		rows, err := db.QueryContext(ctx, `SELECT DISTINCT ON ("releaseId") "releaseId", id FROM campaign WHERE "organizationId"=$1 AND "releaseId" = ANY($2) ORDER BY "releaseId", "createdAt" DESC, id DESC`, org, releaseIDs)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var rid, cid string
+			if err = rows.Scan(&rid, &cid); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			reads.releaseCampaigns[rid] = cid
 		}
 		err = rows.Err()
 		rows.Close()
@@ -579,28 +725,44 @@ func (r *resourceReads) sourceSet(ctx context.Context, db queryer, org, user, id
 // resourceForRole applies resource's rules for a role resourceRole already read.
 // reads may be nil; a feed page passes the rows and sets it loaded in batches.
 func (s *Service) resourceForRole(ctx context.Context, org, user, role, kind, id string, reads *resourceReads) (bool, map[string]any, error) {
+	return s.resourceForRoleDB(ctx, s.DB, org, user, role, kind, id, reads)
+}
+
+func (s *Service) resourceForRoleDB(ctx context.Context, db queryer, org, user, role, kind, id string, reads *resourceReads) (bool, map[string]any, error) {
 	if kind == "legacy_activity" {
 		return true, map[string]any{}, nil
 	}
 	if kind == "member" && role != "owner" && role != "admin" {
+		if reads != nil && reads.memberIDs != nil {
+			return reads.memberIDs[user] == id, map[string]any{}, nil
+		}
 		var owned bool
-		err := s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM member WHERE id=$1 AND "organizationId"=$2 AND "userId"=$3)`, id, org, user).Scan(&owned)
+		err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM member WHERE id=$1 AND "organizationId"=$2 AND "userId"=$3)`, id, org, user).Scan(&owned)
 		return owned, map[string]any{}, err
 	}
 	if kind == "integration_connection" || kind == "channel_connection" {
-		var owner sql.NullString
-		var setID string
-		err := s.DB.QueryRowContext(ctx, `SELECT "createdByUserId",COALESCE(to_jsonb(c)->>'socialSetId','') FROM `+kind+` c WHERE id=$1 AND "organizationId"=$2`, id, org).Scan(&owner, &setID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil, nil
+		var owner, setID string
+		if reads != nil && reads.conns[kind] != nil {
+			rec, found := reads.conns[kind][id]
+			if !found {
+				return false, nil, nil
+			}
+			owner, setID = rec.owner, rec.setID
+		} else {
+			var ownerNull sql.NullString
+			err := db.QueryRowContext(ctx, `SELECT "createdByUserId",COALESCE(to_jsonb(c)->>'socialSetId','') FROM `+kind+` c WHERE id=$1 AND "organizationId"=$2`, id, org).Scan(&ownerNull, &setID)
+			if errors.Is(err, sql.ErrNoRows) {
+				return false, nil, nil
+			}
+			if err != nil {
+				return false, nil, err
+			}
+			owner = ownerNull.String
 		}
-		if err != nil {
+		if private, setOwner, err := reads.privateSet(ctx, db, org, setID); err != nil || private && setOwner != user {
 			return false, nil, err
 		}
-		if private, setOwner, err := reads.privateSet(ctx, s.DB, org, setID); err != nil || private && setOwner != user {
-			return false, nil, err
-		}
-		return role == "owner" || role == "admin" || owner.String == user, map[string]any{"createdByUserId": owner.String, "socialSetId": setID}, nil
+		return role == "owner" || role == "admin" || owner == user, map[string]any{"createdByUserId": owner, "socialSetId": setID}, nil
 	}
 	if slices.Contains([]string{"member", "invitation", "organization", "workspace"}, kind) {
 		return role == "owner" || role == "admin", map[string]any{}, nil
@@ -609,7 +771,7 @@ func (s *Service) resourceForRole(ctx context.Context, org, user, role, kind, id
 	if !ok {
 		return false, nil, nil
 	}
-	raw, found, err := reads.row(ctx, s.DB, table, id, org)
+	raw, found, err := reads.row(ctx, db, table, id, org)
 	if err != nil || !found {
 		return false, nil, err
 	}
@@ -621,14 +783,21 @@ func (s *Service) resourceForRole(ctx context.Context, org, user, role, kind, id
 		return false, row, nil
 	}
 	// A private social set's drafts and posts are its owner's alone (RFC 024).
-	if private, owner, err := reads.privateSet(ctx, s.DB, org, socialSetOf(row)); err != nil {
+	if private, owner, err := reads.privateSet(ctx, db, org, socialSetOf(row)); err != nil {
 		return false, nil, err
 	} else if private && owner != user {
 		return false, row, nil
 	}
 	if kind == "release_spec" {
+		releaseID := textValue(row, "releaseId")
+		if reads != nil {
+			if cid, ok := reads.releaseCampaigns[releaseID]; ok {
+				row["campaignId"] = cid
+				return true, row, nil
+			}
+		}
 		var campaignID string
-		err = s.DB.QueryRowContext(ctx, `SELECT id FROM campaign WHERE "organizationId"=$1 AND "releaseId"=$2 ORDER BY "createdAt" DESC,id DESC LIMIT 1`, org, textValue(row, "releaseId")).Scan(&campaignID)
+		err = db.QueryRowContext(ctx, `SELECT id FROM campaign WHERE "organizationId"=$1 AND "releaseId"=$2 ORDER BY "createdAt" DESC,id DESC LIMIT 1`, org, releaseID).Scan(&campaignID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return false, nil, err
 		}

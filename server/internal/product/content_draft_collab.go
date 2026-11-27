@@ -169,40 +169,23 @@ func (c *Configuration) collabClaims(ctx context.Context, token, documentName, d
 			return collab.Claims{}, err
 		}
 	}
-	var owned bool
 	if claims.Kind == "creative-set" {
-		owned, err = c.client.PlatformCreativeSet.Query().Where(platformcreativeset.ID(claims.DraftID), platformcreativeset.OrganizationID(claims.OrganizationID)).Exist(ctx)
+		owned, err := c.client.PlatformCreativeSet.Query().Where(platformcreativeset.ID(claims.DraftID), platformcreativeset.OrganizationID(claims.OrganizationID)).Exist(ctx)
+		if err != nil {
+			return collab.Claims{}, err
+		}
+		if !owned {
+			return collab.Claims{}, publishing.ErrNotFound
+		}
 	} else {
 		// The draft must still be one the token's person may see: a private
 		// set's draft closes to everyone else even mid-session.
-		_, err = visibleContentDraft(ctx, c.client, Actor{OrganizationID: claims.OrganizationID, UserID: claims.UserID, Kind: "session"}, claims.DraftID)
-		owned = err == nil
-		if errors.Is(err, publishing.ErrNotFound) {
-			err = nil
-		}
-	}
-	if err != nil {
-		return collab.Claims{}, err
-	}
-	if !owned {
-		return collab.Claims{}, publishing.ErrNotFound
-	}
-	if claims.Kind != "creative-set" {
-		// A member moved out of a restricted set loses the draft on the next
-		// load or store, even with a token that has not expired.
-		draft, err := c.client.ContentDraft.Get(ctx, claims.DraftID)
+		draft, err := visibleContentDraft(ctx, c.client, Actor{OrganizationID: claims.OrganizationID, UserID: claims.UserID, Kind: "session"}, claims.DraftID)
 		if err != nil {
 			return collab.Claims{}, err
 		}
 		if draft.CollabGeneration != claims.Generation {
 			return collab.Claims{}, publishing.ErrForbidden
-		}
-		visible, err := contentDraftVisible(ctx, c.client, Actor{OrganizationID: claims.OrganizationID, UserID: claims.UserID}, draft)
-		if err != nil {
-			return collab.Claims{}, err
-		}
-		if !visible {
-			return collab.Claims{}, publishing.ErrNotFound
 		}
 	}
 	writable, err := collabWritable(ctx, c.client, claims.OrganizationID, claims.UserID, role)

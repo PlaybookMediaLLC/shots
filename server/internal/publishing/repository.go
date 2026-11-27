@@ -323,11 +323,25 @@ func keepVisiblePosts(ctx context.Context, client *ent.Client, query *ent.Schedu
 }
 
 func (r *Repository) ListRecoverablePosts(ctx context.Context, since, dueBefore time.Time, limit int) ([]RecoverablePost, error) {
-	posts, err := r.client.ScheduledPost.Query().Where(
+	return r.ListRecoverablePostsAfter(ctx, since, dueBefore, time.Time{}, "", limit)
+}
+
+func (r *Repository) ListRecoverablePostsAfter(ctx context.Context, since, dueBefore, afterScheduled time.Time, afterID string, limit int) ([]RecoverablePost, error) {
+	query := r.client.ScheduledPost.Query().Where(
 		scheduledpost.StatusEQ(scheduledpost.StatusSCHEDULED),
 		scheduledpost.ScheduledForGTE(since),
 		scheduledpost.ScheduledForLTE(dueBefore),
-	).Order(ent.Asc(scheduledpost.FieldScheduledFor)).Limit(limit).All(ctx)
+	)
+	if afterID != "" {
+		query = query.Where(scheduledpost.Or(
+			scheduledpost.ScheduledForGT(afterScheduled),
+			scheduledpost.And(
+				scheduledpost.ScheduledForEQ(afterScheduled),
+				scheduledpost.IDGT(afterID),
+			),
+		))
+	}
+	posts, err := query.Order(ent.Asc(scheduledpost.FieldScheduledFor), ent.Asc(scheduledpost.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

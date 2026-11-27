@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/activity"
@@ -60,16 +62,58 @@ func (s *Service) Process(ctx context.Context) error {
 	if _, err := s.DB.ExecContext(ctx, `UPDATE platform_notification_delivery SET status=CASE WHEN send_started_at IS NULL THEN 'PENDING' ELSE 'UNCERTAIN' END,failure_code=CASE WHEN send_started_at IS NULL THEN '' ELSE 'WORKER_LOST' END,claim_token='',updated_at=now() WHERE status='CLAIMED' AND claimed_at<now()-interval '2 minutes'`); err != nil {
 		return err
 	}
-	for i := 0; i < 100; i++ {
-		ok, err := s.dispatch(ctx)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			break
+	workers := max(s.DispatchWorkers, 1)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	// Probe one delivery before fanning out workers so idle ticks run a single query.
+	ok, err := s.dispatch(ctx)
+	if err != nil || !ok {
+		return err
+	}
+	var claimed atomic.Int32
+	claimed.Store(1)
+	var mu sync.Mutex
+	var firstErr error
+	runWorker := func() {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			if claimed.Add(1) > 100 {
+				return
+			}
+			more, err := s.dispatch(ctx)
+			if err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+				return
+			}
+			if !more {
+				return
+			}
 		}
 	}
-	return nil
+	if workers == 1 {
+		runWorker()
+	} else {
+		var wg sync.WaitGroup
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runWorker()
+			}()
+		}
+		wg.Wait()
+	}
+	if firstErr == nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return firstErr
 }
 
 func (s *Service) fanout(ctx context.Context) (bool, error) {
@@ -112,87 +156,195 @@ func (s *Service) fanout(ctx context.Context) (bool, error) {
 		if e2 != nil {
 			return false, e2
 		}
-		recipients, e2 := s.recipients(ctx, e, def)
+		recipients, e2 := s.recipientsQuery(ctx, tx, e, def)
 		if e2 != nil {
 			return false, e2
 		}
-		for _, user := range recipients {
-			var memberID string
-			e2 = tx.QueryRowContext(ctx, `SELECT m.id FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND m."userId"=$2 AND COALESCE(u.banned,false)=false FOR SHARE OF m,u`, e.org, user).Scan(&memberID)
-			if errors.Is(e2, sql.ErrNoRows) {
-				continue
-			}
-			if e2 != nil {
+		if len(recipients) > 0 {
+			var deleting bool
+			if e2 = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM workspace_deletion WHERE "organizationId"=$1 AND status<>'CANCELLED')`, e.org).Scan(&deleting); e2 != nil {
 				return false, e2
 			}
-			allowed, row, e2 := s.resource(ctx, e.org, user, e.resourceType, e.resourceID)
-			if e2 != nil {
-				return false, e2
-			}
-			if !allowed {
-				continue
-			}
-			if _, sourceAllowed, err := sourceSocialSet(ctx, tx, e.org, user, e.sourceSocialSetID); err != nil {
-				return false, err
-			} else if !sourceAllowed {
-				continue
-			}
-			pref, e2 := preferences(ctx, tx, e.org, user)
-			if e2 != nil {
-				return false, e2
-			}
-			wantsEmail, e2 := emailWanted(ctx, tx, user)
-			if e2 != nil {
-				return false, e2
-			}
-			for _, channel := range []string{"in_app", "email", "slack_dm"} {
-				permitted, decision := personalDecision(pol, pref, def, channel, wantsEmail, socialSetOf(row), e.sourceSocialSetID)
-				status, failureCode, connectionID := "PENDING", "", ""
-				if !permitted {
-					status, failureCode = "SKIPPED", decision
-				}
-				if channel == "slack_dm" {
-					personal, err := personalSlack(ctx, tx, e.org, user)
-					if err != nil {
-						return false, err
-					}
-					if personal != nil {
-						connectionID = personal.ID
-					}
-					if permitted {
-						if personal == nil {
-							status, failureCode = "SKIPPED", "SLACK_NOT_CONNECTED"
-						} else if personal.Health != "CONNECTED" {
-							status, failureCode = "BLOCKED", "SLACK_RECONNECT_REQUIRED"
-						}
-					}
-				}
-				id := cuid.New()
-				if uncertain, _ := e.payload["notificationLegacyUncertain"].(bool); uncertain && channel == "email" && permitted {
-					status = "UNCERTAIN"
-				}
-				if channel == "in_app" && permitted {
-					status = "SUCCEEDED"
-				}
-				var inserted string
-				e2 = tx.QueryRowContext(ctx, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,policy_generation,preference_generation,connection_id,decision_code,failure_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING RETURNING id`, id, e.org, e.id, e.kind, channel, user, status, pol.Generation, pref.Generation, connectionID, decision, failureCode).Scan(&inserted)
-				if errors.Is(e2, sql.ErrNoRows) {
-					continue
-				}
+			if !deleting {
+				roles := make(map[string]string, len(recipients))
+				memberIDs := make(map[string]string, len(recipients))
+				eligibleUsers := make([]string, 0, len(recipients))
+				// Lock in deterministic m.id order to avoid lock-order inversions.
+				memberRows, e2 := tx.QueryContext(ctx, `SELECT m.id, m."userId", m.role FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND m."userId"=ANY($2) AND COALESCE(u.banned,false)=false ORDER BY m.id FOR SHARE OF m,u`, e.org, recipients)
 				if e2 != nil {
 					return false, e2
 				}
-				if channel == "in_app" && permitted {
-					_, e2 = tx.ExecContext(ctx, `INSERT INTO platform_notification_inbox(id,"organizationId","userId",event_id,kind,resource_type,resource_id,description,href,category) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, id, e.org, user, e.id, e.kind, e.resourceType, e.resourceID, personalDescription(def, row), href(e.resourceType, e.resourceID, row), notificationCategory(def))
+				for memberRows.Next() {
+					var mID, uID, role string
+					if e2 = memberRows.Scan(&mID, &uID, &role); e2 != nil {
+						memberRows.Close()
+						return false, e2
+					}
+					roles[uID] = role
+					memberIDs[uID] = mID
+					eligibleUsers = append(eligibleUsers, uID)
+				}
+				e2 = memberRows.Err()
+				memberRows.Close()
+				if e2 != nil {
+					return false, e2
+				}
+				if len(eligibleUsers) > 0 {
+					reads, e2 := loadResourceReads(ctx, tx, e.org, []Item{{
+						resourceType:      e.resourceType,
+						resourceID:        e.resourceID,
+						sourceSocialSetID: e.sourceSocialSetID,
+					}})
 					if e2 != nil {
 						return false, e2
+					}
+					reads.memberIDs = memberIDs
+					prefsByUser, e2 := preferencesBatch(ctx, tx, e.org, eligibleUsers)
+					if e2 != nil {
+						return false, e2
+					}
+					emailByUser, e2 := emailWantedBatch(ctx, tx, eligibleUsers)
+					if e2 != nil {
+						return false, e2
+					}
+					slackByUser, e2 := personalSlackBatch(ctx, tx, e.org, eligibleUsers)
+					if e2 != nil {
+						return false, e2
+					}
+
+					type inboxPending struct {
+						id, user, description, href, category string
+					}
+					nCap := len(eligibleUsers) * 3
+					dIDs := make([]string, 0, nCap)
+					dChannels := make([]string, 0, nCap)
+					dDests := make([]string, 0, nCap)
+					dStatuses := make([]string, 0, nCap)
+					dPrefGens := make([]int, 0, nCap)
+					dConnIDs := make([]string, 0, nCap)
+					dDecisions := make([]string, 0, nCap)
+					dFailures := make([]string, 0, nCap)
+					inboxByDelivery := make(map[string]inboxPending, len(eligibleUsers))
+					legacyUncertain, _ := e.payload["notificationLegacyUncertain"].(bool)
+
+					for _, user := range recipients {
+						role, ok := roles[user]
+						if !ok {
+							continue
+						}
+						allowed, row, e2 := s.resourceForRoleDB(ctx, tx, e.org, user, role, e.resourceType, e.resourceID, reads)
+						if e2 != nil {
+							return false, e2
+						}
+						if !allowed {
+							continue
+						}
+						if _, sourceAllowed, e2 := reads.sourceSet(ctx, tx, e.org, user, e.sourceSocialSetID); e2 != nil {
+							return false, e2
+						} else if !sourceAllowed {
+							continue
+						}
+						pref, hasPref := prefsByUser[user]
+						if !hasPref {
+							pref = defaultPreferences()
+						}
+						wantsEmail, hasEmail := emailByUser[user]
+						if !hasEmail {
+							wantsEmail = true
+						}
+						personal := slackByUser[user]
+						for _, channel := range []string{"in_app", "email", "slack_dm"} {
+							permitted, decision := personalDecision(pol, pref, def, channel, wantsEmail, socialSetOf(row), e.sourceSocialSetID)
+							status, failureCode, connectionID := "PENDING", "", ""
+							if !permitted {
+								status, failureCode = "SKIPPED", decision
+							}
+							if channel == "slack_dm" {
+								if personal != nil {
+									connectionID = personal.ID
+								}
+								if permitted {
+									if personal == nil {
+										status, failureCode = "SKIPPED", "SLACK_NOT_CONNECTED"
+									} else if personal.Health != "CONNECTED" {
+										status, failureCode = "BLOCKED", "SLACK_RECONNECT_REQUIRED"
+									}
+								}
+							}
+							id := cuid.New()
+							if legacyUncertain && channel == "email" && permitted {
+								status = "UNCERTAIN"
+							}
+							if channel == "in_app" && permitted {
+								status = "SUCCEEDED"
+								inboxByDelivery[id] = inboxPending{
+									id:          id,
+									user:        user,
+									description: personalDescription(def, row),
+									href:        href(e.resourceType, e.resourceID, row),
+									category:    notificationCategory(def),
+								}
+							}
+							dIDs = append(dIDs, id)
+							dChannels = append(dChannels, channel)
+							dDests = append(dDests, user)
+							dStatuses = append(dStatuses, status)
+							dPrefGens = append(dPrefGens, pref.Generation)
+							dConnIDs = append(dConnIDs, connectionID)
+							dDecisions = append(dDecisions, decision)
+							dFailures = append(dFailures, failureCode)
+						}
+					}
+
+					if len(dIDs) > 0 {
+						insRows, e2 := tx.QueryContext(ctx, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,policy_generation,preference_generation,connection_id,decision_code,failure_code)
+							SELECT u.id,$1,$2,$3,u.channel,u.destination,u.status,$4,u.pref_gen,u.conn_id,u.decision,u.failure
+							FROM unnest($5::text[],$6::text[],$7::text[],$8::text[],$9::int[],$10::text[],$11::text[],$12::text[]) AS u(id,channel,destination,status,pref_gen,conn_id,decision,failure)
+							ON CONFLICT DO NOTHING RETURNING id`,
+							e.org, e.id, e.kind, pol.Generation, dIDs, dChannels, dDests, dStatuses, dPrefGens, dConnIDs, dDecisions, dFailures)
+						if e2 != nil {
+							return false, e2
+						}
+						inIDs := make([]string, 0, len(inboxByDelivery))
+						inUsers := make([]string, 0, len(inboxByDelivery))
+						inDescs := make([]string, 0, len(inboxByDelivery))
+						inHrefs := make([]string, 0, len(inboxByDelivery))
+						inCats := make([]string, 0, len(inboxByDelivery))
+						for insRows.Next() {
+							var insertedID string
+							if e2 = insRows.Scan(&insertedID); e2 != nil {
+								insRows.Close()
+								return false, e2
+							}
+							if item, ok := inboxByDelivery[insertedID]; ok {
+								inIDs = append(inIDs, item.id)
+								inUsers = append(inUsers, item.user)
+								inDescs = append(inDescs, item.description)
+								inHrefs = append(inHrefs, item.href)
+								inCats = append(inCats, item.category)
+							}
+						}
+						e2 = insRows.Err()
+						insRows.Close()
+						if e2 != nil {
+							return false, e2
+						}
+						if len(inIDs) > 0 {
+							_, e2 = tx.ExecContext(ctx, `INSERT INTO platform_notification_inbox(id,"organizationId","userId",event_id,kind,resource_type,resource_id,description,href,category)
+								SELECT u.id,$1,u.user_id,$2,$3,$4,$5,u.description,u.href,u.category
+								FROM unnest($6::text[],$7::text[],$8::text[],$9::text[],$10::text[]) AS u(id,user_id,description,href,category)`,
+								e.org, e.id, e.kind, e.resourceType, e.resourceID, inIDs, inUsers, inDescs, inHrefs, inCats)
+							if e2 != nil {
+								return false, e2
+							}
+						}
 					}
 				}
 			}
 		}
 		// Shared channels receive only catalogue metadata, never restricted event
 		// content, and nothing about a private social set (RFC 024).
-		private, err := s.privateEvent(ctx, e)
+		private, err := s.privateEventQuery(ctx, tx, e)
 		if err != nil {
 			return false, err
 		}
@@ -233,6 +385,10 @@ func stringsFrom(v any) []string {
 	return out
 }
 func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Definition) ([]string, error) {
+	return s.recipientsQuery(ctx, s.DB, e, d)
+}
+
+func (s *Service) recipientsQuery(ctx context.Context, db queryer, e occurrence, d activity.Definition) ([]string, error) {
 	wanted := map[string]bool{}
 	for _, k := range []string{"ownerUserId", "requestedByUserId", "createdByUserId", "affectedUserId"} {
 		if id := textValue(e.payload, k); id != "" {
@@ -246,7 +402,7 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 	}
 	if table, ok := resourceTables[e.resourceType]; ok {
 		var raw []byte
-		err := s.DB.QueryRowContext(ctx, `SELECT to_jsonb(r) FROM `+table+` r WHERE id=$1 AND "organizationId"=$2`, e.resourceID, e.org).Scan(&raw)
+		err := db.QueryRowContext(ctx, `SELECT to_jsonb(r) - 'document' FROM `+table+` r WHERE id=$1 AND "organizationId"=$2`, e.resourceID, e.org).Scan(&raw)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -267,7 +423,7 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 		}
 		if sourceID != "" {
 			var owner sql.NullString
-			err = s.DB.QueryRowContext(ctx, `SELECT "platformOwnerUserId" FROM source_app WHERE id=$1 AND "organizationId"=$2`, sourceID, e.org).Scan(&owner)
+			err = db.QueryRowContext(ctx, `SELECT "platformOwnerUserId" FROM source_app WHERE id=$1 AND "organizationId"=$2`, sourceID, e.org).Scan(&owner)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
 			}
@@ -280,7 +436,7 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 			releaseID = e.resourceID
 		}
 		if releaseID != "" && (e.resourceType == "release" || e.resourceType == "source_change") {
-			rows, err := s.DB.QueryContext(ctx, `SELECT "createdByUserId" FROM campaign WHERE "releaseId"=$1 AND "organizationId"=$2 AND "createdByUserId" IS NOT NULL`, releaseID, e.org)
+			rows, err := db.QueryContext(ctx, `SELECT "createdByUserId" FROM campaign WHERE "releaseId"=$1 AND "organizationId"=$2 AND "createdByUserId" IS NOT NULL`, releaseID, e.org)
 			if err != nil {
 				return nil, err
 			}
@@ -300,7 +456,7 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 		}
 		if id := textValue(row, "campaignId"); id != "" {
 			var owner sql.NullString
-			err = s.DB.QueryRowContext(ctx, `SELECT "createdByUserId" FROM campaign WHERE id=$1 AND "organizationId"=$2`, id, e.org).Scan(&owner)
+			err = db.QueryRowContext(ctx, `SELECT "createdByUserId" FROM campaign WHERE id=$1 AND "organizationId"=$2`, id, e.org).Scan(&owner)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
 			}
@@ -336,7 +492,7 @@ func (s *Service) recipients(ctx context.Context, e occurrence, d activity.Defin
 		wanted[actor] = true
 	}
 	background, _ := e.payload["background"].(bool)
-	rows, err := s.DB.QueryContext(ctx, `SELECT m."userId",m.role FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND COALESCE(u.banned,false)=false`, e.org)
+	rows, err := db.QueryContext(ctx, `SELECT m."userId",m.role FROM member m JOIN "user" u ON u.id=m."userId" WHERE m."organizationId"=$1 AND COALESCE(u.banned,false)=false`, e.org)
 	if err != nil {
 		return nil, err
 	}
@@ -415,21 +571,24 @@ func (s *Service) dispatch(ctx context.Context) (bool, error) {
 		return true, err
 	}
 	d.encryptedPayload = encrypted
-	// Authorize again after request preparation; queued configuration changes cannot reroute a send.
-	if env, out, err = s.prepare(ctx, d); err != nil {
-		return true, s.finish(ctx, d, Outcome{Status: "UNCERTAIN", Code: "PRE_SEND_CHECK_FAILED"})
-	}
-	if out.Status != "" {
-		return true, s.finish(ctx, d, out)
-	}
-	// Removal, disconnect and lease recovery can fence a claim independently of
-	// the current access checks. A later grant must not revive that old claim.
-	var ownsClaim bool
-	if err = s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM platform_notification_delivery WHERE id=$1 AND claim_token=$2 AND status='CLAIMED')`, d.ID, d.claimToken).Scan(&ownsClaim); err != nil {
-		return true, err
-	}
-	if !ownsClaim {
-		return true, nil
+	// Re-authorize after external channel discovery (Slack) so configuration or
+	// visibility changes made while Slack responded cannot reroute or leak a send.
+	if d.Channel == "slack" {
+		if env, out, err = s.prepare(ctx, d); err != nil {
+			return true, s.finish(ctx, d, Outcome{Status: "UNCERTAIN", Code: "PRE_SEND_CHECK_FAILED"})
+		}
+		if out.Status != "" {
+			return true, s.finish(ctx, d, out)
+		}
+		// Removal, disconnect and lease recovery can fence a claim independently of
+		// the current access checks. A later grant must not revive that old claim.
+		var ownsClaim bool
+		if err = s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM platform_notification_delivery WHERE id=$1 AND claim_token=$2 AND status='CLAIMED')`, d.ID, d.claimToken).Scan(&ownsClaim); err != nil {
+			return true, err
+		}
+		if !ownsClaim {
+			return true, nil
+		}
 	}
 	out, err = s.Send(ctx, d, env)
 	if err != nil && out.Status == "" {
@@ -761,7 +920,11 @@ func availableChannel(p Policy, ch string) bool {
 // privateEvent excludes private or unavailable social-set resources from shared
 // delivery, both during projection and immediately before sending queued work.
 func (s *Service) privateEvent(ctx context.Context, e occurrence) (bool, error) {
-	if private, _, err := privateSocialSet(ctx, s.DB, e.org, e.sourceSocialSetID); err != nil || private {
+	return s.privateEventQuery(ctx, s.DB, e)
+}
+
+func (s *Service) privateEventQuery(ctx context.Context, db queryer, e occurrence) (bool, error) {
+	if private, _, err := privateSocialSet(ctx, db, e.org, e.sourceSocialSetID); err != nil || private {
 		return private, err
 	}
 	table, ok := resourceTables[e.resourceType]
@@ -772,13 +935,13 @@ func (s *Service) privateEvent(ctx context.Context, e occurrence) (bool, error) 
 		return false, nil
 	}
 	var setID sql.NullString
-	err := s.DB.QueryRowContext(ctx, `SELECT "socialSetId" FROM `+table+` r WHERE id=$1 AND "organizationId"=$2 AND COALESCE(to_jsonb(r)->>'deletedAt','')='' AND COALESCE(to_jsonb(r)->>'status','')<>'DELETED'`, e.resourceID, e.org).Scan(&setID)
+	err := db.QueryRowContext(ctx, `SELECT "socialSetId" FROM `+table+` r WHERE id=$1 AND "organizationId"=$2 AND COALESCE(to_jsonb(r)->>'deletedAt','')='' AND COALESCE(to_jsonb(r)->>'status','')<>'DELETED'`, e.resourceID, e.org).Scan(&setID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return true, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	private, _, err := privateSocialSet(ctx, s.DB, e.org, setID.String)
+	private, _, err := privateSocialSet(ctx, db, e.org, setID.String)
 	return private, err
 }

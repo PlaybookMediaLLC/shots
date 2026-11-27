@@ -171,6 +171,7 @@ func Pipeline(ctx workflow.Context, input Input) (Outcome, error) {
 	t := &tracker{ctx: ctx, input: input, progress: Progress{CompletedStages: []string{onboarding.StageFastPath}, PagesDiscovered: len(crawlList),
 		Percent: onboarding.ProgressFastPath, RunID: input.RunID, Stage: onboarding.StageCrawl, ModelCostMicros: input.ModelCostMicros, TokenBudget: input.TokenBudget, TokensUsed: input.TokensUsed}}
 	crawlCtx := activityContext(ctx, 45*time.Second, 15*time.Second)
+	batchProgress := workflow.GetVersion(ctx, "batch-crawl-progress", workflow.DefaultVersion, 1) == 1
 	var changed []string
 	for i, page := range crawlList {
 		var result PageOutcome
@@ -189,7 +190,9 @@ func Pipeline(ctx workflow.Context, input Input) (Outcome, error) {
 		if result.Changed {
 			changed = append(changed, page)
 		}
-		t.report(onboarding.StageCrawl, onboarding.ProgressFastPath+35*t.progress.PagesProcessed/max(len(crawlList), 1), false)
+		if !batchProgress || t.progress.PagesProcessed == 1 || (i < len(crawlList)-1 && t.progress.PagesProcessed%3 == 0) {
+			t.report(onboarding.StageCrawl, onboarding.ProgressFastPath+35*t.progress.PagesProcessed/max(len(crawlList), 1), false)
+		}
 		if result.Fetched && i < len(crawlList)-1 {
 			if err := workflow.Sleep(ctx, hostInterval); err != nil {
 				return Outcome{}, err

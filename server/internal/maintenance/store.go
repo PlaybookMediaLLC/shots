@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/notifications"
@@ -56,6 +57,8 @@ type Store struct {
 	Onboarding OnboardingCanceller
 	// Webhooks delivers outbound customer webhooks (RFC 024).
 	Webhooks *webhooks.Dispatcher
+
+	lastNotificationMaintain atomic.Int64
 }
 
 // OnboardingCanceller stops a workspace's running onboarding workflow.

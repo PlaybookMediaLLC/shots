@@ -113,3 +113,42 @@ func TestRefreshSocialTokensRenewsDueChannelsAndFlagsRevokedOnes(t *testing.T) {
 		})
 	}
 }
+
+func TestRefreshCooldownBackoffAndExpiry(t *testing.T) {
+	p := &Publisher{}
+	now := time.Date(2026, 11, 27, 12, 0, 0, 0, time.UTC)
+
+	// Failure 1 -> 15m cooldown.
+	p.recordRefreshFailure("int-1", now)
+	if skip := p.activeCooldownIDs(now.Add(14 * time.Minute)); len(skip) != 1 || skip[0] != "int-1" {
+		t.Fatalf("expected int-1 skipped at +14m, got %v", skip)
+	}
+	// At +16m it becomes eligible again, while retaining failure history.
+	now = now.Add(16 * time.Minute)
+	if skip := p.activeCooldownIDs(now); len(skip) != 0 {
+		t.Fatalf("expected int-1 eligible at +16m, got %v", skip)
+	}
+	// Failure 2 -> escalates to 30m cooldown.
+	p.recordRefreshFailure("int-1", now)
+	if skip := p.activeCooldownIDs(now.Add(29 * time.Minute)); len(skip) != 1 || skip[0] != "int-1" {
+		t.Fatalf("expected 30m escalated cooldown at +29m, got %v", skip)
+	}
+	now = now.Add(31 * time.Minute)
+	if skip := p.activeCooldownIDs(now); len(skip) != 0 {
+		t.Fatalf("expected int-1 eligible at +31m, got %v", skip)
+	}
+	// Further failures cap at 4h and expire cleanly after 4h.
+	for range 5 {
+		p.recordRefreshFailure("int-1", now)
+	}
+	if skip := p.activeCooldownIDs(now.Add(3*time.Hour + 59*time.Minute)); len(skip) != 1 || skip[0] != "int-1" {
+		t.Fatalf("expected capped 4h cooldown at +3h59m, got %v", skip)
+	}
+	if skip := p.activeCooldownIDs(now.Add(4*time.Hour + time.Minute)); len(skip) != 0 {
+		t.Fatalf("expected capped 4h cooldown to expire at +4h01m, got %v", skip)
+	}
+	p.clearRefreshFailure("int-1")
+	if skip := p.activeCooldownIDs(now); len(skip) != 0 {
+		t.Fatalf("expected cleared cooldown, got %v", skip)
+	}
+}

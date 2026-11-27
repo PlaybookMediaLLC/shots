@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
@@ -47,15 +48,31 @@ func (c *Configuration) CollectDueAnalytics(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	count := 0
+	featureEligible := map[string]bool{}
+	due := make([]*ent.ChannelConnection, 0, min(len(connections), 20))
 	for _, connection := range connections {
 		if ctx.Err() != nil {
-			return count, ctx.Err()
+			return 0, ctx.Err()
 		}
-		if count >= 20 {
+		if len(due) >= 20 {
 			break
 		}
-		if err = c.requireWorkspaceFeature(ctx, connection.OrganizationID, contentDraftFeature); err != nil {
+		ok, cached := featureEligible[connection.OrganizationID]
+		if !cached {
+			featErr := c.requireWorkspaceFeature(ctx, connection.OrganizationID, contentDraftFeature)
+			var notEntitled *FeatureNotEntitledError
+			switch {
+			case featErr == nil:
+				ok = true
+				featureEligible[connection.OrganizationID] = true
+			case errors.As(featErr, &notEntitled):
+				ok = false
+				featureEligible[connection.OrganizationID] = false
+			default:
+				return 0, featErr
+			}
+		}
+		if !ok {
 			// Defer ineligible connections so a stable ordered batch cannot starve paid workspaces.
 			if _, e := c.analyticsState(ctx, connection); e == nil {
 				_, _ = c.client.AnalyticsAccount.UpdateOneID(connection.ID).SetNextCheckAt(time.Now().Add(24 * time.Hour)).Save(ctx)
@@ -64,17 +81,30 @@ func (c *Configuration) CollectDueAnalytics(ctx context.Context) (int, error) {
 		}
 		state, e := c.analyticsState(ctx, connection)
 		if e != nil {
-			return count, e
+			return 0, e
 		}
 		if state.NextCheckAt.After(time.Now()) {
 			continue
 		}
-		if e = c.collectAnalytics(ctx, connection, true); e != nil {
-			slog.Warn("analytics collection deferred", "connectionId", connection.ID)
-		}
-		count++
+		due = append(due, connection)
 	}
-	return count, nil
+	if len(due) == 0 {
+		return 0, nil
+	}
+	var completed atomic.Int64
+	tasks := make([]func(context.Context) error, len(due))
+	for i, connection := range due {
+		conn := connection
+		tasks[i] = func(taskCtx context.Context) error {
+			if e := c.collectAnalytics(taskCtx, conn, true); e != nil {
+				slog.Warn("analytics collection deferred", "connectionId", conn.ID)
+			}
+			completed.Add(1)
+			return nil
+		}
+	}
+	err = runParallel(ctx, 4, tasks...)
+	return int(completed.Load()), err
 }
 func (c *Configuration) collectAnalytics(ctx context.Context, connection *ent.ChannelConnection, automatic bool) (resultErr error) {
 	if c.analytics == nil || c.postMetrics == nil {

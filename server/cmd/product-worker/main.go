@@ -339,14 +339,16 @@ func main() {
 		if model := platformai.FromEnvironment(); model != nil {
 			events.WithAutomationModel(model)
 		}
-		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: notifications.New(db.SQL, db.Client), DB: db.SQL, RetentionDB: retentionSQL, Objects: tenantObjects, Events: events,
+		activityService := notifications.New(db.SQL, db.Client)
+		activityService.DispatchWorkers = 4
+		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: activityService, DB: db.SQL, RetentionDB: retentionSQL, Objects: tenantObjects, Events: events,
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),
 			Webhooks:   webhooks.NewDispatcher(db.SQL, cfg.WebhookEncryptionKey),
 			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, PostalAddress: cfg.CompanyPostalAddress},
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
-			MaxConcurrentActivityExecutionSize: max(1, 6/cfg.WorkerConcurrencyDivider),
+			MaxConcurrentActivityExecutionSize: max(1, 8/cfg.WorkerConcurrencyDivider),
 			OnFatalError:                       func(err error) { slog.Error("maintenance worker failed"); stop() },
 		})
 		temporalmaintenance.Register(maintenanceWorker, temporalmaintenance.RunnerFunc(func(ctx context.Context, job string) (int, error) {

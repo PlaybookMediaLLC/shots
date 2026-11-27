@@ -61,25 +61,43 @@ func NewScheduler(temporalClient client.Client, cfg SchedulerConfig) *Scheduler 
 	return &Scheduler{client: temporalClient, config: cfg}
 }
 
+func (s *Scheduler) postWorkflowArgs(input ScheduleInput) (client.StartWorkflowOptions, WorkflowInput) {
+	return client.StartWorkflowOptions{
+			ID:                                       WorkflowID(input.PostID),
+			TaskQueue:                                s.config.WorkflowTaskQueue,
+			WorkflowIDConflictPolicy:                 enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+			WorkflowIDReusePolicy:                    enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+			WorkflowExecutionErrorWhenAlreadyStarted: false,
+			Memo:                                     map[string]any{"organizationId": input.OrganizationID, "postId": input.PostID},
+			TypedSearchAttributes:                    postSearchAttributes(input.OrganizationID, input.PostID),
+		}, WorkflowInput{
+			ActivityTaskQueue: s.config.ActivityTaskQueue,
+			ActivityTimeout:   s.config.ActivityTimeout,
+			MaxAttempts:       s.config.MaxAttempts,
+			MainTaskQueue:     s.config.WorkflowTaskQueue,
+			OrganizationID:    input.OrganizationID,
+			PostID:            input.PostID,
+			RetryDelay:        s.config.RetryDelay,
+			ScheduledFor:      input.ScheduledFor,
+		}
+}
+
 func (s *Scheduler) Start(ctx context.Context, input ScheduleInput) error {
-	_, err := s.client.SignalWithStartWorkflow(ctx, WorkflowID(input.PostID), PokeSignalName, PokeSignal{}, client.StartWorkflowOptions{
-		ID:                                       WorkflowID(input.PostID),
-		TaskQueue:                                s.config.WorkflowTaskQueue,
-		WorkflowIDConflictPolicy:                 enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
-		WorkflowIDReusePolicy:                    enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
-		WorkflowExecutionErrorWhenAlreadyStarted: false,
-		Memo:                                     map[string]any{"organizationId": input.OrganizationID, "postId": input.PostID},
-		TypedSearchAttributes:                    postSearchAttributes(input.OrganizationID, input.PostID),
-	}, WorkflowNameV2, WorkflowInput{
-		ActivityTaskQueue: s.config.ActivityTaskQueue,
-		ActivityTimeout:   s.config.ActivityTimeout,
-		MaxAttempts:       s.config.MaxAttempts,
-		MainTaskQueue:     s.config.WorkflowTaskQueue,
-		OrganizationID:    input.OrganizationID,
-		PostID:            input.PostID,
-		RetryDelay:        s.config.RetryDelay,
-		ScheduledFor:      input.ScheduledFor,
-	})
+	opts, args := s.postWorkflowArgs(input)
+	_, err := s.client.SignalWithStartWorkflow(ctx, opts.ID, PokeSignalName, PokeSignal{}, opts, WorkflowNameV2, args)
+	var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
+	if errors.As(err, &alreadyStarted) {
+		return nil
+	}
+	return err
+}
+
+// EnsureStarted ensures a post workflow is running without injecting a
+// PokeSignal into an already-running execution. Used by periodic recovery and
+// due-post sweeps to avoid appending redundant signal events to history.
+func (s *Scheduler) EnsureStarted(ctx context.Context, input ScheduleInput) error {
+	opts, args := s.postWorkflowArgs(input)
+	_, err := s.client.ExecuteWorkflow(ctx, opts, WorkflowNameV2, args)
 	var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
 	if errors.As(err, &alreadyStarted) {
 		return nil
