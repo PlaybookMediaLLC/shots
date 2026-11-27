@@ -1,14 +1,25 @@
 import 'server-only'
 
 import type { OrganizationAccess, SessionAccess } from '@/lib/auth/access'
-import { backendSDK } from '@/lib/backend/sdk'
+import { backendSDK, serviceBackend } from '@/lib/backend/sdk'
 import type {
   WorkspaceDeletion as BackendWorkspaceDeletion,
   WorkspaceInvitationDetail as BackendWorkspaceInvitationDetail,
   WorkspaceSettings as BackendWorkspaceSettings,
 } from 'screenshot-studio-backend-sdk'
 import { normalizeOrganizationRole } from '@/lib/auth/permissions'
-import type { WorkspaceCreateInput, WorkspaceInviteInput, WorkspaceUpdateInput } from './schemas'
+import { parseWorkspaceAiDefaults } from '@/lib/ai/models/tiers'
+import { brandKitLibrary, storedBrandKitSchema } from '@/lib/brand/kit'
+import { listCampaigns } from '@/lib/tenant/campaigns'
+import { getBrandProfile, listBrandKits } from '@/lib/tenant/configuration'
+import { getProductProfile } from '@/lib/tenant/product-profile'
+import { listProductSurfaces } from '@/lib/tenant/product-surfaces'
+import type {
+  WorkspaceAiSettingsUpdateInput,
+  WorkspaceCreateInput,
+  WorkspaceInviteInput,
+  WorkspaceUpdateInput,
+} from './schemas'
 
 function fromBackendSettings(settings: BackendWorkspaceSettings) {
   return {
@@ -68,6 +79,108 @@ export async function getWorkspace(access: OrganizationAccess) {
 export async function updateWorkspace(access: OrganizationAccess, input: WorkspaceUpdateInput) {
   const result = await backendSDK(access).updateWorkspace(input)
   return { organization: result.organization, settings: fromBackendSettings(result.settings) }
+}
+
+export async function updateWorkspaceAiSettings(
+  access: OrganizationAccess,
+  input: WorkspaceAiSettingsUpdateInput
+) {
+  const result = await backendSDK(access).updateWorkspaceAiSettings({
+    ...(input.aiAgentEnabled !== undefined ? { aiAgentEnabled: input.aiAgentEnabled } : {}),
+    ...(input.aiModelDefaults !== undefined ? { aiModelDefaults: input.aiModelDefaults } : {}),
+    ...(input.aiInstructions !== undefined ? { aiInstructions: input.aiInstructions } : {}),
+    ...(input.aiProviderApiKey !== undefined ? { aiProviderApiKey: input.aiProviderApiKey } : {}),
+  })
+  return { organization: result.organization, settings: fromBackendSettings(result.settings) }
+}
+
+/**
+ * Computes workspace readiness steps, active AI model defaults, and pinnable
+ * context items (brand kits, product surfaces, campaigns) in one parallel read.
+ */
+export async function getWorkspaceReadiness(access: OrganizationAccess) {
+  const sdk = backendSDK(access)
+  const [workspaceRes, product, brand, storedKits, surfaces, campaigns, apiKeyRows] =
+    await Promise.all([
+      sdk.getWorkspace(),
+      getProductProfile(access).catch(() => null),
+      getBrandProfile(access).catch(() => null),
+      listBrandKits(access).catch((): Awaited<ReturnType<typeof listBrandKits>> => []),
+      listProductSurfaces(access).catch((): Awaited<ReturnType<typeof listProductSurfaces>> => []),
+      listCampaigns(access, { limit: 12 }).catch((): Awaited<ReturnType<typeof listCampaigns>> => []),
+      serviceBackend()
+        .authStore({
+          model: 'apikey',
+          op: 'findMany',
+          select: ['enabled', 'id'],
+          where: [{ field: 'referenceId', value: access.organizationId }],
+        })
+        .then((res) => (res.rows ?? []) as { enabled: boolean | null; id: string }[])
+        .catch((): { enabled: boolean | null; id: string }[] => []),
+    ])
+
+  const parsedKits = brandKitLibrary(
+    storedKits.flatMap((kit) => {
+      const parsed = storedBrandKitSchema.safeParse(kit)
+      return parsed.success ? [parsed.data] : []
+    })
+  )
+
+  const hasProductAndVoice = Boolean(
+    product?.summary?.trim() || brand?.productDescription?.trim() || brand?.tone?.trim()
+  )
+  const hasBrandKit = parsedKits.length > 0
+  const hasSurfaces = surfaces.length > 0
+  const hasAgentOrCampaign =
+    campaigns.length > 0 || apiKeyRows.some((key) => key.enabled !== false)
+
+  const steps = [
+    {
+      done: hasProductAndVoice,
+      href: '/settings/product',
+      id: 'product-voice',
+      label: 'Verify product & brand voice',
+    },
+    {
+      done: hasBrandKit,
+      href: '/settings/brand-kit',
+      id: 'brand-kit',
+      label: 'Create a visual brand kit',
+    },
+    {
+      done: hasSurfaces,
+      href: '/settings/product-pages',
+      id: 'product-surfaces',
+      label: 'Add a product page to capture',
+    },
+    {
+      done: hasAgentOrCampaign,
+      href: '/settings/ai-agents',
+      id: 'agents-or-campaign',
+      label: 'Start a campaign or connect an agent',
+    },
+  ]
+
+  const settings = workspaceRes.workspace?.workspaceSettings ?? null
+  return {
+    aiAgentEnabled: settings?.aiAgentEnabled ?? true,
+    aiModelDefaults: parseWorkspaceAiDefaults(settings?.aiModelDefaults),
+    aiProviderKeyHint: settings?.aiProviderKeyHint ?? null,
+    brandKits: parsedKits.slice(0, 12).map((kit) => ({ id: kit.id, name: kit.name })),
+    campaigns: campaigns.slice(0, 12).map((item) => ({
+      id: item.id,
+      name: item.name,
+    })),
+    completed: steps.filter((step) => step.done).length,
+    hasAiProviderKey: Boolean(settings?.hasAiProviderKey),
+    hasCustomInstructions: Boolean(settings?.aiInstructions?.trim()),
+    steps,
+    surfaces: surfaces.slice(0, 12).map((item) => ({
+      id: item.id,
+      name: item.name,
+    })),
+    total: steps.length,
+  }
 }
 
 export async function listWorkspaceMembers(access: OrganizationAccess) {

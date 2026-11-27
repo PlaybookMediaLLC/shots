@@ -270,6 +270,30 @@ export type Command = z.infer<typeof commandSchema>
 /** Command type names. */
 export type CommandType = Command['type']
 
+/** The Store commands the model may send: edits to what exists, never deletes. */
+const STORE_MODEL_COMMANDS: ReadonlySet<string> = new Set([
+  'slides.duplicate',
+  'slides.reorder',
+  'slides.patch',
+  'slides.setLayout',
+  'slides.applyStyle',
+  'slides.patchText',
+  'slides.patchDevices',
+  'layers.patch',
+  'layers.arrange',
+  'theme.patch',
+  'theme.patchText',
+  'copy.apply',
+])
+
+/** Typed from the editor's own command schema, so the model sees only non-destructive shapes. */
+export const storeModelCommandSchema = z.discriminatedUnion(
+  'type',
+  commandSchema.options.filter((option) =>
+    STORE_MODEL_COMMANDS.has(option.shape.type.value)
+  ) as unknown as typeof commandSchema.options
+)
+
 /** Human labels for undo history. */
 export const COMMAND_LABELS: Record<CommandType, string> = {
   'slides.add': 'Add slides',

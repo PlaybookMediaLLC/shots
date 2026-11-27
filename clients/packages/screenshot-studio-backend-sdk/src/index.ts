@@ -700,6 +700,14 @@ export type WorkspaceSettings = {
   defaultPublishTime: string
   /** The workspace AI agent kill switch; on unless an owner or admin turned it off. */
   aiAgentEnabled: boolean
+  /** Per-surface AI model tier & reasoning effort defaults. */
+  aiModelDefaults?: Record<string, unknown> | null
+  /** Workspace-wide standing AI instructions layered alongside brand voice. */
+  aiInstructions?: string | null
+  /** Whether the workspace has connected its own OpenRouter API key (BYOK). */
+  hasAiProviderKey?: boolean
+  /** Safe masked hint for the saved workspace OpenRouter API key (e.g. "sk-or-…a9f2"). */
+  aiProviderKeyHint?: string | null
   /** Missing on older backends; treat as disabled during an additive rollout. */
   releaseReadinessEnabled?: boolean
   createdAt: string
@@ -2306,6 +2314,14 @@ export type ListedWorkspace = {
   role: string
   slug: string
   workspaceDeletion?: { requestedByUserId: string; scheduledFor: string; status: string }
+}
+
+export type UpdateWorkspaceAiSettingsInput = {
+  aiAgentEnabled?: boolean
+  aiModelDefaults?: Record<string, unknown>
+  aiInstructions?: string | null
+  /** Set a workspace OpenRouter API key, or pass null / empty string to remove it. */
+  aiProviderApiKey?: string | null
 }
 
 export type UpdateWorkspaceInput = {
@@ -6071,6 +6087,18 @@ export class ScreenshotStudioBackendSDK {
 
   async updateWorkspace(input: UpdateWorkspaceInput) {
     return this.request<WorkspaceMutation>('v1/workspace', { body: input, method: 'PATCH' })
+  }
+
+  async updateWorkspaceAiSettings(input: UpdateWorkspaceAiSettingsInput) {
+    return this.request<WorkspaceMutation>('v1/workspace/ai-settings', {
+      body: input,
+      method: 'PUT',
+    })
+  }
+
+  /** Server-only: decrypts the workspace's BYOK OpenRouter API key for assistant turns. */
+  async getWorkspaceAiProviderKey() {
+    return this.request<{ apiKey: string | null }>('v1/workspace/ai-provider-key')
   }
 
   async listWorkspaceMembers() {

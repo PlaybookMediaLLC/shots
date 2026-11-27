@@ -31,6 +31,7 @@ test('a saved thread keeps words and in-app links, and drops cards and outside l
   assert.ok(!('undo' in kept[1]!))
   assert.deepEqual(resumedMemory(kept), [
     { content: 'hi', role: 'user' },
+    { content: '[Applied earlier change: Applied]', role: 'assistant' },
     { content: 'hello', role: 'assistant' },
   ])
 })

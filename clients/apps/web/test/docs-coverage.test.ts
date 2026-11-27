@@ -36,6 +36,8 @@ const SETTINGS_COVERAGE = new Map<string, string>([
   ['roles', '/docs/features/settings-workspace'],
   ['voice', '/docs/features/settings-workspace'],
   ['new-team', '/docs/getting-started/workspace-setup'],
+  ['ai-models', '/docs/features/settings-workspace'],
+  ['ai-instructions', '/docs/features/settings-workspace'],
   ['brand', '/docs/features/settings-brand'],
   ['product', '/docs/features/settings-brand'],
   ['surfaces', '/docs/features/settings-brand'],

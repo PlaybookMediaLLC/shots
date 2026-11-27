@@ -21,7 +21,10 @@ export const POST = route(workspaceAssistantContract, {
       return await streamLines((send) =>
         runWorkspaceAssistantTurn(access, {
           clientTools: body.clientTools,
+          contextRefs: body.contextRefs,
+          effort: body.effort,
           messages: body.messages as unknown as ModelMessage[],
+          modelTier: body.modelTier,
           onEvent: send,
           page: body.page,
           selection: body.selection,

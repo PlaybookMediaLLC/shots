@@ -432,6 +432,134 @@ func TestConfigurationUsesOneTenantScopedEntDatabase(t *testing.T) {
 	if err != nil || fetched.Name != "Renamed Workspace" {
 		t.Fatalf("workspace fetch=%v err=%v", fetched, err)
 	}
+	wsActor := Actor{OrganizationID: workspace.ID, UserID: userID, SessionID: actor.SessionID, RequestID: actor.RequestID}
+	testEncKey := []byte("0123456789abcdef0123456789abcdef")
+	repo.WithWebhooks(testEncKey, nil)
+	// Without a workspace BYOK API key, only Haiku (`fast`) is allowed out of the box.
+	if _, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIModelDefaults: map[string]any{"default": map[string]any{"tier": "balanced", "effort": "medium"}},
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("balanced without BYOK key expected ErrInvalidInput got %v", err)
+	}
+	if _, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIModelDefaults: map[string]any{"default": map[string]any{"tier": "deep", "effort": "high"}},
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("deep without BYOK key expected ErrInvalidInput got %v", err)
+	}
+	const testByokKey = "sk-or-v1-testsecretkey1234567890abcd"
+	aiEnabledFalse := false
+	aiUpdated, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIAgentEnabled:   &aiEnabledFalse,
+		AIModelDefaults:  map[string]any{"default": map[string]any{"tier": "balanced", "effort": "medium"}, "editors": map[string]any{"tier": "fast", "effort": "low"}},
+		AIInstructions:   NullableString{Set: true, Value: stringPointer("Cite PR numbers.")},
+		AIProviderAPIKey: NullableString{Set: true, Value: stringPointer(testByokKey)},
+	})
+	if err != nil || aiUpdated.WorkspaceSettings.AiAgentEnabled || aiUpdated.WorkspaceSettings.AiInstructions == nil || *aiUpdated.WorkspaceSettings.AiInstructions != "Cite PR numbers." || len(aiUpdated.WorkspaceSettings.AiModelDefaults) != 2 || aiUpdated.WorkspaceSettings.AiProviderKeyHint == nil || *aiUpdated.WorkspaceSettings.AiProviderKeyHint != "sk-or-…abcd" {
+		t.Fatalf("ai settings update=%+v err=%v", aiUpdated, err)
+	}
+	var sealedInDB string
+	if err := db.SQL.QueryRowContext(ctx, `SELECT "aiProviderKeyEncrypted" FROM workspace_settings WHERE "organizationId"=$1`, workspace.ID).Scan(&sealedInDB); err != nil || sealedInDB == "" || strings.Contains(sealedInDB, testByokKey) {
+		t.Fatalf("expected encrypted key in DB, got %q err=%v", sealedInDB, err)
+	}
+	if _, err := openWorkspaceAIKey(testEncKey, otherOrgID, sealedInDB); !errors.Is(err, ErrAIKeyDecryptionFailed) {
+		t.Fatalf("cross-organization AAD expected ErrAIKeyDecryptionFailed got %v", err)
+	}
+	// When Workspace AI is disabled, GetWorkspaceAIProviderKey must refuse even workspace admins.
+	if _, err := repo.GetWorkspaceAIProviderKey(ctx, wsActor); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("disabled workspace AI key read expected ErrForbidden got %v", err)
+	}
+	// Partial update clearing instructions must preserve previously saved aiModelDefaults and BYOK key.
+	aiCleared, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIInstructions: NullableString{Set: true, Value: stringPointer("   ")},
+	})
+	if err != nil || aiCleared.WorkspaceSettings.AiInstructions != nil || len(aiCleared.WorkspaceSettings.AiModelDefaults) != 2 || aiCleared.WorkspaceSettings.AiProviderKeyHint == nil {
+		t.Fatalf("ai settings clear=%+v err=%v", aiCleared, err)
+	}
+	aiEnabledTrue := true
+	aiReenabled, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIAgentEnabled: &aiEnabledTrue,
+	})
+	if err != nil || !aiReenabled.WorkspaceSettings.AiAgentEnabled {
+		t.Fatalf("ai settings re-enable=%+v err=%v", aiReenabled, err)
+	}
+	decrypted, err := repo.GetWorkspaceAIProviderKey(ctx, wsActor)
+	if err != nil || decrypted == nil || *decrypted != testByokKey {
+		t.Fatalf("decrypted key=%v err=%v", decrypted, err)
+	}
+	// Non-session principals (e.g. API keys) and cross-org actors must be refused from decrypting BYOK keys.
+	apiKeyActor := Actor{OrganizationID: workspace.ID, Kind: "api_key", KeyID: "key_" + id, RequestID: actor.RequestID}
+	if _, err := repo.GetWorkspaceAIProviderKey(ctx, apiKeyActor); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("non-session key read expected ErrForbidden got %v", err)
+	}
+	crossOrgActor := Actor{OrganizationID: otherOrgID, UserID: userID, SessionID: actor.SessionID, RequestID: actor.RequestID}
+	if _, err := repo.GetWorkspaceAIProviderKey(ctx, crossOrgActor); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("cross-org key read expected ErrForbidden got %v", err)
+	}
+	// Simultaneous key removal + BYOK default must be rejected.
+	if _, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIProviderAPIKey: NullableString{Set: true, Value: nil},
+		AIModelDefaults:  map[string]any{"default": map[string]any{"tier": "balanced", "effort": "medium"}},
+	}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("remove key + balanced default expected ErrInvalidInput got %v", err)
+	}
+	viewerUserID := "user_viewer_" + id
+	viewerSessionID := "sess_viewer_" + id
+	if _, err := db.SQL.ExecContext(ctx,
+		`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Viewer',$2,true,now(),now())`,
+		viewerUserID, viewerUserID+"@example.test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SQL.ExecContext(ctx,
+		`INSERT INTO session (id,"expiresAt",token,"createdAt","updatedAt","userId") VALUES ($1,now()+interval '1 hour',$2,now(),now(),$3)`,
+		viewerSessionID, "tok_"+viewerSessionID, viewerUserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SQL.ExecContext(ctx,
+		`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'viewer',now())`,
+		"mem_viewer_"+id, workspace.ID, viewerUserID); err != nil {
+		t.Fatal(err)
+	}
+	nonAdminActor := Actor{OrganizationID: workspace.ID, UserID: viewerUserID, SessionID: viewerSessionID, RequestID: actor.RequestID}
+	if _, err := repo.UpdateWorkspaceAISettings(ctx, nonAdminActor, UpdateWorkspaceAISettingsInput{}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("non-admin ai settings update expected ErrForbidden got %v", err)
+	}
+	// Workspace members may execute server-side assistant turns using the workspace BYOK key.
+	viewerKey, err := repo.GetWorkspaceAIProviderKey(ctx, nonAdminActor)
+	if err != nil || viewerKey == nil || *viewerKey != testByokKey {
+		t.Fatalf("viewer server key read=%v err=%v", viewerKey, err)
+	}
+	// Removing the BYOK key clears DB ciphertext/hint and strips balanced/deep defaults back to fast-only.
+	keyRemoved, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIProviderAPIKey: NullableString{Set: true, Value: nil},
+	})
+	if err != nil || keyRemoved.WorkspaceSettings.AiProviderKeyHint != nil || len(keyRemoved.WorkspaceSettings.AiModelDefaults) != 1 || keyRemoved.WorkspaceSettings.AiModelDefaults["editors"] == nil {
+		t.Fatalf("remove BYOK key=%+v err=%v", keyRemoved, err)
+	}
+	var encAfterRemove *string
+	if err := db.SQL.QueryRowContext(ctx, `SELECT "aiProviderKeyEncrypted" FROM workspace_settings WHERE "organizationId"=$1`, workspace.ID).Scan(&encAfterRemove); err != nil || encAfterRemove != nil {
+		t.Fatalf("expected NULL aiProviderKeyEncrypted after removal, got %v err=%v", encAfterRemove, err)
+	}
+	if afterRemove, err := repo.GetWorkspaceAIProviderKey(ctx, wsActor); err != nil || afterRemove != nil {
+		t.Fatalf("key after removal=%v err=%v", afterRemove, err)
+	}
+	// Repeat clear when no key is set must not emit a duplicate removal audit event.
+	if _, err := repo.UpdateWorkspaceAISettings(ctx, wsActor, UpdateWorkspaceAISettingsInput{
+		AIProviderAPIKey: NullableString{Set: true, Value: nil},
+	}); err != nil {
+		t.Fatalf("repeat key clear err=%v", err)
+	}
+	for action, want := range map[string]int{
+		"product.workspace_ai_settings_updated":     5,
+		"product.workspace_ai_provider_key_updated": 1,
+		"product.workspace_ai_provider_key_removed": 1,
+		"product.workspace_ai_agent_disabled":       1,
+		"product.workspace_ai_agent_enabled":        1,
+	} {
+		var count int
+		if err := db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action=$2`, workspace.ID, action).Scan(&count); err != nil || count != want {
+			t.Fatalf("audit %s count=%d want=%d err=%v", action, count, want, err)
+		}
+	}
 	if err := repo.SetActiveWorkspace(ctx, actor, orgID); err != nil {
 		t.Fatal(err)
 	}

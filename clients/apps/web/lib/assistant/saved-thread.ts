@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { internalHref } from './page-context'
+import { INTERNAL_HREF_MAX, internalHref } from './page-context'
 
 /**
  * What a saved thread keeps: the words and links. Cards, Undo and Accept act on
@@ -18,7 +18,7 @@ export const savedEntrySchema = z.discriminatedUnion('kind', [
     kind: z.literal('link'),
     text: z.string().max(200),
     // Read back from storage, so it must still be a place inside the app.
-    href: z.string().max(1_000).refine((href) => internalHref(href) !== null),
+    href: z.string().max(INTERNAL_HREF_MAX).refine((href) => internalHref(href) !== null),
   }),
 ])
 
@@ -50,11 +50,18 @@ export function savedEntries(entries: readonly unknown[]): SavedEntry[] {
   return kept.slice(start)
 }
 
-/** The model's memory of a resumed thread: what was said, without its tool steps. */
+/** The model's memory of a resumed thread: conversation turns plus concise summaries of prior edits/posts. */
 export function resumedMemory(entries: readonly SavedEntry[]) {
-  return entries.flatMap((entry) =>
-    entry.kind === 'user' || entry.kind === 'assistant'
-      ? [{ content: entry.text, role: entry.kind }]
-      : []
-  )
+  return entries.flatMap((entry) => {
+    if (entry.kind === 'user' || entry.kind === 'assistant') {
+      return [{ content: entry.text, role: entry.kind }]
+    }
+    if (entry.kind === 'change') {
+      return [{ content: `[Applied earlier change: ${entry.text}]`, role: 'assistant' as const }]
+    }
+    if (entry.kind === 'post') {
+      return [{ content: `[Drafted earlier post: ${entry.text}]`, role: 'assistant' as const }]
+    }
+    return []
+  })
 }

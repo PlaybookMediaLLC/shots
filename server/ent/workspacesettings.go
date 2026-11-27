@@ -28,6 +28,14 @@ type WorkspaceSettings struct {
 	DefaultPublishTime string `json:"default_publish_time,omitempty"`
 	// AiAgentEnabled holds the value of the "ai_agent_enabled" field.
 	AiAgentEnabled bool `json:"ai_agent_enabled,omitempty"`
+	// AiModelDefaults holds the value of the "ai_model_defaults" field.
+	AiModelDefaults map[string]interface{} `json:"ai_model_defaults,omitempty"`
+	// AiInstructions holds the value of the "ai_instructions" field.
+	AiInstructions *string `json:"ai_instructions,omitempty"`
+	// AiProviderKeyEncrypted holds the value of the "ai_provider_key_encrypted" field.
+	AiProviderKeyEncrypted *string `json:"-"`
+	// AiProviderKeyHint holds the value of the "ai_provider_key_hint" field.
+	AiProviderKeyHint *string `json:"ai_provider_key_hint,omitempty"`
 	// ReleaseReadinessEnabled holds the value of the "release_readiness_enabled" field.
 	ReleaseReadinessEnabled bool `json:"release_readiness_enabled,omitempty"`
 	// DisabledExperiments holds the value of the "disabled_experiments" field.
@@ -44,11 +52,11 @@ func (*WorkspaceSettings) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case workspacesettings.FieldDisabledExperiments:
+		case workspacesettings.FieldAiModelDefaults, workspacesettings.FieldDisabledExperiments:
 			values[i] = new([]byte)
 		case workspacesettings.FieldAiAgentEnabled, workspacesettings.FieldReleaseReadinessEnabled:
 			values[i] = new(sql.NullBool)
-		case workspacesettings.FieldID, workspacesettings.FieldDescription, workspacesettings.FieldLocale, workspacesettings.FieldTimeZone, workspacesettings.FieldDefaultPublishTime:
+		case workspacesettings.FieldID, workspacesettings.FieldDescription, workspacesettings.FieldLocale, workspacesettings.FieldTimeZone, workspacesettings.FieldDefaultPublishTime, workspacesettings.FieldAiInstructions, workspacesettings.FieldAiProviderKeyEncrypted, workspacesettings.FieldAiProviderKeyHint:
 			values[i] = new(sql.NullString)
 		case workspacesettings.FieldCreatedAt, workspacesettings.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -103,6 +111,35 @@ func (_m *WorkspaceSettings) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field ai_agent_enabled", values[i])
 			} else if value.Valid {
 				_m.AiAgentEnabled = value.Bool
+			}
+		case workspacesettings.FieldAiModelDefaults:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field ai_model_defaults", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.AiModelDefaults); err != nil {
+					return fmt.Errorf("unmarshal field ai_model_defaults: %w", err)
+				}
+			}
+		case workspacesettings.FieldAiInstructions:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field ai_instructions", values[i])
+			} else if value.Valid {
+				_m.AiInstructions = new(string)
+				*_m.AiInstructions = value.String
+			}
+		case workspacesettings.FieldAiProviderKeyEncrypted:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field ai_provider_key_encrypted", values[i])
+			} else if value.Valid {
+				_m.AiProviderKeyEncrypted = new(string)
+				*_m.AiProviderKeyEncrypted = value.String
+			}
+		case workspacesettings.FieldAiProviderKeyHint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field ai_provider_key_hint", values[i])
+			} else if value.Valid {
+				_m.AiProviderKeyHint = new(string)
+				*_m.AiProviderKeyHint = value.String
 			}
 		case workspacesettings.FieldReleaseReadinessEnabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -182,6 +219,21 @@ func (_m *WorkspaceSettings) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("ai_agent_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AiAgentEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("ai_model_defaults=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AiModelDefaults))
+	builder.WriteString(", ")
+	if v := _m.AiInstructions; v != nil {
+		builder.WriteString("ai_instructions=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("ai_provider_key_encrypted=<sensitive>")
+	builder.WriteString(", ")
+	if v := _m.AiProviderKeyHint; v != nil {
+		builder.WriteString("ai_provider_key_hint=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("release_readiness_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseReadinessEnabled))

@@ -21,6 +21,7 @@ import { listBrandKits } from '@/lib/tenant/configuration'
 import { listContentDraftPostsBetween, listContentDrafts } from '@/lib/tenant/content-drafts'
 import { getIdealCustomerProfile } from '@/lib/tenant/ideal-customer-profile'
 import { listProjects } from '@/lib/tenant/projects'
+import { getWorkspaceReadiness } from '@/lib/workspace/service'
 import { getRelease } from '@/lib/tenant/releases'
 import { backendSDK } from '@/lib/backend/sdk'
 import { draftHref, draftName } from '@/lib/write/library'
@@ -552,6 +553,31 @@ export function workspaceAssistantTools(run: ToolRun, state: AssistantTurnState)
     timeoutMs: 2_000,
   })
 
+  const inspectWorkspaceSetup = defineTool(run, {
+    description:
+      'Inspect what is configured and what is still missing in this workspace (product profile, brand voice, visual brand kits, product pages to capture, AI model defaults, and connected agents/campaigns) so you can guide setup step by step and offer direct links.',
+    effect: 'read',
+    execute: async () => {
+      const readiness = await getWorkspaceReadiness(access)
+      for (const step of readiness.steps) state.known.add(step.href)
+      state.known.add('/settings/ai-models')
+      state.known.add('/settings/ai-instructions')
+      return {
+        aiAgentEnabled: readiness.aiAgentEnabled,
+        completed: readiness.completed,
+        hasCustomInstructions: readiness.hasCustomInstructions,
+        ok: true as const,
+        steps: readiness.steps,
+        total: readiness.total,
+      }
+    },
+    inputSchema: z.object({}),
+    maxCallsPerRun: 2,
+    name: 'inspectWorkspaceSetup',
+    permission: 'workspace:read',
+    timeoutMs: 10_000,
+  })
+
   return {
     draftPost,
     findPages,
@@ -560,6 +586,7 @@ export function workspaceAssistantTools(run: ToolRun, state: AssistantTurnState)
     getProduct,
     getReleaseDetails,
     getSocialAnalyticsSummary,
+    inspectWorkspaceSetup,
     proposeCaptureRecipe,
     listBrandKits: listWorkspaceBrandKits,
     listCampaigns: listWorkspaceCampaigns,
