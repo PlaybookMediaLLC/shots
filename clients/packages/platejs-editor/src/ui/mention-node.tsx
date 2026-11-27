@@ -17,11 +17,11 @@ import {
   useSelected,
 } from "platejs/react";
 import { useEffect, useMemo, useState } from "react";
-import { useMounted } from "react-tweet";
 import { BaseEditorKit } from "../components/editor-base-kit";
 import type { MyMentionElement } from "../components/plate-types";
 import { insertInlineElement } from "../components/transforms";
 import { useDebounce } from "../hooks/use-debounce";
+import { useMounted } from "../hooks/use-mounted";
 
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { EditorStatic } from "./editor-static";

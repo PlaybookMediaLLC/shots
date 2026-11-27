@@ -31,6 +31,7 @@ export function useCompositeSource(ref: RefObject<HTMLDivElement | null>, width:
       dirty = false
       running = domToPng(canvas, {
         width, height, scale: 1,
+        fetch: { requestInit: { mode: 'cors', cache: 'no-cache' } },
         style: { transform: 'none' },
         filter: (node) => !(node instanceof Element && node.matches(excluded)),
       }).then((url) => { if (!disposed) setSource(url) }).catch((error) => {

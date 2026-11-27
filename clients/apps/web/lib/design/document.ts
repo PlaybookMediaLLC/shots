@@ -57,11 +57,19 @@ const ASSET_REF = /^asset:[0-9a-f-]{36}$/i
 const BUILTIN_PATH = /^\/?[\w-]+(?:\/[\w.-]+)+$|^\/[\w.-]+$/
 const LOCAL_REF = /^(blob:|data:image\/(?:png|jpeg|webp|gif);base64,)/
 /** Public hosts of the editor's own media library (backgrounds, overlays). */
-const MEDIA_HOSTS = new Set(
-  ['assets.screenshot-studio.com', process.env.NEXT_PUBLIC_R2_PUBLIC_URL]
-    .filter((value): value is string => Boolean(value))
-    .map((value) => (value.includes('://') ? new URL(value).host : value))
-)
+const MEDIA_HOSTS = new Set(['assets.screenshot-studio.com', 'shots-assets.oppulence.io'])
+
+function configuredMediaHost(): string | null {
+  const configured = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim()
+  if (!configured) return null
+  try {
+    return configured.includes('://')
+      ? new URL(configured).host.toLowerCase()
+      : configured.replace(/\/+$/, '').toLowerCase()
+  } catch {
+    return null
+  }
+}
 
 /**
  * True for a reference an image field may hold: a workspace asset, built-in
@@ -72,7 +80,14 @@ export function isDesignSource(ref: string): boolean {
   if (ASSET_REF.test(ref) || BUILTIN_PATH.test(ref) || LOCAL_REF.test(ref)) return true
   if (!ref.startsWith('https://')) return false
   try {
-    return MEDIA_HOSTS.has(new URL(ref).host)
+    const parsed = new URL(ref)
+    if (parsed.username || parsed.password || !parsed.pathname || parsed.pathname === '/') {
+      return false
+    }
+    const host = parsed.host.toLowerCase()
+    if (MEDIA_HOSTS.has(host)) return true
+    const configuredHost = configuredMediaHost()
+    return Boolean(configuredHost && host === configuredHost)
   } catch {
     return false
   }

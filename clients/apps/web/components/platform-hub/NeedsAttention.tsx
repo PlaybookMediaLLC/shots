@@ -4,8 +4,12 @@ import { NotificationFeed } from '@/components/notifications/NotificationFeed'
 import { useNotificationIdentity } from '@/lib/notifications/client'
 
 /** Everything the notification badge counts, through the same authorized, paginated feed. */
-export function NeedsAttention() {
-  const identity = useNotificationIdentity()
+export function NeedsAttention({
+  initialIdentity,
+}: {
+  initialIdentity?: { userId: string; workspaceId: string }
+}) {
+  const identity = useNotificationIdentity(initialIdentity)
   if (!identity.ready) return null
   return (
     <section aria-label="Needs attention" className="home-attention space-y-4">

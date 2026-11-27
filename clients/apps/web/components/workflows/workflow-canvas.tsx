@@ -17,15 +17,7 @@ import type {
 } from '@/lib/api/contracts/release-automation'
 import { WORKFLOW_ACTIONS, WORKFLOW_CLASSIFY } from '@/lib/workflows/actions'
 import { cn } from '@/lib/utils'
-
-/** Event family names as customers read them. */
-export const FAMILY_NAMES: Record<AutomationFamily, string> = {
-  'release.published': 'Release published',
-  'pull_request.merged': 'Pull request merged',
-  'deployment.succeeded': 'Deployment succeeded',
-  'tag.pushed': 'Tag pushed',
-  'milestone.closed': 'Milestone closed',
-}
+import { FAMILY_NAMES } from './workflow-ui'
 
 const nodeIcons = {
   trigger: Zap,

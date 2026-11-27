@@ -1,3 +1,9 @@
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@custom-variant dark (&:is(.dark *));
+@import 'fumadocs-ui/css/shadcn.css';
+@import 'fumadocs-ui/css/preset.css';
+
 /* Scoped Shots documentation shell — aligned with the authenticated
    platform-shell.css palette, three-surface hierarchy (#fafafa / #ffffff in
    light mode, #000000 / #0a0a0a in dark mode), hairline borders, Inter

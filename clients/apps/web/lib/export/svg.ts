@@ -86,6 +86,7 @@ export async function captureStageSvg(
   const rect = { width: parseFloat(container.style.width), height: parseFloat(container.style.height) }
   const svg = await domToForeignObjectSvg(container, {
     backgroundColor: null,
+    fetch: { requestInit: { mode: 'cors', cache: 'no-cache' } },
     filter: shouldIncludeInExport,
     height: rect.height,
     onCloneNode: cleanExportClone,

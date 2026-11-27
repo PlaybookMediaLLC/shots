@@ -1603,6 +1603,14 @@ export type BackendProject = {
   updatedByUserId: string | null
 }
 
+/** Lightweight project or canvas metadata for navigation recents (omits document payload). */
+export type BackendRecentWorkItem = {
+  id: string
+  kind: 'project' | 'canvas'
+  name: string
+  updatedAt: string
+}
+
 /** How a project version came to be. */
 export type BackendProjectVersionKind = 'autosave' | 'named' | 'restore' | 'duplicate'
 
@@ -4587,6 +4595,13 @@ export class ScreenshotStudioBackendSDK {
         method: 'DELETE',
       }
     )
+  }
+
+  async listRecentWork(limit?: number) {
+    const params = new URLSearchParams()
+    if (limit !== undefined) params.set('limit', String(limit))
+    const suffix = params.size ? `?${params}` : ''
+    return this.request<{ items: BackendRecentWorkItem[] }>(`v1/recent-work${suffix}`)
   }
 
   async listProjects(query: BackendProjectListQuery = {}) {

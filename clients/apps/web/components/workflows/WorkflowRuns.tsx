@@ -37,7 +37,7 @@ import {
 import { useTRPC } from '@/lib/trpc/react'
 import { connectedSources } from '@/lib/workflows/actions'
 import { runDateBoundary, runDateDay, runHandler } from '@/lib/workflows/history'
-import { FAMILY_NAMES } from './workflow-canvas'
+import { FAMILY_NAMES } from './workflow-ui'
 import {
   duration,
   FAILURE_CODES,

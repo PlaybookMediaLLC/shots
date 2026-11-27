@@ -9,8 +9,10 @@ import { resolveAppearance } from '@/lib/frames/appearance'
 import { CODE_THEMES } from '@/lib/frames/code'
 import { frameScreenRect, screenFrameSpec } from '@/lib/frames/geometry'
 import type { Mockup } from '@/types/mockup'
+import dynamic from 'next/dynamic'
 import { ChromeFrame } from './ChromeFrame'
-import { CodeScreen } from './CodeScreen'
+
+const CodeScreen = dynamic(() => import('./CodeScreen').then((mod) => mod.CodeScreen))
 
 /** What a screen does when it is clicked, dropped on, or cropped, and where its image sits. */
 export type ScreenHandlers = {

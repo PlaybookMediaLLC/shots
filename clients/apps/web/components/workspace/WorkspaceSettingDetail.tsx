@@ -1,39 +1,105 @@
+import dynamic from 'next/dynamic'
 import { type ReactNode } from 'react'
-import { ApprovalSetting } from '@/components/drafts/ApprovalSetting'
-import { AccountSettings } from '@/components/settings/AccountSettings'
-import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
-import { DeveloperTools } from '@/components/settings/DeveloperTools'
-import { ExperimentalSettings } from '@/components/settings/ExperimentalSettings'
-import { FounderHubSettings } from '@/components/settings/FounderHubSettings'
-import { InstallSettings } from '@/components/settings/InstallSettings'
-import { IntegrationCatalog } from '@/components/settings/IntegrationCatalog'
-import { NewTeamSettings } from '@/components/settings/NewTeamSettings'
-import { SocialSetList } from '@/components/settings/social-sets/SocialSetList'
-import { SocialSetSettings } from '@/components/settings/social-sets/SocialSetSettings'
-import { WebhookSettings } from '@/components/settings/WebhookSettings'
-import { VoiceSettings } from '@/components/voice/VoiceSettings'
-import { ChannelConnections } from './ChannelConnections'
-import { WorkspaceAgentSettings } from './WorkspaceAgentSettings'
-import { WorkspaceAuditSettings } from './WorkspaceAuditSettings'
-import { WorkspaceBilling } from './WorkspaceBilling'
-import { WorkspaceBrandSettings } from './WorkspaceBrandSettings'
-import { WorkspaceDeveloperSettings } from './WorkspaceDeveloperSettings'
-import { WorkspaceGeneralSettings } from './WorkspaceGeneralSettings'
-import { WorkspaceIdentitySettings } from './WorkspaceIdentitySettings'
-import { WorkspaceIntegrations } from './WorkspaceIntegrations'
-import { WorkspaceNotifications } from './WorkspaceNotifications'
-import { WorkspaceMembersSettings } from './WorkspaceMembersSettings'
-import { WorkspaceIdealCustomerProfile } from './WorkspaceIdealCustomerProfile'
-import { WorkspacePermissionGroupsSettings } from './WorkspacePermissionGroupsSettings'
-import { WorkspaceProductProfile } from './WorkspaceProductProfile'
-import { WorkspaceProductSurfaces } from './WorkspaceProductSurfaces'
-import { WorkspaceRolesSettings } from './WorkspaceRolesSettings'
-import { WorkspaceSecuritySettings } from './WorkspaceSecuritySettings'
-import { WorkspaceSharedLinks } from './WorkspaceSharedLinks'
-import { WorkspaceWhitelabelSettings } from './WorkspaceWhitelabelSettings'
 import { accessAllows, type Permission } from '@/lib/auth/permissions'
 import type { WorkspaceSettingsProps } from './WorkspaceSettings'
 import type { SettingId } from './settings-sections'
+
+const ApprovalSetting = dynamic(() =>
+  import('@/components/drafts/ApprovalSetting').then((m) => m.ApprovalSetting)
+)
+const AccountSettings = dynamic(() =>
+  import('@/components/settings/AccountSettings').then((m) => m.AccountSettings)
+)
+const AppearanceSettings = dynamic(() =>
+  import('@/components/settings/AppearanceSettings').then((m) => m.AppearanceSettings)
+)
+const DeveloperTools = dynamic(() =>
+  import('@/components/settings/DeveloperTools').then((m) => m.DeveloperTools)
+)
+const ExperimentalSettings = dynamic(() =>
+  import('@/components/settings/ExperimentalSettings').then((m) => m.ExperimentalSettings)
+)
+const FounderHubSettings = dynamic(() =>
+  import('@/components/settings/FounderHubSettings').then((m) => m.FounderHubSettings)
+)
+const InstallSettings = dynamic(() =>
+  import('@/components/settings/InstallSettings').then((m) => m.InstallSettings)
+)
+const IntegrationCatalog = dynamic(() =>
+  import('@/components/settings/IntegrationCatalog').then((m) => m.IntegrationCatalog)
+)
+const NewTeamSettings = dynamic(() =>
+  import('@/components/settings/NewTeamSettings').then((m) => m.NewTeamSettings)
+)
+const SocialSetList = dynamic(() =>
+  import('@/components/settings/social-sets/SocialSetList').then((m) => m.SocialSetList)
+)
+const SocialSetSettings = dynamic(() =>
+  import('@/components/settings/social-sets/SocialSetSettings').then((m) => m.SocialSetSettings)
+)
+const WebhookSettings = dynamic(() =>
+  import('@/components/settings/WebhookSettings').then((m) => m.WebhookSettings)
+)
+const VoiceSettings = dynamic(() =>
+  import('@/components/voice/VoiceSettings').then((m) => m.VoiceSettings)
+)
+const ChannelConnections = dynamic(() =>
+  import('./ChannelConnections').then((m) => m.ChannelConnections)
+)
+const WorkspaceAgentSettings = dynamic(() =>
+  import('./WorkspaceAgentSettings').then((m) => m.WorkspaceAgentSettings)
+)
+const WorkspaceAuditSettings = dynamic(() =>
+  import('./WorkspaceAuditSettings').then((m) => m.WorkspaceAuditSettings)
+)
+const WorkspaceBilling = dynamic(() =>
+  import('./WorkspaceBilling').then((m) => m.WorkspaceBilling)
+)
+const WorkspaceBrandSettings = dynamic(() =>
+  import('./WorkspaceBrandSettings').then((m) => m.WorkspaceBrandSettings)
+)
+const WorkspaceDeveloperSettings = dynamic(() =>
+  import('./WorkspaceDeveloperSettings').then((m) => m.WorkspaceDeveloperSettings)
+)
+const WorkspaceGeneralSettings = dynamic(() =>
+  import('./WorkspaceGeneralSettings').then((m) => m.WorkspaceGeneralSettings)
+)
+const WorkspaceIdentitySettings = dynamic(() =>
+  import('./WorkspaceIdentitySettings').then((m) => m.WorkspaceIdentitySettings)
+)
+const WorkspaceIntegrations = dynamic(() =>
+  import('./WorkspaceIntegrations').then((m) => m.WorkspaceIntegrations)
+)
+const WorkspaceNotifications = dynamic(() =>
+  import('./WorkspaceNotifications').then((m) => m.WorkspaceNotifications)
+)
+const WorkspaceMembersSettings = dynamic(() =>
+  import('./WorkspaceMembersSettings').then((m) => m.WorkspaceMembersSettings)
+)
+const WorkspaceIdealCustomerProfile = dynamic(() =>
+  import('./WorkspaceIdealCustomerProfile').then((m) => m.WorkspaceIdealCustomerProfile)
+)
+const WorkspacePermissionGroupsSettings = dynamic(() =>
+  import('./WorkspacePermissionGroupsSettings').then((m) => m.WorkspacePermissionGroupsSettings)
+)
+const WorkspaceProductProfile = dynamic(() =>
+  import('./WorkspaceProductProfile').then((m) => m.WorkspaceProductProfile)
+)
+const WorkspaceProductSurfaces = dynamic(() =>
+  import('./WorkspaceProductSurfaces').then((m) => m.WorkspaceProductSurfaces)
+)
+const WorkspaceRolesSettings = dynamic(() =>
+  import('./WorkspaceRolesSettings').then((m) => m.WorkspaceRolesSettings)
+)
+const WorkspaceSecuritySettings = dynamic(() =>
+  import('./WorkspaceSecuritySettings').then((m) => m.WorkspaceSecuritySettings)
+)
+const WorkspaceSharedLinks = dynamic(() =>
+  import('./WorkspaceSharedLinks').then((m) => m.WorkspaceSharedLinks)
+)
+const WorkspaceWhitelabelSettings = dynamic(() =>
+  import('./WorkspaceWhitelabelSettings').then((m) => m.WorkspaceWhitelabelSettings)
+)
 
 /** What each section's content reads: the person, the workspace, and what their role may do. */
 type SettingsContext = Omit<WorkspaceSettingsProps, 'section'> & {

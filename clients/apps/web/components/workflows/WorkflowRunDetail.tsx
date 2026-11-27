@@ -23,11 +23,17 @@ import {
   conditionSummary,
   canvasEdges,
   canvasNodes,
-  FAMILY_NAMES,
   nodeLabel,
   workflowNodeTypes,
 } from './workflow-canvas'
-import { duration, FAILURE_CODES, RunStatusPill, runActive, triggeringObject } from './workflow-ui'
+import {
+  duration,
+  FAILURE_CODES,
+  FAMILY_NAMES,
+  RunStatusPill,
+  runActive,
+  triggeringObject,
+} from './workflow-ui'
 
 type Review = { status: string; posts: { status: string }[] }
 

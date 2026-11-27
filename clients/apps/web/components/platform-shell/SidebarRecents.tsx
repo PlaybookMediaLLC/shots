@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { recentWorkQuery } from '@/components/platform-hub/work'
+import { recentWorkSummaryQuery } from '@/components/platform-hub/work'
 import { useHydratedSession } from '@/lib/auth/client'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { CanvasIcon, ImageIcon } from './icons'
@@ -9,30 +9,28 @@ import { SidebarLink } from './SidebarLink'
 
 /**
  * The sidebar's Recents, as a document hub keeps them: the workspace's last
- * few screenshots and canvases, a click from any page. It reads Home's
- * recent-work query, so the two share one cached read. Posts stay in
- * Publish. Shown only when expanded and when there is something to show.
+ * few screenshots and canvases, a click from any page. Uses the lightweight
+ * metadata summary endpoint so the sidebar never fetches document blobs or
+ * drafts/campaigns/releases. Shown only when expanded and when there is
+ * something to show.
  */
 export function SidebarRecents({
-  campaignsEnabled,
-  draftsEnabled,
+  initialWorkspaceId,
   onNavigate,
   paidPlan,
 }: {
-  campaignsEnabled: boolean
-  draftsEnabled: boolean
+  initialWorkspaceId?: string
   onNavigate?: () => void
   paidPlan: boolean
 }) {
   const client = useTRPCClient()
-  const workspaceId = useHydratedSession().data?.session.activeOrganizationId ?? ''
+  const session = useHydratedSession()
+  const workspaceId = initialWorkspaceId ?? session.data?.session.activeOrganizationId ?? ''
   const query = useQuery({
-    ...recentWorkQuery(client, workspaceId, draftsEnabled, paidPlan, campaignsEnabled),
+    ...recentWorkSummaryQuery(client, workspaceId, 5),
     enabled: Boolean(workspaceId) && paidPlan,
   })
-  const items = (query.data?.items ?? [])
-    .filter((item) => item.type === 'Screenshot' || item.type === 'Canvas')
-    .slice(0, 5)
+  const items = query.data ?? []
   if (!items.length) return null
   return (
     <section aria-labelledby="sidebar-recents" className="grid gap-0.5">

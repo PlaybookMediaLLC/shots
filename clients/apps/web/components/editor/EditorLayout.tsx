@@ -22,7 +22,12 @@ import { trackEditorOpen } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 import { hasVisibleMockups, shouldRenderSourceImage } from '@/lib/device-mockups/layouts'
 import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/ssr/SidebarSimple'
-import { TemplateLibraryDrawer } from '@/components/templates/TemplateLibraryDrawer'
+
+const TemplateLibraryDrawer = dynamic(
+  () =>
+    import('@/components/templates/TemplateLibraryDrawer').then((m) => m.TemplateLibraryDrawer),
+  { ssr: false }
+)
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from '@/lib/constants'
 import { useDeviceUIStore } from '@/lib/store/device-ui'
 import { hasTemplateDemoMedia, isTemplateDemoMedia } from '@/lib/templates/demo-media'
@@ -124,7 +129,7 @@ function TemplateMediaPrompt() {
 function EditorMain() {
   const isMobile = useIsMobile()
   const [mobileSheetOpen, setMobileSheetOpen] = React.useState(false)
-  const { uploadedImageUrl, slides, mockups, editorMode, showTimeline, toggleTimeline } =
+  const { uploadedImageUrl, slides, mockups, editorMode, showTimeline, showTemplates, toggleTimeline } =
     useImageStore(
       useShallow((state) => ({
         uploadedImageUrl: state.uploadedImageUrl,
@@ -132,6 +137,7 @@ function EditorMain() {
         mockups: state.mockups,
         editorMode: state.editorMode,
         showTimeline: state.showTimeline,
+        showTemplates: state.showTemplates,
         toggleTimeline: state.toggleTimeline,
       }))
     )
@@ -145,6 +151,10 @@ function EditorMain() {
   const hasContent = hasSourceContent || (editorMode === 'device' && hasVisibleMockups(mockups))
   const [composeShown, setComposeShown] = React.useState(true)
   const [inspectorShown, setInspectorShown] = React.useState(true)
+  const [templatesMounted, setTemplatesMounted] = React.useState(false)
+  React.useEffect(() => {
+    if (showTemplates) setTemplatesMounted(true)
+  }, [showTemplates])
   React.useEffect(() => {
     trackEditorOpen()
   }, [])
@@ -160,7 +170,7 @@ function EditorMain() {
       <MobileBanner />
 
       <EditorHeader />
-      <TemplateLibraryDrawer />
+      {templatesMounted ? <TemplateLibraryDrawer /> : null}
 
       <div className="bg-background border-b border-foreground/10 flex items-center justify-between gap-2 px-3 py-2 z-10 shrink-0 lg:hidden">
         <span />

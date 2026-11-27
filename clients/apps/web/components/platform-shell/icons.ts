@@ -20,8 +20,7 @@ export { CaretDownIcon as ChevronDownIcon } from '@phosphor-icons/react/dist/ssr
 export { LinkIcon } from '@phosphor-icons/react/dist/ssr/Link'
 export { ListIcon as MenuIcon } from '@phosphor-icons/react/dist/ssr/List'
 export { DotsThreeIcon as MoreIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
-// Phosphor has no "add business" glyph (a storefront with a plus), so this one stays Material.
-export { MdOutlineAddBusiness as AddBusinessIcon } from 'react-icons/md'
+export { StorefrontIcon as AddBusinessIcon } from '@phosphor-icons/react/dist/ssr/Storefront'
 export { UserGearIcon as AdminIcon } from '@phosphor-icons/react/dist/ssr/UserGear'
 export { LightningIcon as AutomateIcon } from '@phosphor-icons/react/dist/ssr/Lightning'
 export { PaintBrushIcon as BrushIcon } from '@phosphor-icons/react/dist/ssr/PaintBrush'

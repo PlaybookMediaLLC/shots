@@ -2,11 +2,21 @@
 
 import Link from 'next/link'
 import { Pill, type PillTone } from '@/components/platform-ui'
+import type { AutomationFamily } from '@/lib/api/contracts/release-automation'
 import { type AutomationRunSummary } from '@/lib/api/contracts/workflow-runs'
 import {
   automationRunStatusSchema,
   type AutomationRunStatus,
 } from '@/lib/api/contracts/workflow-runs'
+
+/** Event family names as customers read them. */
+export const FAMILY_NAMES: Record<AutomationFamily, string> = {
+  'release.published': 'Release published',
+  'pull_request.merged': 'Pull request merged',
+  'deployment.succeeded': 'Deployment succeeded',
+  'tag.pushed': 'Tag pushed',
+  'milestone.closed': 'Milestone closed',
+}
 
 const STATUS: Record<AutomationRunStatus, { label: string; tone: PillTone }> = {
   queued: { label: 'Queued', tone: 'gray' },

@@ -148,13 +148,28 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
     if (!browser.isConnected()) browser = await openBrowser()
     const context = await browser.newContext({ deviceScaleFactor: 1, viewport })
     const page = await context.newPage()
-    // Only the app itself and Google Fonts (text may use them): no
-    // analytics or ad scripts in a render.
+    const allowedAssetOrigins = new Set<string>([
+      'https://assets.screenshot-studio.com',
+      'https://shots-assets.oppulence.io',
+    ])
+    const configuredR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim()
+    if (configuredR2) {
+      try {
+        allowedAssetOrigins.add(
+          new URL(configuredR2.includes('://') ? configuredR2 : `https://${configuredR2}`).origin
+        )
+      } catch {
+        // Ignore malformed override.
+      }
+    }
+    // Only the app itself, its static R2 asset CDN, and Google Fonts (text may use them):
+    // no analytics or ad scripts in a render.
     await page.route('**/*', (route) => {
       const url = new URL(route.request().url())
       return url.protocol === 'data:' ||
         url.protocol === 'blob:' ||
         url.origin === baseUrl.origin ||
+        allowedAssetOrigins.has(url.origin) ||
         (externalFonts && (GOOGLE_FONT_ORIGINS as readonly string[]).includes(url.origin))
         ? route.continue()
         : route.abort()

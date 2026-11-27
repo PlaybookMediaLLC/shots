@@ -32,13 +32,14 @@ test('R2 image URLs preserve local builds, legacy paths, and query fragments', (
     delete process.env.NEXT_PUBLIC_R2_PUBLIC_URL
     assert.equal(publicImageUrl('/logo-mark.png'), '/logo-mark.png')
     process.env.NEXT_PUBLIC_R2_PUBLIC_URL = 'https://shots-assets.oppulence.io'
-    const logo = `/r2-assets/${images['/logo-mark.png']}`
+    const logo = `https://shots-assets.oppulence.io/${images['/logo-mark.png']}`
     assert.equal(publicImageUrl('/logo-mark.png?v=2#icon'), `${logo}?v=2#icon`)
     assert.equal(publicImageUrl(logo), logo)
     assert.equal(getR2ImageUrl({ src: logo }), logo)
+    assert.ok(isDesignSource(logo))
     assert.equal(
       getR2PublicUrl('backgrounds/raycast/red_distortion_4.webp'),
-      `/r2-assets/${images['/raycast/red_distortion_4.webp']}`
+      `https://shots-assets.oppulence.io/${images['/raycast/red_distortion_4.webp']}`
     )
     for (const src of [
       'https://example.com/image.png',
@@ -48,6 +49,13 @@ test('R2 image URLs preserve local builds, legacy paths, and query fragments', (
     ]) {
       assert.equal(publicImageUrl(src), src)
     }
+    process.env.NEXT_PUBLIC_R2_PUBLIC_URL = 'custom-cdn.example/'
+    assert.equal(isDesignSource('https://custom-cdn.example/static/a.webp'), true)
+    assert.equal(isDesignSource('https://custom-cdn.example.evil.com/static/a.webp'), false)
+    assert.equal(isDesignSource('http://custom-cdn.example/static/a.webp'), false)
+    assert.equal(isDesignSource('https://custom-cdn.example/static/../a.webp'), false)
+    assert.equal(isDesignSource('https://user@custom-cdn.example/static/a.webp'), false)
+    assert.equal(isDesignSource('https://custom-cdn.example/'), false)
   } finally {
     if (original === undefined) delete process.env.NEXT_PUBLIC_R2_PUBLIC_URL
     else process.env.NEXT_PUBLIC_R2_PUBLIC_URL = original

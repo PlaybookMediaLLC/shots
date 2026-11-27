@@ -1,7 +1,7 @@
 import path from 'node:path'
-import publicImages from './lib/assets/public-images.json'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
+import publicImages from './lib/assets/public-images.json'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
@@ -11,6 +11,24 @@ const FOUNDER_HUB_APT_FILES =
   'https://raw.githubusercontent.com/PlaybookMediaLLC/shots-founder-hub/main/apps/web/public/apt'
 const FOUNDER_HUB_RELEASES =
   'https://github.com/PlaybookMediaLLC/shots-founder-hub/releases/download'
+
+const configuredR2Url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/+$/, '')
+const configuredR2Pattern = (() => {
+  if (!configuredR2Url) return null
+  try {
+    const parsed = new URL(
+      configuredR2Url.includes('://') ? configuredR2Url : `https://${configuredR2Url}`
+    )
+    const protocol = parsed.protocol === 'http:' ? ('http' as const) : ('https' as const)
+    return {
+      protocol,
+      hostname: parsed.hostname,
+      ...(parsed.port ? { port: parsed.port } : {}),
+    }
+  } catch {
+    return null
+  }
+})()
 
 /** Pages that moved to their section's address; bookmarks and sent links keep working. */
 const NAVIGATION_MOVES: Pick<Redirect, 'source' | 'destination' | 'has'>[] = [
@@ -49,6 +67,14 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   experimental: {
     agentUpgrade: 'security',
+    optimizePackageImports: [
+      '@phosphor-icons/react',
+      'date-fns',
+      'radix-ui',
+      'motion',
+      'motion/react',
+      'platejs',
+    ],
   },
   // The vendored editor ships TypeScript source (packages/platejs-editor).
   transpilePackages: ['@shots/platejs-editor'],
@@ -58,12 +84,20 @@ const nextConfig: NextConfig = {
     .filter(Boolean),
 
   images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         // R2 custom domain (new)
         protocol: 'https',
         hostname: 'assets.screenshot-studio.com',
       },
+      ...(configuredR2Pattern &&
+      (configuredR2Pattern.hostname !== 'assets.screenshot-studio.com' ||
+        configuredR2Pattern.protocol !== 'https' ||
+        Boolean(configuredR2Pattern.port))
+        ? [configuredR2Pattern]
+        : []),
     ],
   },
 
@@ -72,10 +106,6 @@ const nextConfig: NextConfig = {
   // Only applied to editor routes — applying globally breaks YouTube embeds on landing page
   async headers() {
     return [
-      {
-        source: '/r2-assets/static/:path*',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
-      },
       {
         source: '/api/:path*',
         headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
@@ -170,12 +200,21 @@ const nextConfig: NextConfig = {
         destination: `${FOUNDER_HUB_RELEASES}/:tag/shots-founder-hub-linux-aarch64.deb`,
         statusCode: 302,
       },
-      ...(process.env.NEXT_PUBLIC_R2_PUBLIC_URL
-        ? Object.entries(publicImages).map(([source, key]) => ({
-            source: source.replace(/[():*+?]/g, '\\$&'),
-            destination: `/r2-assets/${key.split('/').map(encodeURIComponent).join('/')}`,
-            permanent: false,
-          }))
+      // Redirect legacy /r2-assets/* URLs and deleted public/* paths (favicons, OG, manifest icons)
+      // directly to the R2 CDN instead of proxying static asset bytes through Next.js.
+      ...(configuredR2Url
+        ? [
+            {
+              source: '/r2-assets/:path*',
+              destination: `${configuredR2Url}/:path*`,
+              permanent: true,
+            },
+            ...Object.entries(publicImages).map(([source, key]) => ({
+              source,
+              destination: `${configuredR2Url}/${key.split('/').map(encodeURIComponent).join('/')}`,
+              permanent: false,
+            })),
+          ]
         : []),
       ...NAVIGATION_MOVES.flatMap((move) => [
         { ...move, permanent: true },
@@ -226,11 +265,9 @@ const nextConfig: NextConfig = {
     ]
   },
 
-  // Proxy R2 assets through same origin to avoid CORS issues
-  // (especially critical for canvas capture during video export)
-  // Also proxy PostHog through same origin to bypass ad blockers
+  // Proxy PostHog through same origin to bypass ad blockers; static R2 assets
+  // are now served directly from NEXT_PUBLIC_R2_PUBLIC_URL with CORS headers.
   async rewrites() {
-    const r2Url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
     return [
       // LLMs.txt — serve markdown to AI agents
       {
@@ -258,15 +295,6 @@ const nextConfig: NextConfig = {
         source: '/svc/:path*',
         destination: 'https://us.i.posthog.com/:path*',
       },
-      // R2 asset proxy
-      ...(r2Url
-        ? [
-            {
-              source: '/r2-assets/:path*',
-              destination: `${r2Url}/:path*`,
-            },
-          ]
-        : []),
     ]
   },
 

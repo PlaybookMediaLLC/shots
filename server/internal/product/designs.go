@@ -3,6 +3,8 @@ package product
 import (
 	"context"
 	"encoding/json"
+	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,6 +25,56 @@ import (
 
 // Built-in media: an app path, or a media-library path such as backgrounds/x.webp.
 var designBuiltinPath = regexp.MustCompile(`^/[\w./-]+$|^[\w-]+(/[\w.-]+)+$`)
+
+func normalizeMediaHost(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.Contains(trimmed, "://") {
+		parsed, err := url.Parse(trimmed)
+		if err != nil {
+			return ""
+		}
+		return strings.ToLower(parsed.Host)
+	}
+	return strings.ToLower(strings.TrimRight(trimmed, "/"))
+}
+
+func isTrustedMediaHost(host string) bool {
+	lower := strings.ToLower(host)
+	if lower == "assets.screenshot-studio.com" || lower == "shots-assets.oppulence.io" {
+		return true
+	}
+	for _, envKey := range []string{"R2_PUBLIC_URL", "NEXT_PUBLIC_R2_PUBLIC_URL"} {
+		if configured := normalizeMediaHost(os.Getenv(envKey)); configured != "" && lower == configured {
+			return true
+		}
+	}
+	return false
+}
+
+// isBuiltinOrMediaSource accepts built-in app/catalog paths and HTTPS URLs on
+// the platform's own static R2 CDN host (matching lib/design/document.ts).
+func isBuiltinOrMediaSource(ref string) bool {
+	if strings.Contains(ref, "..") {
+		return false
+	}
+	if designBuiltinPath.MatchString(ref) {
+		return true
+	}
+	if !strings.HasPrefix(ref, "https://") {
+		return false
+	}
+	parsed, err := url.Parse(ref)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return false
+	}
+	if !isTrustedMediaHost(parsed.Host) {
+		return false
+	}
+	return parsed.Path != "" && designBuiltinPath.MatchString(parsed.Path)
+}
 
 type CreateDesignInput struct {
 	CampaignID     *string        `json:"campaignId"`
@@ -95,7 +147,7 @@ func designSource(value any, ids map[string]bool) bool {
 		ids[id] = true
 		return true
 	}
-	return designBuiltinPath.MatchString(ref) && !strings.Contains(ref, "..")
+	return isBuiltinOrMediaSource(ref)
 }
 
 // designDocumentVersions are the design document versions the backend stores.

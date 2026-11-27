@@ -5,6 +5,7 @@ import {
   getBackgroundCSS,
   type BackgroundConfig,
 } from '@/lib/constants/backgrounds';
+import { isR2AssetUrl } from '@/lib/r2';
 
 interface HTMLBackgroundLayerProps {
   backgroundConfig: BackgroundConfig;
@@ -106,7 +107,7 @@ export function HTMLBackgroundLayer({
       // For initial image backgrounds, preload to handle 404s
       if (backgroundConfig.type === 'image') {
         const url = extractImageUrl(backgroundStyle);
-        if (url && url.startsWith('/r2-assets/')) {
+        if (url && isR2AssetUrl(url)) {
           preloadImage(url, 0, abortController.signal)
             .then((loadedUrl) => {
               if (!abortController.signal.aborted) {
@@ -162,7 +163,7 @@ export function HTMLBackgroundLayer({
       // For image backgrounds, preload before transitioning
       if (backgroundConfig.type === 'image') {
         const url = extractImageUrl(backgroundStyle);
-        if (url && url.startsWith('/r2-assets/')) {
+        if (url && isR2AssetUrl(url)) {
           preloadImage(url, 0, abortController.signal)
             .then((loadedUrl) => {
               applyNewBackground({

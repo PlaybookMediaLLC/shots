@@ -11,6 +11,7 @@ import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { EditorFontsScope } from '@/components/platform-shell/EditorFontsScope'
 import { fontFamilies } from '@/lib/constants/fonts'
 import {
   contrastRatio,
@@ -221,7 +222,8 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
   }
 
   return (
-    <div className="flex flex-col gap-10">
+    <EditorFontsScope>
+      <div className="flex flex-col gap-10">
       <WritingInheritance />
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -494,7 +496,8 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
           ) : null}
         </div>
       </div>
-    </div>
+      </div>
+    </EditorFontsScope>
   )
 }
 

@@ -440,6 +440,7 @@ export function HTMLMainImageLayer({
   const mainImage = (
     <img
       src={image.src}
+      crossOrigin={image.src.startsWith('blob:') || image.src.startsWith('data:') ? undefined : 'anonymous'}
       alt="Main image"
       draggable={false}
       style={{
