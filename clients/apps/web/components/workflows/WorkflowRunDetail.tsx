@@ -96,11 +96,19 @@ export function WorkflowRunDetail({
   useEffect(() => {
     void load()
   }, [load])
+  const isActive = Boolean(detail && runActive(detail.run.status))
   useEffect(() => {
-    if (!detail || !runActive(detail.run.status)) return
-    const timer = setInterval(() => void load(), 4_000)
-    return () => clearInterval(timer)
-  }, [detail, load])
+    if (!isActive) return
+    const tick = () => {
+      if (!document.hidden) void load()
+    }
+    const timer = setInterval(tick, 4_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [isActive, load])
 
   if (!detail) {
     return (

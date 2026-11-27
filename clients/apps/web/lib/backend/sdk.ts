@@ -41,6 +41,20 @@ function principalScope(principal: Principal): PrincipalScope {
   }
 }
 
+const IGNORED_READ_DEDUP_HEADERS = new Set(['traceparent', 'tracestate', 'x-request-id'])
+
+function readDedupKey(input: Parameters<typeof fetch>[0], headers: Headers): string {
+  const parts: [string, string][] = []
+  headers.forEach((value, name) => {
+    const lower = name.toLowerCase()
+    if (!IGNORED_READ_DEDUP_HEADERS.has(lower)) {
+      parts.push([lower, value])
+    }
+  })
+  parts.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+  return JSON.stringify([String(input), parts])
+}
+
 /**
  * fetch that sends the active trace to the Go backend as `traceparent`, so a
  * backend span joins the web request's trace. Without telemetry the global
@@ -48,18 +62,18 @@ function principalScope(principal: Principal): PrincipalScope {
  */
 const tracedFetch: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers)
-  const key = `${String(input)} ${JSON.stringify([...headers])}`
+  const reads = renderReads()
+  const inSharedScope = reads === renderReads()
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const shareable = method === 'GET' && init?.body == null && inSharedScope
+  const key = shareable ? readDedupKey(input, headers) : ''
   propagation.inject(context.active(), headers, {
     set: (carrier, name, value) => carrier.set(name, value),
   })
-  const reads = renderReads()
-  const shareable =
-    headers.has('traceparent') &&
-    (init?.method ?? 'GET') === 'GET' &&
-    init?.body == null &&
-    // Outside a render, cache() calls through and returns a new map each time.
-    reads === renderReads()
-  if (!shareable) return fetch(input, { ...init, headers })
+  if (!shareable) {
+    if (inSharedScope && method !== 'GET' && method !== 'HEAD') reads.clear()
+    return fetch(input, { ...init, headers })
+  }
   let read = reads.get(key)
   if (!read) {
     read = fetch(input, { ...init, headers })
@@ -95,8 +109,8 @@ type SharedRead =
 
 /**
  * Next shares identical GETs within a render, but each segment's span gives
- * them a different traceparent, so a layout and its page would read twice.
- * This shares JSON reads keyed without it.
+ * them a different traceparent/request-id, so a layout and its page would read
+ * twice. This shares JSON reads keyed by URL and principal/tenant headers.
  */
 const renderReads = cache(() => new Map<string, Promise<SharedRead>>())
 
@@ -150,14 +164,29 @@ type WithDates<T> = T extends string
 
 /** Backend JSON carries ISO timestamps; the web readers return `*At` fields as Dates. */
 export function withDates<T>(value: T): WithDates<T> {
-  if (Array.isArray(value)) return value.map(withDates) as WithDates<T>
-  if (!value || typeof value !== 'object') return value as WithDates<T>
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [
-      key,
-      key.endsWith('At') && typeof item === 'string' ? new Date(item) : withDates(item),
-    ])
-  ) as WithDates<T>
+  if (Array.isArray(value)) {
+    let out: unknown[] | null = null
+    for (let i = 0; i < value.length; i++) {
+      const next = withDates(value[i])
+      if (next !== value[i] && !out) out = value.slice()
+      if (out) out[i] = next
+    }
+    return (out ?? value) as WithDates<T>
+  }
+  if (!value || typeof value !== 'object' || value instanceof Date) return value as WithDates<T>
+  const record = value as Record<string, unknown>
+  let copy: Record<string, unknown> | null = null
+  for (const key in record) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) continue
+    const item = record[key]
+    const next =
+      key.endsWith('At') && typeof item === 'string' ? new Date(item) : withDates(item)
+    if (next !== item) {
+      if (!copy) copy = { ...record }
+      copy[key] = next
+    }
+  }
+  return (copy ?? value) as WithDates<T>
 }
 
 type StoreBackendRequest = <T>(

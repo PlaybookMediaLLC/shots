@@ -521,6 +521,76 @@ function slideScreens(state: ImageState, src: string | null, name: string | null
     ? { ...mockup, screen: { ...mockup.screen, src, name, isCustom: false } } : mockup)
 }
 
+const ownedBlobUrls = new Set<string>()
+
+function trackOwnedBlobUrl(url: string): string {
+  if (url.startsWith('blob:')) ownedBlobUrls.add(url)
+  return url
+}
+
+function collectStateBlobUrls(
+  state:
+    | Partial<
+        Pick<
+          ImageState,
+          | 'uploadedImageUrl'
+          | 'backgroundConfig'
+          | 'slides'
+          | 'imageOverlays'
+          | 'mockups'
+          | 'deviceLayoutSnapshot'
+          | 'motion'
+        >
+      >
+    | undefined,
+  into: Set<string>
+): void {
+  if (!state) return
+  if (state.uploadedImageUrl?.startsWith('blob:')) into.add(state.uploadedImageUrl)
+  if (state.backgroundConfig?.type === 'image' && state.backgroundConfig.value.startsWith('blob:')) {
+    into.add(state.backgroundConfig.value)
+  }
+  for (const slide of state.slides ?? []) {
+    if (slide.src.startsWith('blob:')) into.add(slide.src)
+  }
+  for (const overlay of state.imageOverlays ?? []) {
+    if (overlay.src.startsWith('blob:')) into.add(overlay.src)
+  }
+  for (const mockup of state.mockups ?? []) {
+    if (mockup.screen.src?.startsWith('blob:')) into.add(mockup.screen.src)
+  }
+  for (const mockup of state.deviceLayoutSnapshot ?? []) {
+    if (mockup.screen.src?.startsWith('blob:')) into.add(mockup.screen.src)
+  }
+  for (const clip of state.motion?.audio ?? []) {
+    if (clip.src.startsWith('blob:')) into.add(clip.src)
+  }
+}
+
+/** All blob URLs currently reachable from the live editor state or undo/redo history. */
+export function collectReachableBlobUrls(): Set<string> {
+  const reachable = new Set<string>()
+  collectStateBlobUrls(useImageStore.getState(), reachable)
+  const history = useImageStore.temporal.getState()
+  for (const entry of history.pastStates) collectStateBlobUrls(entry, reachable)
+  for (const entry of history.futureStates) collectStateBlobUrls(entry, reachable)
+  return reachable
+}
+
+/** Revoke store-created blob URLs no longer referenced by current state or undo/redo history. */
+function sweepUnreferencedBlobUrls(): void {
+  if (ownedBlobUrls.size === 0 || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') {
+    return
+  }
+  const reachable = collectReachableBlobUrls()
+  for (const url of ownedBlobUrls) {
+    if (!reachable.has(url)) {
+      ownedBlobUrls.delete(url)
+      URL.revokeObjectURL(url)
+    }
+  }
+}
+
 export const useImageStore = create<ImageState>()(
   temporal(
     (set, get) => ({
@@ -655,7 +725,7 @@ export const useImageStore = create<ImageState>()(
         // Track image upload
         trackImageUpload('file', file.size)
 
-        const imageUrl = URL.createObjectURL(file)
+        const imageUrl = trackOwnedBlobUrl(URL.createObjectURL(file))
         // Reset ALL effects to defaults when uploading a new image
         set({
           uploadedImageUrl: imageUrl,
@@ -729,6 +799,7 @@ export const useImageStore = create<ImageState>()(
           animationClips: [],
           showTimeline: false,
         })
+        sweepUnreferencedBlobUrls()
       },
 
       clearImage: () => {
@@ -736,6 +807,7 @@ export const useImageStore = create<ImageState>()(
         // frame chrome, slide timing, or selection state.
         resetPlayback()
         set({ ...useImageStore.getInitialState(), canvasDimensions: get().canvasDimensions })
+        sweepUnreferencedBlobUrls()
       },
 
       removeMainImage: () => {
@@ -749,6 +821,7 @@ export const useImageStore = create<ImageState>()(
           slides: [],
           uploadedImageUrl: null,
         })
+        sweepUnreferencedBlobUrls()
       },
 
       setGradient: (gradient: GradientKey) => {
@@ -766,6 +839,7 @@ export const useImageStore = create<ImageState>()(
           previewIndex: 0,
           previewStartedAt: null,
         })
+        sweepUnreferencedBlobUrls()
       },
       setBackgroundBorderRadius: (radius: number) => {
         set({ backgroundBorderRadius: radius })
@@ -1473,7 +1547,7 @@ export const useImageStore = create<ImageState>()(
 
         const newSlides = files.map((file) => ({
           id: `slide-${crypto.randomUUID()}`,
-          src: URL.createObjectURL(file),
+          src: trackOwnedBlobUrl(URL.createObjectURL(file)),
           name: file.name,
           duration: Number.isFinite(slideshow.defaultDuration) && slideshow.defaultDuration >= 0.5 && slideshow.defaultDuration <= 30 ? slideshow.defaultDuration : 3,
         }))
@@ -1532,6 +1606,7 @@ export const useImageStore = create<ImageState>()(
         })
         usePlaybackStore.getState().pause()
         usePlaybackStore.getState().seek(usePlaybackStore.getState().playhead)
+        sweepUnreferencedBlobUrls()
       },
 
       startPreview: () => {
@@ -2019,6 +2094,11 @@ useImageStore.subscribe((state, previous) => {
   if (state.selectedElementId && !state.elements.some((element) => element.id === state.selectedElementId)) {
     state.setSelectedElementId(null)
   }
+})
+
+// Sweep store-owned blob URLs whenever undo/redo history trims or clears evicted snapshots.
+useImageStore.temporal.subscribe(() => {
+  sweepUnreferencedBlobUrls()
 })
 
 /** The main image as the stage draws it. Every field derives from the image state. */

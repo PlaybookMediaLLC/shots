@@ -352,7 +352,7 @@ function updateTopCommenting(
   return Object.fromEntries(discussionArray.map((d) => [d.id, d.topDistance]));
 }
 
-const resolveOverlappingTop = (
+export const resolveOverlappingTop = (
   topMap: Record<string, number>,
   domMap: Record<string, HTMLDivElement | null>
 ) => {
@@ -360,40 +360,22 @@ const resolveOverlappingTop = (
     .map(([id, topDistance]) => ({ id, topDistance }))
     .sort((a, b) => a.topDistance - b.topDistance);
 
-  // Iterate through each discussion from top to bottom, checking for overlap with previous discussions
-  for (let i = 1; i < discussionArray.length; i++) {
-    const currentDiscussion = discussionArray[i];
-    const currentElement = domMap[currentDiscussion.id];
+  // Batch all DOM layout reads once before adjusting positions.
+  const heights = new Map<string, number>();
+  for (const { id } of discussionArray) {
+    const el = domMap[id];
+    if (el) heights.set(id, el.clientHeight);
+  }
 
-    if (!currentElement) continue;
+  let minNextTop = Number.NEGATIVE_INFINITY;
+  for (const currentDiscussion of discussionArray) {
+    const height = heights.get(currentDiscussion.id);
+    if (height === undefined) continue;
 
-    // Calculate the range of current discussion
-    const currentStart = currentDiscussion.topDistance;
-    const currentEnd = currentStart + currentElement.clientHeight;
-
-    // Check for overlap with all previous discussions
-    for (let j = 0; j < i; j++) {
-      const previousDiscussion = discussionArray[j];
-      const previousElement = domMap[previousDiscussion.id];
-
-      if (!previousElement) continue;
-
-      const previousStart = previousDiscussion.topDistance;
-      const previousEnd = previousStart + previousElement.clientHeight;
-
-      // Check for overlap: condition for two intervals overlapping
-      if (
-        (currentStart <= previousEnd && currentEnd >= previousStart) ||
-        (previousStart <= currentEnd && previousEnd >= currentStart)
-      ) {
-        // If overlapping, move current discussion below the previous one
-        currentDiscussion.topDistance = previousEnd + FLOATING_PANEL_GAP;
-        // Update current discussion range and check for overlaps again
-        i -= 1;
-
-        break;
-      }
+    if (currentDiscussion.topDistance < minNextTop) {
+      currentDiscussion.topDistance = minNextTop;
     }
+    minNextTop = currentDiscussion.topDistance + height + FLOATING_PANEL_GAP;
   }
 
   return Object.fromEntries(discussionArray.map((d) => [d.id, d.topDistance]));

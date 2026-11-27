@@ -50,6 +50,10 @@ export const assetDownloadQuerySchema = z.object({
   assetId: assetIdSchema,
 })
 
+export const assetDownloadsQuerySchema = z.object({
+  assetIds: z.array(assetIdSchema).max(100),
+})
+
 export const assetUploadSchema = z
   .object({
     bytes: z.number().int().positive().max(MEDIA_LIMITS.videoBytes),

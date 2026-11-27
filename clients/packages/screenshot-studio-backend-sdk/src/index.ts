@@ -3170,6 +3170,13 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ downloadUrl: string }>(`v1/assets/${encodeURIComponent(id)}/download-url`)
   }
 
+  async signAssetDownloads(assetIds: string[]) {
+    return this.request<{ urls: Record<string, string> }>('v1/assets/sign-downloads', {
+      body: { assetIds },
+      method: 'POST',
+    })
+  }
+
   /** Server-side asset read through the backend, where a browser URL is unreachable. */
   async readAsset(id: string) {
     return this.request<Uint8Array>(`v1/assets/${encodeURIComponent(id)}/bytes`, {
@@ -3577,6 +3584,7 @@ export class ScreenshotStudioBackendSDK {
       if (value !== undefined && value !== '') params.set(key, String(value))
     }
     return this.request<{
+      failedCount?: number
       items: BackendContentDraft[]
       nextCursor: string | null
       pinned: BackendContentDraft[]

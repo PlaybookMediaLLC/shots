@@ -662,6 +662,57 @@ func (c *Configuration) SignAssetDownload(ctx context.Context, actor Actor, asse
 	return c.assetDownloadURL(actor, row.ID)
 }
 
+const maxBatchSignDownloads = 100
+
+// SignAssetDownloads signs download URLs for up to 100 uploaded assets in this
+// workspace in a single authorization check and SQL query. Assets missing or
+// outside this workspace are omitted from the returned map.
+func (c *Configuration) SignAssetDownloads(ctx context.Context, actor Actor, assetIDs []string) (map[string]string, error) {
+	if err := c.authorizeAssetRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	if len(assetIDs) > maxBatchSignDownloads {
+		return nil, invalid("Sign at most 100 assets at a time.")
+	}
+	unique := make([]string, 0, len(assetIDs))
+	seen := make(map[string]struct{}, len(assetIDs))
+	for _, id := range assetIDs {
+		if _, err := uuid.Parse(id); err != nil {
+			return nil, invalid("Each asset ID must be a valid UUID.")
+		}
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			unique = append(unique, id)
+		}
+	}
+	urls := make(map[string]string, len(unique))
+	if len(unique) == 0 {
+		return urls, nil
+	}
+	if c.objects == nil {
+		return nil, ErrStorageUnavailable
+	}
+	rows, err := c.client.Asset.Query().
+		Where(
+			asset.IDIn(unique...),
+			asset.OrganizationID(actor.OrganizationID),
+			asset.StatusEQ(asset.StatusUPLOADED),
+		).
+		Select(asset.FieldID).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		signed, err := c.assetDownloadURL(actor, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		urls[row.ID] = signed
+	}
+	return urls, nil
+}
+
 // AssetStream represents a streamed or 304-revalidated private asset response.
 type AssetStream struct {
 	Body          io.ReadCloser

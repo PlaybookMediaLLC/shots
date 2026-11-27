@@ -12,7 +12,7 @@ import { XCircleIcon as XCircle } from '@phosphor-icons/react/dist/ssr/XCircle'
 import { WarningIcon as AlertTriangle } from '@phosphor-icons/react/dist/ssr/Warning'
 import { InfoIcon as Info } from '@phosphor-icons/react/dist/ssr/Info'
 import { motion } from 'motion/react'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { Pill, type PillTone } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
@@ -423,6 +423,17 @@ function ImageCheck({
   const [guide, setGuide] = useState<z.infer<typeof cropGuideSchema>>(G.none)
   const [fixing, setFixing] = useState(false)
   const [fixError, setFixError] = useState('')
+  const optimizedUrlRef = useRef<string | null>(null)
+  const optimizeAbortRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    return () => {
+      optimizeAbortRef.current?.abort()
+      if (optimizedUrlRef.current) {
+        URL.revokeObjectURL(optimizedUrlRef.current)
+        optimizedUrlRef.current = null
+      }
+    }
+  }, [])
   if (!url) return null
   const width = measured?.width ?? loaded?.[0]
   const height = measured?.height ?? loaded?.[1]
@@ -431,19 +442,32 @@ function ImageCheck({
   const optimized = `/api/link-preview/image?${new URLSearchParams({ url })}`
 
   async function tryOptimized() {
+    optimizeAbortRef.current?.abort()
+    const controller = new AbortController()
+    optimizeAbortRef.current = controller
     setFixing(true)
     setFixError('')
     try {
-      const response = await fetch(optimized)
+      const response = await fetch(optimized, { signal: controller.signal })
       if (!response.ok) {
         const body = await response.json().catch(() => null)
         throw new Error(body?.message ?? 'The image could not be converted.')
       }
-      onUse?.(URL.createObjectURL(await response.blob()))
+      const blob = await response.blob()
+      if (controller.signal.aborted) return
+      const nextUrl = URL.createObjectURL(blob)
+      const prevUrl = optimizedUrlRef.current
+      optimizedUrlRef.current = nextUrl
+      onUse?.(nextUrl)
+      if (prevUrl) URL.revokeObjectURL(prevUrl)
     } catch (caught) {
+      if (controller.signal.aborted) return
       setFixError(caught instanceof Error ? caught.message : 'The image could not be converted.')
     } finally {
-      setFixing(false)
+      if (optimizeAbortRef.current === controller) {
+        optimizeAbortRef.current = null
+        setFixing(false)
+      }
     }
   }
 

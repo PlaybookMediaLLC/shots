@@ -478,7 +478,7 @@ export function WriteComposer({
   const [primaryEditor, setPrimaryEditor] = React.useState<PlateEditor | null>(null)
   const [resync, setResync] = React.useState<DraftChannel | null>(null)
   const primary = document.primaryPlatform
-  const accounts = set?.accounts ?? []
+  const accounts = React.useMemo(() => set?.accounts ?? [], [set?.accounts])
   const enabled = document.channelConnectionIds
   const channels = tabChannels(accounts, enabled, primary)
   // A switched-off platform keeps its tab, so it can be read and switched back on.
@@ -518,19 +518,29 @@ export function WriteComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- channels is derived anew each render.
   }, [trpcClient, aiEnabled, active, initial.id, channels.join()])
   const versionOfTab = versionFor(document.versions, active)
-  const draftFields = {
-    article: document.article,
-    body: document.value as PlateBody,
-    engagement: server.engagement,
-    kind: server.kind,
-    platformVersions: document.versions,
-    target: document.target,
-  }
+  const draftFields = React.useMemo(
+    () => ({
+      article: document.article,
+      body: document.value as PlateBody,
+      engagement: server.engagement,
+      kind: server.kind,
+      platformVersions: document.versions,
+      target: document.target,
+    }),
+    [
+      document.article,
+      document.value,
+      server.engagement,
+      server.kind,
+      document.versions,
+      document.target,
+    ]
+  )
   // Tables and math post as images, rendered when scheduling (RFC 013);
   // until then each counts as a pending image, as it will publish.
-  const pendingBlocks: BlockImages = Array.from(
-    { length: renderableBlockCount(document.value) },
-    () => ''
+  const pendingBlocks: BlockImages = React.useMemo(
+    () => Array.from({ length: renderableBlockCount(document.value) }, () => ''),
+    [document.value]
   )
   const bodyArea = React.useRef<HTMLDivElement>(null)
   // Opening or closing a side panel changes the composer's width, so the sticky
@@ -586,31 +596,51 @@ export function WriteComposer({
     }
     return renderBlockImages(bodyArea.current, services.uploadFile)
   }
-  const items: PreviewItem[] = accounts
-    .filter((account) => enabled.includes(account.id))
-    .map((account) => ({
-      account,
-      publication: buildPublication(
-        draftFields,
-        {
-          channel: account.channel,
-          connectionId: account.id,
-          standing: {
-            tiktokCreator: account.tiktokCreator,
-            maxWeightedCharacters: account.xCaptionLimit,
-            articles: account.xArticles,
-            xQuotes: account.xQuotes,
-            xVideoMaxSeconds: account.xVideoMaxSeconds,
-            pollLimits: account.pollLimits,
-            mastodonQuotes: account.mastodonQuotes,
-          },
-        },
-        pendingBlocks
+  const deferredDraftFields = React.useDeferredValue(draftFields)
+  const deferredPendingBlocks = React.useDeferredValue(pendingBlocks)
+  // Bypass deferral while a publish/schedule dialog is open so review matches live state.
+  const effectiveDraftFields = dialog ? draftFields : deferredDraftFields
+  const effectivePendingBlocks = dialog ? pendingBlocks : deferredPendingBlocks
+  const buildPreviewItems = React.useCallback(
+    (fields: typeof draftFields, blocks: BlockImages): PreviewItem[] =>
+      accounts
+        .filter((account) => enabled.includes(account.id))
+        .map((account) => ({
+          account,
+          publication: buildPublication(
+            fields,
+            {
+              channel: account.channel,
+              connectionId: account.id,
+              standing: {
+                tiktokCreator: account.tiktokCreator,
+                maxWeightedCharacters: account.xCaptionLimit,
+                articles: account.xArticles,
+                xQuotes: account.xQuotes,
+                xVideoMaxSeconds: account.xVideoMaxSeconds,
+                pollLimits: account.pollLimits,
+                mastodonQuotes: account.mastodonQuotes,
+              },
+            },
+            blocks
+          ),
+        })),
+    [accounts, enabled]
+  )
+  const items: PreviewItem[] = React.useMemo(
+    () => buildPreviewItems(effectiveDraftFields, effectivePendingBlocks),
+    [buildPreviewItems, effectiveDraftFields, effectivePendingBlocks]
+  )
+  const activePublication = React.useMemo(
+    () =>
+      items.find((item) => item.account.channel === active)?.publication ??
+      buildPublication(
+        effectiveDraftFields,
+        { channel: active, connectionId: 'preview' },
+        effectivePendingBlocks
       ),
-    }))
-  const activePublication =
-    items.find((item) => item.account.channel === active)?.publication ??
-    buildPublication(draftFields, { channel: active, connectionId: 'preview' }, pendingBlocks)
+    [items, active, effectiveDraftFields, effectivePendingBlocks]
+  )
   const publishing = items.some((item) => item.account.channel === active)
   const approved = server.reviewStatus === 'approved' && server.approvedVersion === server.version
   const limitFor = (channel: DraftChannel) =>
@@ -920,7 +950,21 @@ export function WriteComposer({
   const startPublishing = (action: PublishAction) => {
     if (locked) return setPostAgain(true)
     // An archived draft has no checklist in its header: the review says to restore it.
-    if (blockers.length === 0 || server.status === 'archived') return setDialog(action)
+    const liveBlockers =
+      effectiveDraftFields === draftFields && effectivePendingBlocks === pendingBlocks
+        ? blockers
+        : scheduleBlockers({
+            approved,
+            canPublish: canPublish && server.status !== 'archived',
+            conflict: conflict !== null,
+            draft: server,
+            items: buildPreviewItems(draftFields, pendingBlocks).filter(
+              (item) => !live.has(item.account.id)
+            ),
+            requireApproval,
+            saveState,
+          })
+    if (liveBlockers.length === 0 || server.status === 'archived') return setDialog(action)
     setBlockedAction(action)
     fixList.current?.focus()
   }
@@ -1181,8 +1225,23 @@ export function WriteComposer({
   }, [active, editorInstance])
   const splitAtLimit = (number: number) => {
     const current = editor.current
-    const point = current && overflowStart(current.children, number, excess, active)
-    if (!current || !point) return
+    if (!current) return
+    let liveExcess = excess
+    if (effectiveDraftFields !== draftFields || effectivePendingBlocks !== pendingBlocks) {
+      const liveItems = buildPreviewItems(draftFields, pendingBlocks)
+      const livePub =
+        liveItems.find((item) => item.account.channel === active)?.publication ??
+        buildPublication(draftFields, { channel: active, connectionId: 'preview' }, pendingBlocks)
+      const liveLimit = livePub.serialized.limit
+      const livePostCount = postRanges((current.children ?? []) as Value).length
+      liveExcess = Object.fromEntries(
+        livePub.serialized.posts
+          .filter((post) => post.length > liveLimit)
+          .map((post) => [CAPABILITIES[active].thread ? post.group : livePostCount, post.length - liveLimit])
+      )
+    }
+    const point = overflowStart(current.children, number, liveExcess, active)
+    if (!point) return
     current.tf.select(point)
     splitPostAtCaret(current)
     current.tf.focus()

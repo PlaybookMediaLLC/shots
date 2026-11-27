@@ -249,6 +249,7 @@ type ConfigurationStore interface {
 	CompleteAssetUpload(context.Context, product.Actor, string, *string, ...string) (*product.AssetRecord, error)
 	SignAssetUploadParts(context.Context, product.Actor, string, []int) (*product.AssetUploadParts, error)
 	SignAssetDownload(context.Context, product.Actor, string) (string, error)
+	SignAssetDownloads(context.Context, product.Actor, []string) (map[string]string, error)
 	ReadAsset(context.Context, product.Actor, string) ([]byte, string, error)
 	ReadAssetDownload(context.Context, string, string, string) ([]byte, string, error)
 	StoreGeneratedAsset(context.Context, product.Actor, product.GeneratedAssetInput) (*product.GeneratedAssetRecord, error)

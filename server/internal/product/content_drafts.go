@@ -144,9 +144,10 @@ type ContentDraftRecord struct {
 // ContentDraftPage is one page of a workspace's drafts in the asked order.
 // Pinned drafts come first, in Pinned, on the first page only.
 type ContentDraftPage struct {
-	Items      []ContentDraftRecord `json:"items"`
-	NextCursor *string              `json:"nextCursor"`
-	Pinned     []ContentDraftRecord `json:"pinned"`
+	FailedCount int                  `json:"failedCount"`
+	Items       []ContentDraftRecord `json:"items"`
+	NextCursor  *string              `json:"nextCursor"`
+	Pinned      []ContentDraftRecord `json:"pinned"`
 }
 
 // ContentDraftListQuery filters a draft list. Status is empty for every
@@ -955,8 +956,8 @@ func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentD
 	}
 }
 
-// draftListFilters turns a list query into predicates.
-func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query ContentDraftListQuery) ([]predicate.ContentDraft, error) {
+// draftListFilters turns a list query into predicates plus the resolved social-set visibility predicate.
+func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query ContentDraftListQuery) ([]predicate.ContentDraft, predicate.ContentDraft, error) {
 	filters := []predicate.ContentDraft{contentdraft.OrganizationID(actor.OrganizationID)}
 	var sets predicate.ContentDraft
 	var err error
@@ -966,7 +967,7 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 		sets, err = c.draftVisibilityPredicate(ctx, actor)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	filters = append(filters, sets)
 	switch query.Status {
@@ -977,7 +978,7 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 	case "draft", "scheduled", "archived":
 		filters = append(filters, contentdraft.StatusEQ(contentdraft.Status(query.Status)))
 	default:
-		return nil, invalid("Filter by draft, scheduled, or archived.")
+		return nil, nil, invalid("Filter by draft, scheduled, or archived.")
 	}
 	switch query.View {
 	case "":
@@ -991,40 +992,40 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 	case "archived":
 		filters = append(filters, contentdraft.StatusEQ(contentdraft.StatusArchived))
 	default:
-		return nil, invalid("A view is drafts, posted, failed, or archived.")
+		return nil, nil, invalid("A view is drafts, posted, failed, or archived.")
 	}
 	if query.ConnectionID != "" && !contentDraftRefPattern.MatchString(query.ConnectionID) {
-		return nil, invalid("Filter by a valid account.")
+		return nil, nil, invalid("Filter by a valid account.")
 	}
 	if query.From != nil && query.To != nil && !query.To.After(*query.From) {
-		return nil, invalid("Choose an end date after the start date.")
+		return nil, nil, invalid("Choose an end date after the start date.")
 	}
 	if query.ConnectionID != "" || query.From != nil || query.To != nil {
 		filters = append(filters, draftPostsMatch(actor.OrganizationID, query))
 	}
 	if query.Kind != "" {
 		if _, ok := draftKindChannels[query.Kind]; !ok {
-			return nil, invalid("Filter by a draft kind.")
+			return nil, nil, invalid("Filter by a draft kind.")
 		}
 		filters = append(filters, contentdraft.KindEQ(contentdraft.Kind(query.Kind)))
 	}
 	if search := strings.TrimSpace(query.Search); search != "" {
 		if utf8.RuneCountInString(search) > 200 {
-			return nil, invalid("Search for at most 200 characters.")
+			return nil, nil, invalid("Search for at most 200 characters.")
 		}
 		filters = append(filters, contentdraft.Or(contentdraft.TitleContainsFold(search), contentdraft.PlainTextContainsFold(search),
 			contentdraft.ScratchpadContainsFold(search)))
 	}
 	if query.TagID != "" {
 		if !contentDraftRefPattern.MatchString(query.TagID) {
-			return nil, invalid("Filter by a valid tag.")
+			return nil, nil, invalid("Filter by a valid tag.")
 		}
 		tag := query.TagID
 		filters = append(filters, func(s *sql.Selector) {
 			s.Where(sqljson.ValueContains(s.C(contentdraft.FieldTagIds), tag))
 		})
 	}
-	return filters, nil
+	return filters, sets, nil
 }
 
 func (c *Configuration) ListContentDrafts(ctx context.Context, actor Actor, query ContentDraftListQuery) (*ContentDraftPage, error) {
@@ -1038,43 +1039,73 @@ func (c *Configuration) ListContentDrafts(ctx context.Context, actor Actor, quer
 	if !ok {
 		return nil, invalid("Sort by updated_desc, updated_asc, created_desc or created_asc.")
 	}
-	filters, err := c.draftListFilters(ctx, actor, query)
+	filters, setFilter, err := c.draftListFilters(ctx, actor, query)
 	if err != nil {
 		return nil, err
 	}
 	page := &ContentDraftPage{Items: []ContentDraftRecord{}, Pinned: []ContentDraftRecord{}}
-	var pinned []*ent.ContentDraft
-	if query.Cursor == "" {
-		pinned, err = c.client.ContentDraft.Query().Where(append(filters, contentdraft.PinnedAtNotNil())...).
-			Order(ent.Desc(contentdraft.FieldPinnedAt), ent.Desc(contentdraft.FieldID)).Limit(50).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	rows := c.client.ContentDraft.Query().Where(append(filters, contentdraft.PinnedAtIsNil())...)
+	var (
+		pinned      []*ent.ContentDraft
+		found       []*ent.ContentDraft
+		failedCount int
+	)
+	var cursorPred func(*sql.Selector)
 	if query.Cursor != "" {
 		at, id, err := decodeTimeCursor(query.Cursor)
 		if err != nil {
 			return nil, err
 		}
 		if order.desc {
-			rows.Where(func(s *sql.Selector) {
+			cursorPred = func(s *sql.Selector) {
 				s.Where(sql.Or(sql.LT(s.C(order.field), at), sql.And(sql.EQ(s.C(order.field), at), sql.LT(s.C(contentdraft.FieldID), id))))
-			})
+			}
 		} else {
-			rows.Where(func(s *sql.Selector) {
+			cursorPred = func(s *sql.Selector) {
 				s.Where(sql.Or(sql.GT(s.C(order.field), at), sql.And(sql.EQ(s.C(order.field), at), sql.GT(s.C(contentdraft.FieldID), id))))
-			})
+			}
 		}
 	}
 	direction := ent.Asc
 	if order.desc {
 		direction = ent.Desc
 	}
-	found, err := rows.Order(direction(order.field), direction(contentdraft.FieldID)).Limit(query.Limit + 1).All(ctx)
-	if err != nil {
+	// Make independent copies of the shared filters prefix before concurrent appends.
+	pageFilters := append(append([]predicate.ContentDraft(nil), filters...), contentdraft.PinnedAtIsNil())
+	tasks := []func(context.Context) error{
+		func(ctx context.Context) error {
+			rows := c.client.ContentDraft.Query().Where(pageFilters...)
+			if cursorPred != nil {
+				rows.Where(cursorPred)
+			}
+			var err error
+			found, err = rows.Order(direction(order.field), direction(contentdraft.FieldID)).Limit(query.Limit + 1).All(ctx)
+			return err
+		},
+	}
+	if query.Cursor == "" {
+		pinnedFilters := append(append([]predicate.ContentDraft(nil), filters...), contentdraft.PinnedAtNotNil())
+		tasks = append(tasks, func(ctx context.Context) error {
+			var err error
+			pinned, err = c.client.ContentDraft.Query().Where(pinnedFilters...).
+				Order(ent.Desc(contentdraft.FieldPinnedAt), ent.Desc(contentdraft.FieldID)).Limit(50).All(ctx)
+			return err
+		})
+		failedFilters := []predicate.ContentDraft{
+			contentdraft.OrganizationID(actor.OrganizationID),
+			setFilter,
+			contentdraft.StatusNEQ(contentdraft.StatusArchived),
+			draftNeedsAttention(),
+		}
+		tasks = append(tasks, func(ctx context.Context) error {
+			var err error
+			failedCount, err = c.client.ContentDraft.Query().Where(failedFilters...).Count(ctx)
+			return err
+		})
+	}
+	if err := runParallel(ctx, len(tasks), tasks...); err != nil {
 		return nil, err
 	}
+	page.FailedCount = failedCount
 	if len(found) > query.Limit {
 		found = found[:query.Limit]
 		last := found[len(found)-1]

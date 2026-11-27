@@ -235,18 +235,24 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
     if (!is3DPointerDown) return;
 
     const DRAG_THRESHOLD = 3;
+    let rafId: number | null = null;
+    let latestEvent: PointerEvent | null = null;
 
-    const handleMove = (e: PointerEvent) => {
+    const applyMove = () => {
+      rafId = null;
+      const e = latestEvent;
       const s = drag3DStartRef.current;
-      if (!s) return;
+      if (!e || !s) return;
 
       const dx = e.clientX - s.clientX;
       const dy = e.clientY - s.clientY;
 
       // Only start actual drag after threshold — clicks pass through
       if (!s.moved && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
-      s.moved = true;
-      setIs3DDragging(true);
+      if (!s.moved) {
+        s.moved = true;
+        setIs3DDragging(true);
+      }
 
       const sensitivity = 0.15;
       const newTX = Math.max(-30, Math.min(30, s.tX + dx * sensitivity));
@@ -258,7 +264,16 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
       });
     };
 
+    const handleMove = (e: PointerEvent) => {
+      latestEvent = e;
+      if (rafId === null) rafId = requestAnimationFrame(applyMove);
+    };
+
     const handleUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        applyMove();
+      }
       setIs3DDragging(false);
       setIs3DPointerDown(false);
       drag3DStartRef.current = null;
@@ -266,10 +281,13 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
 
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
     };
   }, [is3DPointerDown]);
 

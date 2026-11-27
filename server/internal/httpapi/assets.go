@@ -131,6 +131,32 @@ func (s *Server) signAssetDownload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"downloadUrl": url})
 }
 
+func (s *Server) signAssetDownloads(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		AssetIDs []string `json:"assetIds"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(input.AssetIDs) > 100 {
+		writeError(w, http.StatusBadRequest, "too many asset IDs")
+		return
+	}
+	for _, id := range input.AssetIDs {
+		if _, err := uuid.Parse(id); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid asset ID")
+			return
+		}
+	}
+	urls, err := s.configuration.SignAssetDownloads(r.Context(), workspaceActor(r), input.AssetIDs)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"urls": urls})
+}
+
 type assetStreamStore interface {
 	OpenAssetStream(ctx context.Context, actor product.Actor, assetID, rangeHeader, ifNoneMatch string) (*product.AssetStream, error)
 	OpenAssetDownloadStream(ctx context.Context, assetID, token, requestID, rangeHeader, ifNoneMatch string) (*product.AssetStream, error)

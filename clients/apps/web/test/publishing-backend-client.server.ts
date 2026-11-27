@@ -172,3 +172,28 @@ test('the web client carries the active trace to the backend', async (t) => {
   })
   assert.deepEqual(await context.with(active, () => listBackendScheduledPosts(access, 10)), [])
 })
+
+test('withDates converts *At ISO strings without mutating input or copying unchanged subtrees', async () => {
+  const { withDates } = await import('../lib/backend/sdk')
+  const staticPayload = { count: 3, nested: { label: 'unchanged' }, tags: ['a', 'b'] }
+  assert.equal(withDates(staticPayload), staticPayload)
+
+  const existingDate = new Date('2026-10-15T00:00:00.000Z')
+  assert.equal(withDates(existingDate), existingDate)
+
+  const unchangedChild = { id: 'child-1', title: 'Keep ref' }
+  const input = {
+    child: unchangedChild,
+    createdAt: '2026-10-15T12:30:00.000Z',
+    items: [unchangedChild, { updatedAt: '2026-10-16T00:00:00.000Z' }],
+  }
+  const result = withDates(input)
+  assert.notEqual(result, input)
+  assert.equal(typeof input.createdAt, 'string', 'original input must not be mutated')
+  assert.ok(result.createdAt instanceof Date)
+  assert.equal(result.createdAt.toISOString(), '2026-10-15T12:30:00.000Z')
+  assert.equal(result.child, unchangedChild, 'unchanged sibling subtree keeps reference identity')
+  assert.equal(result.items[0], unchangedChild, 'unchanged array item keeps reference identity')
+  const secondItem = result.items[1]
+  assert.ok('updatedAt' in secondItem && secondItem.updatedAt instanceof Date)
+})

@@ -185,7 +185,12 @@ export function HTMLMainImageLayer({
     const width = framedW * screenshot.scale * previewScale;
     const height = framedH * screenshot.scale * previewScale;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    let rafId: number | null = null;
+    let latestEvent: PointerEvent | null = null;
+    const applyMove = () => {
+      rafId = null;
+      const e = latestEvent;
+      if (!e) return;
       const offsetX = e.clientX - dragStart.x;
       const offsetY = e.clientY - dragStart.y;
       const { dx, dy } = lines
@@ -196,8 +201,16 @@ export function HTMLMainImageLayer({
         : { dx: 0, dy: 0 };
       setScreenshot({ offsetX: (offsetX + dx) / previewScale, offsetY: (offsetY + dy) / previewScale });
     };
+    const handleMouseMove = (e: PointerEvent) => {
+      latestEvent = e;
+      if (rafId === null) rafId = requestAnimationFrame(applyMove);
+    };
 
     const handleMouseUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        applyMove();
+      }
       endSnapDrag();
       setIsDragging(false);
       onDragStateChange?.(false);
@@ -205,10 +218,13 @@ export function HTMLMainImageLayer({
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
     };
   }, [isDragging, dragStart, setScreenshot, onDragStateChange, canvasW, canvasH, framedW, framedH, screenshot.scale]);
 
@@ -216,13 +232,19 @@ export function HTMLMainImageLayer({
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: PointerEvent) => {
+    const scale = canvasScale(containerRef.current);
+    let rafId: number | null = null;
+    let latestEvent: PointerEvent | null = null;
+
+    const applyResize = () => {
+      rafId = null;
+      const e = latestEvent;
       const start = resizeStartRef.current;
-      if (!start) return;
+      if (!e || !start) return;
 
       // Calculate diagonal movement based on handle position
-      const dx = (e.clientX - start.mouseX) / canvasScale(containerRef.current);
-      const dy = (e.clientY - start.mouseY) / canvasScale(containerRef.current);
+      const dx = (e.clientX - start.mouseX) / scale;
+      const dy = (e.clientY - start.mouseY) / scale;
 
       // Determine direction multiplier based on handle corner
       let dirX = 1, dirY = 1;
@@ -240,17 +262,29 @@ export function HTMLMainImageLayer({
       useImageStore.getState().setImageScale(newScale);
     };
 
+    const handleMouseMove = (e: PointerEvent) => {
+      latestEvent = e;
+      if (rafId === null) rafId = requestAnimationFrame(applyResize);
+    };
+
     const handleMouseUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        applyResize();
+      }
       setIsResizing(false);
       resizeStartRef.current = null;
     };
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
     };
   }, [isResizing]);
 
@@ -279,9 +313,14 @@ export function HTMLMainImageLayer({
   useEffect(() => {
     if (!isRotating) return;
 
-    const handleMouseMove = (e: PointerEvent) => {
+    let rafId: number | null = null;
+    let latestEvent: PointerEvent | null = null;
+
+    const applyRotate = () => {
+      rafId = null;
+      const e = latestEvent;
       const start = rotateStartRef.current;
-      if (!start) return;
+      if (!e || !start) return;
 
       const currentAngle = Math.atan2(e.clientY - start.centerY, e.clientX - start.centerX) * (180 / Math.PI);
       const delta = currentAngle - start.startAngle;
@@ -289,17 +328,29 @@ export function HTMLMainImageLayer({
       setScreenshot({ rotation: newRotation });
     };
 
+    const handleMouseMove = (e: PointerEvent) => {
+      latestEvent = e;
+      if (rafId === null) rafId = requestAnimationFrame(applyRotate);
+    };
+
     const handleMouseUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        applyRotate();
+      }
       setIsRotating(false);
       rotateStartRef.current = null;
     };
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
+    window.addEventListener('pointercancel', handleMouseUp);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('pointerup', handleMouseUp);
+      window.removeEventListener('pointercancel', handleMouseUp);
     };
   }, [isRotating, setScreenshot]);
 
