@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.56.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.56.0...v2.56.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **editor-ai:** guard stale suggestions, add cost limits, and fix reviews ([#675](https://github.com/PlaybookMediaLLC/shots/issues/675)) ([6171d02](https://github.com/PlaybookMediaLLC/shots/commit/6171d0295f5ddc047e861f1a3e28e1bdb7e5a154))
+
 ## [2.56.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.55.0...v2.56.0) (2026-11-27)
 
 
