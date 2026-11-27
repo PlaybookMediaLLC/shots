@@ -13,6 +13,7 @@ export {
   EditorToolNameSchema,
   type EditorAICommentEventDetail,
   type EditorAIQualityEventDetail,
+  type EditorAIRange,
   type EditorProposal,
   type EditorProposalAction,
   type EditorToolName,

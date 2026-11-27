@@ -112,6 +112,13 @@ export const EDITOR_COPILOT_RATE_LIMIT: RateLimitPolicy = {
   windowMs: 60_000,
 }
 
+/** Per-member inline suggestion budget so one writer cannot exhaust the workspace cap. */
+export const EDITOR_COPILOT_USER_RATE_LIMIT: RateLimitPolicy = {
+  maxRequests: 30,
+  name: 'editor-copilot-user',
+  windowMs: 60_000,
+}
+
 /**
  * Link previews fetch an arbitrary public page plus its robots.txt, sitemap,
  * favicon, and images, so each workspace gets a budget that covers a batch

@@ -163,9 +163,25 @@ test('the voice block carries every field of the merged context', () => {
 
 test('the post editor sends its AI requests for the draft and platform being edited', () => {
   const draftId = 'clf0f1a2c3d4e5f6'
-  const services = platformEditorServices({} as never, { channel: 'linkedin', draftId })
+  const services = platformEditorServices({} as never, {
+    channel: 'linkedin',
+    comments: true,
+    draftId,
+  })
   const query = `channel=linkedin&draftId=${draftId}`
   assert.equal(services.ai?.chat?.api, `/api/ai/document?${query}`)
   assert.equal(services.ai?.copilot?.api, `/api/ai/document/copilot?${query}`)
+  assert.equal(services.ai?.comments, true)
   assert.equal(platformEditorServices({} as never).ai, undefined)
+
+  // A platform version tab omits review comments and can disable inline suggestions.
+  const versionTab = platformEditorServices({} as never, {
+    channel: 'linkedin',
+    comments: false,
+    draftId,
+    inlineSuggestions: false,
+  })
+  assert.equal(versionTab.ai?.chat?.api, `/api/ai/document?${query}`)
+  assert.equal(versionTab.ai?.copilot, undefined)
+  assert.equal(versionTab.ai?.comments, false)
 })
