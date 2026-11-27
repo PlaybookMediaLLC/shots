@@ -105,7 +105,11 @@ export function RevisePanel({
           revisionId: proposed.id,
         })
         toast.success('Revision applied', {
-          description: result.rendered ? 'The design was rendered again.' : undefined,
+          description: result.renderingInBackground
+            ? 'Re-rendering updated designs in the background.'
+            : result.rendered
+              ? 'The design was rendered again.'
+              : undefined,
         })
       } else {
         await trpcClient.launch.revision.discard.mutate({ revisionId: proposed.id })

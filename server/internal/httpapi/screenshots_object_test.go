@@ -57,4 +57,23 @@ func TestScreenshotCacheObjectRequiresServiceAuthAndPreservesBytes(t *testing.T)
 	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Base64 != base64.StdEncoding.EncodeToString(image) {
 		t.Fatalf("download returned %d: %s", response.Code, response.Body.String())
 	}
+	pngReq := httptest.NewRequest(http.MethodGet, path, nil)
+	pngReq.Header.Set("Authorization", "Bearer secret")
+	pngReq.Header.Set("Accept", "image/png")
+	pngRes := httptest.NewRecorder()
+	handler.ServeHTTP(pngRes, pngReq)
+	if pngRes.Code != http.StatusOK || pngRes.Header().Get("Content-Type") != "image/png" || pngRes.Header().Get("Content-Length") != "8" || !bytes.Equal(pngRes.Body.Bytes(), image) {
+		t.Fatalf("raw png download returned %d type=%q len=%q body=%v", pngRes.Code, pngRes.Header().Get("Content-Type"), pngRes.Header().Get("Content-Length"), pngRes.Body.Bytes())
+	}
+
+	jpegBytes := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10}
+	config.body = jpegBytes
+	jpgReq := httptest.NewRequest(http.MethodGet, path, nil)
+	jpgReq.Header.Set("Authorization", "Bearer secret")
+	jpgReq.Header.Set("Accept", "image/png")
+	jpgRes := httptest.NewRecorder()
+	handler.ServeHTTP(jpgRes, jpgReq)
+	if jpgRes.Code != http.StatusOK || jpgRes.Header().Get("Content-Type") != "image/jpeg" || jpgRes.Header().Get("Content-Length") != "6" || !bytes.Equal(jpgRes.Body.Bytes(), jpegBytes) {
+		t.Fatalf("raw jpeg download returned %d type=%q len=%q body=%v", jpgRes.Code, jpgRes.Header().Get("Content-Type"), jpgRes.Header().Get("Content-Length"), jpgRes.Body.Bytes())
+	}
 }

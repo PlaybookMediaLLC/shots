@@ -3,6 +3,7 @@ import { defineContract } from '@/lib/api/contract'
 import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
 import { onlyInlineFiles } from '@/lib/assistant/attachments'
 import { INTERNAL_HREF_MAX, pageContextSchema } from '@/lib/assistant/page-context'
+import { measureMessageChars } from '@/lib/assistant/snapshots'
 import { draftChannelSchema } from '@/lib/write/document'
 
 /** Roles the browser may send. It may not inject system or operator messages. */
@@ -13,6 +14,9 @@ export const editorResponseRoleSchema = z.enum(['assistant', 'tool'])
 
 /** Most messages one workspace assistant request may carry. */
 export const MAX_ASSISTANT_MESSAGES = 80
+
+/** Most total text characters one workspace assistant request may carry (excluding inline media). */
+export const MAX_ASSISTANT_MESSAGES_CHARS = 400_000
 
 /** Most client-side surface tool names one assistant turn may declare. */
 export const MAX_ASSISTANT_CLIENT_TOOLS = 32
@@ -38,7 +42,15 @@ export const workspaceAssistantRequestSchema = z.object({
     .array(z.looseObject({ role: editorMessageRoleSchema }))
     .min(1)
     .max(MAX_ASSISTANT_MESSAGES)
-    .refine(onlyInlineFiles, 'Attach images inline: JPEG, PNG, or WebP.'),
+    .refine(onlyInlineFiles, 'Attach images inline: JPEG, PNG, or WebP.')
+    .refine(
+      (messages) =>
+        measureMessageChars(messages, {
+          allowInlineFileData: true,
+          limit: MAX_ASSISTANT_MESSAGES_CHARS,
+        }) <= MAX_ASSISTANT_MESSAGES_CHARS,
+      'Conversation history is too large. Start a new thread.'
+    ),
   page: pageContextSchema,
   selection: z.string().max(200).nullable().default(null),
 })
@@ -108,6 +120,9 @@ export const workspaceAssistantContract = defineContract({
 /** Most messages one document-editor AI request may carry. */
 export const MAX_DOCUMENT_MESSAGES = 40
 
+/** Most total text characters one document-editor AI request's messages may carry. */
+export const MAX_DOCUMENT_MESSAGES_CHARS = 200_000
+
 /** Roles the document editor may send; it may not inject system messages. */
 export const documentMessageRoleSchema = z.enum(['user', 'assistant'])
 
@@ -130,7 +145,15 @@ export const documentChatRequestSchema = z.looseObject({
       })
     )
     .min(1)
-    .max(MAX_DOCUMENT_MESSAGES),
+    .max(MAX_DOCUMENT_MESSAGES)
+    .refine(
+      (messages) =>
+        measureMessageChars(messages, {
+          allowInlineFileData: false,
+          limit: MAX_DOCUMENT_MESSAGES_CHARS,
+        }) <= MAX_DOCUMENT_MESSAGES_CHARS,
+      'Conversation history is too large.'
+    ),
   system: z.string().max(120_000).optional(),
 })
 

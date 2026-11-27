@@ -51,10 +51,10 @@ export function hashUrl(url: string): string {
   return createHash('sha256').update(normalizeUrl(url)).digest('hex')
 }
 
-export async function getCachedScreenshot(
+export async function getCachedScreenshotBytes(
   url: string,
   maxAgeMs: number = CACHE_MAX_AGE_MS
-): Promise<string | null> {
+): Promise<Buffer | null> {
   try {
     const hash = hashUrl(url)
     const cached = await orNull(serviceBackend().getScreenshotCache(hash))
@@ -67,11 +67,20 @@ export async function getCachedScreenshot(
       return null
     }
 
-    return (await orNull(serviceBackend().getScreenshotCacheObject(hash)))?.base64 ?? null
+    const bytes = await orNull(serviceBackend().getScreenshotCacheImage(hash))
+    return bytes ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null
   } catch (error) {
     console.error('Error reading cached screenshot:', error)
     return null
   }
+}
+
+export async function getCachedScreenshot(
+  url: string,
+  maxAgeMs: number = CACHE_MAX_AGE_MS
+): Promise<string | null> {
+  const bytes = await getCachedScreenshotBytes(url, maxAgeMs)
+  return bytes ? bytes.toString('base64') : null
 }
 
 export async function cacheScreenshot(url: string, screenshotBase64: string): Promise<void> {

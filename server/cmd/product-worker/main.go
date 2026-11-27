@@ -140,14 +140,18 @@ func main() {
 		}
 	}
 
+	// Share one OpenRouter HTTP client across onboarding, release automation,
+	// and maintenance sweeps so connection pools are reused.
+	aiModel := platformai.FromEnvironment()
+
 	// The onboarding agent's background read (docs/rfcs/032) on its own queue.
 	// Onboarding spends no AI credits, so its store needs no quota meter.
 	onboardingStore := product.NewConfiguration(db.Client)
 	fetcher := onboarding.NewFetcher()
 	onboardingActivities := &temporalonboarding.Activities{Fetcher: fetcher, Store: onboardingStore,
 		Enricher: &enrichment.Enricher{Providers: enrichment.FromEnvironment(fetcher), Store: onboardingStore}}
-	if model := platformai.FromEnvironment(); model != nil {
-		onboardingActivities.Model = model
+	if aiModel != nil {
+		onboardingActivities.Model = aiModel
 	}
 	var onboardingWorker worker.Worker
 	if !slices.Contains(cfg.ExcludedQueues, temporalonboarding.TaskQueue) {
@@ -202,8 +206,8 @@ func main() {
 	}
 	// Paid workflow copy needs a model and the credit meter that bills it;
 	// without both this worker never advertises the ai capability.
-	if model := platformai.FromEnvironment(); model != nil {
-		automationStore.WithAutomationModel(model)
+	if aiModel != nil {
+		automationStore.WithAutomationModel(aiModel)
 	}
 	if renderer := product.AutomationRendererFromEnvironment(); renderer != nil {
 		// One signed web client renders creatives and lays out canvases.
@@ -328,7 +332,11 @@ func main() {
 		if renderer := product.AutomationRendererFromEnvironment(); renderer != nil {
 			events.WithAutomationRenderer(renderer)
 		}
-		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
+		automationDispatcher := &temporalreleaseautomation.Client{Temporal: temporalClient}
+		events.WithAutomationDispatcher(automationDispatcher)
+		if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
+			events.WithKitDispatcher(automationDispatcher)
+		}
 		if deploymentCaptureEnabled {
 			events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
 		}
@@ -336,8 +344,8 @@ func main() {
 			events.WithGitHubApp(github)
 		}
 		// The voice-commands sweep retries parses that waited on the model.
-		if model := platformai.FromEnvironment(); model != nil {
-			events.WithAutomationModel(model)
+		if aiModel != nil {
+			events.WithAutomationModel(aiModel)
 		}
 		activityService := notifications.New(db.SQL, db.Client)
 		activityService.DispatchWorkers = 4

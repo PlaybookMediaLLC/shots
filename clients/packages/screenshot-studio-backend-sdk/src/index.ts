@@ -5150,6 +5150,19 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Streams raw image bytes from the screenshot cache, falling back to legacy JSON base64 during rolling deploys. */
+  async getScreenshotCacheImage(urlHash: string): Promise<Uint8Array> {
+    const response = await this.request<Response>(
+      `v1/internal/screenshot-cache/${encodeURIComponent(urlHash)}/object`,
+      { headers: { accept: 'image/png' }, responseType: 'response' }
+    )
+    if (response.headers.get('content-type')?.includes('application/json')) {
+      const payload = (await response.json()) as { base64?: string }
+      return Buffer.from(payload.base64 ?? '', 'base64')
+    }
+    return new Uint8Array(await response.arrayBuffer())
+  }
+
   async putScreenshotCacheObject(urlHash: string, body: Uint8Array) {
     return this.request<{ stored: true }>(
       `v1/internal/screenshot-cache/${encodeURIComponent(urlHash)}/object`,
@@ -6087,6 +6100,15 @@ export class ScreenshotStudioBackendSDK {
       conversation: BackendConversation
       messages: BackendConversationMessage[]
     }>(`v1/conversations/${encodeURIComponent(conversationId)}`)
+  }
+
+  /** A conversation, its 200 newest messages, and the newest 10 traced runs with steps. */
+  async getConversationView(conversationId: string) {
+    return this.request<{
+      conversation: BackendConversation
+      messages: BackendConversationMessage[]
+      runs: Array<{ run: BackendAgentRun; steps: BackendLaunchRunStep[] }>
+    }>(`v1/conversations/${encodeURIComponent(conversationId)}/view`)
   }
 
   /** Answers 409 for an archived conversation. */

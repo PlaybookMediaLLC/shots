@@ -153,61 +153,67 @@ export async function renderWorkflowCreatives(request: WorkflowRenderRequest) {
   const lazy: { renderer?: Promise<DesignRenderer> } = {}
   const getRenderer = () => (lazy.renderer ??= createDesignRenderer())
   try {
-    const renders: z.infer<typeof workflowRenderSchema>[] = []
-    for (const template of templates) {
-      const name = `Workflow ${request.nodeId} · ${template.id}${request.part ? ` · ${request.part + 1}` : ''}`
-      const reused = existing.find((item) => item.name === name && item.templateId === template.id)
-      let design = reused ? await getDesign(tenant, reused.id) : null
-      if (!design) {
-        let document = template.build({
-          headline: request.headline,
-          screenshot: `asset:${request.captureAssetId}`,
-          subheadline: request.subheadline,
-        })
-        if (kit) document = patchDesignDocument(document, brandDesignChanges(kit, document.texts))
-        // The brand logo, small in the top left corner, above everything else.
-        if (kit?.logoAssetId)
-          document = patchDesignDocument(document, {
-            overlays: [
-              ...document.overlays,
-              {
-                id: BRAND_LOGO_ID,
-                position: { x: 0.08, y: 0.09 },
-                size: 0.09,
-                src: `asset:${kit.logoAssetId}`,
-              },
-            ],
+    const settled = await Promise.allSettled(
+      templates.map(async (template) => {
+        const name = `Workflow ${request.nodeId} · ${template.id}${request.part ? ` · ${request.part + 1}` : ''}`
+        const reused = existing.find((item) => item.name === name && item.templateId === template.id)
+        let design = reused ? await getDesign(tenant, reused.id) : null
+        if (!design) {
+          let document = template.build({
+            headline: request.headline,
+            screenshot: `asset:${request.captureAssetId}`,
+            subheadline: request.subheadline,
           })
-        // Spotlight the changed marker region in transformed canvas coordinates.
-        if (request.focus) {
-          const focusAnnotation = buildFocusAnnotation(
-            document,
-            request.focus,
-            captureAspect,
-            kit?.accent ?? '#3b82f6'
-          )
-          if (focusAnnotation) {
+          if (kit) document = patchDesignDocument(document, brandDesignChanges(kit, document.texts))
+          // The brand logo, small in the top left corner, above everything else.
+          if (kit?.logoAssetId)
             document = patchDesignDocument(document, {
-              annotations: [...document.annotations, focusAnnotation],
+              overlays: [
+                ...document.overlays,
+                {
+                  id: BRAND_LOGO_ID,
+                  position: { x: 0.08, y: 0.09 },
+                  size: 0.09,
+                  src: `asset:${kit.logoAssetId}`,
+                },
+              ],
             })
+          // Spotlight the changed marker region in transformed canvas coordinates.
+          if (request.focus) {
+            const focusAnnotation = buildFocusAnnotation(
+              document,
+              request.focus,
+              captureAspect,
+              kit?.accent ?? '#3b82f6'
+            )
+            if (focusAnnotation) {
+              document = patchDesignDocument(document, {
+                annotations: [...document.annotations, focusAnnotation],
+              })
+            }
           }
+          design = await createDesign(tenant, {
+            campaignId: request.campaignId,
+            document,
+            name,
+            templateId: template.id,
+          })
         }
-        design = await createDesign(tenant, {
-          campaignId: request.campaignId,
-          document,
-          name,
-          templateId: template.id,
+        const rendered = await renderDesignForTenant(tenant, getRenderer, design)
+        await backendSDK(tenant).linkCampaignAsset(request.campaignId, rendered.asset.id, {
+          caption: `${request.headline} · ${template.name}`,
+          kind: 'design-render',
         })
-      }
-      const rendered = await renderDesignForTenant(tenant, getRenderer, design)
-      await backendSDK(tenant).linkCampaignAsset(request.campaignId, rendered.asset.id, {
-        caption: `${request.headline} · ${template.name}`,
-        kind: 'design-render',
+        return { assetId: rendered.asset.id, designId: design.id, templateId: template.id }
       })
-      renders.push({ assetId: rendered.asset.id, designId: design.id, templateId: template.id })
+    )
+    const renders: z.infer<typeof workflowRenderSchema>[] = []
+    for (const outcome of settled) {
+      if (outcome.status === 'rejected') throw outcome.reason
+      renders.push(outcome.value)
     }
     return { renders }
   } finally {
-    if (lazy.renderer) await (await lazy.renderer).close().catch(() => undefined)
+    await lazy.renderer?.then((renderer) => renderer.close()).catch(() => undefined)
   }
 }

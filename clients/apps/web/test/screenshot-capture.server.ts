@@ -323,3 +323,46 @@ test('buildFocusAnnotation transforms viewport boxes into screenshot canvas geom
   assert.equal(isCaptureAssetKey('org/o1/capture/a1.png'), true)
   assert.equal(isCaptureAssetKey('org/o1/derived/a1.png'), false)
 })
+
+test('getCachedScreenshotBytes streams raw PNG when backend returns image/png and falls back to JSON base64', async (t) => {
+  const { getCachedScreenshotBytes } = await import('../lib/screenshot-cache')
+  process.env.PUBLISHING_API_URL = 'http://backend.test'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'private-test-token'
+  t.after(() => {
+    delete process.env.PUBLISHING_API_URL
+    delete process.env.PUBLISHING_SERVICE_TOKEN
+  })
+
+  const pngBytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])
+  let acceptHeader = ''
+  let mode: 'raw' | 'json' = 'raw'
+  t.mock.method(globalThis, 'fetch', async (url: string | URL, init?: RequestInit) => {
+    const pathname = new URL(String(url)).pathname
+    if (pathname.endsWith('/object')) {
+      acceptHeader = new Headers(init?.headers).get('accept') ?? ''
+      if (mode === 'raw') {
+        return new Response(new Uint8Array(pngBytes), {
+          headers: { 'content-type': 'image/png' },
+          status: 200,
+        })
+      }
+      return Response.json({ base64: pngBytes.toString('base64') })
+    }
+    return Response.json({
+      cloudinaryPublicId: 'screenshots/test.png',
+      cloudinaryUrl: 'screenshots/test.png',
+      createdAt: new Date().toISOString(),
+      url: 'https://example.com',
+    })
+  })
+
+  const rawResult = await getCachedScreenshotBytes('https://example.com:desktop:light')
+  assert.equal(acceptHeader, 'image/png')
+  assert.ok(rawResult)
+  assert.deepEqual(rawResult, pngBytes)
+
+  mode = 'json'
+  const jsonResult = await getCachedScreenshotBytes('https://example.com:desktop:light')
+  assert.ok(jsonResult)
+  assert.deepEqual(jsonResult, pngBytes)
+})

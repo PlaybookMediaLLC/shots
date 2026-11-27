@@ -91,6 +91,7 @@ type Configuration struct {
 	captureRunner     CaptureRunner
 	captureKeys       *sessionstate.Keys
 	captureDispatcher CaptureDispatcher
+	kitDispatcher     KitDispatcher
 	captureStateAge   time.Duration
 	// emailAuth enables unattended email sign-in (RFC 007A); nil keeps it off.
 	emailAuth *emailauth.Settings

@@ -2,7 +2,7 @@ import 'server-only'
 
 import { type ModelMessage, stepCountIs, streamText } from 'ai'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
-import { withAiCredits } from '@/lib/ai/metering'
+import { scheduleAfterResponse, withAiCredits } from '@/lib/ai/metering'
 import { models } from '@/lib/ai/models'
 import {
   EDITOR_COPILOT_INSTRUCTIONS,
@@ -21,7 +21,7 @@ import {
 import { ASSISTANT_POSTS_MAX, type AssistantProgress } from '@/lib/api/contracts/ai'
 import { ASSISTANT_AI_RATE_LIMIT } from '@/lib/api/rate-limit-policy'
 import { describePage, type PageContext } from '@/lib/assistant/page-context'
-import { trimSnapshots } from '@/lib/assistant/snapshots'
+import { trimMessagesToBudget, trimSnapshots } from '@/lib/assistant/snapshots'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK } from '@/lib/backend/sdk'
@@ -107,8 +107,6 @@ export async function runWorkspaceAssistantTurn(
   }
 ) {
   if (!isCampaignStudioConfigured()) throw new AssistantRefusal('AI is not configured.', 503)
-  if (!(await isAiEnabled(access)))
-    throw new AssistantRefusal('AI is turned off for this workspace.', 403)
 
   const lastRole = messages.at(-1)?.role
   if (lastRole !== 'user' && lastRole !== 'tool') {
@@ -121,6 +119,8 @@ export async function runWorkspaceAssistantTurn(
     .slice(lastUser)
     .filter((message) => message.role === 'assistant').length
   if (stepsThisTurn >= MAX_STEPS_PER_TURN) {
+    if (!(await isAiEnabled(access)))
+      throw new AssistantRefusal('AI is turned off for this workspace.', 403)
     return {
       done: true,
       links: [],
@@ -132,8 +132,14 @@ export async function runWorkspaceAssistantTurn(
     }
   }
 
-  // Every round trip counts: the caller owns the history, so its shape proves nothing.
-  const limit = await checkRateLimit(`assistant-ai:${access.organizationId}`, ASSISTANT_AI_RATE_LIMIT)
+  // Every round trip counts: check workspace enablement and rate limit in parallel.
+  const [enabled, limit] = await Promise.all([
+    isAiEnabled(access),
+    checkRateLimit(`assistant-ai:${access.organizationId}`, ASSISTANT_AI_RATE_LIMIT),
+  ])
+  if (!enabled) {
+    throw new AssistantRefusal('AI is turned off for this workspace.', 403)
+  }
   if (!limit.allowed) {
     throw new AssistantRefusal('Too many AI requests. Wait a minute and try again.', 429)
   }
@@ -152,32 +158,35 @@ export async function runWorkspaceAssistantTurn(
     ? { ...workspaceTools, ...createEditorCopilotTools(activeClientTools) }
     : workspaceTools
 
-  // Posts and on-surface text are both public copy, so every turn carries the voice.
-  const [voice, product] = await Promise.all([
+  // Start voice + product context immediately so they overlap with the credit balance check.
+  const contextPromise = Promise.all([
     turnVoice(access, page).catch(() => null),
     productContext(access),
   ])
-  const systemParts: string[] = [WORKSPACE_ASSISTANT_INSTRUCTIONS]
-  if (hasSurfaceTools) {
-    if (page.surface === 'store-screenshots') {
-      systemParts.push(STORE_COPILOT_INSTRUCTIONS)
-    } else if (page.surface !== 'screenshot-editor' && page.surface !== 'canvas') {
-      systemParts.push(SURFACE_COPILOT_INSTRUCTIONS)
-    } else {
-      systemParts.push(EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(activeSelection))
-    }
-  }
-  const voiceBlock = voiceInstructions(voice)
-  if (voiceBlock) systemParts.push(voiceBlock)
-  if (product) systemParts.push(product)
-  systemParts.push(describePage(page))
+  contextPromise.catch(() => undefined)
 
   try {
     return await withAiCredits(access, async () => {
+      const [voice, product] = await contextPromise
+      const systemParts: string[] = [WORKSPACE_ASSISTANT_INSTRUCTIONS]
+      if (hasSurfaceTools) {
+        if (page.surface === 'store-screenshots') {
+          systemParts.push(STORE_COPILOT_INSTRUCTIONS)
+        } else if (page.surface !== 'screenshot-editor' && page.surface !== 'canvas') {
+          systemParts.push(SURFACE_COPILOT_INSTRUCTIONS)
+        } else {
+          systemParts.push(EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(activeSelection))
+        }
+      }
+      const voiceBlock = voiceInstructions(voice)
+      if (voiceBlock) systemParts.push(voiceBlock)
+      if (product) systemParts.push(product)
+      systemParts.push(describePage(page))
+
       const started = Date.now()
       const result = streamText({
         abortSignal: signal,
-        messages: trimSnapshots(messages),
+        messages: trimMessagesToBudget(trimSnapshots(messages)),
         model: models.languageModel('drafting'),
         stopWhen: [stepCountIs(MAX_STEPS), isRunStopped(run)],
         system: systemParts.join('\n\n'),
@@ -235,6 +244,8 @@ export async function runWorkspaceAssistantTurn(
       }
     })
   } finally {
-    await flushToolRun(run)
+    if (!scheduleAfterResponse(() => flushToolRun(run))) {
+      await flushToolRun(run)
+    }
   }
 }

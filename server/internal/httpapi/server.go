@@ -112,6 +112,7 @@ type ConfigurationStore interface {
 	CreateConversation(context.Context, product.Actor, product.CreateConversationInput) (*product.ConversationRecord, error)
 	ListConversations(context.Context, product.Actor, product.ListConversationsInput) ([]product.ConversationRecord, error)
 	GetConversation(context.Context, product.Actor, string) (*product.ConversationDetail, error)
+	GetConversationView(context.Context, product.Actor, string) (*product.ConversationView, error)
 	AppendConversationMessage(context.Context, product.Actor, string, product.AppendConversationMessageInput) (*product.ConversationMessageRecord, error)
 	UpdateConversation(context.Context, product.Actor, string, product.UpdateConversationInput) (*product.ConversationRecord, error)
 	ListAssistantThreads(context.Context, product.Actor) ([]product.AssistantThreadRecord, error)

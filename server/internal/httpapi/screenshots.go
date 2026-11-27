@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 )
@@ -25,6 +27,17 @@ func (s *Server) getScreenshotCacheObject(w http.ResponseWriter, r *http.Request
 	body, err := s.configuration.GetScreenshotCacheObject(r.Context(), r.PathValue("hash"))
 	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	if strings.Contains(r.Header.Get("Accept"), "image/png") {
+		mediaType := "image/png"
+		if len(body) >= 2 && body[0] == 0xff && body[1] == 0xd8 {
+			mediaType = "image/jpeg"
+		}
+		w.Header().Set("Content-Type", mediaType)
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"base64": base64.StdEncoding.EncodeToString(body)})

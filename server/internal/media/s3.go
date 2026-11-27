@@ -30,6 +30,7 @@ type S3Store struct {
 	bucket         string
 	client         *s3.Client
 	signer         *s3.PresignClient
+	internalSigner *s3.PresignClient
 	deliverySigner *s3.PresignClient
 	delivery       *deliveryGateway
 }
@@ -60,8 +61,9 @@ func NewS3Store(endpoint, browserEndpoint, region, bucket, accessKey, secretKey 
 		})
 	}
 	internal := client(endpoint)
+	internalPresign := s3.NewPresignClient(internal)
 	return &S3Store{bucket: bucket, client: internal, signer: s3.NewPresignClient(client(browserEndpoint)),
-		deliverySigner: s3.NewPresignClient(internal)}, nil
+		internalSigner: internalPresign, deliverySigner: internalPresign}, nil
 }
 
 func NewS3StoreFromEnvironment() (*S3Store, error) {
@@ -223,6 +225,20 @@ func (s *S3Store) SignDownloadFor(ctx context.Context, key string, expires time.
 	}, s3.WithPresignExpires(expires))
 	if err != nil {
 		return "", fmt.Errorf("sign media download: %w", err)
+	}
+	return request.URL, nil
+}
+
+// SignInternalDownload signs a GET against the internal storage endpoint
+// (R2_ENDPOINT) for server-to-server fetches such as Next.js kit rendering,
+// avoiding browser-only hosts (e.g., localhost in Compose) unreachable from
+// other backend containers.
+func (s *S3Store) SignInternalDownload(ctx context.Context, key string) (string, error) {
+	request, err := s.internalSigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(key),
+	}, s3.WithPresignExpires(5*time.Minute))
+	if err != nil {
+		return "", fmt.Errorf("sign internal media download: %w", err)
 	}
 	return request.URL, nil
 }

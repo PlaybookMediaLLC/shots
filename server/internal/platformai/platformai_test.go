@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
@@ -89,7 +88,7 @@ func TestStructuredDecodesTheReplyAndItsCost(t *testing.T) {
 	}
 	system := sent["messages"].([]any)[0].(map[string]any)["content"].(string)
 	if sent["model"] != "model-fast" || sent["response_format"].(map[string]any)["type"] != "json_schema" ||
-		!strings.HasPrefix(system, "sys") || !strings.HasSuffix(system, "JSON Schema:\n{}") {
+		system != "sys" {
 		t.Fatalf("sent %+v", sent)
 	}
 	// The web's provider rules: no endpoint that stores prompts, none that drops the schema.
