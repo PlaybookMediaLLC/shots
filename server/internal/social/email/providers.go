@@ -21,6 +21,8 @@ import (
 	"time"
 )
 
+var emailHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
 // Provider is EmailInterface.
 type Provider interface {
 	Name() string
@@ -69,12 +71,12 @@ func (ResendProvider) SendEmail(ctx context.Context, to, subject, html, emailFro
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := emailHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	data, _ := io.ReadAll(res.Body)
+	data, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 
 	// The SDK returns API errors (like 429 rate limits) instead of throwing;
 	// they are errors here so SendEmailSync retries the send

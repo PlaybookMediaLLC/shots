@@ -34,6 +34,12 @@ type Input struct {
 	RunID          string `json:"runId"`
 }
 
+const (
+	batchMaxIterationsPerRun = 250
+	batchItemsPerActivity    = 10
+	batchActivitySoftBudget  = 90 * time.Second
+)
+
 // Workflow schedules a run's items in order. An item with no answer after its
 // retries is marked and the rest go on: one stuck item never holds up the others.
 func Workflow(ctx workflow.Context, input Input) error {
@@ -41,7 +47,8 @@ func Workflow(ctx workflow.Context, input Input) error {
 		StartToCloseTimeout: 3 * time.Minute,
 		RetryPolicy:         &temporal.RetryPolicy{InitialInterval: 5 * time.Second, MaximumAttempts: 4},
 	})
-	for {
+	version := workflow.GetVersion(ctx, "batch-continue-as-new", workflow.DefaultVersion, 1)
+	for iteration := 0; ; iteration++ {
 		var done bool
 		err := workflow.ExecuteActivity(ctx, NextActivity, input).Get(ctx, &done)
 		if err != nil {
@@ -51,10 +58,11 @@ func Workflow(ctx workflow.Context, input Input) error {
 			if err := workflow.ExecuteActivity(ctx, UnconfirmedActivity, input).Get(ctx, nil); err != nil {
 				return err
 			}
-			continue
-		}
-		if done {
+		} else if done {
 			return nil
+		}
+		if version >= 1 && (iteration+1 >= batchMaxIterationsPerRun || workflow.GetInfo(ctx).GetContinueAsNewSuggested()) {
+			return workflow.NewContinueAsNewError(ctx, WorkflowName, input)
 		}
 	}
 }
@@ -77,26 +85,39 @@ type Activities struct {
 	Store     Store
 }
 
-// Next schedules the next item and wakes its posts. The posts are committed
-// either way: the once-a-minute dispatcher starts a due post whose wakeup failed.
+// Next schedules up to batchItemsPerActivity items (within a soft time budget)
+// and wakes their posts. The posts are committed either way: the once-a-minute
+// dispatcher starts a due post whose wakeup failed.
 func (a *Activities) Next(ctx context.Context, input Input) (bool, error) {
-	step, err := a.Store.ScheduleNextBatchRunItem(ctx, input.OrganizationID, input.RunID)
-	if err != nil {
-		return false, err
+	started := time.Now()
+	for i := 0; i < batchItemsPerActivity; i++ {
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+		if i > 0 && time.Since(started) >= batchActivitySoftBudget {
+			return false, nil
+		}
+		step, err := a.Store.ScheduleNextBatchRunItem(ctx, input.OrganizationID, input.RunID)
+		if err != nil {
+			return false, err
+		}
+		var wakeup error
+		for _, postID := range step.Cancelled {
+			wakeup = errors.Join(wakeup, a.Publisher.Cancel(ctx, postID))
+		}
+		for _, post := range step.Scheduled {
+			wakeup = errors.Join(wakeup, a.Publisher.Start(ctx, temporalpublishing.ScheduleInput{
+				OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor,
+			}))
+		}
+		if wakeup != nil {
+			slog.WarnContext(ctx, "batch post workflows were not woken", "run", input.RunID, "error", wakeup)
+		}
+		if step.Done {
+			return true, nil
+		}
 	}
-	var wakeup error
-	for _, postID := range step.Cancelled {
-		wakeup = errors.Join(wakeup, a.Publisher.Cancel(ctx, postID))
-	}
-	for _, post := range step.Scheduled {
-		wakeup = errors.Join(wakeup, a.Publisher.Start(ctx, temporalpublishing.ScheduleInput{
-			OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor,
-		}))
-	}
-	if wakeup != nil {
-		slog.WarnContext(ctx, "batch post workflows were not woken", "run", input.RunID, "error", wakeup)
-	}
-	return step.Done, nil
+	return false, nil
 }
 
 // Unconfirmed settles the item whose retries found no answer.

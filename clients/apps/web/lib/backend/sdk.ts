@@ -62,14 +62,19 @@ const tracedFetch: typeof fetch = (input, init) => {
   if (!shareable) return fetch(input, { ...init, headers })
   let read = reads.get(key)
   if (!read) {
-    read = fetch(input, { ...init, headers }).then(async (response): Promise<SharedRead> => {
-      if (!response.headers.get('content-type')?.includes('application/json')) {
+    read = fetch(input, { ...init, headers })
+      .then(async (response): Promise<SharedRead> => {
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+          reads.delete(key)
+          return { response, taken: false }
+        }
+        const { status, statusText } = response
+        return { headers: response.headers, status, statusText, text: await response.text() }
+      })
+      .catch((error) => {
         reads.delete(key)
-        return { response, taken: false }
-      }
-      const { status, statusText } = response
-      return { headers: response.headers, status, statusText, text: await response.text() }
-    })
+        throw error
+      })
     reads.set(key, read)
   }
   return read.then((shared) => {

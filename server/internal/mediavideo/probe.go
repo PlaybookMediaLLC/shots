@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"strings"
 
 	mp4 "github.com/abema/go-mp4"
@@ -85,6 +86,121 @@ func Probe(r io.Reader) (Info, error) {
 		}
 		if n, err := io.CopyN(io.Discard, r, int64(body)); err != nil || n != int64(body) {
 			return Info{}, ErrInvalid
+		}
+	}
+	if moov == nil || !data {
+		return Info{}, ErrInvalid
+	}
+	return readMovie(moov)
+}
+
+// ProbeRange inspects top-level MP4/QuickTime boxes via targeted inclusive
+// byte-range reads [start, end], skipping over large mdat payloads instead of
+// downloading gigabytes of video data. Transport errors from readRange are
+// propagated unwrapped so callers can distinguish storage outages from ErrInvalid.
+func ProbeRange(totalSize int64, readRange func(start, end int64) ([]byte, error)) (Info, error) {
+	if totalSize < 8 {
+		return Info{}, ErrInvalid
+	}
+	const (
+		windowSize    = 64 << 10
+		maxRangeReads = 64
+	)
+	var (
+		offset     int64
+		buf        []byte
+		bufOff     int64
+		moov       []byte
+		data       bool
+		typed      bool
+		rangeReads int
+	)
+	fetchRange := func(start, end int64) ([]byte, error) {
+		rangeReads++
+		if rangeReads > maxRangeReads {
+			return nil, ErrInvalid
+		}
+		return readRange(start, end)
+	}
+	readSlice := func(pos, n int64) ([]byte, error) {
+		if pos < 0 || n <= 0 || n > totalSize-pos {
+			return nil, ErrInvalid
+		}
+		if pos >= bufOff && pos+n <= bufOff+int64(len(buf)) {
+			rel := pos - bufOff
+			return buf[rel : rel+n], nil
+		}
+		fetchLen := max(n, windowSize)
+		end := min(totalSize-1, pos+fetchLen-1)
+		chunk, err := fetchRange(pos, end)
+		if err != nil {
+			return nil, err
+		}
+		if int64(len(chunk)) < n {
+			return nil, ErrInvalid
+		}
+		buf, bufOff = chunk, pos
+		return buf[:n], nil
+	}
+	for boxes := 0; offset < totalSize; boxes++ {
+		if boxes > 10000 {
+			return Info{}, ErrInvalid
+		}
+		hdr, err := readSlice(offset, 8)
+		if err != nil {
+			return Info{}, err
+		}
+		size, kind, headerSize := uint64(binary.BigEndian.Uint32(hdr[:4])), string(hdr[4:8]), uint64(8)
+		if size == 1 {
+			ext, err := readSlice(offset+8, 8)
+			if err != nil {
+				return Info{}, err
+			}
+			size, headerSize = binary.BigEndian.Uint64(ext), 16
+		}
+		if boxes == 0 {
+			typed = kind == "ftyp" || kind == "wide" || kind == "free" || kind == "mdat" || kind == "moov"
+			if !typed {
+				return Info{}, ErrInvalid
+			}
+		}
+		if size == 0 {
+			data = data || (kind == "mdat" && uint64(totalSize-offset) > headerSize)
+			break
+		}
+		remaining := uint64(totalSize - offset)
+		if size < headerSize || size > math.MaxInt64 || size > remaining {
+			return Info{}, ErrInvalid
+		}
+		body := size - headerSize
+		switch kind {
+		case "moov":
+			if moov != nil || size > moovLimit {
+				return Info{}, ErrInvalid
+			}
+			if size > windowSize {
+				// Read large moov directly without double-buffering inside buf.
+				moovBytes, err := fetchRange(offset, offset+int64(size)-1)
+				if err != nil {
+					return Info{}, err
+				}
+				if uint64(len(moovBytes)) < size {
+					return Info{}, ErrInvalid
+				}
+				moov = moovBytes[:size]
+			} else {
+				moovBytes, err := readSlice(offset, int64(size))
+				if err != nil {
+					return Info{}, err
+				}
+				moov = append([]byte(nil), moovBytes...)
+			}
+		case "mdat", "moof":
+			data = data || body > 0
+		}
+		offset += int64(size)
+		if moov != nil && data {
+			break
 		}
 	}
 	if moov == nil || !data {

@@ -11,6 +11,16 @@ import { signAssetDownload } from '@/lib/tenant/assets'
 
 class InvalidThumbnailError extends Error {}
 
+const PRIVATE_REVALIDATE_CACHE = 'private, max-age=0, must-revalidate'
+
+function matchesIfNoneMatch(header: string | undefined, etag: string): boolean {
+  if (!header) return false
+  return header.split(',').some((part) => {
+    const value = part.trim()
+    return value === etag || value.replace(/^W\//, '') === etag
+  })
+}
+
 /** Returns private previews or original bytes only after Go rechecks current access. */
 export const GET = route(assetContentContract, {
   auth: async (context) =>
@@ -22,22 +32,46 @@ export const GET = route(assetContentContract, {
       const source = await serviceBackend().readAssetDownload(
         params.assetId,
         query.downloadToken ?? '',
-        headers.range
+        headers.range,
+        headers['if-none-match']
       )
       const responseHeaders = new Headers({
-        'cache-control': 'private, no-store',
+        'cache-control': PRIVATE_REVALIDATE_CACHE,
         'referrer-policy': 'no-referrer',
         'x-content-type-options': 'nosniff',
         'content-security-policy': "sandbox; default-src 'none'",
       })
-      for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+      for (const name of [
+        'content-type',
+        'content-length',
+        'content-range',
+        'accept-ranges',
+        'etag',
+      ]) {
         const value = source.headers.get(name)
         if (value) responseHeaders.set(name, value)
+      }
+      if (source.status === 304) {
+        return new Response(null, { headers: responseHeaders, status: 304 })
       }
       return new Response(source.body, { headers: responseHeaders, status: source.status })
     }
     if (query.variant === 'thumbnail') {
+      const thumbnailEtag = `"thumb-${params.assetId}-v1"`
       try {
+        if (matchesIfNoneMatch(headers['if-none-match'], thumbnailEtag)) {
+          // Ownership, deletion, and current permissions are checked before every 304.
+          if (!(await signAssetDownload(access, params.assetId))) {
+            throw new BackendSDKError('Asset not found.', 404)
+          }
+          return new Response(null, {
+            headers: {
+              'cache-control': PRIVATE_REVALIDATE_CACHE,
+              etag: thumbnailEtag,
+            },
+            status: 304,
+          })
+        }
         const thumbnail = await cachedThumbnail(
           thumbnailKey(access.organizationId, params.assetId),
           async () => {
@@ -58,7 +92,11 @@ export const GET = route(assetContentContract, {
           async () => (await getRedisClient()).withCommandOptions({ timeout: 1_000 })
         )
         return new Response(new Uint8Array(thumbnail), {
-          headers: { 'content-type': 'image/webp', 'cache-control': 'private, no-store' },
+          headers: {
+            'cache-control': PRIVATE_REVALIDATE_CACHE,
+            'content-type': 'image/webp',
+            etag: thumbnailEtag,
+          },
         })
       } catch (error) {
         if (error instanceof InvalidThumbnailError) return errorResponse(422, error.message)

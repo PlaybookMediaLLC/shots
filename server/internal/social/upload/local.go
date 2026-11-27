@@ -87,7 +87,15 @@ func fetchSimple(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-	return io.ReadAll(res.Body)
+	const maxSimpleBytes = 100 << 20
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxSimpleBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxSimpleBytes {
+		return nil, errors.New("Media file exceeds 100 MiB limit.")
+	}
+	return data, nil
 }
 
 func (s *LocalStorage) UploadSimple(ctx context.Context, path string) (string, error) {

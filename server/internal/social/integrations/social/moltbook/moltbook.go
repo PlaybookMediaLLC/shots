@@ -98,7 +98,7 @@ func request(ctx context.Context, method, url string, headers map[string]string,
 		return err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return err
 	}

@@ -223,7 +223,7 @@ func (p *Provider) UploadFile(ctx context.Context, instanceURL, fileURL, accessT
 		}
 		// identity encoding so content-length matches the streamed bytes
 		fileReq.Header.Set("Accept-Encoding", "identity")
-		mediaClient := ssrf.Client()
+		mediaClient := ssrf.StreamingClient()
 		if p.client != nil {
 			mediaClient = ssrf.PublicClient()
 		}
@@ -282,12 +282,16 @@ func (p *Provider) UploadFile(ctx context.Context, instanceURL, fileURL, accessT
 		}
 		req.Header.Set("Content-Type", w.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		res, err := p.instanceClient().Do(req)
+		uploadClient := ssrf.StreamingClient()
+		if p.client != nil {
+			uploadClient = p.client
+		}
+		res, err := uploadClient.Do(req)
 		if err != nil {
 			return "", err
 		}
 		defer res.Body.Close()
-		data, _ := io.ReadAll(res.Body)
+		data, _ := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 		if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
 			if len(data) == 0 {
 				data = []byte("{}")
@@ -399,7 +403,7 @@ func (p *Provider) CheckPostStatus(ctx context.Context, accessToken string, raw 
 			// workflow exhausts its checks and warns the user properly.
 			return pendingResponse("pending", raw), nil
 		}
-		body, readErr := io.ReadAll(res.Body)
+		body, readErr := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 		res.Body.Close()
 		text := string(body)
 		if readErr != nil {

@@ -20,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ids"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ssrf"
 )
 
 // APIURL and WWWURL are the LinkedIn hosts called over HTTP; tests point them
@@ -193,7 +194,7 @@ func fetchJSON(ctx context.Context, method, url string, headers map[string]strin
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := ssrf.Client().Do(req)
 	if err != nil {
 		return err
 	}
@@ -203,7 +204,7 @@ func fetchJSON(ctx context.Context, method, url string, headers map[string]strin
 			return err
 		}
 	}
-	return json.NewDecoder(res.Body).Decode(out)
+	return json.NewDecoder(io.LimitReader(res.Body, 10<<20)).Decode(out)
 }
 
 // EncodeURIComponent is JavaScript's encodeURIComponent.

@@ -60,7 +60,10 @@ func (m *MemoryEpochs) Read(_ context.Context, organizationIDs []string) (int64,
 const epochPrefix = "shots-collab:epoch:"
 
 // RedisEpochs shares the counts between backend replicas.
-type RedisEpochs struct{ client *redis.Client }
+type RedisEpochs struct {
+	client *redis.Client
+	owned  bool
+}
 
 // NewRedisEpochs connects to rawURL.
 func NewRedisEpochs(rawURL string) (*RedisEpochs, error) {
@@ -70,7 +73,13 @@ func NewRedisEpochs(rawURL string) (*RedisEpochs, error) {
 	}
 	client := redis.NewClient(options)
 	telemetry.InstrumentRedis("collab", client)
-	return &RedisEpochs{client: client}, nil
+	return &RedisEpochs{client: client, owned: true}, nil
+}
+
+// NewRedisEpochsWithClient wraps an existing shared Redis client.
+// Close is a no-op; the caller retains ownership of client.
+func NewRedisEpochsWithClient(client *redis.Client) *RedisEpochs {
+	return &RedisEpochs{client: client, owned: false}
 }
 
 func epochKey(organizationID string) string {
@@ -102,8 +111,13 @@ func (r *RedisEpochs) Read(ctx context.Context, organizationIDs []string) (int64
 	return redisCount(values[0]), counts, nil
 }
 
-// Close releases the connection.
-func (r *RedisEpochs) Close() error { return r.client.Close() }
+// Close releases the connection when owned by this instance.
+func (r *RedisEpochs) Close() error {
+	if !r.owned {
+		return nil
+	}
+	return r.client.Close()
+}
 
 // redisCount reads a counter MGET returned; a missing key is zero.
 func redisCount(value any) int64 {

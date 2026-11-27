@@ -57,7 +57,7 @@ func main() {
 		slog.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
-	db, err := database.Open(ctx, cfg.DatabaseURL)
+	db, err := database.OpenWithOptions(ctx, cfg.DatabaseURL, database.PoolConfigFromEnv(15, 8))
 	if err != nil {
 		slog.Error("database unavailable", "error", err)
 		os.Exit(1)
@@ -84,13 +84,8 @@ func main() {
 		os.Exit(1)
 	}
 	tenantObjects := media.NewTenantObjects(objectStore)
-	// The social Ent projection and canonical scheduled_post use the same DB.
-	provider, closeShared, err := tenantpublishing.OpenShared(ctx, cfg.DatabaseURL, repository, tenantObjects)
-	if err != nil {
-		slog.Error("direct social publisher unavailable", "error", err)
-		os.Exit(1)
-	}
-	defer closeShared()
+	// The social Ent projection and canonical scheduled_post share the worker DB pool.
+	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects)
 	activities := temporalpublishing.NewActivities(repository, provider)
 	scheduler := temporalpublishing.NewScheduler(temporalClient, temporalpublishing.SchedulerConfig{
 		ActivityTaskQueue: cfg.ActivityTaskQueue, ActivityTimeout: cfg.ActivityTimeout,
@@ -99,8 +94,9 @@ func main() {
 	})
 	recovery := temporalpublishing.NewRecoveryActivities(repository, scheduler)
 	workflowWorker := worker.New(temporalClient, cfg.WorkflowTaskQueue, worker.Options{
-		MaxHeartbeatThrottleInterval: 15 * time.Second,
-		OnFatalError:                 func(err error) { slog.Error("Temporal workflow worker failed", "error", err); stop() },
+		MaxConcurrentActivityExecutionSize: max(1, 20/cfg.WorkerConcurrencyDivider),
+		MaxHeartbeatThrottleInterval:       15 * time.Second,
+		OnFatalError:                       func(err error) { slog.Error("Temporal workflow worker failed", "error", err); stop() },
 	})
 	workflowWorker.RegisterWorkflowWithOptions(temporalpublishing.PostWorkflowV1, workflow.RegisterOptions{Name: temporalpublishing.WorkflowNameV1})
 	workflowWorker.RegisterWorkflowWithOptions(temporalpublishing.PostWorkflowV2, workflow.RegisterOptions{Name: temporalpublishing.WorkflowNameV2})
@@ -310,12 +306,21 @@ func main() {
 	}
 
 	if cfg.RunMaintenance {
-		retention, err := database.Open(ctx, cfg.AuditRetentionDatabaseURL)
-		if err != nil {
-			slog.Error("audit retention database unavailable")
-			os.Exit(1)
+		retentionSQL := db.SQL
+		if cfg.AuditRetentionDatabaseURL != cfg.DatabaseURL {
+			retention, err := database.OpenWithOptions(ctx, cfg.AuditRetentionDatabaseURL, database.PoolConfig{
+				MaxOpenConns:    2,
+				MaxIdleConns:    1,
+				ConnMaxLifetime: 30 * time.Minute,
+				ConnMaxIdleTime: 5 * time.Minute,
+			})
+			if err != nil {
+				slog.Error("audit retention database unavailable")
+				os.Exit(1)
+			}
+			defer retention.Close()
+			retentionSQL = retention.SQL
 		}
-		defer retention.Close()
 		events := product.NewConfiguration(db.Client).WithWebhooks(cfg.WebhookEncryptionKey, nil).WithCapturer(capture.FromEnvironment()).WithPostMetrics(provider).WithAnalytics(provider)
 		if objectStore != nil {
 			events.WithObjectStore(objectStore)
@@ -334,14 +339,15 @@ func main() {
 		if model := platformai.FromEnvironment(); model != nil {
 			events.WithAutomationModel(model)
 		}
-		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: notifications.New(db.SQL, db.Client), DB: db.SQL, RetentionDB: retention.SQL, Objects: tenantObjects, Events: events,
+		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: notifications.New(db.SQL, db.Client), DB: db.SQL, RetentionDB: retentionSQL, Objects: tenantObjects, Events: events,
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),
 			Webhooks:   webhooks.NewDispatcher(db.SQL, cfg.WebhookEncryptionKey),
 			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, PostalAddress: cfg.CompanyPostalAddress},
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
-			MaxConcurrentActivityExecutionSize: 5, OnFatalError: func(err error) { slog.Error("maintenance worker failed"); stop() },
+			MaxConcurrentActivityExecutionSize: max(1, 6/cfg.WorkerConcurrencyDivider),
+			OnFatalError:                       func(err error) { slog.Error("maintenance worker failed"); stop() },
 		})
 		temporalmaintenance.Register(maintenanceWorker, temporalmaintenance.RunnerFunc(func(ctx context.Context, job string) (int, error) {
 			if job == "social-analytics" {

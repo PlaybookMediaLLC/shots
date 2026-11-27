@@ -31,6 +31,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
+	socialredis "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/redis"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/tenantpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialconnect"
@@ -39,6 +40,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalonboarding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 	"github.com/getsentry/sentry-go"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -110,14 +112,9 @@ func main() {
 		configuration.WithEmailAuth(emailAuth)
 	}
 	// Live draft posts' engagement is read through the direct social publisher,
-	// which shares this database (RFC 013).
-	if publisher, closeShared, err := tenantpublishing.OpenShared(ctx, cfg.DatabaseURL, publishing.NewRepository(db.Client),
-		media.NewTenantObjects(objects)); err == nil {
-		defer closeShared()
-		configuration.WithPostMetrics(publisher).WithAccountStanding(publisher).WithAnalytics(publisher)
-	} else {
-		slog.Warn("post engagement unavailable", "error", err)
-	}
+	// which shares this database pool (RFC 013).
+	publisher := tenantpublishing.NewWithSQL(db.SQL, publishing.NewRepository(db.Client), media.NewTenantObjects(objects))
+	configuration.WithPostMetrics(publisher).WithAccountStanding(publisher).WithAnalytics(publisher)
 	// Outbound webhooks (RFC 024): the key seals signing secrets.
 	webhookKey, err := config.WebhookEncryptionKey()
 	if err != nil {
@@ -145,23 +142,24 @@ func main() {
 		// Without the App, Code Studio still imports public repositories and gists.
 		configuration.WithCodeReader(githubapp.NewPublic())
 	}
-	// The MCP server counts per-key calls on the same Redis; nil skips them.
+	// One shared Redis client serves collaboration epochs, quotas, and social OAuth state.
 	var limiter product.QuotaCounter
+	var sharedRedis *goredis.Client
 	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		redisOpts, err := goredis.ParseURL(redisURL)
+		if err != nil {
+			slog.Error("invalid REDIS_URL configuration", "error", err)
+			os.Exit(1)
+		}
+		redisOpts.DialTimeout = 10 * time.Second
+		sharedRedis = goredis.NewClient(redisOpts)
+		telemetry.InstrumentRedis("product-api", sharedRedis)
+		defer sharedRedis.Close()
+
 		// Collaboration access counts are shared by every backend replica.
-		epochs, err := collab.NewRedisEpochs(redisURL)
-		if err != nil {
-			slog.Error("invalid collaboration epoch configuration", "error", err)
-			os.Exit(1)
-		}
-		defer epochs.Close()
+		epochs := collab.NewRedisEpochsWithClient(sharedRedis)
 		configuration.WithCollabEpochs(epochs)
-		counter, err := quota.NewRedisCounter(redisURL)
-		if err != nil {
-			slog.Error("invalid quota counter configuration", "error", err)
-			os.Exit(1)
-		}
-		defer counter.Close()
+		counter := quota.NewRedisCounterWithClient(sharedRedis)
 		limiter = counter
 		configuration.WithQuotaCounter(counter)
 		meter, err := counter.MonthlyMeter()
@@ -184,17 +182,16 @@ func main() {
 		configuration.WithAutomationModel(client)
 	}
 	// SOCIAL_API_URL keeps the HTTP social API (the browser e2e suite mocks it);
-	// otherwise channels connect in process.
+	// otherwise channels connect in process sharing the DB and Redis clients.
 	var verifier httpapi.DestinationVerifier
 	if socialURL := os.Getenv("SOCIAL_API_URL"); socialURL != "" {
 		verifier = socialapi.New(socialURL, &http.Client{Timeout: 20 * time.Second}, nil)
 	} else {
-		connector, closeConnector, err := socialconnect.Open(ctx, cfg.DatabaseURL, db.Client)
+		connector, err := socialconnect.OpenWithShared(db.SQL, db.Client, socialredis.NewWithClient(sharedRedis))
 		if err != nil {
 			slog.Error("social connections unavailable", "error", err)
 			os.Exit(1)
 		}
-		defer closeConnector()
 		verifier = connector
 	}
 	server := &http.Server{

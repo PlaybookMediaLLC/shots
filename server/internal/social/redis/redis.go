@@ -45,10 +45,29 @@ func New() (Store, error) {
 	opts.DialTimeout = 10 * time.Second
 	c := goredis.NewClient(opts)
 	telemetry.InstrumentRedis("social", c)
-	return &client{c: c}, nil
+	return &client{c: c, owned: true}, nil
 }
 
-type client struct{ c *goredis.Client }
+// NewWithClient wraps an existing shared Redis client.
+// Close is a no-op; the caller retains ownership of c.
+func NewWithClient(c *goredis.Client) Store {
+	if c == nil {
+		return NewMemory()
+	}
+	return &client{c: c, owned: false}
+}
+
+type client struct {
+	c     *goredis.Client
+	owned bool
+}
+
+func (r *client) Close() error {
+	if !r.owned || r.c == nil {
+		return nil
+	}
+	return r.c.Close()
+}
 
 func (r *client) Get(ctx context.Context, key string) (string, bool, error) {
 	value, err := r.c.Get(ctx, key).Result()

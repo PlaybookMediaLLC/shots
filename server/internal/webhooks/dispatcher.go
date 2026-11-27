@@ -56,9 +56,9 @@ func NewDispatcher(db *sql.DB, key []byte) *Dispatcher {
 	return &Dispatcher{DB: db, Key: key, HTTP: NewHTTPClient(), Workers: 8}
 }
 
-// Run fans out and delivers for up to window, polling every two seconds while
-// idle, so events reach endpoints within seconds while the maintenance
-// schedule starts it once a minute.
+// Run drains ready outbox webhook events and due deliveries for up to window,
+// exiting immediately once idle so empty runs do not pin a maintenance worker
+// slot or advisory-lock connection.
 func (d *Dispatcher) Run(ctx context.Context, window time.Duration) (int, error) {
 	deadline := time.Now().Add(window)
 	total := 0
@@ -67,20 +67,16 @@ func (d *Dispatcher) Run(ctx context.Context, window time.Duration) (int, error)
 		if err != nil {
 			return total, err
 		}
-		sent, err := d.Deliver(ctx)
+		sent, attempted, err := d.deliverBatch(ctx)
 		if err != nil {
 			return total, err
 		}
 		total += fanned + sent
-		if !time.Now().Before(deadline) {
+		if (fanned == 0 && attempted == 0) || !time.Now().Before(deadline) {
 			return total, nil
 		}
-		if fanned == 0 && sent == 0 {
-			select {
-			case <-ctx.Done():
-				return total, nil
-			case <-time.After(2 * time.Second):
-			}
+		if ctx.Err() != nil {
+			return total, nil
 		}
 	}
 }
@@ -145,9 +141,14 @@ type claim struct {
 // delivery is then tried again, so a receiver may see it twice and should
 // deduplicate on the event ID.
 func (d *Dispatcher) Deliver(ctx context.Context) (int, error) {
+	sent, _, err := d.deliverBatch(ctx)
+	return sent, err
+}
+
+func (d *Dispatcher) deliverBatch(ctx context.Context) (int, int, error) {
 	if _, err := d.DB.ExecContext(ctx, `UPDATE webhook_delivery SET status = 'PENDING', "leaseUntil" = NULL, "updatedAt" = now()
 		WHERE status = 'SENDING' AND "leaseUntil" < now()`); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	rows, err := d.DB.QueryContext(ctx, `SELECT DISTINCT ON (d."subscriptionId") d.id FROM webhook_delivery d
 		JOIN webhook_subscription s ON s.id = d."subscriptionId"
@@ -155,19 +156,22 @@ func (d *Dispatcher) Deliver(ctx context.Context) (int, error) {
 		  AND NOT EXISTS (SELECT 1 FROM webhook_delivery x WHERE x."subscriptionId" = d."subscriptionId" AND x.status = 'SENDING')
 		ORDER BY d."subscriptionId", d."createdAt", d.id LIMIT 50`)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	var due []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
-			return 0, err
+			return 0, 0, err
 		}
 		due = append(due, id)
 	}
 	if err := rows.Close(); err != nil {
-		return 0, err
+		return 0, 0, err
+	}
+	if len(due) == 0 {
+		return 0, 0, nil
 	}
 	workers := max(d.Workers, 1)
 	queue := make(chan string)
@@ -197,7 +201,7 @@ func (d *Dispatcher) Deliver(ctx context.Context) (int, error) {
 	}
 	close(queue)
 	wait.Wait()
-	return sent, firstErr
+	return sent, len(due), firstErr
 }
 
 func (d *Dispatcher) deliverOne(ctx context.Context, id string) (bool, error) {

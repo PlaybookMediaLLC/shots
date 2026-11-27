@@ -131,7 +131,7 @@ func call(ctx context.Context, method string, params url.Values, files []file, o
 		return fmt.Errorf("EFATAL: %w", err)
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(res.Body)
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return fmt.Errorf("EFATAL: %w", err)
 	}

@@ -97,7 +97,7 @@ func deliverEmail(ctx context.Context, to, subject, text, htmlBody string) error
 	for name, value := range headers {
 		request.Header.Set(name, value)
 	}
-	response, err := http.DefaultClient.Do(request)
+	response, err := invitationMailClient.Do(request)
 	if err != nil {
 		return err
 	}
@@ -106,5 +106,8 @@ func deliverEmail(ctx context.Context, to, subject, text, htmlBody string) error
 		detail, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
 		return fmt.Errorf("email delivery failed (%d): %s", response.StatusCode, strings.TrimSpace(string(detail)))
 	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
 	return nil
 }
+
+var invitationMailClient = &http.Client{Timeout: 15 * time.Second}

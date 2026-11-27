@@ -4,6 +4,7 @@ package tenantpublishing
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -64,6 +65,13 @@ func New(bindings BindingLookup, socialClient *socialent.Client, signer MediaSig
 		signer: signer, resolve: func(platform string) poster { return manager.GetSocialIntegration(platform) }, now: time.Now,
 		channels: socialClient, refresh: newRefresh(socialClient, manager),
 	}
+}
+
+// NewWithSQL reads social integrations through an existing shared SQL pool,
+// avoiding an extra PostgreSQL connection pool per process.
+func NewWithSQL(sqlDB *stdsql.DB, bindings BindingLookup, signer MediaSigner) *Publisher {
+	db := socialdatabase.WrapSQL(sqlDB)
+	return New(bindings, db.Client, signer, notifications.New(sqlDB, nil))
 }
 
 // OpenShared reads social integrations from the same DSN as canonical product

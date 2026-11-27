@@ -193,7 +193,7 @@ func (c *client) do(req *http.Request, signed url.Values) ([]byte, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return nil, err
 	}
