@@ -30,7 +30,20 @@ func TestNotificationsRunByDefault(t *testing.T) {
 			} else if !errors.Is(err, context.Canceled) {
 				t.Fatalf("dispatcher did not reach database with cancelled context: %v", err)
 			}
+			_, err = store.NotificationsMaintain(ctx)
+			if legacyPaused == "false" {
+				if err != nil {
+					t.Fatalf("maintain ran alongside legacy senders: %v", err)
+				}
+			} else if !errors.Is(err, context.Canceled) {
+				t.Fatalf("maintain did not reach database with cancelled context: %v", err)
+			}
 		})
+	}
+	// Verify Store.Run routes "notifications-maintain" to WithLock rather than unknown job.
+	store.DB = db
+	if _, err := store.Run(ctx, "notifications-maintain"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Store.Run(notifications-maintain) = %v, want context.Canceled", err)
 	}
 }
 
