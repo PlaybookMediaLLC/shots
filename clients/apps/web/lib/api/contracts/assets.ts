@@ -111,7 +111,10 @@ export const createAssetDownloadUrlContract = defineContract({
  */
 export const assetContentContract = defineContract({
   method: 'GET',
-  headers: z.object({ range: z.string().max(256).optional() }),
+  headers: z.object({
+    'if-none-match': z.string().max(256).optional(),
+    range: z.string().max(256).optional(),
+  }),
   name: 'assets.content',
   query: z.object({
     downloadToken: z.string().min(1).max(4096).optional(),

@@ -635,7 +635,7 @@ func rawJSON(ctx context.Context, rawURL string, out any) error {
 	if err := integrations.CheckResponse(res); err != nil {
 		return err
 	}
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return err
 	}

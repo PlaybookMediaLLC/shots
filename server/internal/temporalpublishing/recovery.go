@@ -12,6 +12,7 @@ import (
 
 const (
 	recoveryBatchSize = 100
+	recoveryMaxPages  = 5
 	recoveryLookback  = 48 * time.Hour
 	// stalledAfter is how long a claimed post may make no progress before the
 	// sweep asks Temporal whether its workflow still runs.
@@ -79,16 +80,30 @@ func (a *RecoveryActivities) ReleaseStalled(ctx context.Context) (int, error) {
 }
 
 func (a *RecoveryActivities) dispatch(ctx context.Context, since, now time.Time) (int, error) {
-	posts, err := a.store.ListRecoverablePosts(ctx, since, now, recoveryBatchSize)
-	if err != nil {
-		return 0, err
-	}
-	for index, post := range posts {
-		if err := a.scheduler.Start(ctx, ScheduleInput{
-			OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor,
-		}); err != nil {
-			return index, err
+	total := 0
+	var afterScheduled time.Time
+	afterID := ""
+	for range recoveryMaxPages {
+		posts, err := a.store.ListRecoverablePostsAfter(ctx, since, now, afterScheduled, afterID, recoveryBatchSize)
+		if err != nil {
+			return total, err
 		}
+		if len(posts) == 0 {
+			break
+		}
+		for _, post := range posts {
+			if err := a.scheduler.EnsureStarted(ctx, ScheduleInput{
+				OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor,
+			}); err != nil {
+				return total, err
+			}
+			total++
+		}
+		if len(posts) < recoveryBatchSize {
+			break
+		}
+		last := posts[len(posts)-1]
+		afterScheduled, afterID = last.ScheduledFor, last.ID
 	}
-	return len(posts), nil
+	return total, nil
 }

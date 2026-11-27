@@ -51,7 +51,42 @@ func Apply(ctx context.Context, db *sql.DB) error {
 	return socialmigrations.Apply(ctx, db)
 }
 
+const noTransactionDirective = "-- +migrate no-transaction"
+
+func isNoTransaction(script string) bool {
+	firstLine, _, _ := strings.Cut(strings.TrimLeft(script, "\r\n \t"), "\n")
+	return strings.TrimSpace(firstLine) == noTransactionDirective
+}
+
+func splitStatements(script string) []string {
+	raw := strings.Split(script, ";")
+	out := make([]string, 0, len(raw))
+	for _, part := range raw {
+		var lines []string
+		for _, line := range strings.Split(part, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+				continue
+			}
+			lines = append(lines, line)
+		}
+		stmt := strings.TrimSpace(strings.Join(lines, "\n"))
+		if stmt != "" {
+			out = append(out, stmt)
+		}
+	}
+	return out
+}
+
 func applyOne(ctx context.Context, db *sql.DB, name string) error {
+	scriptBytes, err := files.ReadFile("sql/" + name)
+	if err != nil {
+		return err
+	}
+	script := string(scriptBytes)
+	if isNoTransaction(script) {
+		return applyOneNoTx(ctx, db, name, script)
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -89,14 +124,41 @@ func applyOne(ctx context.Context, db *sql.DB, name string) error {
 			return fmt.Errorf("platform schema exists without an applied migration record")
 		}
 	}
-	script, err := files.ReadFile("sql/" + name)
-	if err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, string(script)); err != nil {
+	if _, err := tx.ExecContext(ctx, script); err != nil {
 		return fmt.Errorf("apply %s: %w", name, err)
 	}
 	return recordApplied(ctx, tx, name)
+}
+
+// applyOneNoTx runs DDL that PostgreSQL forbids inside a transaction block
+// (such as CREATE/DROP INDEX CONCURRENTLY) under a session advisory lock on a
+// dedicated connection, executing each statement independently.
+func applyOneNoTx(ctx context.Context, db *sql.DB, name, script string) error {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock(hashtext('screenshot-studio-platform-migrations'))`); err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock(hashtext('screenshot-studio-platform-migrations'))`)
+	}()
+	var done bool
+	if err := conn.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM `+migrationTable+` WHERE name=$1)`, name).Scan(&done); err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	for _, stmt := range splitStatements(script) {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("apply %s: %w", name, err)
+		}
+	}
+	_, err = conn.ExecContext(ctx, `INSERT INTO `+migrationTable+` (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, name)
+	return err
 }
 
 func recordApplied(ctx context.Context, tx *sql.Tx, name string) error {

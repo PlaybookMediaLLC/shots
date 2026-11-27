@@ -14,6 +14,7 @@ import {
   NotificationRequestError,
   notificationRequest,
   useNotificationIdentity,
+  useNotificationPageVisible,
 } from '@/lib/notifications/client'
 import {
   notificationPageSchema,
@@ -44,6 +45,7 @@ export function NotificationFeed({
       live.current = false
     }
   }, [])
+  const visible = useNotificationPageVisible()
   const listKey = [...identity.key, 'feed', view]
   const retry = useRef<NotificationStateInput | null>(null)
   const feed = useInfiniteQuery({
@@ -58,7 +60,7 @@ export function NotificationFeed({
       ),
     getNextPageParam: (page) => page.nextCursor || undefined,
     staleTime: 0,
-    refetchInterval: 30_000,
+    refetchInterval: visible ? 30_000 : false,
     retry: (failures, error) =>
       !(error instanceof NotificationRequestError && [401, 403, 404].includes(error.status)) &&
       failures < 2,

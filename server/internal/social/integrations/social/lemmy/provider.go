@@ -151,7 +151,7 @@ func raw(ctx context.Context, method, rawURL string, headers map[string]string, 
 		return 0, nil, err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	return res.StatusCode, data, err
 }
 

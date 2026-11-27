@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getR2ImageUrl } from '@/lib/r2';
+import { getR2ImageUrl, isR2AssetUrl } from '@/lib/r2';
 import { isOverlayPath } from '@/lib/r2-overlays';
 import { backgroundPaths } from '@/lib/r2-backgrounds';
 import type { BackgroundConfig } from '@/lib/constants/backgrounds';
@@ -86,7 +86,7 @@ export function useBackgroundImage(
       }
 
       // Determine if this is an R2 asset (eligible for retry on 404)
-      const isR2Asset = imageUrl.startsWith('/r2-assets/');
+      const isR2Asset = isR2AssetUrl(imageUrl);
 
       if (isR2Asset) {
         loadImageWithRetry(imageUrl, 0, abortController.signal)
@@ -159,7 +159,7 @@ export function useOverlayImages(imageOverlays: ImageOverlay[]) {
               ? getR2ImageUrl({ src: overlay.src })
               : overlay.src;
 
-          const isR2Asset = imageUrl.startsWith('/r2-assets/');
+          const isR2Asset = isR2AssetUrl(imageUrl);
 
           if (isR2Asset) {
             loadImageWithRetry(imageUrl, 0, abortController.signal)

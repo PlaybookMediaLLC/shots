@@ -98,7 +98,7 @@ func (c *Configuration) VerifyAPIKey(ctx context.Context, key string) (*AgentKey
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.AuthorizeAPIKey(ctx, row.ReferenceID, row.ID); err != nil {
+	if err := c.auth.AuthorizeVerifiedAPIKey(ctx, row); err != nil {
 		return nil, err
 	}
 	display := "Organization API key"

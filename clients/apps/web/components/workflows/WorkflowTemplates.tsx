@@ -43,14 +43,18 @@ import {
   WORKFLOW_TEMPLATES,
   type WorkflowTemplate,
 } from '@/lib/workflows/templates'
-import { AutomateBreadcrumb } from './workflow-ui'
-import { WorkflowEditor } from './WorkflowEditor'
+import dynamic from 'next/dynamic'
+import { AutomateBreadcrumb, FAMILY_NAMES } from './workflow-ui'
 import {
   WorkflowTemplateDiagram,
   WorkflowTemplatePreview,
   WorkflowTemplateSample,
 } from './WorkflowTemplatePreview'
-import { FAMILY_NAMES } from './workflow-canvas'
+
+const WorkflowEditor = dynamic(
+  () => import('./WorkflowEditor').then((mod) => mod.WorkflowEditor),
+  { ssr: false }
+)
 
 /** A workflow the editor holds until it is saved, so a look at a template leaves nothing behind. */
 function newDefinition(

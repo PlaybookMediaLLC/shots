@@ -21,13 +21,19 @@ type PlanPageProps = {
 export default async function PlanPage({ params, searchParams }: PlanPageProps) {
   const [{ campaignId, locale }, { version }] = await Promise.all([params, searchParams])
   const access = await requireCampaignPageAccess(locale)
-  const campaign = await getCampaign(access.tenant, campaignId)
-  if (!campaign) notFound()
-  const [plans, specs, runs] = await Promise.all([
-    getCampaignPlans(access.tenant, campaign.id),
-    campaign.release ? getReleaseSpecs(access.tenant, campaign.release.id) : null,
-    latestLaunchRuns(access.tenant, campaign.id),
+  const [campaignResult, plansResult, runsResult] = await Promise.allSettled([
+    getCampaign(access.tenant, campaignId),
+    getCampaignPlans(access.tenant, campaignId),
+    latestLaunchRuns(access.tenant, campaignId),
   ])
+  if (campaignResult.status === 'rejected') throw campaignResult.reason
+  const campaign = campaignResult.value
+  if (!campaign) notFound()
+  if (plansResult.status === 'rejected') throw plansResult.reason
+  if (runsResult.status === 'rejected') throw runsResult.reason
+  const plans = plansResult.value
+  const runs = runsResult.value
+  const specs = campaign.release ? await getReleaseSpecs(access.tenant, campaign.release.id) : null
   const workingSpec = specs ? (specs.approved ?? specs.latest) : null
   if (!workingSpec) {
     return (

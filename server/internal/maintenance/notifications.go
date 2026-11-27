@@ -15,7 +15,7 @@ func (s *Store) Notifications(ctx context.Context) (int, error) {
 }
 
 // NotificationsMaintain cleans up expired OAuth starts, orphaned delivery rows,
-// and performs hourly Slack installation health checks.
+// and performs hourly Slack installation health checks on its own schedule.
 func (s *Store) NotificationsMaintain(ctx context.Context) (int, error) {
 	if os.Getenv("PLATFORM_ACTIVITY_LEGACY_PAUSED") == "false" || s.Activity == nil {
 		return 0, nil

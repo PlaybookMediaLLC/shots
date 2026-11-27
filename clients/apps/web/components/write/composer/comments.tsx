@@ -38,6 +38,8 @@ function commentText(value: unknown): string {
  * than moved onto other text; guest comments from the public link; and how
  * to comment. Comments themselves are written beside the text they anchor.
  */
+const EMPTY_THREADS: Thread[] = []
+
 export function CommentsPanel({
   draft,
   editor,
@@ -57,10 +59,18 @@ export function CommentsPanel({
   )
   React.useEffect(() => {
     if (!editor) return
-    const read = () => setThreads(editor.getOption(discussionPlugin, 'discussions') ?? [])
+    const read = () => {
+      if (document.hidden) return
+      const next = (editor.getOption(discussionPlugin, 'discussions') ?? EMPTY_THREADS) as Thread[]
+      setThreads((prev) => (prev === next ? prev : next))
+    }
     read()
     const timer = setInterval(read, 1_000)
-    return () => clearInterval(timer)
+    document.addEventListener('visibilitychange', read)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', read)
+    }
   }, [editor])
   const anchored = new Set([
     ...commentThreads(primary),

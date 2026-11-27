@@ -8,14 +8,19 @@
 /.local
 npm-debug.log*
 **/Dockerfile*
-infra/charts
+infra
+dev
 docs
 /server
 # The browser and Go enforce the same media limits from this embedded document.
 !/server/internal/medialimits/limits.json
 *.md
-# Browser tests and their output never ship in an image; excluding them keeps
-# the e2e production build cached when only tests change.
+# Browser tests, package tests, and standalone native integrations never ship in web/collab images.
+clients/integrations
 clients/apps/web/test
 clients/apps/web/playwright-report
 clients/apps/web/test-results
+clients/packages/*/test
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts

@@ -60,19 +60,37 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 	if !workspaceroles.Allows(result.Active.Role, readRoles...) {
 		return nil, publishing.ErrForbidden
 	}
-	if result.DeniedPermissions, err = deniedPermissions(ctx, c.client, actor.OrganizationID, actor.UserID, result.Active.Role); err != nil {
+	var (
+		denied      []string
+		workspace   *Workspace
+		entitlement *ent.WorkspaceEntitlement
+	)
+	if err := runParallel(ctx, 3,
+		func(ctx context.Context) error {
+			var err error
+			denied, err = deniedPermissions(ctx, c.client, actor.OrganizationID, actor.UserID, result.Active.Role)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			workspace, err = c.GetWorkspace(ctx, actor.OrganizationID)
+			return err
+		},
+		func(ctx context.Context) error {
+			row, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(actor.OrganizationID)).Only(ctx)
+			if err != nil && !ent.IsNotFound(err) {
+				return err
+			}
+			entitlement = row
+			return nil
+		},
+	); err != nil {
 		return nil, err
 	}
-	result.Workspace, err = c.GetWorkspace(ctx, actor.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
+	result.DeniedPermissions = denied
+	result.Workspace = workspace
 	if result.Workspace == nil {
 		return result, nil
-	}
-	entitlement, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(actor.OrganizationID)).Only(ctx)
-	if err != nil && !ent.IsNotFound(err) {
-		return nil, err
 	}
 	_, _, result.Features = evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
 	if result.Features[WhitelabelFeature] {

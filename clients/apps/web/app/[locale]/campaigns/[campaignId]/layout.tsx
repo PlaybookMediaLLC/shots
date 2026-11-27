@@ -28,16 +28,23 @@ export default async function CampaignLayout({ children, params }: CampaignLayou
   const { campaignId, locale } = await params
   const access = await requireCampaignPageAccess(locale)
   // Scoped to the active workspace: another workspace's id is a 404.
-  const [campaign, bootstrap] = await Promise.all([
+  // Start campaign-id reads in parallel; tracedFetch deduplicates them with the child page.
+  const [campaignResult, bootstrapResult, plansResult, runsResult] = await Promise.allSettled([
     getCampaign(access.tenant, campaignId),
     backendSDK(access.tenant).getBootstrap(),
+    getCampaignPlans(access.tenant, campaignId),
+    latestLaunchRuns(access.tenant, campaignId),
   ])
+  if (campaignResult.status === 'rejected') throw campaignResult.reason
+  const campaign = campaignResult.value
   if (!campaign) notFound()
-  const [plans, specs, runs] = await Promise.all([
-    getCampaignPlans(access.tenant, campaign.id),
-    campaign.release ? getReleaseSpecs(access.tenant, campaign.release.id) : null,
-    latestLaunchRuns(access.tenant, campaign.id),
-  ])
+  if (bootstrapResult.status === 'rejected') throw bootstrapResult.reason
+  if (plansResult.status === 'rejected') throw plansResult.reason
+  if (runsResult.status === 'rejected') throw runsResult.reason
+  const bootstrap = bootstrapResult.value
+  const plans = plansResult.value
+  const runs = runsResult.value
+  const specs = campaign.release ? await getReleaseSpecs(access.tenant, campaign.release.id) : null
   const progress =
     runs.produce?.status === 'RUNNING'
       ? 'Producing'

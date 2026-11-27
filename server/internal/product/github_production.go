@@ -617,7 +617,11 @@ func (c *Configuration) GitHubProductionCatalog(ctx context.Context, actor Actor
 }
 
 func (c *Configuration) githubDeliveryOrigin(ctx context.Context, delivery string) (string, error) {
-	recovered, err := c.client.GitHubDeliveryRecovery.Query().Where(githubdeliveryrecovery.GUID(delivery), githubdeliveryrecovery.Recovery(true)).Exist(ctx)
+	return githubDeliveryOriginWithClient(ctx, c.client, delivery)
+}
+
+func githubDeliveryOriginWithClient(ctx context.Context, client *ent.Client, delivery string) (string, error) {
+	recovered, err := client.GitHubDeliveryRecovery.Query().Where(githubdeliveryrecovery.GUID(delivery), githubdeliveryrecovery.Recovery(true)).Exist(ctx)
 	if err != nil {
 		return "", err
 	}

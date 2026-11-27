@@ -40,21 +40,23 @@ function mapR2PathToLocal(path: string): string {
 }
 
 /**
- * Get the public URL for an R2 object.
- * Uses a same-origin proxy path (/r2-assets/...) to avoid CORS issues
- * during canvas capture (e.g. video export with domToCanvas).
- * The Next.js rewrite in next.config.ts proxies these to the actual R2 URL.
+ * Get the direct public CDN URL for an R2 object.
+ * R2 serves CORS headers (`Access-Control-Allow-Origin`) so images loaded with
+ * `crossOrigin="anonymous"` stay untainted during canvas & video exports
+ * without proxying 100+ MB of static assets through the Next.js Node server.
  *
  * If R2 is not configured, falls back to serving assets from local public/ directory.
  *
  * @param path - The object path/key in the bucket (e.g., "backgrounds/image.jpg")
- * @returns The proxied URL path or local public path
+ * @returns The direct R2 CDN URL or local public path
  */
 export function getR2PublicUrl(path: string): string {
-  if (path.startsWith('/r2-assets/')) return path
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path
+  const publicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/+$/, '')
 
-  const publicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+  if (path.startsWith('/r2-assets/')) {
+    return publicUrl ? `${publicUrl}/${path.slice('/r2-assets/'.length)}` : path
+  }
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path
 
   if (!publicUrl) {
     // Fall back to local public/ directory with path mapping
@@ -63,7 +65,14 @@ export function getR2PublicUrl(path: string): string {
 
   const local = mapR2PathToLocal(path)
   const versioned = publicImageUrl(local)
-  return versioned !== local ? versioned : `/r2-assets/${cleanPath}`
+  return versioned !== local ? versioned : `${publicUrl}/${cleanPath}`
+}
+
+/** Whether a URL points to the static R2 asset catalog (direct CDN or legacy proxy path). */
+export function isR2AssetUrl(url: string): boolean {
+  if (url.startsWith('/r2-assets/')) return true
+  const publicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/+$/, '')
+  return Boolean(publicUrl && url.startsWith(`${publicUrl}/`))
 }
 
 /**
@@ -98,10 +107,12 @@ export function getR2ImageUrl(options: {
   return getR2PublicUrl(src)
 }
 
-/** Same-origin image URL resized by the Next.js image optimizer; width must be a configured image size. */
+/** Image URL resized by the Next.js image optimizer for local or R2 catalog assets; width must be a configured image size. */
 export function getResizedImageUrl(url: string, width: number): string {
-  if (!url.startsWith('/') || url.startsWith('//')) return url
-  return `/_next/image?url=${encodeURIComponent(url)}&w=${width}&q=75`
+  if ((url.startsWith('/') && !url.startsWith('//')) || isR2AssetUrl(url)) {
+    return `/_next/image?url=${encodeURIComponent(url)}&w=${width}&q=75`
+  }
+  return url
 }
 
 /**

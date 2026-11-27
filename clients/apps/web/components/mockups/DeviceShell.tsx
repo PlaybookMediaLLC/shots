@@ -333,6 +333,7 @@ export function DeviceShell({
         />
         <img
           src={asset.src}
+          crossOrigin={asset.src.startsWith('blob:') || asset.src.startsWith('data:') ? undefined : 'anonymous'}
           alt=""
           aria-hidden="true"
           draggable={false}

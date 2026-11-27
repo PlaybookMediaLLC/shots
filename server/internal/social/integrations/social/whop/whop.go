@@ -329,7 +329,7 @@ func (p *Provider) put(ctx context.Context, mediaPath, uploadURL string, content
 		return err
 	}
 	getReq.Header.Set("Accept-Encoding", "identity")
-	file, err := ssrf.Client().Do(getReq)
+	file, err := ssrf.StreamingClient().Do(getReq)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (p *Provider) put(ctx context.Context, mediaPath, uploadURL string, content
 		}
 		req.Header.Set(k, communityutil.JSString(v))
 	}
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (p *Provider) put(ctx context.Context, mediaPath, uploadURL string, content
 	// A rejected PUT leaves the file pending forever - fail fast instead of
 	// burning the ~9 minute status poll.
 	if !communityutil.OK(res.StatusCode) {
-		text, err := io.ReadAll(res.Body)
+		text, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 		if err != nil {
 			text = []byte("{}")
 		}

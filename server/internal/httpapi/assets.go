@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strconv"
@@ -130,10 +131,52 @@ func (s *Server) signAssetDownload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"downloadUrl": url})
 }
 
+func (s *Server) signAssetDownloads(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		AssetIDs []string `json:"assetIds"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(input.AssetIDs) > 100 {
+		writeError(w, http.StatusBadRequest, "too many asset IDs")
+		return
+	}
+	for _, id := range input.AssetIDs {
+		if _, err := uuid.Parse(id); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid asset ID")
+			return
+		}
+	}
+	urls, err := s.configuration.SignAssetDownloads(r.Context(), workspaceActor(r), input.AssetIDs)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"urls": urls})
+}
+
+type assetStreamStore interface {
+	OpenAssetStream(ctx context.Context, actor product.Actor, assetID, rangeHeader, ifNoneMatch string) (*product.AssetStream, error)
+	OpenAssetDownloadStream(ctx context.Context, assetID, token, requestID, rangeHeader, ifNoneMatch string) (*product.AssetStream, error)
+}
+
+const privateRevalidateCacheControl = "private, max-age=0, must-revalidate"
+
 func (s *Server) readAsset(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if _, err := uuid.Parse(id); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid asset ID")
+		return
+	}
+	if streamer, ok := s.configuration.(assetStreamStore); ok {
+		stream, err := streamer.OpenAssetStream(r.Context(), workspaceActor(r), id, r.Header.Get("Range"), r.Header.Get("If-None-Match"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		serveAssetStream(w, r, stream)
 		return
 	}
 	body, mediaType, err := s.configuration.ReadAsset(r.Context(), workspaceActor(r), id)
@@ -157,6 +200,15 @@ func (s *Server) readAssetDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid download grant")
 		return
 	}
+	if streamer, ok := s.configuration.(assetStreamStore); ok {
+		stream, err := streamer.OpenAssetDownloadStream(r.Context(), id, input.Token, r.Header.Get("X-Request-ID"), r.Header.Get("Range"), r.Header.Get("If-None-Match"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		serveAssetStream(w, r, stream)
+		return
+	}
 	body, mediaType, err := s.configuration.ReadAssetDownload(r.Context(), id, input.Token, r.Header.Get("X-Request-ID"))
 	if err != nil {
 		writeStoreError(w, err)
@@ -165,9 +217,54 @@ func (s *Server) readAssetDownload(w http.ResponseWriter, r *http.Request) {
 	serveAssetBytes(w, r, body, mediaType)
 }
 
+func serveAssetStream(w http.ResponseWriter, r *http.Request, stream *product.AssetStream) {
+	if stream.Body != nil {
+		defer stream.Body.Close()
+	}
+	if stream.ETag != "" {
+		w.Header().Set("ETag", stream.ETag)
+	}
+	w.Header().Set("Cache-Control", privateRevalidateCacheControl)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if stream.Status == http.StatusNotModified {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	if stream.Status == http.StatusRequestedRangeNotSatisfiable {
+		if stream.ContentRange != "" {
+			w.Header().Set("Content-Range", stream.ContentRange)
+		}
+		http.Error(privateAssetResponse{w}, "invalid range", http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
+	if stream.Body == nil {
+		serveAssetBytes(w, r, stream.FallbackBytes, stream.MediaType)
+		return
+	}
+	// Large media transfers may outlast the API's default WriteTimeout.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(10 * time.Minute))
+	w.Header().Set("Content-Type", stream.MediaType)
+	w.Header().Set("Accept-Ranges", "bytes")
+	if stream.ContentLength != nil && *stream.ContentLength >= 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(*stream.ContentLength, 10))
+	}
+	if stream.ContentRange != "" {
+		w.Header().Set("Content-Range", stream.ContentRange)
+	}
+	status := stream.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	w.WriteHeader(status)
+	if _, err := io.Copy(w, stream.Body); err != nil {
+		// Never turn a truncated stream into an apparently complete response.
+		panic(http.ErrAbortHandler)
+	}
+}
+
 func serveAssetBytes(w http.ResponseWriter, r *http.Request, body []byte, mediaType string) {
 	w.Header().Set("Content-Type", mediaType)
-	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Cache-Control", privateRevalidateCacheControl)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Preserve seeking and PDF range reads without issuing a storage redirect.
 	http.ServeContent(privateAssetResponse{w}, r, "", time.Time{}, bytes.NewReader(body))
@@ -178,7 +275,7 @@ type privateAssetResponse struct{ http.ResponseWriter }
 func (w privateAssetResponse) WriteHeader(status int) {
 	// ServeContent clears cache headers on range errors. Those responses are
 	// principal-dependent too and must never become a shared cached result.
-	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Cache-Control", privateRevalidateCacheControl)
 	w.ResponseWriter.WriteHeader(status)
 }
 

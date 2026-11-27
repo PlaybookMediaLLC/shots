@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // S3Store keeps media bytes outside PostgreSQL while asset authorization and
@@ -29,6 +30,7 @@ type S3Store struct {
 	bucket         string
 	client         *s3.Client
 	signer         *s3.PresignClient
+	internalSigner *s3.PresignClient
 	deliverySigner *s3.PresignClient
 	delivery       *deliveryGateway
 }
@@ -59,8 +61,9 @@ func NewS3Store(endpoint, browserEndpoint, region, bucket, accessKey, secretKey 
 		})
 	}
 	internal := client(endpoint)
+	internalPresign := s3.NewPresignClient(internal)
 	return &S3Store{bucket: bucket, client: internal, signer: s3.NewPresignClient(client(browserEndpoint)),
-		deliverySigner: s3.NewPresignClient(internal)}, nil
+		internalSigner: internalPresign, deliverySigner: internalPresign}, nil
 }
 
 func NewS3StoreFromEnvironment() (*S3Store, error) {
@@ -226,6 +229,20 @@ func (s *S3Store) SignDownloadFor(ctx context.Context, key string, expires time.
 	return request.URL, nil
 }
 
+// SignInternalDownload signs a GET against the internal storage endpoint
+// (R2_ENDPOINT) for server-to-server fetches such as Next.js kit rendering,
+// avoiding browser-only hosts (e.g., localhost in Compose) unreachable from
+// other backend containers.
+func (s *S3Store) SignInternalDownload(ctx context.Context, key string) (string, error) {
+	request, err := s.internalSigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(key),
+	}, s3.WithPresignExpires(5*time.Minute))
+	if err != nil {
+		return "", fmt.Errorf("sign internal media download: %w", err)
+	}
+	return request.URL, nil
+}
+
 // SignDelivery is called only when a scheduled post is due. Providers can
 // fetch this private object for the next 24 hours without a stored public URL.
 func (s *S3Store) SignDelivery(ctx context.Context, key string) (string, error) {
@@ -277,6 +294,19 @@ func (s *S3Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 
+// ErrInvalidRange is returned when storage rejects a malformed or out-of-bounds Range header.
+var ErrInvalidRange = errors.New("invalid media range")
+
+// ObjectRange is a streamed object (or byte range) opened from storage.
+type ObjectRange struct {
+	Body          io.ReadCloser
+	ContentType   string
+	ContentLength *int64
+	ContentRange  string
+	ETag          string
+	Status        int
+}
+
 // Open streams an object, for reading it back without holding it whole. A
 // missing object is ErrObjectNotFound.
 func (s *S3Store) Open(ctx context.Context, key string) (io.ReadCloser, error) {
@@ -288,6 +318,44 @@ func (s *S3Store) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return response.Body, nil
+}
+
+// OpenRange streams an object or byte range directly from S3 without buffering
+// the full object in memory.
+func (s *S3Store) OpenRange(ctx context.Context, key, rangeHeader string) (*ObjectRange, error) {
+	input := &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}
+	if rangeHeader != "" {
+		input.Range = aws.String(rangeHeader)
+	}
+	response, err := s.client.GetObject(ctx, input)
+	if err != nil {
+		if missingObject(err) {
+			return nil, fmt.Errorf("%w: %v", ErrObjectNotFound, err)
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidRange" {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidRange, err)
+		}
+		var httpErr *smithyhttp.ResponseError
+		if errors.As(err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusRequestedRangeNotSatisfiable {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidRange, err)
+		}
+		return nil, err
+	}
+	status := http.StatusOK
+	contentRange := ""
+	if response.ContentRange != nil {
+		contentRange = *response.ContentRange
+		status = http.StatusPartialContent
+	}
+	return &ObjectRange{
+		Body:          response.Body,
+		ContentType:   aws.ToString(response.ContentType),
+		ContentLength: response.ContentLength,
+		ContentRange:  contentRange,
+		ETag:          aws.ToString(response.ETag),
+		Status:        status,
+	}, nil
 }
 
 func (s *S3Store) Read(ctx context.Context, key string) ([]byte, error) {

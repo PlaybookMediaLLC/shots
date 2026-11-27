@@ -6,12 +6,14 @@ import {
   deleteAsset,
   listAssets,
   signAssetDownload,
+  signAssetDownloads,
   signAssetUpload,
   signAssetUploadInParts,
   signAssetUploadParts,
 } from '@/lib/tenant/assets'
 import {
   assetDownloadQuerySchema,
+  assetDownloadsQuerySchema,
   assetListQuerySchema,
   assetPartsCompleteSchema,
   assetUploadPartsSchema,
@@ -69,6 +71,11 @@ export const assetRouter = router({
       }
       return { downloadUrl }
     }),
+  signDownloads: tenantProcedure({ apiKeyScope: 'artifact:read', permission: 'artifact:read' })
+    .input(assetDownloadsQuerySchema)
+    .query(async ({ ctx, input }) => ({
+      urls: await signAssetDownloads(ctx.tenant, input.assetIds),
+    })),
   delete: tenantProcedure({
     apiKeyScope: 'asset:write',
     permission: 'artifact:edit',

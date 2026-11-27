@@ -24,6 +24,7 @@ import {
   documentReviewCommentSchema,
   type documentVoiceQuerySchema,
 } from '@/lib/api/contracts/ai'
+import { trimMessagesToBudget } from '@/lib/assistant/snapshots'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { getWorkspaceVoice } from '@/lib/launch/store'
 import { writingContext } from '@/lib/write/ai-route'
@@ -47,27 +48,34 @@ export function documentVoice(access: OrganizationAccess, query: DocumentVoiceQu
 }
 
 /** Everything after the task: the voice, the product's facts and the platform's limit. */
-async function systemPrompt(
+function systemPrompt(
   access: OrganizationAccess,
   instructions: string,
   query: DocumentVoiceQuery
-) {
-  const voice = documentVoice(access, query)
-  const product = productContext(access)
-  const limit = query.channel
-    ? `\n\nEach post is for ${query.channel} and may hold ${CAPABILITIES[query.channel].captionLimit} characters.`
-    : ''
-  return [instructions + limit + voiceInstructions(await voice), await product]
-    .filter(Boolean)
-    .join('\n\n')
+): Promise<string> {
+  const prompt = (async () => {
+    const voice = documentVoice(access, query)
+    const product = productContext(access)
+    const limit = query.channel
+      ? `\n\nEach post is for ${query.channel} and may hold ${CAPABILITIES[query.channel].captionLimit} characters.`
+      : ''
+    return [instructions + limit + voiceInstructions(await voice), await product]
+      .filter(Boolean)
+      .join('\n\n')
+  })()
+  prompt.catch(() => undefined)
+  return prompt
 }
 
 /** The document goes to the model as content, fenced, never as instructions. */
 async function modelMessages(body: DocumentChatRequest) {
   const document = (body.system ?? '').replaceAll('</document_context>', '')
+  const converted = trimMessagesToBudget(
+    await convertToModelMessages(body.messages as unknown as UIMessage[])
+  )
   return [
     { content: `<document_context>\n${document}\n</document_context>`, role: 'user' as const },
-    ...(await convertToModelMessages(body.messages as unknown as UIMessage[])),
+    ...converted,
   ]
 }
 
@@ -84,12 +92,14 @@ export function streamDocumentChat(
 ): Promise<Response> {
   const toolName = body.ctx?.toolName ?? 'generate'
   if (toolName === 'comment') return reviewDocument(access, body, query)
+  const systemPromise = systemPrompt(access, DOCUMENT_EDITOR_INSTRUCTIONS, query)
   return new Promise<Response>((resolve, reject) => {
     withAiCredits(access, async () => {
+      const [messages, system] = await Promise.all([modelMessages(body), systemPromise])
       const result = streamText({
-        messages: await modelMessages(body),
+        messages,
         model: models.languageModel('drafting'),
-        system: await systemPrompt(access, DOCUMENT_EDITOR_INSTRUCTIONS, query),
+        system,
       })
       const stream = createUIMessageStream({
         execute: ({ writer }) => {
@@ -108,14 +118,16 @@ async function reviewDocument(
   body: DocumentChatRequest,
   query: DocumentVoiceQuery
 ): Promise<Response> {
+  const systemPromise = systemPrompt(access, DOCUMENT_REVIEW_INSTRUCTIONS, query)
   const comments = await withAiCredits(access, async () => {
+    const [messages, system] = await Promise.all([modelMessages(body), systemPromise])
     const { output } = await generateText({
-      messages: await modelMessages(body),
+      messages,
       model: models.languageModel('drafting'),
       output: Output.object({
         schema: z.object({ comments: z.array(documentReviewCommentSchema).max(5) }),
       }),
-      system: await systemPrompt(access, DOCUMENT_REVIEW_INSTRUCTIONS, query),
+      system,
     })
     return output.comments
   })
@@ -135,11 +147,12 @@ export function completeDocumentText(
   body: z.infer<typeof documentCopilotRequestSchema>,
   query: DocumentVoiceQuery
 ): Promise<{ text: string }> {
+  const systemPromise = systemPrompt(access, DOCUMENT_COPILOT_INSTRUCTIONS, query)
   return withAiCredits(access, async () => {
     const { text } = await generateText({
       model: models.languageModel('fast'),
       prompt: body.prompt,
-      system: await systemPrompt(access, DOCUMENT_COPILOT_INSTRUCTIONS, query),
+      system: await systemPromise,
     })
     return { text: text.trim() || '0' }
   })

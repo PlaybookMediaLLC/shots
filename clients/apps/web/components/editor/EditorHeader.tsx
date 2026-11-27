@@ -45,13 +45,21 @@ import { KeyboardShortcutsDialog } from '@/components/canvas/dialogs/KeyboardSho
 import { aspectRatios } from '@/lib/constants/aspect-ratios'
 import { AspectRatioPicker } from '@/components/aspect-ratio/aspect-ratio-picker'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import dynamic from 'next/dynamic'
 import { CopyProgressDialog } from '@/components/canvas/dialogs/CopyProgressDialog'
-import { ExportSlideshowDialog } from '@/lib/export-slideshow-dialog'
 import { useExportSettings } from '@/lib/export/use-export-settings'
 import { formatHasControl } from '@/lib/export/formats'
 import { ExportPanel } from '@/components/export/ExportPanel'
-import { BatchWorkspace } from '@/components/export/batch/BatchWorkspace'
 import { useLibraryStyleSources } from '@/components/export/batch/use-library-styles'
+
+const ExportSlideshowDialog = dynamic(
+  () => import('@/lib/export-slideshow-dialog').then((m) => m.ExportSlideshowDialog),
+  { ssr: false }
+)
+const BatchWorkspace = dynamic(
+  () => import('@/components/export/batch/BatchWorkspace').then((m) => m.BatchWorkspace),
+  { ssr: false }
+)
 import { cn } from '@/lib/utils'
 import { ProjectMenu } from '@/components/projects/ProjectMenu'
 import { ShareButton } from './share/ShareButton'
@@ -155,6 +163,10 @@ export function EditorHeader() {
   const [exportSlideshowOpen, setExportSlideshowOpen] = React.useState(false)
   const [exportBusy, setExportBusy] = React.useState(false)
   const [batchOpen, setBatchOpen] = React.useState(false)
+  const [batchMounted, setBatchMounted] = React.useState(false)
+  React.useEffect(() => {
+    if (batchOpen) setBatchMounted(true)
+  }, [batchOpen])
   const libraryStyles = useLibraryStyleSources(batchOpen)
   const [resetOpen, setResetOpen] = React.useState(false)
 
@@ -541,9 +553,13 @@ export function EditorHeader() {
 
       <CopyProgressDialog open={isCopying} progress={copyProgress} />
 
-      <ExportSlideshowDialog open={exportSlideshowOpen} onOpenChange={setExportSlideshowOpen} />
+      {exportSlideshowOpen ? (
+        <ExportSlideshowDialog open={exportSlideshowOpen} onOpenChange={setExportSlideshowOpen} />
+      ) : null}
 
-      <BatchWorkspace onOpenChange={setBatchOpen} open={batchOpen} styleSources={libraryStyles} />
+      {batchMounted ? (
+        <BatchWorkspace onOpenChange={setBatchOpen} open={batchOpen} styleSources={libraryStyles} />
+      ) : null}
     </>
   )
 }

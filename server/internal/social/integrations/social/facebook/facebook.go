@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -23,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ids"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ssrf"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 	"go.temporal.io/sdk/temporal"
 )
@@ -1155,7 +1157,7 @@ func getJSON(ctx context.Context, rawURL string, v any, checked bool) error {
 	if err != nil {
 		return err
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := ssrf.Client().Do(req)
 	if err != nil {
 		return err
 	}
@@ -1165,7 +1167,7 @@ func getJSON(ctx context.Context, rawURL string, v any, checked bool) error {
 			return err
 		}
 	}
-	return json.NewDecoder(res.Body).Decode(v)
+	return json.NewDecoder(io.LimitReader(res.Body, 10<<20)).Decode(v)
 }
 
 // All is Promise.all: fn runs for every item concurrently, results keep the

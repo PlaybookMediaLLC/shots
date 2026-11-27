@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -350,7 +351,8 @@ func (d *Dispatcher) record(ctx context.Context, c claim, started time.Time, sta
 			_, err = tx.ExecContext(ctx, `UPDATE webhook_subscription SET "lastFailureAt" = $2 WHERE id = $1`, c.sub, started.UTC())
 		}
 	default:
-		wait := Backoff[min(c.attempts-1, len(Backoff)-1)]
+		base := Backoff[min(c.attempts-1, len(Backoff)-1)]
+		wait := jitteredDuration(base)
 		_, err = tx.ExecContext(ctx, `UPDATE webhook_delivery SET status = 'PENDING', "leaseUntil" = NULL, "lastAttemptAt" = $2,
 			"responseStatus" = $3, "errorClass" = $4, "nextAttemptAt" = $5, "updatedAt" = now() WHERE id = $1`,
 			c.id, started.UTC(), responseStatus, errorClass, time.Now().UTC().Add(wait))
@@ -362,4 +364,15 @@ func (d *Dispatcher) record(ctx context.Context, c claim, started time.Time, sta
 		return err
 	}
 	return tx.Commit()
+}
+
+func jitteredDuration(base time.Duration) time.Duration {
+	if base <= 0 {
+		return base
+	}
+	quarter := base / 4
+	if quarter <= 0 {
+		return base
+	}
+	return base - quarter + time.Duration(rand.Int64N(int64(2*quarter)+1))
 }

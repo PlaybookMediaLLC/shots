@@ -41,9 +41,8 @@ func (a *Activities) Load(ctx context.Context, input Input) (*product.Automation
 	result, err := a.Store.LoadReleaseAutomation(ctx, input.OrganizationID, input.RunID, input.Attempt)
 	return result, activityError(err)
 }
-func (a *Activities) Enrich(ctx context.Context, input Input) (automation.Event, error) {
+func startHeartbeat(ctx context.Context) func() {
 	done := make(chan struct{})
-	defer close(done)
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
@@ -58,6 +57,11 @@ func (a *Activities) Enrich(ctx context.Context, input Input) (automation.Event,
 			}
 		}
 	}()
+	return func() { close(done) }
+}
+
+func (a *Activities) Enrich(ctx context.Context, input Input) (automation.Event, error) {
+	defer startHeartbeat(ctx)()
 	result, err := a.Store.EnrichReleaseAutomation(ctx, input.OrganizationID, input.RunID, input.Attempt)
 	return result, activityError(err)
 }
@@ -81,4 +85,14 @@ func (a *Activities) Collect(ctx context.Context, input Input) (string, error) {
 }
 func (a *Activities) Finish(ctx context.Context, input Finish) error {
 	return activityError(a.Store.FinishReleaseAutomation(ctx, input.Run.OrganizationID, input.Run.RunID, input.Status, input.Code, input.Reason, input.Run.Attempt))
+}
+
+func (a *Activities) PrepareKit(ctx context.Context, input KitInput) error {
+	defer startHeartbeat(ctx)()
+	return activityError(a.Store.ProcessKitPreparation(ctx, input.OrganizationID, input.ID))
+}
+
+func (a *Activities) ExportKit(ctx context.Context, input KitInput) error {
+	defer startHeartbeat(ctx)()
+	return activityError(a.Store.ProcessKitExport(ctx, input.OrganizationID, input.ID))
 }

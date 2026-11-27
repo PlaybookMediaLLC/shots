@@ -179,6 +179,7 @@ function Navigation({
   onNavigate,
   paidPlan,
   role,
+  workspaceId,
 }: {
   campaignsEnabled: boolean
   collapsed: boolean
@@ -188,6 +189,7 @@ function Navigation({
   onNavigate?: () => void
   paidPlan: boolean
   role: string
+  workspaceId?: string
 }) {
   const t = useTranslations('platformNavigation')
   const area = platformArea(usePathname())
@@ -255,8 +257,7 @@ function Navigation({
         {navGroup(AREAS_GROUP)}
         {collapsed ? null : (
           <SidebarRecents
-            campaignsEnabled={campaignsEnabled}
-            draftsEnabled={draftsEnabled}
+            initialWorkspaceId={workspaceId}
             onNavigate={onNavigate}
             paidPlan={paidPlan}
           />
@@ -601,6 +602,7 @@ export function PlatformSidebar({
             paidPlan={paidPlan}
             deniedPermissions={deniedPermissions}
             role={role}
+            workspaceId={notificationIdentity?.workspaceId}
           />
         </div>
 
@@ -654,6 +656,7 @@ export function PlatformSidebar({
                   paidPlan={paidPlan}
                   deniedPermissions={deniedPermissions}
                   role={role}
+                  workspaceId={notificationIdentity?.workspaceId}
                   onNavigate={() => setMobileOpen(false)}
                 />
               </div>

@@ -24,8 +24,13 @@ const (
 	// ClassifyActivity asks the AI whether an event is worth marketing and
 	// returns the verdict recorded on the node receipt.
 	ClassifyActivity = "release-automation-classify-v1"
-	StoppedError     = "ReleaseAutomationStopped"
-	PermanentError   = "ReleaseAutomationInvalid"
+	// Release kit preparation and export workflows run off the global outbox loop.
+	KitPrepareWorkflowName = "platform-release-kit-prepare-v1"
+	KitExportWorkflowName  = "platform-release-kit-export-v1"
+	KitPrepareActivity     = "release-kit-prepare-v1"
+	KitExportActivity      = "release-kit-export-v1"
+	StoppedError           = "ReleaseAutomationStopped"
+	PermanentError         = "ReleaseAutomationInvalid"
 	// SupersededError ends a run whose deployment a newer one replaced before
 	// its capture ran. It schedules the same finish activity as any failure, so
 	// histories without it replay unchanged.
@@ -34,6 +39,36 @@ const (
 	// commands a run collected before the change would have scheduled.
 	deploymentKindChange = "deployment-kind"
 )
+
+// KitInput identifies a release kit revision or export build; safe in workflow history.
+type KitInput struct {
+	OrganizationID string `json:"organizationId"`
+	ID             string `json:"id"`
+}
+
+func runKitActivity(ctx workflow.Context, name string, timeout time.Duration, input KitInput) error {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: timeout,
+		HeartbeatTimeout:    30 * time.Second,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:        5 * time.Second,
+			MaximumInterval:        time.Minute,
+			MaximumAttempts:        3,
+			NonRetryableErrorTypes: []string{StoppedError, PermanentError},
+		},
+	})
+	return workflow.ExecuteActivity(ctx, name, input).Get(ctx, nil)
+}
+
+// KitPrepareWorkflow renders and pins release kit artifacts off the global outbox loop.
+func KitPrepareWorkflow(ctx workflow.Context, input KitInput) error {
+	return runKitActivity(ctx, KitPrepareActivity, 6*time.Minute, input)
+}
+
+// KitExportWorkflow assembles an approved release kit ZIP bundle off the global outbox loop.
+func KitExportWorkflow(ctx workflow.Context, input KitInput) error {
+	return runKitActivity(ctx, KitExportActivity, 4*time.Minute, input)
+}
 
 type Input struct {
 	OrganizationID string `json:"organizationId"`

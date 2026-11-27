@@ -42,8 +42,6 @@ import { CheckIcon, CloseIcon, TourIcon } from './icons'
 
 /** How long a step waits for its element, which can render after the page. */
 const ANCHOR_WAIT_MS = 3_000
-/** How often an open step checks its element, which can render late or be replaced. */
-const ANCHOR_CHECK_MS = 250
 /** A first visit settles before the tour starts by itself. */
 const AUTO_START_DELAY_MS = 800
 
@@ -211,20 +209,44 @@ export function ProductTourProvider({
   // the step without it.
   useEffect(() => {
     if (!step || !stepKey || !onRoute) return
-    const startedAt = Date.now()
     let reported: HTMLElement | null | undefined
-    const check = () => {
+    let checkTimer: number | null = null
+    const check = (expired = false) => {
+      if (checkTimer !== null) {
+        window.clearTimeout(checkTimer)
+        checkTimer = null
+      }
       if (reported?.isConnected && reported.getClientRects().length > 0) return
       const found = findAnchor(step.anchor)
       if (found === reported) return
-      if (found || Date.now() - startedAt >= ANCHOR_WAIT_MS) {
+      if (found || expired) {
         reported = found
         setTarget({ key: stepKey, element: found })
       }
     }
-    check()
-    const timer = window.setInterval(check, ANCHOR_CHECK_MS)
-    return () => window.clearInterval(timer)
+    const scheduleCheck = () => {
+      if (checkTimer !== null) return
+      checkTimer = window.setTimeout(() => {
+        checkTimer = null
+        check(false)
+      }, 200)
+    }
+    check(false)
+    const observer = new MutationObserver(scheduleCheck)
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'hidden', 'data-navigation', 'data-state', 'data-tour-id'],
+      childList: true,
+      subtree: true,
+    })
+    window.addEventListener('resize', scheduleCheck, { passive: true })
+    const deadlineTimer = window.setTimeout(() => check(true), ANCHOR_WAIT_MS)
+    return () => {
+      if (checkTimer !== null) window.clearTimeout(checkTimer)
+      window.clearTimeout(deadlineTimer)
+      observer.disconnect()
+      window.removeEventListener('resize', scheduleCheck)
+    }
   }, [onRoute, step, stepKey])
 
   // While the next step's element is found, the card stays beside the last one

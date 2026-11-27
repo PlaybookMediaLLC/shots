@@ -46,8 +46,6 @@ import { voiceInstructions } from '@/lib/write/voice'
 
 /** Model steps one turn may take. */
 const MAX_STEPS = 12
-/** Runs whose trace `getConversationView` loads, newest first. */
-const TRACED_RUNS = 10
 /** The backend's title for a conversation created without one. */
 const DEFAULT_TITLE = 'New conversation'
 
@@ -380,21 +378,14 @@ export type ConversationRunView = {
  * the UI renders it as text.
  */
 export async function getConversationView(access: OrganizationAccess, conversationId: string) {
-  const backend = backendSDK(access)
-  const { conversation, messages } = await backend.getConversation(conversationId)
-  const runIds = [
-    ...new Set(messages.flatMap((message) => (message.launchRunId ? [message.launchRunId] : []))),
-  ].slice(-TRACED_RUNS)
-  // ponytail: two backend reads per traced run on every poll; a batch read when it shows.
-  const runs = await Promise.all(
-    runIds.map(async (id): Promise<ConversationRunView> => {
-      const [run, { steps }] = await Promise.all([
-        backend.getAgentRun(id),
-        backend.listLaunchRunSteps(id),
-      ])
-      return { ...runStatus(run), id, steps: steps.map((step) => describeStep(step, steps)) }
-    })
+  const { conversation, messages, runs: rawRuns } = await backendSDK(access).getConversationView(
+    conversationId
   )
+  const runs: ConversationRunView[] = rawRuns.map(({ run, steps }) => ({
+    ...runStatus(run),
+    id: run.id,
+    steps: steps.map((step) => describeStep(step, steps)),
+  }))
   return {
     conversation: {
       campaignId: conversation.campaignId,

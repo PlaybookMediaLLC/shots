@@ -87,7 +87,9 @@ func (o *recordingAssetObjects) Read(_ context.Context, key string) ([]byte, err
 	return o.written, nil
 }
 func (o *recordingAssetObjects) Delete(_ context.Context, key string) error {
+	o.mu.Lock()
 	o.key = key
+	o.mu.Unlock()
 	return nil
 }
 

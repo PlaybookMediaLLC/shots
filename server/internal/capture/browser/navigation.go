@@ -419,7 +419,7 @@ func (s *scope) waitNavigation(ctx context.Context, input RunInput, before Navig
 		select {
 		case <-waitCtx.Done():
 			return &Failure{Code: NavigationFailed}
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 }

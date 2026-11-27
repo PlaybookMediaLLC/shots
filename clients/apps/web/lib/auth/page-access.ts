@@ -79,11 +79,26 @@ async function loadPageAccess(requestHeaders: Headers) {
   return getBackendPageAccess(requestHeaders, session)
 }
 
+const pageAccessCache = cache(
+  () => new Map<string, Promise<Awaited<ReturnType<typeof loadPageAccess>>>>()
+)
+
 /**
  * The signed-in person's access, or null without a session. Read once per
- * request, so a page and its shell share one backend round trip.
+ * request, so a layout, page, and shell share one backend round trip even when
+ * `headers()` returns distinct Headers instances. Outside a React render,
+ * `cache()` allocates a fresh Map per call so nothing leaks across requests.
  */
-export const getPageAccess = cache(loadPageAccess)
+export function getPageAccess(requestHeaders: Headers) {
+  const byCookie = pageAccessCache()
+  const key = requestHeaders.get('cookie') ?? ''
+  let pending = byCookie.get(key)
+  if (!pending) {
+    pending = loadPageAccess(requestHeaders)
+    byCookie.set(key, pending)
+  }
+  return pending
+}
 
 export function getLocalizedPath(locale: string, path: string): string {
   return locale === 'en' ? path : `/${locale}${path}`

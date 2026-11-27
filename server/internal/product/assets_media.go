@@ -11,6 +11,7 @@ import (
 	_ "image/png"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,9 +22,11 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitartifactrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/kitexport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/mediavideo"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
@@ -206,6 +209,19 @@ func (c *Configuration) SignAssetUpload(ctx context.Context, actor Actor, input 
 			return nil, err
 		}
 	}
+	var projectRef *ent.Project
+	if input.ProjectID != "" {
+		projectRef, err = c.client.Project.Query().
+			Where(project.ID(input.ProjectID), project.OrganizationID(actor.OrganizationID)).
+			Select(project.FieldID, project.FieldName).
+			Only(ctx)
+		if ent.IsNotFound(err) {
+			return nil, publishing.ErrNotFound
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	id := uuid.NewString()
 	key := fmt.Sprintf("org/%s/%s/%s/1/%s", actor.OrganizationID, input.Classification, id, input.FileName)
 	parts, split := c.objects.(multipartObjectStore)
@@ -237,12 +253,8 @@ func (c *Configuration) SignAssetUpload(ctx context.Context, actor Actor, input 
 		return nil, err
 	}
 	metadata := map[string]any{"fileName": input.FileName, "classification": input.Classification}
-	if input.ProjectID != "" {
-		project, err := c.GetProject(ctx, actor, input.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		metadata["projectId"], metadata["projectName"] = project.ID, project.Name
+	if projectRef != nil {
+		metadata["projectId"], metadata["projectName"] = projectRef.ID, projectRef.Name
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.asset_upload_signed", "asset", row.ID, metadata); err != nil {
 		return nil, err
@@ -479,16 +491,19 @@ func (c *Configuration) CompleteAssetUpload(ctx context.Context, actor Actor, as
 		return nil, err
 	}
 	video := content.video
-	if sha256 == nil && row.Sha256 == nil {
+	if sha256 == nil && row.Sha256 == nil && content.sha256 != "" {
 		// A large file's digest is the server's own reading of it.
 		sha256 = &content.sha256
 	}
-	dimensions, err := c.uploadedImageDimensions(ctx, row)
-	if err != nil {
-		if errors.Is(err, ErrInvalidInput) {
-			_, _ = c.client.Asset.Update().Where(asset.ID(row.ID), asset.StatusEQ(asset.StatusPENDING)).SetStatus(asset.StatusFAILED).Save(ctx)
+	dimensions := content.dimensions
+	if dimensions == nil && strings.HasPrefix(row.MediaType, "image/") {
+		dimensions, err = c.uploadedImageDimensions(ctx, row)
+		if err != nil {
+			if errors.Is(err, ErrInvalidInput) {
+				_, _ = c.client.Asset.Update().Where(asset.ID(row.ID), asset.StatusEQ(asset.StatusPENDING)).SetStatus(asset.StatusFAILED).Save(ctx)
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
@@ -532,15 +547,92 @@ func (c *Configuration) CompleteAssetUpload(ctx context.Context, actor Actor, as
 	return &result, nil
 }
 
+type rangeObjectOpener interface {
+	OpenRange(ctx context.Context, key, rangeHeader string) (*media.ObjectRange, error)
+}
+
+const largeVideoRangeProbeThreshold = 32 << 20
+
+var (
+	errUploadedSizeMismatch = errors.New("stored upload size differs from reserved size")
+	singleByteRangePattern  = regexp.MustCompile(`^bytes=(?:(\d+)-(\d*)|-(\d+))$`)
+)
+
+func sanitizeByteRange(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if !singleByteRangePattern.MatchString(trimmed) {
+		return ""
+	}
+	return trimmed
+}
+
+func parseContentRangeTotal(header string) (int64, bool) {
+	_, total, ok := strings.Cut(header, "/")
+	if !ok || total == "*" || total == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(total), 10, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
+}
+
 // checkUploadedBytes verifies the actual length, digest and media signature.
 // A store without streaming still verifies bytes through its Read contract.
 func (c *Configuration) checkUploadedBytes(ctx context.Context, actor Actor, row *ent.Asset, partSHA256 []string) (uploadedContent, error) {
+	// For large MP4/QuickTime videos (>32 MiB) when no full-stream SHA-256 or
+	// part checksums were requested, probe the container via targeted S3 Range
+	// reads instead of streaming gigabytes synchronously on the HTTP thread.
+	if probedVideo[row.MediaType] && row.Bytes > largeVideoRangeProbeThreshold && row.Sha256 == nil && len(partSHA256) == 0 {
+		if ranger, ok := c.objects.(rangeObjectOpener); ok {
+			sizeChecked := false
+			info, err := mediavideo.ProbeRange(int64(row.Bytes), func(start, end int64) ([]byte, error) {
+				obj, err := ranger.OpenRange(ctx, row.ObjectKey, fmt.Sprintf("bytes=%d-%d", start, end))
+				if err != nil {
+					return nil, err
+				}
+				defer obj.Body.Close()
+				if !sizeChecked {
+					if total, ok := parseContentRangeTotal(obj.ContentRange); ok {
+						if total != int64(row.Bytes) {
+							return nil, errUploadedSizeMismatch
+						}
+						sizeChecked = true
+					}
+				}
+				return io.ReadAll(io.LimitReader(obj.Body, (end-start+1)+1))
+			})
+			if err != nil {
+				if errors.Is(err, errUploadedSizeMismatch) || errors.Is(err, media.ErrInvalidRange) {
+					if _, failErr := c.client.Asset.Update().Where(asset.ID(row.ID), asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusPENDING)).SetStatus(asset.StatusFAILED).Save(ctx); failErr != nil {
+						return uploadedContent{}, failErr
+					}
+					return uploadedContent{}, invalid("The stored file size differs from the reserved upload. Upload the complete file again.")
+				}
+				if errors.Is(err, mediavideo.ErrInvalid) {
+					if _, failErr := c.client.Asset.Update().Where(asset.ID(row.ID), asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusPENDING)).SetStatus(asset.StatusFAILED).Save(ctx); failErr != nil {
+						return uploadedContent{}, failErr
+					}
+					return uploadedContent{}, invalid("This file is not a complete MP4 or MOV video. Export it again and upload the whole file.")
+				}
+				return uploadedContent{}, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+			}
+			if sizeChecked {
+				return uploadedContent{video: &info}, nil
+			}
+			// Fall back to full-stream verification if storage omitted Content-Range total.
+		}
+	}
 	object, err := c.openObject(ctx, row.ObjectKey)
 	if err != nil {
 		return uploadedContent{}, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
 	}
 	defer object.Close()
-	content, err := verifyUploadedContent(object, row.MediaType, row.Bytes, row.Sha256, partSHA256...)
+	content, err := verifyUploadedContent(ctx, object, row.MediaType, row.Bytes, row.Sha256, partSHA256...)
 	if err != nil {
 		if errors.Is(err, ErrInvalidInput) {
 			if _, failErr := c.client.Asset.Update().Where(asset.ID(row.ID), asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusPENDING)).SetStatus(asset.StatusFAILED).Save(ctx); failErr != nil {
@@ -568,6 +660,168 @@ func (c *Configuration) SignAssetDownload(ctx context.Context, actor Actor, asse
 		return "", ErrStorageUnavailable
 	}
 	return c.assetDownloadURL(actor, row.ID)
+}
+
+const maxBatchSignDownloads = 100
+
+// SignAssetDownloads signs download URLs for up to 100 uploaded assets in this
+// workspace in a single authorization check and SQL query. Assets missing or
+// outside this workspace are omitted from the returned map.
+func (c *Configuration) SignAssetDownloads(ctx context.Context, actor Actor, assetIDs []string) (map[string]string, error) {
+	if err := c.authorizeAssetRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	if len(assetIDs) > maxBatchSignDownloads {
+		return nil, invalid("Sign at most 100 assets at a time.")
+	}
+	unique := make([]string, 0, len(assetIDs))
+	seen := make(map[string]struct{}, len(assetIDs))
+	for _, id := range assetIDs {
+		if _, err := uuid.Parse(id); err != nil {
+			return nil, invalid("Each asset ID must be a valid UUID.")
+		}
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			unique = append(unique, id)
+		}
+	}
+	urls := make(map[string]string, len(unique))
+	if len(unique) == 0 {
+		return urls, nil
+	}
+	if c.objects == nil {
+		return nil, ErrStorageUnavailable
+	}
+	rows, err := c.client.Asset.Query().
+		Where(
+			asset.IDIn(unique...),
+			asset.OrganizationID(actor.OrganizationID),
+			asset.StatusEQ(asset.StatusUPLOADED),
+		).
+		Select(asset.FieldID).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		signed, err := c.assetDownloadURL(actor, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		urls[row.ID] = signed
+	}
+	return urls, nil
+}
+
+// AssetStream represents a streamed or 304-revalidated private asset response.
+type AssetStream struct {
+	Body          io.ReadCloser
+	MediaType     string
+	ETag          string
+	ContentLength *int64
+	ContentRange  string
+	Status        int
+	// FallbackBytes is populated only when the underlying store cannot stream ranges.
+	FallbackBytes []byte
+}
+
+func assetETag(row *ent.Asset) string {
+	if row.Sha256 != nil && *row.Sha256 != "" {
+		return fmt.Sprintf(`"%s-%s"`, row.ID, (*row.Sha256)[:min(16, len(*row.Sha256))])
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d", row.ID, row.ObjectKey, row.Bytes)))
+	return fmt.Sprintf(`"%s-%x"`, row.ID, sum[:8])
+}
+
+func etagMatches(ifNoneMatch, etag string) bool {
+	if ifNoneMatch == "" || etag == "" {
+		return false
+	}
+	for _, candidate := range strings.Split(ifNoneMatch, ",") {
+		c := strings.TrimSpace(candidate)
+		if c == "*" || c == etag || strings.TrimPrefix(c, "W/") == etag {
+			return true
+		}
+	}
+	return false
+}
+
+// OpenAssetStream authorizes access, handles If-None-Match (304) without
+// hitting object storage, and streams ranges directly from R2/S3 without
+// buffering the full object in Go memory.
+func (c *Configuration) OpenAssetStream(ctx context.Context, actor Actor, assetID, rangeHeader, ifNoneMatch string) (*AssetStream, error) {
+	if err := c.authorizeAssetRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	row, err := c.client.Asset.Query().Where(asset.ID(assetID), asset.OrganizationID(actor.OrganizationID),
+		asset.StatusEQ(asset.StatusUPLOADED)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if c.objects == nil {
+		return nil, ErrStorageUnavailable
+	}
+	rangeHeader = sanitizeByteRange(rangeHeader)
+	etag := assetETag(row)
+	if rangeHeader == "" && etagMatches(ifNoneMatch, etag) {
+		return &AssetStream{MediaType: row.MediaType, ETag: etag, Status: 304}, nil
+	}
+	if ranger, ok := c.objects.(rangeObjectOpener); ok {
+		obj, err := ranger.OpenRange(ctx, row.ObjectKey, rangeHeader)
+		if err != nil {
+			if errors.Is(err, media.ErrInvalidRange) {
+				size := int64(row.Bytes)
+				return &AssetStream{
+					MediaType:    row.MediaType,
+					ETag:         etag,
+					ContentRange: fmt.Sprintf("bytes */%d", size),
+					Status:       416,
+				}, nil
+			}
+			if errors.Is(err, media.ErrObjectNotFound) {
+				return nil, publishing.ErrNotFound
+			}
+			return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+		}
+		// Recheck authorization and asset existence after opening storage,
+		// matching ReadAsset's revocation semantics before releasing bytes.
+		if err := c.authorizeAssetRead(ctx, actor); err != nil {
+			obj.Body.Close()
+			return nil, err
+		}
+		current, err := c.client.Asset.Query().Where(asset.ID(assetID), asset.OrganizationID(actor.OrganizationID),
+			asset.StatusEQ(asset.StatusUPLOADED), asset.ObjectKey(row.ObjectKey)).Exist(ctx)
+		if err != nil {
+			obj.Body.Close()
+			return nil, err
+		}
+		if !current {
+			obj.Body.Close()
+			return nil, publishing.ErrNotFound
+		}
+		return &AssetStream{
+			Body:          obj.Body,
+			MediaType:     row.MediaType,
+			ETag:          etag,
+			ContentLength: obj.ContentLength,
+			ContentRange:  obj.ContentRange,
+			Status:        obj.Status,
+		}, nil
+	}
+	// Fallback for non-streaming/mock stores.
+	body, mediaType, err := c.ReadAsset(ctx, actor, assetID)
+	if err != nil {
+		return nil, err
+	}
+	return &AssetStream{
+		MediaType:     mediaType,
+		ETag:          etag,
+		Status:        200,
+		FallbackBytes: body,
+	}, nil
 }
 
 func (c *Configuration) ReadAsset(ctx context.Context, actor Actor, assetID string) ([]byte, string, error) {

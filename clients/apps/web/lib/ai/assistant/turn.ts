@@ -2,7 +2,7 @@ import 'server-only'
 
 import { APICallError, type ModelMessage, stepCountIs, streamText } from 'ai'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
-import { withAiCredits } from '@/lib/ai/metering'
+import { scheduleAfterResponse, withAiCredits } from '@/lib/ai/metering'
 import { models } from '@/lib/ai/models'
 import {
   type AiEffort,
@@ -41,7 +41,7 @@ import {
 } from '@/lib/api/contracts/ai'
 import { ASSISTANT_AI_RATE_LIMIT } from '@/lib/api/rate-limit-policy'
 import { describePage, type PageContext } from '@/lib/assistant/page-context'
-import { trimSnapshots } from '@/lib/assistant/snapshots'
+import { trimMessagesToBudget, trimSnapshots } from '@/lib/assistant/snapshots'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK } from '@/lib/backend/sdk'
@@ -155,9 +155,10 @@ export async function runWorkspaceAssistantTurn(
   }
 ) {
   const backend = backendSDK(access)
-  const [paidDecision, workspace] = await Promise.all([
+  const [paidDecision, workspace, limit] = await Promise.all([
     backend.getFeatureDecision('workspace:paid'),
     backend.getWorkspace(),
+    checkRateLimit(`assistant-ai:${access.organizationId}`, ASSISTANT_AI_RATE_LIMIT),
   ])
   if (!paidDecision.allowed || workspace.workspace?.workspaceSettings?.aiAgentEnabled === false) {
     throw new AssistantRefusal('AI is turned off for this workspace.', 403)
@@ -200,8 +201,6 @@ export async function runWorkspaceAssistantTurn(
     }
   }
 
-  // Every round trip counts: the caller owns the history, so its shape proves nothing.
-  const limit = await checkRateLimit(`assistant-ai:${access.organizationId}`, ASSISTANT_AI_RATE_LIMIT)
   if (!limit.allowed) {
     throw new AssistantRefusal('Too many AI requests. Wait a minute and try again.', 429)
   }
@@ -219,43 +218,46 @@ export async function runWorkspaceAssistantTurn(
     ? { ...workspaceTools, ...createEditorCopilotTools(activeClientTools) }
     : workspaceTools
 
-  // Posts and on-surface text are both public copy, so every turn carries the voice.
-  const [voice, product, pinned, byokResult] = await Promise.all([
+  // Start voice, product, pinned context, and BYOK key lookup so they overlap with credit admission.
+  const contextPromise = Promise.all([
     turnVoice(access, page).catch(() => null),
     productContext(access),
     pinnedContextBlock(access, contextRefs),
     needsByok ? backend.getWorkspaceAiProviderKey() : Promise.resolve({ apiKey: null }),
   ])
-  const byokApiKey = byokResult.apiKey?.trim() || undefined
-  if (needsByok && !byokApiKey) {
-    throw new AssistantRefusal(BYOK_REQUIRED_MESSAGE, 403)
-  }
-
-  const systemParts: string[] = [WORKSPACE_ASSISTANT_INSTRUCTIONS]
-  if (hasSurfaceTools) {
-    if (page.surface === 'store-screenshots') {
-      systemParts.push(STORE_COPILOT_INSTRUCTIONS)
-    } else if (page.surface !== 'screenshot-editor' && page.surface !== 'canvas') {
-      systemParts.push(SURFACE_COPILOT_INSTRUCTIONS)
-    } else {
-      systemParts.push(EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(activeSelection))
-    }
-  }
-  const voiceBlock = voiceInstructions(voice)
-  if (voiceBlock) systemParts.push(voiceBlock)
-  const instructionsBlock = workspaceInstructionsBlock(
-    workspace?.workspace?.workspaceSettings?.aiInstructions
-  )
-  if (instructionsBlock) systemParts.push(instructionsBlock)
-  if (product) systemParts.push(product)
-  if (pinned) systemParts.push(pinned)
-  systemParts.push(describePage(page))
+  contextPromise.catch(() => undefined)
 
   const executeTurn = async () => {
+    const [voice, product, pinned, byokResult] = await contextPromise
+    const byokApiKey = byokResult.apiKey?.trim() || undefined
+    if (needsByok && !byokApiKey) {
+      throw new AssistantRefusal(BYOK_REQUIRED_MESSAGE, 403)
+    }
+
+    const systemParts: string[] = [WORKSPACE_ASSISTANT_INSTRUCTIONS]
+    if (hasSurfaceTools) {
+      if (page.surface === 'store-screenshots') {
+        systemParts.push(STORE_COPILOT_INSTRUCTIONS)
+      } else if (page.surface !== 'screenshot-editor' && page.surface !== 'canvas') {
+        systemParts.push(SURFACE_COPILOT_INSTRUCTIONS)
+      } else {
+        systemParts.push(EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(activeSelection))
+      }
+    }
+    const voiceBlock = voiceInstructions(voice)
+    if (voiceBlock) systemParts.push(voiceBlock)
+    const instructionsBlock = workspaceInstructionsBlock(
+      workspace?.workspace?.workspaceSettings?.aiInstructions
+    )
+    if (instructionsBlock) systemParts.push(instructionsBlock)
+    if (product) systemParts.push(product)
+    if (pinned) systemParts.push(pinned)
+    systemParts.push(describePage(page))
+
     const started = Date.now()
     const result = streamText({
       abortSignal: signal,
-      messages: trimSnapshots(messages),
+      messages: trimMessagesToBudget(trimSnapshots(messages)),
       model: models.tieredModel(effectiveTier, providerEffort, byokApiKey),
       stopWhen: [stepCountIs(MAX_STEPS), isRunStopped(run)],
       system: systemParts.join('\n\n'),
@@ -316,13 +318,15 @@ export async function runWorkspaceAssistantTurn(
   }
 
   try {
-    return byokApiKey ? await executeTurn() : await withAiCredits(access, executeTurn)
+    return needsByok ? await executeTurn() : await withAiCredits(access, executeTurn)
   } catch (error) {
-    if (byokApiKey && isByokProviderAuthFailure(error)) {
+    if (needsByok && isByokProviderAuthFailure(error)) {
       throw new AssistantRefusal(BYOK_KEY_REJECTED_MESSAGE, 403)
     }
     throw error
   } finally {
-    await flushToolRun(run)
+    if (!scheduleAfterResponse(() => flushToolRun(run))) {
+      await flushToolRun(run)
+    }
   }
 }

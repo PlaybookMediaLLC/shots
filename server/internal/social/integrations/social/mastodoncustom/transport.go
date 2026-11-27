@@ -105,8 +105,8 @@ func (p *Provider) requestJSON(ctx context.Context, endpoint string, form url.Va
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusCreated {
 		return errConnection
 	}
-	data, err := io.ReadAll(response.Body)
-	if err != nil || json.Unmarshal(data, out) != nil {
+	data, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
+	if err != nil || int64(len(data)) > responseLimit || json.Unmarshal(data, out) != nil {
 		return errConnection
 	}
 	return nil

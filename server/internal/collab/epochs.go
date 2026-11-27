@@ -2,8 +2,10 @@ package collab
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 	"github.com/redis/go-redis/v9"
@@ -57,10 +59,23 @@ func (m *MemoryEpochs) Read(_ context.Context, organizationIDs []string) (int64,
 	return m.global, counts, nil
 }
 
-const epochPrefix = "shots-collab:epoch:"
+const (
+	epochPrefix = "shots-collab:epoch:"
+	// EpochChannel is the Redis Pub/Sub channel carrying epoch bump notifications.
+	EpochChannel = "shots-collab:epoch:events"
+	epochKeyTTL  = 7 * 24 * time.Hour
+)
+
+type epochEvent struct {
+	OrganizationID string `json:"organizationId"`
+	Epoch          int64  `json:"epoch"`
+}
 
 // RedisEpochs shares the counts between backend replicas.
-type RedisEpochs struct{ client *redis.Client }
+type RedisEpochs struct {
+	client *redis.Client
+	owned  bool
+}
 
 // NewRedisEpochs connects to rawURL.
 func NewRedisEpochs(rawURL string) (*RedisEpochs, error) {
@@ -70,7 +85,13 @@ func NewRedisEpochs(rawURL string) (*RedisEpochs, error) {
 	}
 	client := redis.NewClient(options)
 	telemetry.InstrumentRedis("collab", client)
-	return &RedisEpochs{client: client}, nil
+	return &RedisEpochs{client: client, owned: true}, nil
+}
+
+// NewRedisEpochsWithClient wraps an existing shared Redis client.
+// Close is a no-op; the caller retains ownership of client.
+func NewRedisEpochsWithClient(client *redis.Client) *RedisEpochs {
+	return &RedisEpochs{client: client, owned: false}
 }
 
 func epochKey(organizationID string) string {
@@ -82,7 +103,23 @@ func epochKey(organizationID string) string {
 
 // Bump implements Epochs.
 func (r *RedisEpochs) Bump(ctx context.Context, organizationID string) error {
-	return r.client.Incr(ctx, epochKey(organizationID)).Err()
+	key := epochKey(organizationID)
+	pipe := r.client.Pipeline()
+	incr := pipe.Incr(ctx, key)
+	if organizationID != "" {
+		pipe.Expire(ctx, key, epochKeyTTL)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	if payload, err := json.Marshal(epochEvent{
+		OrganizationID: organizationID,
+		Epoch:          incr.Val(),
+	}); err == nil {
+		// Best-effort push invalidation; collab-server's fallback poll guarantees convergence.
+		_ = r.client.Publish(ctx, EpochChannel, payload).Err()
+	}
+	return nil
 }
 
 // Read implements Epochs.
@@ -102,8 +139,13 @@ func (r *RedisEpochs) Read(ctx context.Context, organizationIDs []string) (int64
 	return redisCount(values[0]), counts, nil
 }
 
-// Close releases the connection.
-func (r *RedisEpochs) Close() error { return r.client.Close() }
+// Close releases the connection when owned by this instance.
+func (r *RedisEpochs) Close() error {
+	if !r.owned {
+		return nil
+	}
+	return r.client.Close()
+}
 
 // redisCount reads a counter MGET returned; a missing key is zero.
 func redisCount(value any) int64 {

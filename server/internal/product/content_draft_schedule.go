@@ -840,6 +840,23 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			return nil, err
 		}
 	}
+	var refund func()
+	committed := false
+	defer func() {
+		if !committed && refund != nil {
+			refund()
+		}
+	}()
+	if loadedDraft.Version == input.Version && loadedDraft.Status != contentdraft.StatusArchived &&
+		(input.BaseCalendarVersion == 0 || loadedDraft.CalendarVersion == input.BaseCalendarVersion) {
+		if err := c.requireDraftApproval(ctx, loadedDraft); err != nil {
+			return nil, err
+		}
+		refund, err = c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, len(input.Targets))
+		if err != nil {
+			return nil, err
+		}
+	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -901,11 +918,11 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if draft.Version != input.Version {
 		return nil, &ContentDraftVersionConflictError{Current: draft.Version}
 	}
-	if err := c.requireDraftApproval(ctx, draft); err != nil {
-		return nil, err
-	}
 	bound := *c
 	bound.client = tx.Client()
+	if err := bound.requireDraftApproval(ctx, draft); err != nil {
+		return nil, err
+	}
 	if err := bound.requireDraftSchedulingPlan(ctx, actor, draft, input); err != nil {
 		return nil, err
 	}
@@ -916,11 +933,11 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err := recordContentDraftRevision(ctx, tx, actor, draft, true, reason); err != nil {
 		return nil, err
 	}
-	set, err := c.draftSocialSet(ctx, tx, draft)
+	set, err := bound.draftSocialSet(ctx, tx, draft)
 	if err != nil {
 		return nil, err
 	}
-	connections, images, err := c.draftTargetConnections(ctx, tx, draft, input.Targets, draft.AssetIds)
+	connections, images, err := bound.draftTargetConnections(ctx, tx, draft, input.Targets, draft.AssetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -968,16 +985,12 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			return nil, &DuplicateContentError{Posts: duplicates}
 		}
 	}
-	refund, err := c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, len(input.Targets))
-	if err != nil {
-		return nil, err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			refund()
+	if refund == nil {
+		refund, err = bound.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, len(input.Targets))
+		if err != nil {
+			return nil, err
 		}
-	}()
+	}
 	result := &ScheduleContentDraftResult{Cancelled: cancelled, Created: true}
 	intent := scheduleIntent(input)
 	channelIDs := make([]string, 0, len(input.Targets))

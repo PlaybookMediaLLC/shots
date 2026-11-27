@@ -13,8 +13,18 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/andybalholm/brotli"
+)
+
+var (
+	brotliPool = sync.Pool{New: func() any { return brotli.NewWriterLevel(io.Discard, 4) }}
+	gzipPool   = sync.Pool{New: func() any { return gzip.NewWriter(io.Discard) }}
+	flatePool  = sync.Pool{New: func() any {
+		fw, _ := flate.NewWriter(io.Discard, flate.DefaultCompression)
+		return fw
+	}}
 )
 
 // Compress is the compression@1.8.1 middleware the original app installs with
@@ -25,8 +35,10 @@ import (
 func Compress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cw := &compressWriter{ResponseWriter: w, r: r}
-		defer cw.close()
 		next.ServeHTTP(cw, r)
+		// Finalize only on normal return so a panic/http.ErrAbortHandler never
+		// emits a valid EOF trailer over a truncated response.
+		cw.close()
 	})
 }
 
@@ -55,6 +67,7 @@ type compressWriter struct {
 	http.ResponseWriter
 	r       *http.Request
 	decided bool
+	method  string
 	enc     io.WriteCloser
 	flusher interface{ Flush() error }
 }
@@ -82,7 +95,7 @@ func (cw *compressWriter) decide(status int) {
 	if enc := h.Get("Content-Encoding"); enc != "" && enc != "identity" {
 		return
 	}
-	if cw.r.Method == http.MethodHead || status == http.StatusNoContent || status == http.StatusNotModified {
+	if cw.r.Method == http.MethodHead || status == http.StatusNoContent || status == http.StatusNotModified || status == http.StatusPartialContent || h.Get("Content-Range") != "" {
 		return
 	}
 	method := negotiateEncoding(cw.r.Header.Values("Accept-Encoding"))
@@ -91,15 +104,19 @@ func (cw *compressWriter) decide(status int) {
 	}
 	switch method {
 	case "br":
-		bw := brotli.NewWriterLevel(cw.ResponseWriter, 4)
+		bw := brotliPool.Get().(*brotli.Writer)
+		bw.Reset(cw.ResponseWriter)
 		cw.enc, cw.flusher = bw, bw
 	case "gzip":
-		gw := gzip.NewWriter(cw.ResponseWriter)
+		gw := gzipPool.Get().(*gzip.Writer)
+		gw.Reset(cw.ResponseWriter)
 		cw.enc, cw.flusher = gw, gw
 	default:
-		fw, _ := flate.NewWriter(cw.ResponseWriter, flate.DefaultCompression)
+		fw := flatePool.Get().(*flate.Writer)
+		fw.Reset(cw.ResponseWriter)
 		cw.enc, cw.flusher = fw, fw
 	}
+	cw.method = method
 	h.Set("Content-Encoding", method)
 	h.Del("Content-Length")
 }
@@ -135,9 +152,25 @@ func (cw *compressWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func (cw *compressWriter) Unwrap() http.ResponseWriter { return cw.ResponseWriter }
 
 func (cw *compressWriter) close() {
-	if cw.enc != nil {
-		_ = cw.enc.Close()
+	if cw.enc == nil {
+		return
 	}
+	_ = cw.enc.Close()
+	switch cw.method {
+	case "br":
+		bw := cw.enc.(*brotli.Writer)
+		bw.Reset(io.Discard)
+		brotliPool.Put(bw)
+	case "gzip":
+		gw := cw.enc.(*gzip.Writer)
+		gw.Reset(io.Discard)
+		gzipPool.Put(gw)
+	default:
+		fw := cw.enc.(*flate.Writer)
+		fw.Reset(io.Discard)
+		flatePool.Put(fw)
+	}
+	cw.enc, cw.flusher = nil, nil
 }
 
 func vary(h http.Header, field string) {

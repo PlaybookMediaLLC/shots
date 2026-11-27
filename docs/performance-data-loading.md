@@ -17,7 +17,9 @@ include the workspace, immutable asset ID, and transformation version. Ownership
 and uploaded/deleted state are checked before every cache hit. Only in-flight renders
 are kept in process memory; concurrent misses share work within that process. Separate
 replicas may render the same cold key concurrently. Redis failures fall back to rendering,
-and authenticated HTTP responses remain `private, no-store`.
+and authenticated immutable asset and thumbnail responses use
+`Cache-Control: private, max-age=0, must-revalidate` with `ETag` (`304 Not Modified`),
+preserving per-request authorization and revocation checks while avoiding repeated transfers.
 
 The workflow overview bulk-loads installation and workspace-link rows. Its configuration
 and aggregate counters refresh every minute; recent run statuses refresh every 15 seconds.

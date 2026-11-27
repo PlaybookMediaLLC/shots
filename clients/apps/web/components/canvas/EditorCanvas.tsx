@@ -6,7 +6,6 @@ import { CleanUploadState } from "@/components/controls/CleanUploadState";
 import { useLayoutEffect, useState } from "react";
 import { toast } from 'sonner';
 import React from "react";
-import { ExportSlideshowDialog } from "@/lib/export-slideshow-dialog";
 import { CanvasStageShell } from "@/components/canvas/CanvasStageShell";
 import { CanvasStageLoadingOverlay } from "@/components/canvas/CanvasStageLoadingOverlay";
 import { SlidePreview } from './SlidePreview';
@@ -48,7 +47,6 @@ export function EditorCanvas() {
   const backgroundReady = useBackgroundImageReady(backgroundConfig);
 
   const hasRenderableContent = useImageStore(hasCanvasContent);
-  const [exportOpen, setExportOpen] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const loadStartedAtRef = React.useRef<number | null>(null);
   const readyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,10 +126,6 @@ export function EditorCanvas() {
   return (
     <>
       <div className="flex min-h-0 flex-col h-full w-full relative">
-        <ExportSlideshowDialog
-          open={exportOpen}
-          onOpenChange={setExportOpen}
-        />
 
         <div
           data-canvas-viewport

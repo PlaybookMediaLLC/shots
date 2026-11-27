@@ -14,6 +14,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroupmember"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubuser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubworkspace"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthclient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
@@ -215,57 +216,104 @@ func (c *Configuration) founderHubProfile(ctx context.Context, userID string) (*
 	if err != nil {
 		return nil, err
 	}
+	activeMemberships := make([]ListedWorkspace, 0, len(memberships))
+	orgIDs := make([]string, 0, len(memberships))
 	for _, membership := range memberships {
 		if membership.IsScheduledForDeletion {
 			continue
 		}
-		rows, err := c.client.Member.Query().Where(member.OrganizationID(membership.ID)).All(ctx)
+		activeMemberships = append(activeMemberships, membership)
+		orgIDs = append(orgIDs, membership.ID)
+	}
+	if len(orgIDs) == 0 {
+		return result, nil
+	}
+	allMembers, err := c.client.Member.Query().Where(member.OrganizationIDIn(orgIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	membersByOrg := make(map[string][]*ent.Member, len(orgIDs))
+	userIDSet := map[string]struct{}{}
+	allUserIDs := make([]string, 0, len(allMembers))
+	allMemberIDs := make([]string, 0, len(allMembers))
+	for _, row := range allMembers {
+		membersByOrg[row.OrganizationID] = append(membersByOrg[row.OrganizationID], row)
+		allMemberIDs = append(allMemberIDs, row.ID)
+		if _, seen := userIDSet[row.UserID]; !seen {
+			userIDSet[row.UserID] = struct{}{}
+			allUserIDs = append(allUserIDs, row.UserID)
+		}
+	}
+	peopleByID := map[string]*ent.User{}
+	deletingSet := map[string]bool{}
+	identitiesByID := map[string]uuid.UUID{}
+	if len(allUserIDs) > 0 {
+		people, err := c.client.User.Query().Where(user.IDIn(allUserIDs...)).All(ctx)
 		if err != nil {
 			return nil, err
 		}
-		userIDs, memberIDs := make([]string, 0, len(rows)), make([]string, 0, len(rows))
-		for _, row := range rows {
-			userIDs = append(userIDs, row.UserID)
-			memberIDs = append(memberIDs, row.ID)
+		for _, p := range people {
+			peopleByID[p.ID] = p
 		}
-		people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		deleting, err := c.client.AccountDeletionRequest.Query().Where(accountdeletionrequest.UserIDIn(userIDs...),
+		deletingList, err := c.client.AccountDeletionRequest.Query().Where(accountdeletionrequest.UserIDIn(allUserIDs...),
 			accountdeletionrequest.StatusIn(accountdeletionrequest.StatusPROCESSING, accountdeletionrequest.StatusCOMPLETED)).Select(accountdeletionrequest.FieldUserID).Strings(ctx)
 		if err != nil {
 			return nil, err
 		}
-		identities, err := c.client.PlatformFounderHubUser.Query().Where(platformfounderhubuser.IDIn(userIDs...)).All(ctx)
+		for _, id := range deletingList {
+			deletingSet[id] = true
+		}
+		identities, err := c.client.PlatformFounderHubUser.Query().Where(platformfounderhubuser.IDIn(allUserIDs...)).All(ctx)
 		if err != nil {
 			return nil, err
 		}
-		groups, err := c.client.PermissionGroup.Query().Where(permissiongroup.OrganizationID(membership.ID)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		assignments, err := c.client.PermissionGroupMember.Query().Where(permissiongroupmember.IDIn(memberIDs...)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		peopleByID := make(map[string]*ent.User, len(people))
-		for _, person := range people {
-			peopleByID[person.ID] = person
-		}
-		identitiesByID := make(map[string]uuid.UUID, len(identities))
 		for _, identity := range identities {
 			identitiesByID[identity.ID] = identity.AccountUserID
 		}
-		assignmentsByID := make(map[string]*ent.PermissionGroupMember, len(assignments))
+	}
+	allGroups, err := c.client.PermissionGroup.Query().Where(permissiongroup.OrganizationIDIn(orgIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groupsByOrg := make(map[string][]*ent.PermissionGroup, len(orgIDs))
+	for _, g := range allGroups {
+		groupsByOrg[g.OrganizationID] = append(groupsByOrg[g.OrganizationID], g)
+	}
+	assignmentsByID := map[string]*ent.PermissionGroupMember{}
+	if len(allMemberIDs) > 0 {
+		assignments, err := c.client.PermissionGroupMember.Query().Where(permissiongroupmember.IDIn(allMemberIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
 		for _, assignment := range assignments {
 			assignmentsByID[assignment.ID] = assignment
 		}
+	}
+	workspaces, err := c.client.PlatformFounderHubWorkspace.Query().Where(platformfounderhubworkspace.IDIn(orgIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	workspaceByOrg := make(map[string]*ent.PlatformFounderHubWorkspace, len(workspaces))
+	for _, ws := range workspaces {
+		workspaceByOrg[ws.ID] = ws
+	}
+	entitlements, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.IDIn(orgIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	entitlementByOrg := make(map[string]*ent.WorkspaceEntitlement, len(entitlements))
+	for _, e := range entitlements {
+		entitlementByOrg[e.ID] = e
+	}
+	now := time.Now()
+	for _, membership := range activeMemberships {
+		rows := membersByOrg[membership.ID]
+		groups := groupsByOrg[membership.ID]
 		var actorDenied []string
 		members := make([]FounderHubMember, 0, len(rows))
 		var owner *FounderHubMember
 		for _, row := range rows {
-			if slices.Contains(deleting, row.UserID) {
+			if deletingSet[row.UserID] {
 				continue
 			}
 			person := peopleByID[row.UserID]
@@ -286,7 +334,7 @@ func (c *Configuration) founderHubProfile(ctx context.Context, userID string) (*
 				}
 				owner = &projected
 			}
-			banned := person.Banned != nil && *person.Banned && (person.BanExpires == nil || person.BanExpires.After(time.Now()))
+			banned := person.Banned != nil && *person.Banned && (person.BanExpires == nil || person.BanExpires.After(now))
 			if banned && !slices.Contains(projected.DeniedPermissions, "workspace:read") {
 				projected.DeniedPermissions = append(projected.DeniedPermissions, "workspace:read")
 			}
@@ -296,15 +344,11 @@ func (c *Configuration) founderHubProfile(ctx context.Context, userID string) (*
 		if owner == nil {
 			return nil, publishing.ErrConflict
 		}
-		workspace, err := c.client.PlatformFounderHubWorkspace.Get(ctx, membership.ID)
-		if err != nil {
-			return nil, err
+		workspace, ok := workspaceByOrg[membership.ID]
+		if !ok {
+			return nil, &ent.NotFoundError{}
 		}
-		entitlement, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(membership.ID)).Only(ctx)
-		if err != nil && !ent.IsNotFound(err) {
-			return nil, err
-		}
-		_, _, features := evaluateBootstrapEntitlement(entitlement, time.Now())
+		_, _, features := evaluateBootstrapEntitlement(entitlementByOrg[membership.ID], now)
 		result.Workspaces = append(result.Workspaces, FounderHubWorkspace{
 			OrganizationID: membership.ID, WorkspaceID: workspace.WorkspaceID, Name: membership.Name,
 			OwnerUserID: owner.AccountUserID, Owner: owner, Members: members,

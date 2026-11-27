@@ -91,6 +91,7 @@ type Configuration struct {
 	captureRunner     CaptureRunner
 	captureKeys       *sessionstate.Keys
 	captureDispatcher CaptureDispatcher
+	kitDispatcher     KitDispatcher
 	captureStateAge   time.Duration
 	// emailAuth enables unattended email sign-in (RFC 007A); nil keeps it off.
 	emailAuth *emailauth.Settings
@@ -221,7 +222,7 @@ type CreateBrandKitInput struct {
 
 func (c *Configuration) ListBrandKits(ctx context.Context, organizationID string) ([]*ent.BrandKit, error) {
 	return c.client.BrandKit.Query().Where(brandkit.OrganizationID(organizationID)).
-		Order(ent.Asc(brandkit.FieldName), ent.Desc(brandkit.FieldVersion)).All(ctx)
+		Order(ent.Asc(brandkit.FieldName), ent.Desc(brandkit.FieldVersion)).Limit(200).All(ctx)
 }
 
 func (c *Configuration) CreateBrandKit(ctx context.Context, actor Actor, input CreateBrandKitInput) (*ent.BrandKit, error) {
@@ -529,7 +530,7 @@ type UpdateProductSurfaceInput struct {
 
 func (c *Configuration) ListProductSurfaces(ctx context.Context, organizationID string) ([]*ent.ProductSurface, error) {
 	return c.client.ProductSurface.Query().Where(productsurface.OrganizationID(organizationID)).
-		Order(ent.Asc(productsurface.FieldName)).All(ctx)
+		Order(ent.Asc(productsurface.FieldName)).Limit(500).All(ctx)
 }
 
 func (c *Configuration) CreateProductSurface(ctx context.Context, actor Actor, input CreateProductSurfaceInput) (*ent.ProductSurface, error) {

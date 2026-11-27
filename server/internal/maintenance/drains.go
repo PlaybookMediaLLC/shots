@@ -14,11 +14,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -115,51 +117,125 @@ func (d *DrainSender) send(ctx context.Context, endpoint, provider, encrypted st
 	}
 	return response.StatusCode, nil
 }
+
+func drainRetryDelay(attempts int) int {
+	shift := min(max(0, attempts-1), 7)
+	base := min(3600, 30*(1<<shift))
+	// ±25% jitter spreads synchronized retries after a SIEM outage.
+	minDelay := max(1, base*3/4)
+	spread := max(1, base/2)
+	return minDelay + rand.IntN(spread+1)
+}
+
+func (s *Store) deliverDrainOne(ctx context.Context, id string) (delivered bool, sendFailed bool, err error) {
+	var attempts int
+	err = s.DB.QueryRowContext(ctx, `UPDATE audit_drain_delivery SET status='PROCESSING',"attemptCount"="attemptCount"+1,"updatedAt"=now() WHERE id=$1 AND status='PENDING' AND "attemptCount"<8 RETURNING "attemptCount"`, id).Scan(&attempts)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	var endpoint, provider, encrypted, org, logID, action, actorType, entityType, outcome, requestID string
+	var actorDisplay, actorUser, entityID *string
+	var metadata json.RawMessage
+	var created time.Time
+	err = s.DB.QueryRowContext(ctx, `SELECT d.endpoint,d.provider,d."encryptedSigningSecret",a."organizationId",a.id,a.action,a."actorType",a."actorDisplay",a."actorUserId",a."entityType",a."entityId",a.outcome,a."requestId",a.metadata,a."createdAt" FROM audit_drain_delivery x JOIN audit_drain d ON d.id=x."drainId" JOIN audit_outbox o ON o.id=x."outboxId" JOIN audit_log a ON a.id=o."auditLogId" WHERE x.id=$1 AND d.enabled AND d."organizationId"=a."organizationId"`, id).Scan(&endpoint, &provider, &encrypted, &org, &logID, &action, &actorType, &actorDisplay, &actorUser, &entityType, &entityID, &outcome, &requestID, &metadata, &created)
+	status := 0
+	if err == nil {
+		body, e := json.Marshal(map[string]any{"specversion": "1.0", "id": logID, "source": "screenshot-studio/organizations/" + org, "time": created.UTC().Format("2006-01-02T15:04:05.000Z"), "type": "com.screenshot-studio.audit." + action, "data": map[string]any{"action": action, "actor": map[string]any{"display": actorDisplay, "type": actorType, "userId": actorUser}, "entity": map[string]any{"id": entityID, "type": entityType}, "metadata": metadata, "outcome": outcome, "organizationId": org, "requestId": requestID}})
+		if e != nil {
+			return false, false, e
+		}
+		status, err = s.Drains.send(ctx, endpoint, provider, encrypted, body)
+	}
+	if ctx.Err() != nil {
+		return false, false, ctx.Err()
+	}
+	if err == nil {
+		_, err = s.DB.ExecContext(ctx, `UPDATE audit_drain_delivery SET status='DELIVERED',"deliveredAt"=now(),"updatedAt"=now(),"responseCode"=$2,"lastError"=NULL WHERE id=$1`, id, status)
+		return err == nil, false, err
+	}
+	delay := drainRetryDelay(attempts)
+	_, err = s.DB.ExecContext(ctx, `UPDATE audit_drain_delivery SET status=CASE WHEN "attemptCount">=8 THEN 'FAILED'::"AuditDrainDeliveryStatus" ELSE 'PENDING'::"AuditDrainDeliveryStatus" END,"updatedAt"=now(),"lastError"='DELIVERY_FAILED',"responseCode"=NULLIF($2,0),"nextAttemptAt"=now()+make_interval(secs=>$3) WHERE id=$1`, id, status, delay)
+	return false, true, err
+}
+
 func (s *Store) AuditDrains(ctx context.Context) (int, error) {
 	_, err := s.DB.ExecContext(ctx, `UPDATE audit_drain_delivery SET status=CASE WHEN "attemptCount">=8 THEN 'FAILED'::"AuditDrainDeliveryStatus" ELSE 'PENDING'::"AuditDrainDeliveryStatus" END,"updatedAt"=now(),"lastError"='INTERRUPTED' WHERE status='PROCESSING' AND "updatedAt"<now()-interval '10 minutes'`)
 	if err != nil {
 		return 0, err
 	}
-	candidates, err := ids(ctx, s.DB, `SELECT d.id FROM audit_drain_delivery d JOIN audit_drain r ON r.id=d."drainId" WHERE d.status='PENDING' AND d."attemptCount"<8 AND d."nextAttemptAt"<=now() AND r.enabled ORDER BY d."nextAttemptAt" LIMIT 100`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT d.id, d."drainId" FROM audit_drain_delivery d JOIN audit_drain r ON r.id=d."drainId" WHERE d.status='PENDING' AND d."attemptCount"<8 AND d."nextAttemptAt"<=now() AND r.enabled ORDER BY d."nextAttemptAt" LIMIT 100`)
 	if err != nil {
 		return 0, err
 	}
-	count := 0
-	for _, id := range candidates {
-		var attempts int
-		err = s.DB.QueryRowContext(ctx, `UPDATE audit_drain_delivery SET status='PROCESSING',"attemptCount"="attemptCount"+1,"updatedAt"=now() WHERE id=$1 AND status='PENDING' AND "attemptCount"<8 RETURNING "attemptCount"`, id).Scan(&attempts)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
+	byDrain := map[string][]string{}
+	drainOrder := []string{}
+	for rows.Next() {
+		var id, drainID string
+		if err = rows.Scan(&id, &drainID); err != nil {
+			rows.Close()
+			return 0, err
 		}
-		if err != nil {
-			return count, err
+		if _, exists := byDrain[drainID]; !exists {
+			drainOrder = append(drainOrder, drainID)
 		}
-		var endpoint, provider, encrypted, org, logID, action, actorType, entityType, outcome, requestID string
-		var actorDisplay, actorUser, entityID *string
-		var metadata json.RawMessage
-		var created time.Time
-		err = s.DB.QueryRowContext(ctx, `SELECT d.endpoint,d.provider,d."encryptedSigningSecret",a."organizationId",a.id,a.action,a."actorType",a."actorDisplay",a."actorUserId",a."entityType",a."entityId",a.outcome,a."requestId",a.metadata,a."createdAt" FROM audit_drain_delivery x JOIN audit_drain d ON d.id=x."drainId" JOIN audit_outbox o ON o.id=x."outboxId" JOIN audit_log a ON a.id=o."auditLogId" WHERE x.id=$1 AND d.enabled AND d."organizationId"=a."organizationId"`, id).Scan(&endpoint, &provider, &encrypted, &org, &logID, &action, &actorType, &actorDisplay, &actorUser, &entityType, &entityID, &outcome, &requestID, &metadata, &created)
-		status := 0
-		if err == nil {
-			body, e := json.Marshal(map[string]any{"specversion": "1.0", "id": logID, "source": "screenshot-studio/organizations/" + org, "time": created.UTC().Format("2006-01-02T15:04:05.000Z"), "type": "com.screenshot-studio.audit." + action, "data": map[string]any{"action": action, "actor": map[string]any{"display": actorDisplay, "type": actorType, "userId": actorUser}, "entity": map[string]any{"id": entityID, "type": entityType}, "metadata": metadata, "outcome": outcome, "organizationId": org, "requestId": requestID}})
-			if e != nil {
-				return count, e
-			}
-			status, err = s.Drains.send(ctx, endpoint, provider, encrypted, body)
-		}
-		if ctx.Err() != nil {
-			return count, ctx.Err()
-		}
-		if err == nil {
-			_, err = s.DB.ExecContext(ctx, `UPDATE audit_drain_delivery SET status='DELIVERED',"deliveredAt"=now(),"updatedAt"=now(),"responseCode"=$2,"lastError"=NULL WHERE id=$1`, id, status)
-			count++
-		} else {
-			delay := min(60, 1<<max(0, attempts-1))
-			_, err = s.DB.ExecContext(ctx, `UPDATE audit_drain_delivery SET status=CASE WHEN "attemptCount">=8 THEN 'FAILED'::"AuditDrainDeliveryStatus" ELSE 'PENDING'::"AuditDrainDeliveryStatus" END,"updatedAt"=now(),"lastError"='DELIVERY_FAILED',"responseCode"=NULLIF($2,0),"nextAttemptAt"=now()+make_interval(secs=>$3) WHERE id=$1`, id, status, delay)
-		}
-		if err != nil {
-			return count, err
-		}
+		byDrain[drainID] = append(byDrain[drainID], id)
 	}
-	return count, nil
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	if err = rows.Close(); err != nil {
+		return 0, err
+	}
+	if len(drainOrder) == 0 {
+		return 0, nil
+	}
+	// Dispatch distinct drains concurrently (up to 4 workers) while keeping
+	// deliveries within each drain ordered and failing fast on a dead SIEM.
+	workers := min(4, len(drainOrder))
+	jobs := make(chan []string, len(drainOrder))
+	for _, drainID := range drainOrder {
+		jobs <- byDrain[drainID]
+	}
+	close(jobs)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	count := 0
+	var firstErr error
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for batch := range jobs {
+				for _, id := range batch {
+					if ctx.Err() != nil {
+						return
+					}
+					ok, failed, err := s.deliverDrainOne(ctx, id)
+					mu.Lock()
+					if ok {
+						count++
+					}
+					if err != nil && firstErr == nil {
+						firstErr = err
+					}
+					mu.Unlock()
+					if err != nil {
+						return
+					}
+					if failed {
+						break
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if firstErr == nil && ctx.Err() != nil {
+		return count, ctx.Err()
+	}
+	return count, firstErr
 }

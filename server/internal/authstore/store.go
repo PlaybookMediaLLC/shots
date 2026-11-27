@@ -11,6 +11,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -79,10 +80,10 @@ type executor interface {
 }
 
 type Store struct {
-	executor executor
-	db       *sql.DB
-	mu       sync.Mutex
-	columns  map[string]map[string]string
+	executor   executor
+	db         *sql.DB
+	mu         sync.Mutex
+	columnsPtr atomic.Pointer[map[string]map[string]string]
 }
 
 func New(db *sql.DB) *Store { return &Store{db: db} }
@@ -90,10 +91,13 @@ func New(db *sql.DB) *Store { return &Store{db: db} }
 // schema reads the live column types once, so the allowlist always matches the
 // migrated tables instead of a hand-kept copy.
 func (s *Store) schema(ctx context.Context) (map[string]map[string]string, error) {
+	if cached := s.columnsPtr.Load(); cached != nil {
+		return *cached, nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.columns != nil {
-		return s.columns, nil
+	if cached := s.columnsPtr.Load(); cached != nil {
+		return *cached, nil
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT table_name, column_name, data_type FROM information_schema.columns
 		WHERE table_schema = current_schema()`)
@@ -117,7 +121,7 @@ func (s *Store) schema(ctx context.Context) (map[string]map[string]string, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	s.columns = columns
+	s.columnsPtr.Store(&columns)
 	return columns, nil
 }
 
@@ -358,7 +362,8 @@ func (s *Store) Execute(ctx context.Context, request Request) (*Result, error) {
 		if _, err = tx.ExecContext(ctx, `SELECT set_config('platform.activity_actor',$1,true)`, actor); err != nil {
 			return nil, err
 		}
-		scoped := &Store{db: s.db, columns: schema, executor: tx}
+		scoped := &Store{db: s.db, executor: tx}
+		scoped.columnsPtr.Store(&schema)
 		result, err := scoped.Execute(ctx, request)
 		if err != nil {
 			return nil, err
@@ -503,7 +508,8 @@ func (s *Store) Execute(ctx context.Context, request Request) (*Result, error) {
 }
 
 // joined nests each join's rows under its model name. Every join is an
-// ordinary read of that model through Execute, so its scoping and guards apply.
+// ordinary read of that model through Execute, so its scoping and guards apply,
+// batched per joined model via IN (...) instead of N+1 sequential queries.
 func (s *Store) joined(ctx context.Context, request Request, result *Result) (*Result, error) {
 	rows := result.Rows
 	if request.Op == "findOne" {
@@ -512,16 +518,77 @@ func (s *Store) joined(ctx context.Context, request Request, result *Result) (*R
 		}
 		rows = []map[string]any{result.Row}
 	}
+	const joinChunkSize = 1000
 	for model, join := range request.Join {
 		one := join.Relation == "one-to-one"
 		if !one && join.Relation != "one-to-many" {
 			return nil, fmt.Errorf("%w: join relation %q", ErrInvalid, join.Relation)
 		}
+		if len(rows) == 0 {
+			continue
+		}
+		seen := make(map[string]struct{}, len(rows))
+		values := make([]any, 0, len(rows))
 		for _, row := range rows {
 			value, selected := row[join.On.From]
 			if !selected {
 				return nil, fmt.Errorf("%w: join %q needs %q selected", ErrInvalid, model, join.On.From)
 			}
+			if value == nil {
+				continue
+			}
+			key := fmt.Sprint(value)
+			if _, ok := seen[key]; !ok {
+				seen[key] = struct{}{}
+				values = append(values, value)
+			}
+		}
+		grouped := make(map[string][]map[string]any, len(values))
+		if len(values) == 1 {
+			read := Request{Model: model, Op: "findMany", Limit: join.Limit, Where: []Where{{Field: join.On.To, Value: values[0]}}}
+			if one {
+				read.Op = "findOne"
+			}
+			found, err := s.Execute(ctx, read)
+			if err != nil {
+				return nil, err
+			}
+			key := fmt.Sprint(values[0])
+			if one {
+				if found.Row != nil {
+					grouped[key] = []map[string]any{found.Row}
+				}
+			} else {
+				grouped[key] = found.Rows
+			}
+		} else if len(values) > 1 {
+			for start := 0; start < len(values); start += joinChunkSize {
+				chunk := values[start:min(start+joinChunkSize, len(values))]
+				found, err := s.Execute(ctx, Request{
+					Model: model,
+					Op:    "findMany",
+					Where: []Where{{Field: join.On.To, Operator: "in", Value: chunk}},
+				})
+				if err != nil {
+					return nil, err
+				}
+				for _, item := range found.Rows {
+					key := fmt.Sprint(item[join.On.To])
+					if one {
+						if len(grouped[key]) == 0 {
+							grouped[key] = []map[string]any{item}
+						}
+						continue
+					}
+					if join.Limit > 0 && len(grouped[key]) >= join.Limit {
+						continue
+					}
+					grouped[key] = append(grouped[key], item)
+				}
+			}
+		}
+		for _, row := range rows {
+			value := row[join.On.From]
 			if value == nil {
 				if one {
 					row[model] = nil
@@ -530,18 +597,17 @@ func (s *Store) joined(ctx context.Context, request Request, result *Result) (*R
 				}
 				continue
 			}
-			read := Request{Model: model, Op: "findMany", Limit: join.Limit, Where: []Where{{Field: join.On.To, Value: value}}}
+			matched := grouped[fmt.Sprint(value)]
 			if one {
-				read.Op = "findOne"
-			}
-			found, err := s.Execute(ctx, read)
-			if err != nil {
-				return nil, err
-			}
-			if one {
-				row[model] = found.Row
+				if len(matched) > 0 {
+					row[model] = matched[0]
+				} else {
+					row[model] = nil
+				}
+			} else if matched == nil {
+				row[model] = []map[string]any{}
 			} else {
-				row[model] = found.Rows
+				row[model] = matched
 			}
 		}
 	}

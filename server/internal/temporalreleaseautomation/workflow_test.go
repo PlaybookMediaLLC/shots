@@ -10,7 +10,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/stretchr/testify/mock"
+	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -353,5 +355,105 @@ func TestInterpreterSupersededCaptureEndsTheRun(t *testing.T) {
 	var app *temporal.ApplicationError
 	if !errors.As(activityError(product.ErrCaptureSuperseded), &app) || app.Type() != SupersededError || !app.NonRetryable() {
 		t.Fatalf("mapped=%v", app)
+	}
+}
+
+func TestKitWorkflowsRetryAndRespectPermanentErrors(t *testing.T) {
+	cases := []struct {
+		name         string
+		workflowName string
+		workflowFn   any
+		activityName string
+	}{
+		{"prepare", KitPrepareWorkflowName, KitPrepareWorkflow, KitPrepareActivity},
+		{"export", KitExportWorkflowName, KitExportWorkflow, KitExportActivity},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+"/retries_transient_then_succeeds", func(t *testing.T) {
+			var suite testsuite.WorkflowTestSuite
+			env := suite.NewTestWorkflowEnvironment()
+			env.RegisterWorkflowWithOptions(tc.workflowFn, workflow.RegisterOptions{Name: tc.workflowName})
+			attempts := 0
+			env.RegisterActivityWithOptions(func(_ context.Context, got KitInput) error {
+				if got.OrganizationID != "org-1" || got.ID != "kit-1" {
+					t.Errorf("unexpected input: %+v", got)
+				}
+				attempts++
+				if attempts == 1 {
+					return errors.New("temporary renderer outage")
+				}
+				return nil
+			}, activity.RegisterOptions{Name: tc.activityName})
+			env.ExecuteWorkflow(tc.workflowName, KitInput{OrganizationID: "org-1", ID: "kit-1"})
+			if err := env.GetWorkflowError(); err != nil {
+				t.Fatalf("expected success after retry, got %v", err)
+			}
+			if attempts != 2 {
+				t.Fatalf("attempts = %d, want 2", attempts)
+			}
+		})
+		t.Run(tc.name+"/stops_on_permanent_error", func(t *testing.T) {
+			var suite testsuite.WorkflowTestSuite
+			env := suite.NewTestWorkflowEnvironment()
+			env.RegisterWorkflowWithOptions(tc.workflowFn, workflow.RegisterOptions{Name: tc.workflowName})
+			attempts := 0
+			env.RegisterActivityWithOptions(func(_ context.Context, _ KitInput) error {
+				attempts++
+				return temporal.NewNonRetryableApplicationError("not eligible", PermanentError, nil)
+			}, activity.RegisterOptions{Name: tc.activityName})
+			env.ExecuteWorkflow(tc.workflowName, KitInput{OrganizationID: "org-1", ID: "kit-1"})
+			if env.GetWorkflowError() == nil {
+				t.Fatal("expected permanent workflow error")
+			}
+			if attempts != 1 {
+				t.Fatalf("permanent error should not retry: attempts = %d", attempts)
+			}
+		})
+	}
+}
+
+type fakeTemporalClient struct {
+	client.Client
+	calls []struct {
+		options client.StartWorkflowOptions
+		name    any
+		args    []any
+	}
+	err error
+}
+
+func (f *fakeTemporalClient) ExecuteWorkflow(_ context.Context, options client.StartWorkflowOptions, workflowFn any, args ...any) (client.WorkflowRun, error) {
+	f.calls = append(f.calls, struct {
+		options client.StartWorkflowOptions
+		name    any
+		args    []any
+	}{options: options, name: workflowFn, args: args})
+	return nil, f.err
+}
+
+func TestClientStartKitWorkflowsDeduplicate(t *testing.T) {
+	fake := &fakeTemporalClient{}
+	c := &Client{Temporal: fake}
+	if err := c.StartKitPrepare(context.Background(), "org-1", "rev-42"); err != nil {
+		t.Fatalf("StartKitPrepare: %v", err)
+	}
+	if err := c.StartKitExport(context.Background(), "org-1", "exp-99"); err != nil {
+		t.Fatalf("StartKitExport: %v", err)
+	}
+	if len(fake.calls) != 2 {
+		t.Fatalf("calls = %d, want 2", len(fake.calls))
+	}
+	if fake.calls[0].options.ID != "release-kit-prepare-rev-42" || fake.calls[0].name != KitPrepareWorkflowName {
+		t.Fatalf("unexpected prepare call: %+v", fake.calls[0])
+	}
+	if fake.calls[1].options.ID != "release-kit-export-exp-99" || fake.calls[1].name != KitExportWorkflowName {
+		t.Fatalf("unexpected export call: %+v", fake.calls[1])
+	}
+	fake.err = &serviceerror.WorkflowExecutionAlreadyStarted{RunId: "existing-run"}
+	if err := c.StartKitPrepare(context.Background(), "org-1", "rev-42"); err != nil {
+		t.Fatalf("duplicate prepare should be suppressed, got %v", err)
+	}
+	if err := c.StartKitExport(context.Background(), "org-1", "exp-99"); err != nil {
+		t.Fatalf("duplicate export should be suppressed, got %v", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
@@ -186,13 +187,29 @@ func (c *Configuration) ListContentBatches(ctx context.Context, actor Actor) ([]
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) == 0 {
+		return []ContentBatchRecord{}, nil
+	}
+	batchIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		batchIDs = append(batchIDs, row.ID)
+	}
+	counts := make(map[string]int, len(rows))
+	if err := c.client.PlatformQuery(ctx, `SELECT "batchId", COUNT(*)::int FROM content_batch_item WHERE "organizationId"=$1 AND "batchId"=ANY($2) GROUP BY "batchId"`,
+		[]any{actor.OrganizationID, batchIDs}, func(row entsql.ColumnScanner) error {
+			var batchID string
+			var count int
+			if err := row.Scan(&batchID, &count); err != nil {
+				return err
+			}
+			counts[batchID] = count
+			return nil
+		}); err != nil {
+		return nil, err
+	}
 	records := make([]ContentBatchRecord, 0, len(rows))
 	for _, row := range rows {
-		count, err := c.client.ContentBatchItem.Query().Where(contentbatchitem.BatchID(row.ID)).Count(ctx)
-		if err != nil {
-			return nil, err
-		}
-		records = append(records, batchRecord(row, bySet[row.SocialSetID], count))
+		records = append(records, batchRecord(row, bySet[row.SocialSetID], counts[row.ID]))
 	}
 	return records, nil
 }

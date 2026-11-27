@@ -326,12 +326,12 @@ func (p *RunPodMediaProcessor[Job, Result]) request(ctx context.Context, method,
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := processorHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return err
 	}
@@ -340,6 +340,8 @@ func (p *RunPodMediaProcessor[Job, Result]) request(ctx context.Context, method,
 	}
 	return json.Unmarshal(data, out)
 }
+
+var processorHTTPClient = &http.Client{Timeout: 30 * time.Second}
 
 // truncate is String.prototype.slice(0, n) (UTF-16 units approximated by
 // runes).

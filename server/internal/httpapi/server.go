@@ -112,6 +112,7 @@ type ConfigurationStore interface {
 	CreateConversation(context.Context, product.Actor, product.CreateConversationInput) (*product.ConversationRecord, error)
 	ListConversations(context.Context, product.Actor, product.ListConversationsInput) ([]product.ConversationRecord, error)
 	GetConversation(context.Context, product.Actor, string) (*product.ConversationDetail, error)
+	GetConversationView(context.Context, product.Actor, string) (*product.ConversationView, error)
 	AppendConversationMessage(context.Context, product.Actor, string, product.AppendConversationMessageInput) (*product.ConversationMessageRecord, error)
 	UpdateConversation(context.Context, product.Actor, string, product.UpdateConversationInput) (*product.ConversationRecord, error)
 	ListAssistantThreads(context.Context, product.Actor) ([]product.AssistantThreadRecord, error)
@@ -251,6 +252,7 @@ type ConfigurationStore interface {
 	CompleteAssetUpload(context.Context, product.Actor, string, *string, ...string) (*product.AssetRecord, error)
 	SignAssetUploadParts(context.Context, product.Actor, string, []int) (*product.AssetUploadParts, error)
 	SignAssetDownload(context.Context, product.Actor, string) (string, error)
+	SignAssetDownloads(context.Context, product.Actor, []string) (map[string]string, error)
 	ReadAsset(context.Context, product.Actor, string) ([]byte, string, error)
 	ReadAssetDownload(context.Context, string, string, string) ([]byte, string, error)
 	StoreGeneratedAsset(context.Context, product.Actor, product.GeneratedAssetInput) (*product.GeneratedAssetRecord, error)
@@ -964,9 +966,17 @@ func writeError(w http.ResponseWriter, status int, message string) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data = append(data, '\n')
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	_, _ = w.Write(data)
 }
 
 func requestLogging(next http.Handler) http.Handler {

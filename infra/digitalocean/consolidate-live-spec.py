@@ -267,17 +267,19 @@ def configure_collab(spec, backend, secrets, collab_tag):
     for key in COLLAB_SECRETS:
         set_secret_env(backend["envs"], "TENANT_" + key, secrets[key])
     # Replicas relay live edits through Redis (the Hocuspocus Redis
-    # extension); without COLLAB_REDIS_URL there is one instance.
-    instances = int(secrets.get("COLLAB_INSTANCE_COUNT") or 1)
-    if instances < 1 or (instances > 1 and not secrets.get("COLLAB_REDIS_URL")):
+    # extension); with COLLAB_REDIS_URL default to 2 replicas for HA, otherwise 1.
+    has_redis = bool(secrets.get("COLLAB_REDIS_URL"))
+    default_instances = 2 if has_redis else 1
+    instances = int(secrets.get("COLLAB_INSTANCE_COUNT") or default_instances)
+    if instances < 1 or (instances > 1 and not has_redis):
         raise ValueError("COLLAB_INSTANCE_COUNT above 1 needs COLLAB_REDIS_URL")
     redis = ([{"key": "COLLAB_REDIS_URL", "value": secrets["COLLAB_REDIS_URL"], "type": "SECRET",
-               "scope": "RUN_TIME"}] if secrets.get("COLLAB_REDIS_URL") else [])
+               "scope": "RUN_TIME"}] if has_redis else [])
     spec["services"].append({
         "name": COLLAB,
         "image": dict(IMAGE, tag=collab_tag),
         "instance_count": instances,
-        "instance_size_slug": "apps-s-1vcpu-0.5gb",
+        "instance_size_slug": "apps-s-1vcpu-1gb",
         "http_port": 1234,
         "health_check": {"http_path": "/health", "port": 1234, "initial_delay_seconds": 10,
                          "period_seconds": 15, "timeout_seconds": 5, "failure_threshold": 6},

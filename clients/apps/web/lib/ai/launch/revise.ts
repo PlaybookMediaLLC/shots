@@ -198,12 +198,20 @@ export async function proposeCampaignRevision(
     // Posts written from this version, or from an earlier one whose claims say
     // the same thing here (a redraft that kept them): their refs mean what
     // this version says.
-    const earlier = new Map<number, ReleaseSpecContent>()
-    for (const version of new Set(posts.map((post) => post.specVersion))) {
-      const match = versions.find((entry) => entry.version === version)
-      if (version === null || version === spec.version || !match) continue
-      earlier.set(version, (await getSpecById(tenant, match.id)).content)
-    }
+    const earlierVersions = [...new Set(posts.map((post) => post.specVersion))]
+      .map((version) => {
+        if (version === null || version === spec.version) return null
+        const match = versions.find((entry) => entry.version === version)
+        return match ? { id: match.id, version } : null
+      })
+      .filter((entry): entry is { id: string; version: number } => entry !== null)
+    const earlier = new Map<number, ReleaseSpecContent>(
+      await Promise.all(
+        earlierVersions.map(
+          async ({ id, version }) => [version, (await getSpecById(tenant, id)).content] as const
+        )
+      )
+    )
     const agrees = (post: (typeof posts)[number]) => {
       if (post.specVersion === spec.version) return true
       const from = post.specVersion === null ? undefined : earlier.get(post.specVersion)

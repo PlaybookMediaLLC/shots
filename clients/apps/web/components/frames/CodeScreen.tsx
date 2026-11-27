@@ -43,8 +43,9 @@ import synthwave84 from 'react-syntax-highlighter/dist/esm/styles/prism/synthwav
 import vs from 'react-syntax-highlighter/dist/esm/styles/prism/vs'
 import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus'
 import { CODE_LINE_HEIGHT, CODE_THEMES, codeMetrics, normalizeCode } from '@/lib/frames/code'
+import { loadCodeFont } from '@/lib/frames/load-code-font'
 import type { CodeContent, CodeLanguage, CodeTheme } from '@/lib/frames/schema'
-import { googleFontCss, loadGoogleFont } from '@/lib/typography/google-fonts'
+import { googleFontCss } from '@/lib/typography/google-fonts'
 
 /**
  * Code drawn as a screen: Prism highlighting (react-syntax-highlighter's
@@ -107,11 +108,6 @@ const STYLES: Record<CodeTheme, PrismStyle> = {
 function themeTextColor(style: PrismStyle): string {
   const color = style['code[class*="language-"]']?.color ?? style['pre[class*="language-"]']?.color
   return typeof color === 'string' ? color : '#d4d4d4'
-}
-
-/** Load a code screen's font; resolves when it can be drawn (or failed and falls back). */
-export function loadCodeFont(content: Pick<CodeContent, 'font'>): Promise<void> {
-  return loadGoogleFont(content.font, ['normal']).catch(() => undefined)
 }
 
 /** Code filling a `width` × `height` screen. */

@@ -252,8 +252,15 @@ func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(failed.Items) != 1 || failed.Items[0].ID != today || failed.Items[0].AttentionAt == nil {
-		t.Errorf("failed view: %+v", failed.Items)
+	if len(failed.Items) != 1 || failed.Items[0].ID != today || failed.Items[0].AttentionAt == nil || failed.FailedCount != 1 {
+		t.Errorf("failed view: count=%d items=%+v", failed.FailedCount, failed.Items)
+	}
+	draftsTab, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{View: "drafts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draftsTab.FailedCount != 1 {
+		t.Errorf("drafts view should still report workspace FailedCount=1, got %d", draftsTab.FailedCount)
 	}
 
 	if _, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{ConnectionID: "not an id"}); !errors.Is(err, ErrInvalidInput) {
@@ -272,13 +279,13 @@ func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	post(secret.ID, hidden, day, scheduledpost.StatusSCHEDULED)
+	post(secret.ID, hidden, day, scheduledpost.StatusFAILED)
 	page, err := repo.ListContentDrafts(ctx, w.actor("other"), ContentDraftListQuery{ConnectionID: hidden})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Items) != 0 {
-		t.Errorf("another member found a private set's draft through its account: %+v", page.Items)
+	if len(page.Items) != 0 || page.FailedCount != 1 {
+		t.Errorf("another member should not see private set's draft or its failed count: count=%d items=%+v", page.FailedCount, page.Items)
 	}
 }
 

@@ -24,15 +24,26 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
   const { campaignId, locale } = await params
   const access = await requireCampaignPageAccess(locale)
   // Scoped to the active workspace: another workspace's id is a 404.
-  const campaign = await getCampaign(access.tenant, campaignId)
+  const [campaignResult, plansResult, runsResult, revisionsResult, designsResult] =
+    await Promise.allSettled([
+      getCampaign(access.tenant, campaignId),
+      getCampaignPlans(access.tenant, campaignId),
+      latestLaunchRuns(access.tenant, campaignId),
+      listRevisions(access.tenant, campaignId),
+      listCampaignDesigns(access.tenant, campaignId),
+    ])
+  if (campaignResult.status === 'rejected') throw campaignResult.reason
+  const campaign = campaignResult.value
   if (!campaign) notFound()
-  const [specs, plans, runs, revisions, designs] = await Promise.all([
-    campaign.release ? getReleaseSpecs(access.tenant, campaign.release.id) : null,
-    getCampaignPlans(access.tenant, campaign.id),
-    latestLaunchRuns(access.tenant, campaign.id),
-    listRevisions(access.tenant, campaign.id),
-    listCampaignDesigns(access.tenant, campaign.id),
-  ])
+  if (plansResult.status === 'rejected') throw plansResult.reason
+  if (runsResult.status === 'rejected') throw runsResult.reason
+  if (revisionsResult.status === 'rejected') throw revisionsResult.reason
+  if (designsResult.status === 'rejected') throw designsResult.reason
+  const plans = plansResult.value
+  const runs = runsResult.value
+  const revisions = revisionsResult.value
+  const designs = designsResult.value
+  const specs = campaign.release ? await getReleaseSpecs(access.tenant, campaign.release.id) : null
 
   return (
     <>

@@ -2,7 +2,10 @@ import type { Connection } from "@hocuspocus/server";
 
 const protectedConnections = new WeakSet<Connection>();
 const MAX_PENDING_BYTES = 8 << 20;
+const MAX_GLOBAL_PENDING_BYTES = 64 << 20;
 const MAX_PENDING_MESSAGES = 256;
+
+let globalPendingBytes = 0;
 
 /**
  * Gate every outgoing frame, including Redis broadcasts, on current access.
@@ -25,6 +28,7 @@ export function protectConnection(
   let stopped = false;
   const stop = () => {
     stopped = true;
+    globalPendingBytes = Math.max(0, globalPendingBytes - bytes);
     pending.length = 0;
     bytes = 0;
     messages = 0;
@@ -43,6 +47,11 @@ export function protectConnection(
       code: 4403,
       reason: "Document access is no longer available.",
     });
+  const busy = () =>
+    connection.close({
+      code: 1013,
+      reason: "Collaboration server is busy. Reconnect to retry.",
+    });
   const drain = async () => {
     if (draining || stopped) return;
     draining = true;
@@ -59,6 +68,10 @@ export function protectConnection(
         for (const message of batch) {
           if (stopped) return;
           bytes -= message.byteLength;
+          globalPendingBytes = Math.max(
+            0,
+            globalPendingBytes - message.byteLength
+          );
           messages--;
           send(message);
         }
@@ -71,16 +84,21 @@ export function protectConnection(
   };
   connection.send = (message: unknown) => {
     if (stopped) return;
-    if (
-      !(message instanceof Uint8Array) ||
-      messages >= MAX_PENDING_MESSAGES ||
-      bytes + message.byteLength > MAX_PENDING_BYTES
-    ) {
+    if (!(message instanceof Uint8Array)) {
       refuse();
+      return;
+    }
+    if (
+      messages >= MAX_PENDING_MESSAGES ||
+      bytes + message.byteLength > MAX_PENDING_BYTES ||
+      globalPendingBytes + message.byteLength > MAX_GLOBAL_PENDING_BYTES
+    ) {
+      busy();
       return;
     }
     pending.push(new Uint8Array(message));
     bytes += message.byteLength;
+    globalPendingBytes += message.byteLength;
     messages++;
     void drain();
   };

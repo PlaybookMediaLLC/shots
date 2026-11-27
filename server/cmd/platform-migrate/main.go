@@ -23,7 +23,13 @@ func main() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	db, err := database.Open(ctx, os.Getenv("DATABASE_URL"))
+	migratePool := database.PoolConfig{
+		MaxOpenConns:     2,
+		MaxIdleConns:     1,
+		StatementTimeout: 5 * time.Minute,
+		IdleInTxTimeout:  5 * time.Minute,
+	}
+	db, err := database.OpenWithOptions(ctx, os.Getenv("DATABASE_URL"), migratePool)
 	if err != nil {
 		slog.Error("platform database unavailable", "error", err)
 		os.Exit(1)

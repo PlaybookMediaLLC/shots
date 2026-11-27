@@ -206,25 +206,50 @@ func (c *Configuration) CollectSocialAnalytics(ctx context.Context) (int, error)
 	}
 	now := time.Now().UTC()
 	count := 0
+	orgEligible := map[string]bool{}
 	eligible := func(connection *ent.ChannelConnection) bool {
-		if connection.SocialSetID == nil || connection.Status != channelconnection.StatusACTIVE {
+		if connection == nil || connection.SocialSetID == nil || connection.Status != channelconnection.StatusACTIVE {
 			return false
 		}
-		if c.requireWorkspaceFeature(ctx, connection.OrganizationID, contentDraftFeature) != nil {
+		if ok, cached := orgEligible[connection.OrganizationID]; cached {
+			return ok
+		}
+		featErr := c.requireWorkspaceFeature(ctx, connection.OrganizationID, contentDraftFeature)
+		var notEntitled *FeatureNotEntitledError
+		if featErr != nil {
+			if errors.As(featErr, &notEntitled) {
+				orgEligible[connection.OrganizationID] = false
+			}
 			return false
 		}
 		deleting, err := c.client.WorkspaceDeletion.Query().Where(workspacedeletion.OrganizationID(connection.OrganizationID), workspacedeletion.StatusNEQ(workspacedeletion.StatusCANCELLED)).Exist(ctx)
-		return err == nil && !deleting
-	}
-	due := func(org, kind, id string) (bool, error) {
-		row, err := c.client.PlatformSocialObservation.Get(ctx, observationID(org, kind, id, now))
-		if ent.IsNotFound(err) {
-			return true, nil
-		}
 		if err != nil {
-			return false, err
+			return false
 		}
-		return row.Status == observation.StatusFailed && now.Sub(row.ObservedAt) >= time.Hour, nil
+		ok := !deleting
+		orgEligible[connection.OrganizationID] = ok
+		return ok
+	}
+	loadObs := func(ids []string) (map[string]*ent.PlatformSocialObservation, error) {
+		result := make(map[string]*ent.PlatformSocialObservation, len(ids))
+		if len(ids) == 0 {
+			return result, nil
+		}
+		rows, err := c.client.PlatformSocialObservation.Query().Where(observation.IDIn(ids...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			result[row.ID] = row
+		}
+		return result, nil
+	}
+	obsDue := func(existing map[string]*ent.PlatformSocialObservation, id string) bool {
+		row, ok := existing[id]
+		if !ok {
+			return true
+		}
+		return row.Status == observation.StatusFailed && now.Sub(row.ObservedAt) >= time.Hour
 	}
 	for after := ""; count < 25; {
 		posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.IDGT(after), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED), scheduledpost.ContentDraftIDNotNil(), scheduledpost.RemotePostIDNotNil(), scheduledpost.DeletedAtIsNil(), scheduledpost.PublishedAtGTE(now.AddDate(0, 0, -30))).WithChannelConnection().Order(ent.Asc(scheduledpost.FieldID)).Limit(100).All(ctx)
@@ -234,17 +259,23 @@ func (c *Configuration) CollectSocialAnalytics(ctx context.Context) (int, error)
 		if len(posts) == 0 {
 			break
 		}
+		postObsIDs := make([]string, 0, len(posts))
+		for _, post := range posts {
+			if eligible(post.Edges.ChannelConnection) {
+				postObsIDs = append(postObsIDs, observationID(post.OrganizationID, "post", post.ID, now))
+			}
+		}
+		existingObs, err := loadObs(postObsIDs)
+		if err != nil {
+			return count, err
+		}
 		for _, post := range posts {
 			after = post.ID
 			connection := post.Edges.ChannelConnection
 			if !eligible(connection) {
 				continue
 			}
-			ready, err := due(post.OrganizationID, "post", post.ID)
-			if err != nil {
-				return count, err
-			}
-			if !ready {
+			if !obsDue(existingObs, observationID(post.OrganizationID, "post", post.ID, now)) {
 				continue
 			}
 			readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -266,6 +297,7 @@ func (c *Configuration) CollectSocialAnalytics(ctx context.Context) (int, error)
 	if !ok {
 		return count, nil
 	}
+	feed, hasFeed := c.postMetrics.(RecentPostMetricsReader)
 	accountCount, feedCount := 0, 0
 	for after := ""; accountCount < 25; {
 		connections, err := c.client.ChannelConnection.Query().Where(channelconnection.IDGT(after), channelconnection.StatusEQ(channelconnection.StatusACTIVE), channelconnection.SocialSetIDNotNil()).Order(ent.Asc(channelconnection.FieldID)).Limit(100).All(ctx)
@@ -275,28 +307,32 @@ func (c *Configuration) CollectSocialAnalytics(ctx context.Context) (int, error)
 		if len(connections) == 0 {
 			break
 		}
+		obsIDs := make([]string, 0, len(connections)*2)
+		for _, connection := range connections {
+			if !eligible(connection) {
+				continue
+			}
+			obsIDs = append(obsIDs, observationID(connection.OrganizationID, "account", connection.ID, now))
+			if hasFeed {
+				obsIDs = append(obsIDs, observationID(connection.OrganizationID, "feed", connection.ID, now))
+			}
+		}
+		existingObs, err := loadObs(obsIDs)
+		if err != nil {
+			return count, err
+		}
 		for _, connection := range connections {
 			after = connection.ID
 			if !eligible(connection) {
 				continue
 			}
-			if feed, ok := c.postMetrics.(RecentPostMetricsReader); ok && feedCount < 25 {
-				ready, err := due(connection.OrganizationID, "feed", connection.ID)
-				if err != nil {
+			if hasFeed && feedCount < 25 && obsDue(existingObs, observationID(connection.OrganizationID, "feed", connection.ID, now)) {
+				feedCount++
+				if err := c.collectObservedPosts(ctx, connection, feed); err != nil {
 					return count, err
 				}
-				if ready {
-					feedCount++
-					if err := c.collectObservedPosts(ctx, connection, feed); err != nil {
-						return count, err
-					}
-				}
 			}
-			ready, err := due(connection.OrganizationID, "account", connection.ID)
-			if err != nil {
-				return count, err
-			}
-			if !ready {
+			if !obsDue(existingObs, observationID(connection.OrganizationID, "account", connection.ID, now)) {
 				continue
 			}
 			readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

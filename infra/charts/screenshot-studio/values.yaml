@@ -77,11 +77,23 @@ collab:
   publicUrl: ''
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 500m
+      cpu: 250m
       memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  terminationGracePeriodSeconds: 45
+  preStopSleepSeconds: 5
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+    scaleDownStabilizationWindowSeconds: 300
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
 
 # The Go platform migrator, shipped in the backend image.
 migration:
@@ -139,11 +151,14 @@ httpRoute:
 
 resources:
   requests:
-    cpu: 100m
-    memory: 512Mi
+    cpu: 500m
+    memory: 768Mi
   limits:
     cpu: 1000m
     memory: 1Gi
+
+terminationGracePeriodSeconds: 45
+preStopSleepSeconds: 5
 
 startupProbe:
   httpGet:
@@ -167,6 +182,12 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 75
+  scaleDownStabilizationWindowSeconds: 300
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
 
 volumes: []
 volumeMounts: []

@@ -3,6 +3,7 @@
   "version": "0.1.44",
   "description": "Typed server SDK for the Screenshot Studio Go backend",
   "type": "module",
+  "sideEffects": false,
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

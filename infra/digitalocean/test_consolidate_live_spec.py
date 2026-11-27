@@ -276,6 +276,8 @@ class ConsolidateLiveSpecTest(unittest.TestCase):
         services = {item["name"]: item for item in spec["services"]}
         collab = services["collab"]
         self.assertEqual(collab["image"], dict(cutover.IMAGE, tag=collab_tag))
+        self.assertEqual(collab["instance_count"], 1)
+        self.assertEqual(collab["instance_size_slug"], "apps-s-1vcpu-1gb")
         collab_env = {item["key"]: item for item in collab["envs"]}
         self.assertEqual(collab_env["COLLAB_BACKEND_URL"]["value"], "http://screenshot-studio-backend:8082")
         self.assertEqual((collab_env["COLLAB_SERVICE_TOKEN"]["type"], collab_env["COLLAB_SERVICE_TOKEN"]["value"]),
@@ -301,7 +303,18 @@ class ConsolidateLiveSpecTest(unittest.TestCase):
                                                              COLLAB_REDIS_URL="rediss://collab"), None, collab_tag)
         scaled_collab = next(item for item in scaled["services"] if item["name"] == "collab")
         self.assertEqual(scaled_collab["instance_count"], 3)
+        self.assertEqual(scaled_collab["instance_size_slug"], "apps-s-1vcpu-1gb")
         self.assertEqual({item["key"]: item["type"] for item in scaled_collab["envs"]}["COLLAB_REDIS_URL"], "SECRET")
+        # With COLLAB_REDIS_URL present and no explicit count, collab defaults to 2 HA instances on 1 GiB.
+        redis_default = cutover.consolidate(live, self.digest, dict(enabled, COLLAB_REDIS_URL="rediss://collab"), None, collab_tag)
+        redis_collab = next(item for item in redis_default["services"] if item["name"] == "collab")
+        self.assertEqual(redis_collab["instance_count"], 2)
+        self.assertEqual(redis_collab["instance_size_slug"], "apps-s-1vcpu-1gb")
+        # Explicit COLLAB_INSTANCE_COUNT=1 overrides the 2-replica Redis default.
+        redis_single = cutover.consolidate(live, self.digest, dict(enabled, COLLAB_INSTANCE_COUNT="1",
+                                                                   COLLAB_REDIS_URL="rediss://collab"), None, collab_tag)
+        single_collab = next(item for item in redis_single["services"] if item["name"] == "collab")
+        self.assertEqual(single_collab["instance_count"], 1)
 
     def test_onboarding_keys_follow_infisical(self):
         secrets = {key: "infisical-" + key for key in

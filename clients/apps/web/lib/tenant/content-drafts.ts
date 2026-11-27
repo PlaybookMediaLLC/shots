@@ -65,6 +65,7 @@ export async function listContentDrafts(
 ) {
   const page = await backendSDK(context).listContentDrafts(query)
   return {
+    failedCount: page.failedCount ?? 0,
     items: page.items.map(readDraft),
     nextCursor: page.nextCursor,
     pinned: (page.pinned ?? []).map(readDraft),

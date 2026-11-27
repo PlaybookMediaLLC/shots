@@ -13,6 +13,7 @@ type ProjectStore interface {
 	CreateProject(context.Context, product.Actor, string, map[string]any) (*product.ProjectRecord, error)
 	GetProject(context.Context, product.Actor, string) (*product.ProjectRecord, error)
 	ListProjects(context.Context, product.Actor, product.ProjectListQuery) (*product.ProjectPage, error)
+	ListRecentWork(context.Context, product.Actor, int) (*product.RecentWorkPage, error)
 	RenameProject(context.Context, product.Actor, string, string) (*product.ProjectRecord, error)
 	UpdateProjectDocument(context.Context, product.Actor, string, product.ProjectDocumentWrite) (*product.ProjectWriteResult, error)
 	DuplicateProject(context.Context, product.Actor, string, *string) (*product.ProjectRecord, error)
@@ -24,6 +25,7 @@ type ProjectStore interface {
 }
 
 func (s *Server) registerProjects(mux *http.ServeMux) {
+	mux.Handle("GET /v1/recent-work", s.authenticateProduct(http.HandlerFunc(s.listRecentWork)))
 	mux.Handle("GET /v1/projects", s.authenticateProduct(http.HandlerFunc(s.listProjects)))
 	mux.Handle("POST /v1/projects", s.authenticateProduct(http.HandlerFunc(s.createProject)))
 	mux.Handle("GET /v1/projects/{id}", s.authenticateProduct(http.HandlerFunc(s.getProject)))
@@ -58,6 +60,20 @@ func writeProjectError(w http.ResponseWriter, err error) {
 		return
 	}
 	writeStoreError(w, err)
+}
+
+func (s *Server) listRecentWork(w http.ResponseWriter, r *http.Request) {
+	limit, ok := queryLimit(r, 5, 20)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid recent-work limit")
+		return
+	}
+	page, err := s.configuration.ListRecentWork(r.Context(), workspaceActor(r), limit)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
 }
 
 func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {

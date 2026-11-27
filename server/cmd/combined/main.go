@@ -12,14 +12,21 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
 
-const tenantPrefix = "TENANT_"
+const (
+	tenantPrefix      = "TENANT_"
+	minChildMemLimit  = 64 << 20  // 64 MiB floor when container RAM >= 256 MiB
+	minFloorContainer = 256 << 20 // below 256 MiB, strictly keep 35%/45% proportional shares
+	cgroupUnlimitedV1 = int64(1) << 60
+)
 
 // socialCredentialKeys let the worker open sealed channel tokens and refresh
 // them. Production sets them without a TENANT_ twin; see
@@ -45,12 +52,18 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	memLimit := detectContainerMemoryLimit("/sys/fs/cgroup", "/proc/self/cgroup")
 	children := []*exec.Cmd{
 		exec.Command("/publishing-orchestrator"),
 		exec.Command("/publishing-backend"),
 	}
-	children[0].Env = tenantEnv
-	children[1].Env = apiEnv(os.Environ(), tenantEnv)
+	// Go 1.26 natively sets cgroup-aware GOMAXPROCS; budget 80% of container RAM
+	// across both Go child processes (35% worker, 45% API), leaving 20% headroom.
+	children[0].Env = applyMemoryLimit(tenantEnv, memLimit, 0.35)
+	children[1].Env = applyMemoryLimit(apiEnv(os.Environ(), tenantEnv), memLimit, 0.45)
+	if memLimit > 0 {
+		slog.Info("configured combined backend memory limits", "container_memory_bytes", memLimit)
+	}
 	started := make([]*exec.Cmd, 0, len(children))
 	for _, child := range children {
 		child.Stdout, child.Stderr = os.Stdout, os.Stderr
@@ -124,11 +137,11 @@ func publishingEnv(environ []string) ([]string, error) {
 			result = append(result, name+"="+value)
 		}
 	}
-	// Both processes share the telemetry settings, the image's version and the
-	// social credentials; a TENANT_ twin still wins.
+	// Both processes share the telemetry settings, the image's version, explicit
+	// GOMEMLIMIT overrides, and the social credentials; a TENANT_ twin still wins.
 	for _, item := range environ {
 		key, _, _ := strings.Cut(item, "=")
-		if (strings.HasPrefix(key, "OTEL_") || key == "SERVICE_VERSION" || slices.Contains(socialCredentialKeys, key)) && !hasEnv(result, key) {
+		if (strings.HasPrefix(key, "OTEL_") || key == "SERVICE_VERSION" || key == "GOMEMLIMIT" || slices.Contains(socialCredentialKeys, key)) && !hasEnv(result, key) {
 			result = append(result, item)
 		}
 	}
@@ -241,4 +254,77 @@ func readinessHandler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ready"))
 	})
+}
+
+func parseMemoryFile(path string) int64 {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	text := strings.TrimSpace(string(raw))
+	if text == "" || text == "max" {
+		return 0
+	}
+	n, err := strconv.ParseInt(text, 10, 64)
+	if err != nil || n <= 0 || n >= cgroupUnlimitedV1 {
+		return 0
+	}
+	return n
+}
+
+func minPositiveMemory(root, relPath, filename string) int64 {
+	clean := filepath.Clean("/" + strings.TrimSpace(relPath))
+	var lowest int64
+	for {
+		dir := root
+		if clean != "/" && clean != "." {
+			dir = filepath.Join(root, strings.TrimPrefix(clean, "/"))
+		}
+		if n := parseMemoryFile(filepath.Join(dir, filename)); n > 0 && (lowest == 0 || n < lowest) {
+			lowest = n
+		}
+		if clean == "/" || clean == "." {
+			break
+		}
+		clean = filepath.Dir(clean)
+	}
+	return lowest
+}
+
+// detectContainerMemoryLimit resolves the tightest finite Linux cgroup v2 or v1
+// memory limit along the process's cgroup hierarchy (supporting both private
+// cgroup namespaces and host-namespaced nested pod/container cgroups).
+func detectContainerMemoryLimit(cgroupRoot, procSelfCgroup string) int64 {
+	v2Path, v1MemPath := "/", "/"
+	if raw, err := os.ReadFile(procSelfCgroup); err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+			parts := strings.SplitN(line, ":", 3)
+			if len(parts) != 3 {
+				continue
+			}
+			if parts[0] == "0" && parts[1] == "" {
+				v2Path = parts[2]
+			} else if slices.Contains(strings.Split(parts[1], ","), "memory") {
+				v1MemPath = parts[2]
+			}
+		}
+	}
+	if n := minPositiveMemory(cgroupRoot, v2Path, "memory.max"); n > 0 {
+		return n
+	}
+	return minPositiveMemory(filepath.Join(cgroupRoot, "memory"), v1MemPath, "memory.limit_in_bytes")
+}
+
+// applyMemoryLimit injects GOMEMLIMIT into a child environment when a finite
+// container memory limit was detected and the operator did not already set it.
+func applyMemoryLimit(environ []string, containerMemoryBytes int64, memoryShare float64) []string {
+	result := slices.Clone(environ)
+	if containerMemoryBytes > 0 && memoryShare > 0 && !hasEnv(result, "GOMEMLIMIT") {
+		budget := int64(float64(containerMemoryBytes) * memoryShare)
+		if containerMemoryBytes >= minFloorContainer && budget < minChildMemLimit {
+			budget = minChildMemLimit
+		}
+		result = append(result, fmt.Sprintf("GOMEMLIMIT=%dB", budget))
+	}
+	return result
 }

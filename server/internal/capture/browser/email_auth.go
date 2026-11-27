@@ -236,7 +236,7 @@ func exactlyOne(ctx context.Context, page *rod.Page, selector string) (*rod.Elem
 		select {
 		case <-waitCtx.Done():
 			return nil, &Failure{Code: LoginPageChanged}
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 }
@@ -345,7 +345,7 @@ func awaitChallengeScreen(ctx context.Context, s *scope, recipe LoginRecipe) err
 		select {
 		case <-waitCtx.Done():
 			return &Failure{Code: LoginPageChanged}
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 }
@@ -468,7 +468,7 @@ func ApplyEmailCode(ctx context.Context, browser *rod.Browser, target Target, ho
 		select {
 		case <-waitCtx.Done():
 			return &Failure{Code: ChallengeExpired}
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 	if s.blocked(ctx) {

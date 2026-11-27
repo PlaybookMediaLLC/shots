@@ -274,7 +274,7 @@ func streamUpload(ctx context.Context, mediaPath, uploadURL string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	media, err := ssrf.Client().Do(getReq)
+	media, err := ssrf.StreamingClient().Do(getReq)
 	if err != nil {
 		return nil, err
 	}
@@ -312,12 +312,12 @@ func streamUpload(ctx context.Context, mediaPath, uploadURL string) (map[string]
 		return nil, err
 	}
 	req.Header.Set("Content-Type", w.FormDataContentType())
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return nil, err
 	}

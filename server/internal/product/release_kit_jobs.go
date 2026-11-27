@@ -3,8 +3,11 @@ package product
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
+	"net/url"
 	"slices"
 	"time"
 
@@ -20,12 +23,37 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceroles"
 )
 
+// KitDispatcher decouples slow release-kit preparation and export builds from
+// the global outbox dispatcher by launching durable Temporal workflows.
+type KitDispatcher interface {
+	StartKitPrepare(ctx context.Context, organizationID, revisionID string) error
+	StartKitExport(ctx context.Context, organizationID, exportID string) error
+}
+
+// WithKitDispatcher configures durable background execution for release kits.
+func (c *Configuration) WithKitDispatcher(dispatcher KitDispatcher) *Configuration {
+	c.kitDispatcher = dispatcher
+	return c
+}
+
+// ProcessKitPreparation executes a release-kit preparation job.
+func (c *Configuration) ProcessKitPreparation(ctx context.Context, org, id string) error {
+	return c.processKitPreparation(ctx, org, id)
+}
+
+// ProcessKitExport executes a release-kit export bundle build.
+func (c *Configuration) ProcessKitExport(ctx context.Context, org, id string) error {
+	return c.processKitExport(ctx, org, id)
+}
+
 type KitRenderRequest struct {
 	OrganizationID string                     `json:"organizationId"`
 	ArtifactID     string                     `json:"artifactId"`
 	Snapshot       releasekits.NativeSnapshot `json:"snapshot"`
-	// Pinned bytes are resolved by the Go owner, never fetched from a live URL.
+	// Pinned bytes are resolved by the Go owner, either as signed storage URLs
+	// (preferred, avoiding 140 MiB base64 JSON payloads) or inline data URIs.
 	Assets     map[string]string `json:"assets"`
+	AssetURLs  map[string]string `json:"assetUrls,omitempty"`
 	AssetPaths map[string]string `json:"assetPaths"`
 }
 type KitRenderOutput struct {
@@ -263,23 +291,52 @@ func (c *Configuration) failKitPreparation(ctx context.Context, revision *ent.Ki
 	return err
 }
 
-func (c *Configuration) readKitObject(ctx context.Context, key, hash string, size int64) ([]byte, error) {
+func (c *Configuration) streamKitObject(ctx context.Context, key, hash string, size int64, dst io.Writer) error {
 	if c.objects == nil || key == "" || size <= 0 || size > releasekits.MaxBundleBytes {
-		return nil, ErrStorageUnavailable
+		return ErrStorageUnavailable
 	}
 	body, err := c.openObject(ctx, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer body.Close()
-	raw, err := io.ReadAll(io.LimitReader(body, size+1))
-	if err != nil {
-		return nil, err
+	sum := sha256.New()
+	var sink io.Writer = sum
+	if dst != nil {
+		sink = io.MultiWriter(sum, dst)
 	}
-	if int64(len(raw)) != size || releasefacts.ByteHash(raw) != hash {
+	written, err := io.Copy(sink, io.LimitReader(body, size+1))
+	if err != nil {
+		return err
+	}
+	if written != size || hex.EncodeToString(sum.Sum(nil)) != hash {
+		return ErrStorageUnavailable
+	}
+	return nil
+}
+
+func (c *Configuration) readKitObject(ctx context.Context, key, hash string, size int64) ([]byte, error) {
+	if size <= 0 || size > releasekits.MaxBundleBytes {
 		return nil, ErrStorageUnavailable
 	}
-	return raw, nil
+	buf := bytes.NewBuffer(make([]byte, 0, size))
+	if err := c.streamKitObject(ctx, key, hash, size, buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c *Configuration) verifyKitObject(ctx context.Context, key, hash string, size int64) error {
+	return c.streamKitObject(ctx, key, hash, size, nil)
+}
+
+type internalDownloadSigner interface {
+	SignInternalDownload(ctx context.Context, key string) (string, error)
+}
+
+func isHTTPURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	return err == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != ""
 }
 
 func (c *Configuration) renderKitArtifact(ctx context.Context, org string, a *ent.KitArtifactRevision, paths map[string]string) (KitRenderOutput, error) {
@@ -309,8 +366,34 @@ func (c *Configuration) renderKitArtifact(ctx context.Context, org string, a *en
 		if !ok {
 			return result, ErrAutomationRendererUnavailable
 		}
-		request := KitRenderRequest{OrganizationID: org, ArtifactID: a.ID, Snapshot: a.Snapshot, Assets: map[string]string{}, AssetPaths: paths}
+		if len(a.Snapshot.Assets) > 0 && c.objects == nil {
+			return result, ErrStorageUnavailable
+		}
+		request := KitRenderRequest{
+			OrganizationID: org,
+			ArtifactID:     a.ID,
+			Snapshot:       a.Snapshot,
+			Assets:         map[string]string{},
+			AssetURLs:      map[string]string{},
+			AssetPaths:     paths,
+		}
+		signer, canSignInternal := c.objects.(internalDownloadSigner)
 		for _, pin := range a.Snapshot.Assets {
+			// Prefer internal-endpoint presigned URLs (R2_ENDPOINT, 5m TTL) so the
+			// web container reaches storage directly without 140 MiB base64 JSON.
+			if canSignInternal {
+				if signed, signErr := signer.SignInternalDownload(ctx, pin.ObjectKey); signErr == nil && isHTTPURL(signed) {
+					// CREATIVE snapshots independently download and verify byteLength + SHA-256
+					// in Next.js; DRAFT snapshots skip downloading pixels so Go verifies here.
+					if a.Snapshot.Kind != "CREATIVE" {
+						if err := c.verifyKitObject(ctx, pin.ObjectKey, pin.SHA256, pin.ByteLength); err != nil {
+							return result, err
+						}
+					}
+					request.AssetURLs[pin.ID] = signed
+					continue
+				}
+			}
 			body, err := c.readKitObject(ctx, pin.ObjectKey, pin.SHA256, pin.ByteLength)
 			if err != nil {
 				return result, err

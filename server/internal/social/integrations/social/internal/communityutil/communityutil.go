@@ -59,7 +59,7 @@ func Fetch(ctx context.Context, method, rawURL string, headers map[string]string
 		return nil, err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return nil, err
 	}

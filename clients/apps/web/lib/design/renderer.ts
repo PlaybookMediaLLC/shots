@@ -23,6 +23,44 @@ import { RENDER_FRAME_PATH, type RenderResponse } from '@/lib/render/protocol'
  */
 
 const RENDER_TIMEOUT_MS = 60_000
+const LOCAL_IDLE_TTL_MS = 60_000
+const CDP_IDLE_TTL_MS = 30_000
+export const KIT_ASSET_PREFIX = '/__kit-asset/'
+
+function maxRenderConcurrency(): number {
+  const parsed = Number.parseInt(process.env.PLATFORM_RENDER_CONCURRENCY ?? '', 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return 4
+  return Math.min(8, parsed)
+}
+
+/** Bounded semaphore gating concurrent headless render pages across the process. */
+export class RenderSemaphore {
+  private active = 0
+  private readonly waiters: Array<() => void> = []
+
+  constructor(private readonly getLimit: () => number = maxRenderConcurrency) {}
+
+  async run<T>(task: () => Promise<T>): Promise<T> {
+    if (this.active >= this.getLimit()) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve))
+    } else {
+      this.active += 1
+    }
+    try {
+      return await task()
+    } finally {
+      const next = this.waiters.shift()
+      if (next) {
+        // Transfer the permit directly to the next queued waiter without dropping active.
+        next()
+      } else {
+        this.active -= 1
+      }
+    }
+  }
+}
+
+const renderSemaphore = new RenderSemaphore()
 
 /** A strict check refused an artboard (a missing font or image, overflowing copy). */
 export class CanvasPrintRefusedError extends Error {
@@ -80,10 +118,18 @@ export type RenderedDesign = {
   width: number
 }
 
+export type SnapshotLocalAsset = {
+  bytes: Buffer
+  mediaType: string
+}
+
 export type DesignRenderer = {
   close: () => Promise<void>
-  /** Render an immutable document with owned media already resolved to pinned bytes. */
-  renderSnapshot: (document: DesignDocument) => Promise<RenderedDesign>
+  /** Render an immutable document with owned media already resolved to pinned bytes or local assets. */
+  renderSnapshot: (
+    document: DesignDocument,
+    localAssets?: ReadonlyMap<string, SnapshotLocalAsset>
+  ) => Promise<RenderedDesign>
   render: (
     designId: string,
     organizationId: string,
@@ -137,108 +183,261 @@ function openBrowser(): Promise<Browser> {
   })
 }
 
-/** One browser per agent run, with a fresh context per render. */
-export async function createDesignRenderer(): Promise<DesignRenderer> {
-  let browser = await openBrowser()
-  const baseUrl = new URL(getRenderBaseUrl())
+interface PooledBrowserState {
+  browserPromise: Promise<Browser> | null
+  configKey: string
+  idleTimer: ReturnType<typeof setTimeout> | null
+  leases: number
+}
 
-  /** A fresh page that may load only the app itself and Google Fonts. */
-  async function openPage(viewport = { height: 1400, width: 2200 }, externalFonts = true) {
-    // A remote session ends after its idle keep_alive; reconnect if it did.
-    if (!browser.isConnected()) browser = await openBrowser()
-    const context = await browser.newContext({ deviceScaleFactor: 1, viewport })
-    const page = await context.newPage()
-    // Only the app itself and Google Fonts (text may use them): no
-    // analytics or ad scripts in a render.
-    await page.route('**/*', (route) => {
-      const url = new URL(route.request().url())
-      return url.protocol === 'data:' ||
-        url.protocol === 'blob:' ||
-        url.origin === baseUrl.origin ||
-        (externalFonts && (GOOGLE_FONT_ORIGINS as readonly string[]).includes(url.origin))
-        ? route.continue()
-        : route.abort()
-    })
-    return { context, page }
+const pool: PooledBrowserState = {
+  browserPromise: null,
+  configKey: '',
+  idleTimer: null,
+  leases: 0,
+}
+
+function currentPoolConfigKey(): string {
+  return `${process.env.PLATFORM_RENDER_CDP_URL ?? ''}|${process.env.PLATFORM_RENDER_CHROMIUM_PATH ?? ''}`
+}
+
+function clearPoolIdleTimer() {
+  if (pool.idleTimer) {
+    clearTimeout(pool.idleTimer)
+    pool.idleTimer = null
+  }
+}
+
+function schedulePoolIdleClose() {
+  clearPoolIdleTimer()
+  if (pool.leases > 0 || !pool.browserPromise) return
+  const ttl = process.env.PLATFORM_RENDER_CDP_URL ? CDP_IDLE_TTL_MS : LOCAL_IDLE_TTL_MS
+  pool.idleTimer = setTimeout(() => {
+    pool.idleTimer = null
+    if (pool.leases === 0) void closeDesignRendererPool()
+  }, ttl)
+  // Unref so idle warm browsers never keep short-lived test or CLI processes alive.
+  pool.idleTimer.unref?.()
+}
+
+/** Close any idle or active pooled Chromium/CDP browser instance. */
+export async function closeDesignRendererPool(): Promise<void> {
+  clearPoolIdleTimer()
+  const pending = pool.browserPromise
+  pool.browserPromise = null
+  if (!pending) return
+  try {
+    const browser = await pending
+    await browser.close().catch(() => undefined)
+  } catch {
+    // Browser failed to launch; nothing to close.
+  }
+}
+
+async function acquirePooledBrowser(): Promise<Browser> {
+  clearPoolIdleTimer()
+  const key = currentPoolConfigKey()
+  if (pool.browserPromise && pool.configKey !== key) {
+    await closeDesignRendererPool()
+  }
+  while (pool.browserPromise) {
+    const pending = pool.browserPromise
+    try {
+      const existing = await pending
+      if (existing.isConnected()) return existing
+      await existing.close().catch(() => undefined)
+    } catch {
+      // Previous launch failed; replace below if still the active slot.
+    }
+    if (pool.browserPromise === pending) {
+      pool.browserPromise = null
+    }
+  }
+  pool.configKey = key
+  const launched = openBrowser()
+  pool.browserPromise = launched
+  try {
+    return await launched
+  } catch (error) {
+    if (pool.browserPromise === launched) pool.browserPromise = null
+    throw error
+  }
+}
+
+function decodeKitAssetId(pathname: string): string | null {
+  try {
+    return decodeURIComponent(pathname.slice(KIT_ASSET_PREFIX.length))
+  } catch {
+    return null
+  }
+}
+
+/** Lease a pooled Chromium/CDP browser; each render gets a fresh isolated context under the concurrency cap. */
+export async function createDesignRenderer(): Promise<DesignRenderer> {
+  const baseUrl = new URL(getRenderBaseUrl())
+  pool.leases += 1
+  let closed = false
+  try {
+    await acquirePooledBrowser()
+  } catch (error) {
+    pool.leases = Math.max(0, pool.leases - 1)
+    schedulePoolIdleClose()
+    throw error
+  }
+
+  /** Run one render inside a semaphore permit with a fresh isolated browser context. */
+  async function withPage<T>(
+    work: (page: Awaited<ReturnType<Browser['newPage']>>) => Promise<T>,
+    options: {
+      externalFonts?: boolean
+      localAssets?: ReadonlyMap<string, SnapshotLocalAsset>
+    } = {}
+  ): Promise<T> {
+    const { externalFonts = true, localAssets } = options
+    pool.leases += 1
+    try {
+      return await renderSemaphore.run(async () => {
+        const browser = await acquirePooledBrowser()
+        const context = await browser.newContext({
+          deviceScaleFactor: 1,
+          viewport: { height: 1400, width: 2200 },
+        })
+        try {
+          const page = await context.newPage()
+          const allowedAssetOrigins = new Set<string>([
+            'https://assets.screenshot-studio.com',
+            'https://shots-assets.oppulence.io',
+          ])
+          const configuredR2 = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim()
+          if (configuredR2) {
+            try {
+              allowedAssetOrigins.add(
+                new URL(configuredR2.includes('://') ? configuredR2 : `https://${configuredR2}`)
+                  .origin
+              )
+            } catch {
+              // Ignore malformed override.
+            }
+          }
+          // Only the app itself, its static R2 asset CDN, local pinned snapshot assets, and Google Fonts:
+          // no analytics or ad scripts in a render.
+          await page.route('**/*', (route) => {
+            const url = new URL(route.request().url())
+            if (
+              localAssets &&
+              url.origin === baseUrl.origin &&
+              url.pathname.startsWith(KIT_ASSET_PREFIX)
+            ) {
+              const assetId = decodeKitAssetId(url.pathname)
+              const pinned = assetId !== null ? localAssets.get(assetId) : undefined
+              if (pinned) {
+                return route.fulfill({
+                  body: pinned.bytes,
+                  contentType: pinned.mediaType,
+                  status: 200,
+                })
+              }
+              return route.fulfill({ status: 404 })
+            }
+            return url.protocol === 'data:' ||
+              url.protocol === 'blob:' ||
+              url.origin === baseUrl.origin ||
+              allowedAssetOrigins.has(url.origin) ||
+              (externalFonts && (GOOGLE_FONT_ORIGINS as readonly string[]).includes(url.origin))
+              ? route.continue()
+              : route.abort()
+          })
+          return await work(page)
+        } finally {
+          await context.close().catch(() => undefined)
+        }
+      })
+    } finally {
+      pool.leases = Math.max(0, pool.leases - 1)
+      schedulePoolIdleClose()
+    }
   }
 
   return {
-    close: () => browser.close(),
-    renderSnapshot: async (document) => {
-      const { context, page } = await openPage(undefined, false)
-      try {
-        await page.addInitScript(() => {
-          window.addEventListener('message', (event: MessageEvent<RenderResponse>) => {
-            if (
-              event.source === window &&
-              event.origin === location.origin &&
-              event.data.type === 'ready'
-            )
-              window.document.documentElement.dataset.renderReady = 'true'
-          })
-        })
-        const response = await page.goto(new URL(RENDER_FRAME_PATH, baseUrl).toString(), {
-          timeout: RENDER_TIMEOUT_MS,
-        })
-        if (!response?.ok()) throw new Error('Snapshot render page is unavailable.')
-        await page.waitForFunction(
-          () => window.document.documentElement.dataset.renderReady === 'true',
-          undefined,
-          { timeout: RENDER_TIMEOUT_MS }
-        )
-        const result = await page.evaluate(
-          ({ serializedDocument, timeout }) =>
-            new Promise<ExportResult>((resolve, reject) => {
-              const id = crypto.randomUUID()
-              const timer = setTimeout(() => {
-                window.removeEventListener('message', listener.receive)
-                reject(new Error('Snapshot rendering timed out.'))
-              }, timeout)
-              const listener = {
-                receive(event: MessageEvent<RenderResponse>) {
-                  if (
-                    event.source !== window ||
-                    event.origin !== location.origin ||
-                    !('id' in event.data) ||
-                    event.data.id !== id
-                  )
-                    return
-                  if (event.data.type !== 'error' && event.data.type !== 'result') return
-                  clearTimeout(timer)
-                  window.removeEventListener('message', listener.receive)
-                  if (event.data.type === 'error') {
-                    reject(new Error(event.data.message))
-                    return
-                  }
-                  const { blob, width, height } = event.data
-                  const reader = new FileReader()
-                  reader.onerror = () => reject(new Error('Snapshot bytes could not be read.'))
-                  reader.onload = () =>
-                    resolve({ base64: String(reader.result).split(',')[1], width, height })
-                  reader.readAsDataURL(blob)
-                },
-              }
-              window.addEventListener('message', listener.receive)
-              window.postMessage(
-                {
-                  type: 'render',
-                  id,
-                  document: JSON.parse(serializedDocument),
-                  output: { format: 'png', scale: 1, strict: true },
-                },
-                location.origin
-              )
-            }),
-          { serializedDocument: JSON.stringify(document), timeout: RENDER_TIMEOUT_MS }
-        )
-        return toRenderedDesign(result, { format: 'png' })
-      } finally {
-        await context.close()
-      }
+    close: async () => {
+      if (closed) return
+      closed = true
+      pool.leases = Math.max(0, pool.leases - 1)
+      schedulePoolIdleClose()
     },
-    printCanvas: async (canvasId, organizationId, artboardIds) => {
-      const { context, page } = await openPage()
-      try {
+    renderSnapshot: async (document, localAssets) =>
+      withPage(
+        async (page) => {
+          await page.addInitScript(() => {
+            window.addEventListener('message', (event: MessageEvent<RenderResponse>) => {
+              if (
+                event.source === window &&
+                event.origin === location.origin &&
+                event.data.type === 'ready'
+              )
+                window.document.documentElement.dataset.renderReady = 'true'
+            })
+          })
+          const response = await page.goto(new URL(RENDER_FRAME_PATH, baseUrl).toString(), {
+            timeout: RENDER_TIMEOUT_MS,
+          })
+          if (!response?.ok()) throw new Error('Snapshot render page is unavailable.')
+          await page.waitForFunction(
+            () => window.document.documentElement.dataset.renderReady === 'true',
+            undefined,
+            { timeout: RENDER_TIMEOUT_MS }
+          )
+          const result = await page.evaluate(
+            ({ serializedDocument, timeout }) =>
+              new Promise<ExportResult>((resolve, reject) => {
+                const id = crypto.randomUUID()
+                const timer = setTimeout(() => {
+                  window.removeEventListener('message', listener.receive)
+                  reject(new Error('Snapshot rendering timed out.'))
+                }, timeout)
+                const listener = {
+                  receive(event: MessageEvent<RenderResponse>) {
+                    if (
+                      event.source !== window ||
+                      event.origin !== location.origin ||
+                      !('id' in event.data) ||
+                      event.data.id !== id
+                    )
+                      return
+                    if (event.data.type !== 'error' && event.data.type !== 'result') return
+                    clearTimeout(timer)
+                    window.removeEventListener('message', listener.receive)
+                    if (event.data.type === 'error') {
+                      reject(new Error(event.data.message))
+                      return
+                    }
+                    const { blob, width, height } = event.data
+                    const reader = new FileReader()
+                    reader.onerror = () => reject(new Error('Snapshot bytes could not be read.'))
+                    reader.onload = () =>
+                      resolve({ base64: String(reader.result).split(',')[1], width, height })
+                    reader.readAsDataURL(blob)
+                  },
+                }
+                window.addEventListener('message', listener.receive)
+                window.postMessage(
+                  {
+                    type: 'render',
+                    id,
+                    document: JSON.parse(serializedDocument),
+                    output: { format: 'png', scale: 1, strict: true },
+                  },
+                  location.origin
+                )
+              }),
+            { serializedDocument: JSON.stringify(document), timeout: RENDER_TIMEOUT_MS }
+          )
+          return toRenderedDesign(result, { format: 'png' })
+        },
+        { externalFonts: false, localAssets }
+      ),
+    printCanvas: async (canvasId, organizationId, artboardIds) =>
+      withPage(async (page) => {
         const url = new URL(`/render/canvas/${canvasId}`, getRenderBaseUrl())
         url.searchParams.set('token', createRenderToken(`canvas:${canvasId}`, organizationId))
         url.searchParams.set('ids', artboardIds.join(','))
@@ -254,13 +453,9 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
         if (failure) throw new CanvasPrintRefusedError(failure)
         // Each artboard is a named page at its own size; text and shapes stay vector.
         return await page.pdf({ preferCSSPageSize: true, printBackground: true })
-      } finally {
-        await context.close()
-      }
-    },
-    renderCode: async (projectId, organizationId, { slide, scale }) => {
-      const { context, page } = await openPage()
-      try {
+      }),
+    renderCode: async (projectId, organizationId, { slide, scale }) =>
+      withPage(async (page) => {
         const url = new URL(`/render/code/${projectId}`, getRenderBaseUrl())
         url.searchParams.set('token', createRenderToken(`code:${projectId}`, organizationId))
         url.searchParams.set('slide', String(slide))
@@ -274,13 +469,9 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
         return toRenderedDesign(await page.evaluate(() => window.__exportCode!()), {
           format: 'png',
         })
-      } finally {
-        await context.close()
-      }
-    },
-    render: async (designId, organizationId, options = {}) => {
-      const { context, page } = await openPage()
-      try {
+      }),
+    render: async (designId, organizationId, options = {}) =>
+      withPage(async (page) => {
         const response = await page.goto(
           renderPageUrl(designId, organizationId, options).toString(),
           {
@@ -293,9 +484,6 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
           timeout: RENDER_TIMEOUT_MS,
         })
         return toRenderedDesign(await page.evaluate(() => window.__exportDesign!()), options)
-      } finally {
-        await context.close()
-      }
-    },
+      }),
   }
 }

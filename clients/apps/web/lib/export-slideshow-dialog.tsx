@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useShallow } from "zustand/react/shallow";
 import { useImageStore } from "@/lib/store";
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
@@ -125,7 +126,14 @@ export function ExportSlideshowDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { slideshow, timeline, slides, animationClips } = useImageStore();
+  const { slideshow, timeline, slides, animationClips } = useImageStore(
+    useShallow((state) => ({
+      slideshow: state.slideshow,
+      timeline: state.timeline,
+      slides: state.slides,
+      animationClips: state.animationClips,
+    }))
+  );
   const { active: exporting, progress, abort } = useExportProgress();
   const [format, setFormat] = useState<VideoFormat>("mp4");
   const [quality, setQuality] = useState<VideoQuality>("high");

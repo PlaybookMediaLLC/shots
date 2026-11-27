@@ -69,11 +69,10 @@ import { automationSelectClass, ConditionEditor } from './ConditionEditor'
 import {
   canvasEdges,
   canvasNodes,
-  FAMILY_NAMES,
   nodeLabel,
   workflowNodeTypes,
 } from './workflow-canvas'
-import { DeploymentHint } from './workflow-ui'
+import { DeploymentHint, FAMILY_NAMES } from './workflow-ui'
 import { WorkflowTemplateSetup } from './WorkflowTemplateSetup'
 
 type Snapshot = { graph: AutomationGraph; layout: AutomationLayout }

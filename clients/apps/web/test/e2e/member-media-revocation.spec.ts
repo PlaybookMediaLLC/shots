@@ -71,8 +71,12 @@ test('removal invalidates an outstanding media link and stale audit and notifica
     const publicRead = await anonymous.request.get(url)
     expect(publicRead.status()).toBe(200)
     expect(await publicRead.body()).toEqual(png)
-    expect(publicRead.headers()['cache-control']).toBe('private, no-store')
+    expect(publicRead.headers()['cache-control']).toBe('private, max-age=0, must-revalidate')
+    const etag = publicRead.headers()['etag']
+    expect(etag).toBeTruthy()
     expect(publicRead.headers()['location']).toBeUndefined()
+    const revalidated = await anonymous.request.get(url, { headers: { 'if-none-match': etag } })
+    expect(revalidated.status()).toBe(304)
     const partial = await anonymous.request.get(url, { headers: { range: 'bytes=0-7' } })
     expect(partial.status()).toBe(206)
     expect(await partial.body()).toEqual(png.subarray(0, 8))
@@ -104,6 +108,10 @@ test('removal invalidates an outstanding media link and stale audit and notifica
     const denied = await anonymous.request.get(url)
     expect(denied.status()).toBe(401)
     expect(denied.headers()['x-request-id']).toBeTruthy()
+    const deniedRevalidate = await anonymous.request.get(url, {
+      headers: { 'if-none-match': etag },
+    })
+    expect(deniedRevalidate.status()).toBe(401)
     await testInfo.attach('media-revocation-requests', {
       body: JSON.stringify({
         assetId: signed.asset.id,

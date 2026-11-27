@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/facebook"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/instagram"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ssrf"
 )
 
 const host = "graph.instagram.com"
@@ -202,7 +204,7 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 		return nil, err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	res, err := http.DefaultClient.Do(req)
+	res, err := ssrf.Client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +213,7 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 		AccessToken string `json:"access_token"`
 		Permissions any    `json:"permissions"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&getAccessToken); err != nil {
+	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&getAccessToken); err != nil {
 		return nil, err
 	}
 

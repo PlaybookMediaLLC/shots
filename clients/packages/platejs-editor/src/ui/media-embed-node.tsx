@@ -1,10 +1,10 @@
 "use client";
 
+import { lazy, Suspense } from "react";
 import { parseTwitterUrl, parseVideoUrl } from "@platejs/media";
 import { useMediaState } from "@platejs/media/react";
 import { ResizableProvider, useResizableValue } from "@platejs/resizable";
 import { PlateElement, type PlateElementProps, withHOC } from "platejs/react";
-import { Tweet } from "react-tweet";
 
 import { cn } from "../lib/utils";
 
@@ -15,6 +15,10 @@ import {
   Resizable,
   ResizeHandle,
 } from "./resize-handle";
+
+const LazyTweet = lazy(() =>
+  import("react-tweet").then((mod) => ({ default: mod.Tweet }))
+);
 
 export const MediaEmbedElement = withHOC(
   ResizableProvider,
@@ -87,7 +91,9 @@ export const MediaEmbedElement = withHOC(
                       "[&_.react-tweet-theme]:ring-2 [&_.react-tweet-theme]:ring-ring [&_.react-tweet-theme]:ring-offset-2"
                   )}
                 >
-                  <Tweet id={embed.id} />
+                  <Suspense fallback={null}>
+                    <LazyTweet id={embed.id} />
+                  </Suspense>
                 </div>
               )}
 

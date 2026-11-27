@@ -107,6 +107,28 @@ func TestSignatureAndSealing(t *testing.T) {
 	}
 }
 
+func TestJitteredDurationBounds(t *testing.T) {
+	if jitteredDuration(0) != 0 || jitteredDuration(-time.Second) != -time.Second {
+		t.Fatal("non-positive durations must pass through unchanged")
+	}
+	if jitteredDuration(3*time.Nanosecond) != 3*time.Nanosecond {
+		t.Fatal("sub-4ns duration must pass through unchanged")
+	}
+	base := 2 * time.Minute
+	minWant, maxWant := 90*time.Second, 150*time.Second
+	seen := map[time.Duration]bool{}
+	for range 100 {
+		got := jitteredDuration(base)
+		if got < minWant || got > maxWant {
+			t.Fatalf("jitteredDuration(%s) = %s, want [%s, %s]", base, got, minWant, maxWant)
+		}
+		seen[got] = true
+	}
+	if len(seen) < 2 {
+		t.Fatalf("expected jittered spread, got only %d distinct value(s)", len(seen))
+	}
+}
+
 func TestDrainLoop(t *testing.T) {
 	t.Run("exits immediately when idle", func(t *testing.T) {
 		passes := 0

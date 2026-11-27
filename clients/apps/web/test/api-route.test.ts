@@ -293,3 +293,69 @@ test('routes without dynamic segments work when Next.js passes no params', async
     assert.equal(response.status, 200)
   }
 })
+
+test('GET and HEAD routes share requestRead within one request while POST does not cache', async (t) => {
+  captureLogs(t)
+  const { requestRead } = await import('@/lib/auth/request-reads')
+
+  const getContract = defineContract({
+    method: 'GET',
+    name: 'reads.get',
+    output: z.object({ calls: z.number() }),
+    path: '/api/v1/reads',
+    summary: 'Read',
+  })
+  let getCalls = 0
+  const getHandler = route(getContract, {
+    auth: async () => {
+      await requestRead('session', async () => {
+        getCalls += 1
+        return 'ok'
+      })
+      return caller
+    },
+    handler: async () => {
+      await requestRead('session', async () => {
+        getCalls += 1
+        return 'ok'
+      })
+      return { calls: getCalls }
+    },
+  })
+  const getResponse = await getHandler(new NextRequest('https://studio.test/api/v1/reads'), context)
+  assert.deepEqual(await getResponse.json(), { calls: 1 })
+
+  // Concurrent GET requests get isolated scopes.
+  let concurrentCalls = 0
+  const concurrentHandler = route(getContract, {
+    auth: allow,
+    handler: async () => {
+      const value = await requestRead('k', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return ++concurrentCalls
+      })
+      const repeated = await requestRead('k', async () => ++concurrentCalls)
+      assert.equal(repeated, value)
+      return { calls: value }
+    },
+  })
+  const [r1, r2] = await Promise.all([
+    concurrentHandler(new NextRequest('https://studio.test/api/v1/reads'), context),
+    concurrentHandler(new NextRequest('https://studio.test/api/v1/reads'), context),
+  ])
+  assert.deepEqual([(await r1.json()).calls, (await r2.json()).calls].sort(), [1, 2])
+
+  // POST routes never share requestRead across auth and handler.
+  let postCalls = 0
+  const postResponse = await route(itemContract, {
+    auth: async () => {
+      await requestRead('session', async () => ++postCalls)
+      return caller
+    },
+    handler: async () => {
+      await requestRead('session', async () => ++postCalls)
+      return { createdAt: new Date(), id: String(postCalls) }
+    },
+  })(post({ count: 1 }), context)
+  assert.equal((await postResponse.json()).id, '2')
+})

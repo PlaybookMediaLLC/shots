@@ -232,11 +232,26 @@ func (c *Configuration) ListGitHubInstallations(ctx context.Context, organizatio
 	if err != nil {
 		return nil, err
 	}
+	if len(links) == 0 {
+		return []GitHubInstallationLink{}, nil
+	}
+	installIDs := make([]string, 0, len(links))
+	for _, link := range links {
+		installIDs = append(installIDs, link.GithubInstallationID)
+	}
+	installs, err := c.client.GitHubInstallation.Query().Where(githubinstallation.IDIn(installIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]*ent.GitHubInstallation, len(installs))
+	for _, row := range installs {
+		byID[row.ID] = row
+	}
 	result := make([]GitHubInstallationLink, 0, len(links))
 	for _, link := range links {
-		row, err := c.client.GitHubInstallation.Get(ctx, link.GithubInstallationID)
-		if err != nil {
-			return nil, err
+		row, ok := byID[link.GithubInstallationID]
+		if !ok {
+			return nil, publishing.ErrNotFound
 		}
 		result = append(result, *installationLink(link, row))
 	}

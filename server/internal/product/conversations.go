@@ -3,16 +3,19 @@ package product
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/conversation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/conversationmessage"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/launchrunstep"
 	"github.com/lucsky/cuid"
 )
 
@@ -215,6 +218,128 @@ func (c *Configuration) GetConversation(ctx context.Context, actor Actor, id str
 		result.Messages = append(result.Messages, conversationMessageRecord(message))
 	}
 	return result, nil
+}
+
+// ConversationRunView pairs a launch run with its ordered trace steps.
+type ConversationRunView struct {
+	Run   LaunchRunRecord       `json:"run"`
+	Steps []LaunchRunStepRecord `json:"steps"`
+}
+
+// ConversationView returns a conversation, its newest messages, and the newest
+// traced launch runs with their steps in a single round-trip.
+type ConversationView struct {
+	Conversation ConversationRecord          `json:"conversation"`
+	Messages     []ConversationMessageRecord `json:"messages"`
+	Runs         []ConversationRunView       `json:"runs"`
+}
+
+const (
+	conversationTracedRunsMax = 10
+	conversationRunStepsMax   = 500
+)
+
+func conversationRunStepsLimitPredicate(organizationID string, runIDs []string, maxPerRun int) func(*entsql.Selector) {
+	return func(s *entsql.Selector) {
+		runArgs := make([]any, len(runIDs))
+		for i, runID := range runIDs {
+			runArgs[i] = runID
+		}
+		d := entsql.Dialect(s.Dialect())
+		ranked := d.Select(
+			launchrunstep.FieldID,
+			fmt.Sprintf(
+				"ROW_NUMBER() OVER (PARTITION BY %s ORDER BY %s ASC, %s ASC) AS rn",
+				s.Quote(launchrunstep.FieldRunID),
+				s.Quote(launchrunstep.FieldIndex),
+				s.Quote(launchrunstep.FieldID),
+			),
+		).
+			From(entsql.Table(launchrunstep.Table)).
+			Where(entsql.And(
+				entsql.EQ(launchrunstep.FieldOrganizationID, organizationID),
+				entsql.In(launchrunstep.FieldRunID, runArgs...),
+			))
+		limited := d.Select(launchrunstep.FieldID).
+			From(ranked.As("ranked_steps")).
+			Where(entsql.LTE("rn", maxPerRun))
+		s.Where(entsql.In(s.C(launchrunstep.FieldID), limited))
+	}
+}
+
+// GetConversationView loads a conversation, its newest messages, and up to 10
+// newest referenced launch runs and their trace steps in batched queries.
+func (c *Configuration) GetConversationView(ctx context.Context, actor Actor, id string) (*ConversationView, error) {
+	detail, err := c.GetConversation(ctx, actor, id)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, conversationTracedRunsMax)
+	orderedIDs := make([]string, 0, conversationTracedRunsMax)
+	for _, message := range detail.Messages {
+		if message.LaunchRunID == nil || *message.LaunchRunID == "" {
+			continue
+		}
+		runID := *message.LaunchRunID
+		if _, ok := seen[runID]; ok {
+			continue
+		}
+		seen[runID] = struct{}{}
+		orderedIDs = append(orderedIDs, runID)
+	}
+	if len(orderedIDs) > conversationTracedRunsMax {
+		orderedIDs = orderedIDs[len(orderedIDs)-conversationTracedRunsMax:]
+	}
+	view := &ConversationView{
+		Conversation: detail.Conversation,
+		Messages:     detail.Messages,
+		Runs:         make([]ConversationRunView, 0, len(orderedIDs)),
+	}
+	if len(orderedIDs) == 0 {
+		return view, nil
+	}
+	runRows, err := c.client.LaunchRun.Query().
+		Where(launchrun.OrganizationID(actor.OrganizationID), launchrun.IDIn(orderedIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runByID := make(map[string]LaunchRunRecord, len(runRows))
+	foundIDs := make([]string, 0, len(runRows))
+	for _, row := range runRows {
+		runByID[row.ID] = launchRunRecord(row)
+		foundIDs = append(foundIDs, row.ID)
+	}
+	if len(foundIDs) == 0 {
+		return view, nil
+	}
+	stepRows, err := c.client.LaunchRunStep.Query().
+		Where(
+			launchrunstep.OrganizationID(actor.OrganizationID),
+			launchrunstep.RunIDIn(foundIDs...),
+			conversationRunStepsLimitPredicate(actor.OrganizationID, foundIDs, conversationRunStepsMax),
+		).
+		Order(ent.Asc(launchrunstep.FieldRunID), ent.Asc(launchrunstep.FieldIndex)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stepsByRun := make(map[string][]LaunchRunStepRecord, len(foundIDs))
+	for _, row := range stepRows {
+		stepsByRun[row.RunID] = append(stepsByRun[row.RunID], launchRunStepRecord(row))
+	}
+	for _, runID := range orderedIDs {
+		run, ok := runByID[runID]
+		if !ok {
+			continue
+		}
+		steps := stepsByRun[runID]
+		if steps == nil {
+			steps = []LaunchRunStepRecord{}
+		}
+		view.Runs = append(view.Runs, ConversationRunView{Run: run, Steps: steps})
+	}
+	return view, nil
 }
 
 // AppendConversationMessage adds a message to an active conversation.

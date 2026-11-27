@@ -42,7 +42,20 @@ export const kitRenderRequestSchema = z.strictObject({
       )
       .max(100),
   }),
-  assets: z.record(id, z.string().max(140 << 20)),
+  assets: z.record(id, z.string().max(140 << 20)).default({}),
+  assetUrls: z
+    .record(
+      id,
+      z
+        .string()
+        .url()
+        .max(4096)
+        .refine((value) => {
+          const { protocol } = new URL(value)
+          return protocol === 'http:' || protocol === 'https:'
+        }, 'Signed asset URLs must use http or https.')
+    )
+    .optional(),
   assetPaths: z.record(id, safePath),
 })
 /** Serialized bytes return to Go, which reserves storage and independently hashes them. */
