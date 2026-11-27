@@ -1,5 +1,6 @@
 import { createOpenRouter, type OpenRouterChatSettings } from '@openrouter/ai-sdk-provider'
 import { testHooksAllowed } from '@/lib/e2e-hooks'
+import type { AiEffort } from './tiers'
 
 const OPENAI_MODEL_PREFIX = 'openai/'
 const ANTHROPIC_MODEL_PREFIX = 'anthropic/'
@@ -26,10 +27,11 @@ export const OPENROUTER_PROVIDER_PREFERENCES = { data_collection: 'deny' } as co
  * marks the newest message each step, so a multi-step agent reads its growing
  * history from cache instead of paying full input price for it every step.
  */
-export function openRouterSettings(modelId: string): OpenRouterChatSettings {
+export function openRouterSettings(modelId: string, effort?: AiEffort): OpenRouterChatSettings {
   return {
     provider: OPENROUTER_PROVIDER_PREFERENCES,
     usage: { include: true },
+    ...(effort ? { reasoning: { effort } } : {}),
     ...(modelId.startsWith(ANTHROPIC_MODEL_PREFIX) ? { cache_control: { type: 'ephemeral' } } : {}),
   }
 }
@@ -47,8 +49,12 @@ export function openRouterBaseURL(): string | undefined {
 /** Shared OpenRouter provider. Credentials are read from OPENROUTER_API_KEY. */
 export const openRouterProvider = createOpenRouter({ baseURL: openRouterBaseURL() })
 
-/** Resolves an existing language model through OpenRouter. */
-export function openRouterLanguageModel(modelId: string) {
+/** Resolves an existing language model through OpenRouter (platform or workspace BYOK key). */
+export function openRouterLanguageModel(modelId: string, effort?: AiEffort, apiKey?: string) {
   const id = toOpenRouterModelId(modelId)
-  return openRouterProvider(id, openRouterSettings(id))
+  const trimmedKey = apiKey?.trim()
+  const provider = trimmedKey
+    ? createOpenRouter({ apiKey: trimmedKey, baseURL: openRouterBaseURL() })
+    : openRouterProvider
+  return provider(id, openRouterSettings(id, effort))
 }

@@ -6,6 +6,7 @@ import { CheckoutButton } from '@/components/platform-landing/CheckoutButton'
 import { CtaLink } from '@/components/platform-landing/CtaLink'
 import { checkoutPathSchema } from '@/components/platform-landing/primitives'
 import { Group, Pill, type PillTone, Row, Section } from '@/components/platform-ui'
+import { UsageMeterRow } from '@/components/settings/SegmentedMeter'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { checkoutPlanSchema } from '@/lib/billing/plans'
@@ -37,28 +38,7 @@ const PLAN_NAMES: Record<string, string> = {
   pro: 'Pro',
 }
 
-/** What is left of one monthly allowance, out of what the plan includes. */
-function UsageRow({
-  allowance,
-  description,
-  label,
-}: {
-  allowance: Summary['credits']
-  description: string
-  label: string
-}) {
-  return (
-    <Row description={description} label={label} layout="inline">
-      <span className="text-ui-lg font-medium text-foreground tabular-nums">
-        {allowance.left.toLocaleString('en-US')}
-        <span className="text-muted-foreground">
-          {' '}
-          / {allowance.included.toLocaleString('en-US')}
-        </span>
-      </span>
-    </Row>
-  )
-}
+const UsageRow = UsageMeterRow
 
 /**
  * The workspace's plan, its standing, what is left of each monthly allowance,
@@ -240,12 +220,14 @@ export function WorkspaceBilling({ canManage }: { canManage: boolean }) {
                         className="w-[240px]"
                         location="workspace_billing_manage"
                         path={checkoutPathSchema.enum['/api/billing/checkout']}
+                        surface="app"
                       />
                       <CheckoutButton
-                        choices={[{ body: { pack: 'launch' }, label: 'Buy an extra launch' }]}
+                        choices={[{ body: { pack: 'launch' }, label: 'Buy 500 credits ($12)' }]}
                         className="w-[240px]"
                         location="workspace_billing_extra_launch"
                         path={checkoutPathSchema.enum['/api/billing/credits']}
+                        surface="app"
                       />
                     </>
                   ) : (

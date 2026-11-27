@@ -1,6 +1,6 @@
 'use client'
 
-import { type RefObject, useEffect, useRef } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { useSurfaceAbility } from '@/components/assistant/use-surface-ability'
 import { useAssistantStore } from '@/components/assistant/assistant-store'
@@ -67,6 +67,50 @@ export function useWriteAbility({
     const text = at ? editor.current!.api.string(at) : ''
     return at && text ? { at: structuredClone(at), text } : null
   }
+  const [selectionLabel, setSelectionLabel] = useState<string | null>(null)
+  useEffect(() => {
+    let timer: number | null = null
+    const sync = () => {
+      if (
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement.hasAttribute('data-assistant-composer')
+      ) {
+        return
+      }
+      const instance = editor.current
+      const at = instance?.selection
+      if (!instance || !at || instance.api.isCollapsed()) {
+        if (timer !== null) {
+          window.clearTimeout(timer)
+          timer = null
+        }
+        setSelectionLabel((prev) => (prev === null ? prev : null))
+        return
+      }
+      if (timer !== null) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        timer = null
+        try {
+          const currentSelection = editor.current?.selection
+          const current =
+            currentSelection && !editor.current!.api.isCollapsed()
+              ? editor.current!.api.string(currentSelection).trim()
+              : ''
+          const next = current
+            ? `Selected text (“${current.slice(0, 48)}${current.length > 48 ? '…' : ''}”)`
+            : null
+          setSelectionLabel((prev) => (prev === next ? prev : next))
+        } catch {
+          setSelectionLabel(null)
+        }
+      }, 120)
+    }
+    document.addEventListener('selectionchange', sync)
+    return () => {
+      if (timer !== null) window.clearTimeout(timer)
+      document.removeEventListener('selectionchange', sync)
+    }
+  }, [editor])
   const saved = hasImage ? screenshotPrompts() : [...WRITING_PROMPTS]
   const arrived = useRef(false)
   const firstPosts = useRef(posts)
@@ -154,6 +198,7 @@ export function useWriteAbility({
       { id: 'tighten', label: 'Tighten', prompt: 'Tighten the first post for this platform.' },
       { id: 'hooks', label: 'Hooks', prompt: 'Offer a stronger opening post.' },
     ],
+    selection: selectionLabel,
     surface: 'write-composer',
     tools: ['inspectDraft', 'proposeDraftText'],
   })

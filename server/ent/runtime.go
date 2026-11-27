@@ -2989,19 +2989,19 @@ func init() {
 	// workspacesettings.DefaultAiAgentEnabled holds the default value on creation for the ai_agent_enabled field.
 	workspacesettings.DefaultAiAgentEnabled = workspacesettingsDescAiAgentEnabled.Default.(bool)
 	// workspacesettingsDescReleaseReadinessEnabled is the schema descriptor for release_readiness_enabled field.
-	workspacesettingsDescReleaseReadinessEnabled := workspacesettingsFields[6].Descriptor()
+	workspacesettingsDescReleaseReadinessEnabled := workspacesettingsFields[10].Descriptor()
 	// workspacesettings.DefaultReleaseReadinessEnabled holds the default value on creation for the release_readiness_enabled field.
 	workspacesettings.DefaultReleaseReadinessEnabled = workspacesettingsDescReleaseReadinessEnabled.Default.(bool)
 	// workspacesettingsDescDisabledExperiments is the schema descriptor for disabled_experiments field.
-	workspacesettingsDescDisabledExperiments := workspacesettingsFields[7].Descriptor()
+	workspacesettingsDescDisabledExperiments := workspacesettingsFields[11].Descriptor()
 	// workspacesettings.DefaultDisabledExperiments holds the default value on creation for the disabled_experiments field.
 	workspacesettings.DefaultDisabledExperiments = workspacesettingsDescDisabledExperiments.Default.([]string)
 	// workspacesettingsDescCreatedAt is the schema descriptor for created_at field.
-	workspacesettingsDescCreatedAt := workspacesettingsFields[8].Descriptor()
+	workspacesettingsDescCreatedAt := workspacesettingsFields[12].Descriptor()
 	// workspacesettings.DefaultCreatedAt holds the default value on creation for the created_at field.
 	workspacesettings.DefaultCreatedAt = workspacesettingsDescCreatedAt.Default.(func() time.Time)
 	// workspacesettingsDescUpdatedAt is the schema descriptor for updated_at field.
-	workspacesettingsDescUpdatedAt := workspacesettingsFields[9].Descriptor()
+	workspacesettingsDescUpdatedAt := workspacesettingsFields[13].Descriptor()
 	// workspacesettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	workspacesettings.DefaultUpdatedAt = workspacesettingsDescUpdatedAt.Default.(func() time.Time)
 	// workspacesettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

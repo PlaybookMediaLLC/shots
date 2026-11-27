@@ -63,6 +63,7 @@ export function useSurfaceAbility({
   placeholder,
   quickActions,
   selection = null,
+  suggestions = [],
   surface,
   tools,
 }: {
@@ -78,6 +79,7 @@ export function useSurfaceAbility({
   placeholder: string
   quickActions: readonly AssistantQuickAction[]
   selection?: string | null
+  suggestions?: readonly string[]
   surface: AssistantSurfaceKind
   tools: readonly string[]
 }) {
@@ -103,7 +105,7 @@ export function useSurfaceAbility({
           executeClientTool: (call, context) => latest.current(call, context),
         }),
       selection,
-      suggestions: quickActions.map((action) => action.prompt),
+      suggestions,
       surface,
     },
     active

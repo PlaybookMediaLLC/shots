@@ -105,6 +105,78 @@ func (_u *WorkspaceSettingsUpdate) SetNillableAiAgentEnabled(v *bool) *Workspace
 	return _u
 }
 
+// SetAiModelDefaults sets the "ai_model_defaults" field.
+func (_u *WorkspaceSettingsUpdate) SetAiModelDefaults(v map[string]interface{}) *WorkspaceSettingsUpdate {
+	_u.mutation.SetAiModelDefaults(v)
+	return _u
+}
+
+// ClearAiModelDefaults clears the value of the "ai_model_defaults" field.
+func (_u *WorkspaceSettingsUpdate) ClearAiModelDefaults() *WorkspaceSettingsUpdate {
+	_u.mutation.ClearAiModelDefaults()
+	return _u
+}
+
+// SetAiInstructions sets the "ai_instructions" field.
+func (_u *WorkspaceSettingsUpdate) SetAiInstructions(v string) *WorkspaceSettingsUpdate {
+	_u.mutation.SetAiInstructions(v)
+	return _u
+}
+
+// SetNillableAiInstructions sets the "ai_instructions" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableAiInstructions(v *string) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetAiInstructions(*v)
+	}
+	return _u
+}
+
+// ClearAiInstructions clears the value of the "ai_instructions" field.
+func (_u *WorkspaceSettingsUpdate) ClearAiInstructions() *WorkspaceSettingsUpdate {
+	_u.mutation.ClearAiInstructions()
+	return _u
+}
+
+// SetAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field.
+func (_u *WorkspaceSettingsUpdate) SetAiProviderKeyEncrypted(v string) *WorkspaceSettingsUpdate {
+	_u.mutation.SetAiProviderKeyEncrypted(v)
+	return _u
+}
+
+// SetNillableAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableAiProviderKeyEncrypted(v *string) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetAiProviderKeyEncrypted(*v)
+	}
+	return _u
+}
+
+// ClearAiProviderKeyEncrypted clears the value of the "ai_provider_key_encrypted" field.
+func (_u *WorkspaceSettingsUpdate) ClearAiProviderKeyEncrypted() *WorkspaceSettingsUpdate {
+	_u.mutation.ClearAiProviderKeyEncrypted()
+	return _u
+}
+
+// SetAiProviderKeyHint sets the "ai_provider_key_hint" field.
+func (_u *WorkspaceSettingsUpdate) SetAiProviderKeyHint(v string) *WorkspaceSettingsUpdate {
+	_u.mutation.SetAiProviderKeyHint(v)
+	return _u
+}
+
+// SetNillableAiProviderKeyHint sets the "ai_provider_key_hint" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableAiProviderKeyHint(v *string) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetAiProviderKeyHint(*v)
+	}
+	return _u
+}
+
+// ClearAiProviderKeyHint clears the value of the "ai_provider_key_hint" field.
+func (_u *WorkspaceSettingsUpdate) ClearAiProviderKeyHint() *WorkspaceSettingsUpdate {
+	_u.mutation.ClearAiProviderKeyHint()
+	return _u
+}
+
 // SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
 func (_u *WorkspaceSettingsUpdate) SetReleaseReadinessEnabled(v bool) *WorkspaceSettingsUpdate {
 	_u.mutation.SetReleaseReadinessEnabled(v)
@@ -204,6 +276,30 @@ func (_u *WorkspaceSettingsUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AiModelDefaults(); ok {
+		_spec.SetField(workspacesettings.FieldAiModelDefaults, field.TypeJSON, value)
+	}
+	if _u.mutation.AiModelDefaultsCleared() {
+		_spec.ClearField(workspacesettings.FieldAiModelDefaults, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.AiInstructions(); ok {
+		_spec.SetField(workspacesettings.FieldAiInstructions, field.TypeString, value)
+	}
+	if _u.mutation.AiInstructionsCleared() {
+		_spec.ClearField(workspacesettings.FieldAiInstructions, field.TypeString)
+	}
+	if value, ok := _u.mutation.AiProviderKeyEncrypted(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyEncrypted, field.TypeString, value)
+	}
+	if _u.mutation.AiProviderKeyEncryptedCleared() {
+		_spec.ClearField(workspacesettings.FieldAiProviderKeyEncrypted, field.TypeString)
+	}
+	if value, ok := _u.mutation.AiProviderKeyHint(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyHint, field.TypeString, value)
+	}
+	if _u.mutation.AiProviderKeyHintCleared() {
+		_spec.ClearField(workspacesettings.FieldAiProviderKeyHint, field.TypeString)
 	}
 	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
@@ -312,6 +408,78 @@ func (_u *WorkspaceSettingsUpdateOne) SetNillableAiAgentEnabled(v *bool) *Worksp
 	if v != nil {
 		_u.SetAiAgentEnabled(*v)
 	}
+	return _u
+}
+
+// SetAiModelDefaults sets the "ai_model_defaults" field.
+func (_u *WorkspaceSettingsUpdateOne) SetAiModelDefaults(v map[string]interface{}) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetAiModelDefaults(v)
+	return _u
+}
+
+// ClearAiModelDefaults clears the value of the "ai_model_defaults" field.
+func (_u *WorkspaceSettingsUpdateOne) ClearAiModelDefaults() *WorkspaceSettingsUpdateOne {
+	_u.mutation.ClearAiModelDefaults()
+	return _u
+}
+
+// SetAiInstructions sets the "ai_instructions" field.
+func (_u *WorkspaceSettingsUpdateOne) SetAiInstructions(v string) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetAiInstructions(v)
+	return _u
+}
+
+// SetNillableAiInstructions sets the "ai_instructions" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableAiInstructions(v *string) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetAiInstructions(*v)
+	}
+	return _u
+}
+
+// ClearAiInstructions clears the value of the "ai_instructions" field.
+func (_u *WorkspaceSettingsUpdateOne) ClearAiInstructions() *WorkspaceSettingsUpdateOne {
+	_u.mutation.ClearAiInstructions()
+	return _u
+}
+
+// SetAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field.
+func (_u *WorkspaceSettingsUpdateOne) SetAiProviderKeyEncrypted(v string) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetAiProviderKeyEncrypted(v)
+	return _u
+}
+
+// SetNillableAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableAiProviderKeyEncrypted(v *string) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetAiProviderKeyEncrypted(*v)
+	}
+	return _u
+}
+
+// ClearAiProviderKeyEncrypted clears the value of the "ai_provider_key_encrypted" field.
+func (_u *WorkspaceSettingsUpdateOne) ClearAiProviderKeyEncrypted() *WorkspaceSettingsUpdateOne {
+	_u.mutation.ClearAiProviderKeyEncrypted()
+	return _u
+}
+
+// SetAiProviderKeyHint sets the "ai_provider_key_hint" field.
+func (_u *WorkspaceSettingsUpdateOne) SetAiProviderKeyHint(v string) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetAiProviderKeyHint(v)
+	return _u
+}
+
+// SetNillableAiProviderKeyHint sets the "ai_provider_key_hint" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableAiProviderKeyHint(v *string) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetAiProviderKeyHint(*v)
+	}
+	return _u
+}
+
+// ClearAiProviderKeyHint clears the value of the "ai_provider_key_hint" field.
+func (_u *WorkspaceSettingsUpdateOne) ClearAiProviderKeyHint() *WorkspaceSettingsUpdateOne {
+	_u.mutation.ClearAiProviderKeyHint()
 	return _u
 }
 
@@ -444,6 +612,30 @@ func (_u *WorkspaceSettingsUpdateOne) sqlSave(ctx context.Context) (_node *Works
 	}
 	if value, ok := _u.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AiModelDefaults(); ok {
+		_spec.SetField(workspacesettings.FieldAiModelDefaults, field.TypeJSON, value)
+	}
+	if _u.mutation.AiModelDefaultsCleared() {
+		_spec.ClearField(workspacesettings.FieldAiModelDefaults, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.AiInstructions(); ok {
+		_spec.SetField(workspacesettings.FieldAiInstructions, field.TypeString, value)
+	}
+	if _u.mutation.AiInstructionsCleared() {
+		_spec.ClearField(workspacesettings.FieldAiInstructions, field.TypeString)
+	}
+	if value, ok := _u.mutation.AiProviderKeyEncrypted(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyEncrypted, field.TypeString, value)
+	}
+	if _u.mutation.AiProviderKeyEncryptedCleared() {
+		_spec.ClearField(workspacesettings.FieldAiProviderKeyEncrypted, field.TypeString)
+	}
+	if value, ok := _u.mutation.AiProviderKeyHint(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyHint, field.TypeString, value)
+	}
+	if _u.mutation.AiProviderKeyHintCleared() {
+		_spec.ClearField(workspacesettings.FieldAiProviderKeyHint, field.TypeString)
 	}
 	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)

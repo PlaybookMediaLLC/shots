@@ -13,32 +13,8 @@ import {
   storySetEditSchema,
   tweetEditSchema,
 } from '@/lib/assistant/surface-commands'
-import { commandSchema } from '@/lib/store-screenshots/commands/schema'
+import { storeModelCommandSchema } from '@/lib/store-screenshots/commands/schema'
 import type { ToolCapability } from './executor'
-
-/** The Store commands the model may send: edits to what exists, never deletes. */
-const STORE_MODEL_COMMANDS: ReadonlySet<string> = new Set([
-  'slides.duplicate',
-  'slides.reorder',
-  'slides.patch',
-  'slides.setLayout',
-  'slides.applyStyle',
-  'slides.patchText',
-  'slides.patchDevices',
-  'layers.patch',
-  'layers.arrange',
-  'theme.patch',
-  'theme.patchText',
-  'copy.apply',
-])
-
-/** Typed from the editor's own command schema, so the model sees the real shapes. */
-const storeModelCommandSchema = z.discriminatedUnion(
-  'type',
-  commandSchema.options.filter((option) =>
-    STORE_MODEL_COMMANDS.has(option.shape.type.value)
-  ) as unknown as typeof commandSchema.options
-)
 
 /**
  * Tools for the in-editor and studio copilots.

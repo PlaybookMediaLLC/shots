@@ -22,3 +22,19 @@ test('a failure after the first line ends the stream with an error line and no d
   assert.equal(JSON.parse(lines[1]!).type, 'error')
   assert.ok(!lines[1]!.includes('provider detail'))
 })
+
+test('a mid-stream WorkspaceQuotaError surfaces a clear credit message', async (t) => {
+  t.mock.method(console, 'error', () => {})
+  const quotaError = Object.assign(new Error('credits exhausted'), {
+    name: 'WorkspaceQuotaError',
+  })
+  const response = await streamLines(async (send) => {
+    send({ text: 'Working…', type: 'text' })
+    throw quotaError
+  })
+  const lines = (await response.text()).trim().split('\n')
+  assert.equal(lines.length, 2)
+  const last = JSON.parse(lines[1]!) as { error: string; type: string }
+  assert.equal(last.type, 'error')
+  assert.match(last.error, /credits/i)
+})

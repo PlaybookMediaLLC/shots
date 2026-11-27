@@ -1,14 +1,24 @@
 'use client'
 
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { KeyExpiry } from '@/components/settings/KeyExpiry'
 import { Label } from '@/components/ui/label'
-import { API_KEY_PLACEHOLDER, MCP_CLIENTS, type McpClientGuide } from '@/lib/agents/mcp-clients'
+import {
+  API_KEY_PLACEHOLDER,
+  CLAUDE_PLUGIN_INSTALL,
+  MCP_CLIENTS,
+  MCP_TOOLS,
+  PLUGIN_URL,
+  SKILL_INSTALL,
+  type McpClientGuide,
+} from '@/lib/agents/mcp-clients'
 import {
   apiKeyScopeDescriptions,
   apiKeyScopes,
@@ -18,14 +28,18 @@ import {
 import { useTRPCClient } from '@/lib/trpc/react'
 import { getErrorMessage } from './settings-client'
 
-type AgentKey = {
-  agentClient: string | null
-  createdAt: Date | string
-  enabled: boolean | null
-  id: string
-  name: string | null
-  start: string | null
-}
+type AgentKey = Awaited<
+  ReturnType<ReturnType<typeof useTRPCClient>['apiKey']['list']['query']>
+>['keys'][number]
+
+const MCP_TOOLS_BY_SCOPE = MCP_TOOLS.reduce<
+  Record<string, { name: string; summary: string }[]>
+>((groups, tool) => {
+  const bucket = groups[tool.scope] ?? []
+  bucket.push({ name: tool.name, summary: tool.summary })
+  groups[tool.scope] = bucket
+  return groups
+}, {})
 
 const fieldLabel = 'text-xs font-medium text-foreground/65'
 
@@ -98,7 +112,8 @@ export function WorkspaceAgentSettings({
   }
 
   const client = MCP_CLIENTS.find((item) => item.id === clientId) ?? MCP_CLIENTS[0]!
-  const connected = keys.filter((key) => key.agentClient)
+  const oauthAgents = keys.filter((key) => key.agentClient)
+  const keyAgents = keys.filter((key) => !key.agentClient)
 
   return (
     <div className="flex flex-col gap-10">
@@ -117,6 +132,40 @@ export function WorkspaceAgentSettings({
               <a className="underline underline-offset-4" href="/docs/agents">
                 Setup guides
               </a>
+            </p>
+          </Row>
+        </Group>
+      </Section>
+
+      <Section
+        description="Install the official Shots plugin or skill in coding agents so they know your release, draft, and screenshot workflows out of the box."
+        title="Agent plugins & skills"
+      >
+        <Group>
+          <Row>
+            <CopyValue
+              id="claude-plugin-install"
+              label="Claude Code plugin (MCP + posting skill)"
+              value={CLAUDE_PLUGIN_INSTALL}
+            />
+          </Row>
+          <Row>
+            <CopyValue
+              id="agent-skill-install"
+              label="Codex & OpenCode skill"
+              value={SKILL_INSTALL}
+            />
+            <p className="text-xs text-muted-foreground">
+              Inspect the open-source plugin and skill definition on{' '}
+              <a
+                className="underline underline-offset-4"
+                href={PLUGIN_URL}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                GitHub
+              </a>
+              .
             </p>
           </Row>
         </Group>
@@ -172,44 +221,109 @@ export function WorkspaceAgentSettings({
 
       {canManage ? (
         <Section
-          description="Agents you approved through OAuth. Revoking one ends its connection at its next call. Every key is also listed under Developer API."
-          title="Connected agents"
+          description="OAuth connectors and scoped API keys with access to this workspace. Revoking one takes effect on its next call."
+          title="Connected agents & keys"
         >
           <Group>
-            {connected.length === 0 ? (
+            {oauthAgents.length === 0 && keyAgents.length === 0 ? (
               <Row>
                 <p className="text-sm text-muted-foreground">
-                  No agent is connected through OAuth.
+                  No agent or API key is connected yet.
                 </p>
               </Row>
             ) : (
-              connected.map((key) => (
-                <div className="flex items-center gap-4 px-5 py-4" key={key.id}>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">{key.agentClient}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      Approved {new Date(key.createdAt).toLocaleDateString()}
-                    </p>
+              [...oauthAgents, ...keyAgents].map((key) => {
+                const isOAuth = Boolean(key.agentClient)
+                const lastUsed = key.lastRequest
+                  ? new Date(key.lastRequest).toLocaleDateString()
+                  : null
+                return (
+                  <div className="flex flex-wrap items-center gap-3 px-5 py-4" key={key.id}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {key.agentClient ?? key.name ?? 'API key'}
+                        </p>
+                        <Pill tone={isOAuth ? 'blue' : 'gray'}>
+                          {isOAuth ? 'OAuth' : 'API key'}
+                        </Pill>
+                        {key.start ? (
+                          <span className="font-mono text-[0.6875rem] text-muted-foreground">
+                            {key.start}…
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {isOAuth ? 'Approved' : 'Created'}{' '}
+                        {new Date(key.createdAt).toLocaleDateString()}
+                        {lastUsed ? ` · Last used ${lastUsed}` : ''}
+                      </p>
+                    </div>
+                    <Pill tone={key.enabled ? 'green' : 'gray'}>
+                      {key.enabled ? 'active' : 'disabled'}
+                    </Pill>
+                    <Button
+                      className="text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                      disabled={pending === key.id}
+                      onClick={() => void revoke(key.id)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Revoke
+                    </Button>
                   </div>
-                  <Pill tone={key.enabled ? 'green' : 'gray'}>
-                    {key.enabled ? 'connected' : 'disabled'}
-                  </Pill>
-                  <Button
-                    className="text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                    disabled={pending === key.id}
-                    onClick={() => void revoke(key.id)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Revoke
-                  </Button>
-                </div>
-              ))
+                )
+              })
             )}
           </Group>
         </Section>
       ) : null}
+
+      <Section
+        description="Every tool the Shots MCP server exposes and the exact scope required to invoke it."
+        title="MCP tool & scope explorer"
+      >
+        <Group>
+          <Row>
+            <Disclosure>
+              <DisclosureTrigger
+                className="py-0.5 text-sm font-medium text-foreground"
+                summary={`${MCP_TOOLS.length} tools across ${Object.keys(MCP_TOOLS_BY_SCOPE).length} scopes`}
+              >
+                Inspect available MCP tools
+              </DisclosureTrigger>
+              <DisclosureContent className="pt-4">
+                <div className="flex flex-col gap-4">
+                  {Object.entries(MCP_TOOLS_BY_SCOPE).map(([scope, tools]) => (
+                    <div className="flex flex-col gap-1.5" key={scope}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-medium text-foreground">
+                          {scope}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({tools.length})
+                        </span>
+                      </div>
+                      <ul className="grid gap-1 sm:grid-cols-2">
+                        {tools.map((tool) => (
+                          <li
+                            className="rounded-lg border border-border/70 bg-foreground/[0.02] px-2.5 py-1.5"
+                            key={tool.name}
+                          >
+                            <p className="font-mono text-xs text-foreground">{tool.name}</p>
+                            <p className="text-xs text-muted-foreground">{tool.summary}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </DisclosureContent>
+            </Disclosure>
+          </Row>
+        </Group>
+      </Section>
 
       {error ? (
         <Alert variant="destructive">
@@ -231,7 +345,16 @@ function CopyValue({ id, label, value }: { id: string; label: string; value: str
         <Button
           aria-label={`Copy ${label.toLowerCase()}`}
           className="rounded-lg"
-          onClick={() => void navigator.clipboard.writeText(value)}
+          onClick={() => {
+            if (!navigator.clipboard?.writeText) {
+              toast.error('Could not copy to clipboard.')
+              return
+            }
+            void navigator.clipboard
+              .writeText(value)
+              .then(() => toast.success(`${label} copied.`))
+              .catch(() => toast.error('Could not copy to clipboard.'))
+          }}
           size="sm"
           type="button"
         >
@@ -318,7 +441,16 @@ function ClientGuide({
         <div className="flex">
           <Button
             className="rounded-lg"
-            onClick={() => void navigator.clipboard.writeText(snippet)}
+            onClick={() => {
+              if (!navigator.clipboard?.writeText) {
+                toast.error('Could not copy to clipboard.')
+                return
+              }
+              void navigator.clipboard
+                .writeText(snippet)
+                .then(() => toast.success(`${client.name} configuration copied.`))
+                .catch(() => toast.error('Could not copy to clipboard.'))
+            }}
             size="sm"
             type="button"
           >

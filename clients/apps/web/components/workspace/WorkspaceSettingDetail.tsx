@@ -11,6 +11,8 @@ import { NewTeamSettings } from '@/components/settings/NewTeamSettings'
 import { SocialSetList } from '@/components/settings/social-sets/SocialSetList'
 import { SocialSetSettings } from '@/components/settings/social-sets/SocialSetSettings'
 import { WebhookSettings } from '@/components/settings/WebhookSettings'
+import { WorkspaceAiInstructionsSettings } from '@/components/settings/WorkspaceAiInstructionsSettings'
+import { WorkspaceAiModelsSettings } from '@/components/settings/WorkspaceAiModelsSettings'
 import { VoiceSettings } from '@/components/voice/VoiceSettings'
 import { ChannelConnections } from './ChannelConnections'
 import { WorkspaceAgentSettings } from './WorkspaceAgentSettings'
@@ -83,6 +85,21 @@ const SETTINGS_CONTENT = {
   roles: () => <WorkspaceRolesSettings />,
   voice: () => <VoiceSettings />,
   'new-team': ({ email, userId }) => <NewTeamSettings email={email} userId={userId} />,
+  'ai-models': ({ can, organization }) => (
+    <WorkspaceAiModelsSettings
+      canManage={can('workspace:update')}
+      canManageBilling={can('billing:manage')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
+  'ai-instructions': ({ can, organization }) => (
+    <WorkspaceAiInstructionsSettings
+      canManage={can('workspace:update')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
   brand: ({ can }) => <WorkspaceBrandSettings canManage={can('workspace:update')} />,
   product: ({ can }) => (
     <>

@@ -1,3 +1,5 @@
+import type { AiEffort, AiModelTier } from '@/lib/ai/models/tiers'
+import type { AssistantContextRef } from '@/lib/api/contracts/ai'
 import type { DesignChanges } from '@/lib/design/document'
 import type { AssistantSurfaceKind, PageContext } from './page-context'
 
@@ -36,9 +38,17 @@ export type AssistantEntry = {
   /** The part of the surface a card acts on; the card is idle while another is open. */
   target?: string
 } & (
-  | { kind: 'user' | 'assistant' | 'error' | 'note'; text: string }
-  /** A live or completed tool step indicator shown while the assistant works. */
-  | { kind: 'activity'; text: string; done?: boolean }
+  | { kind: 'user' | 'assistant' | 'note'; text: string }
+  /** A failure entry with optional one-click retry and recovery destination. */
+  | {
+      kind: 'error'
+      text: string
+      retryAsk?: string
+      actionHref?: string
+      actionLabel?: string
+    }
+  /** A live, completed, or failed tool step indicator shown while the assistant works. */
+  | { kind: 'activity'; text: string; done?: boolean; status?: 'running' | 'done' | 'error' }
   /**
    * A change applied directly to the open canvas/document. `undo` answers false,
    * and changes nothing, once a newer edit exists.
@@ -64,14 +74,24 @@ export type AssistantEntry = {
 /** What an ability's run gets. */
 export type AbilityRun = {
   ask: string
+  /** Workspace items explicitly pinned into context scope by the user. */
+  contextRefs?: readonly AssistantContextRef[]
+  /** Optional reasoning effort override picked in the composer. */
+  effort?: AiEffort
   /** Attached images as base64 JPEG. */
   images?: readonly string[]
+  /** Optional model tier override picked in the composer. */
+  modelTier?: AiModelTier
   page: PageContext
   /** Aborts when the person stops the run, the page closes, or the ability goes. */
   signal: AbortSignal
-  push: (entry: AssistantEntry) => void
+  push: (entry: AssistantEntry) => number | void
+  /** Updates an existing activity entry in place (e.g. running -> done/error). */
+  updateActivity?: (id: number, status: 'running' | 'done' | 'error') => void
   /** Shows the reply as it is written; an empty string clears it. */
   stream?: (text: string) => void
+  /** Shows live status text while long client tools run (e.g. "Generating AI background…"). */
+  status?: (label: string) => void
   /** Kept between turns of one conversation with this ability; cleared by New chat. */
   memory: { current: unknown[] }
   /** Active selection scope label when the user kept scope enabled, or null. */

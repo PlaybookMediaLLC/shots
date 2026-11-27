@@ -27,11 +27,14 @@ export function CheckoutButton({
   className,
   location,
   path,
+  surface = 'landing',
 }: {
   choices: { body: Record<string, string>; label: string }[]
   className?: string
   location: string
   path: z.infer<typeof checkoutPathSchema>
+  /** `'app'` renders a theme-aware outline button for signed-in settings pages. */
+  surface?: 'landing' | 'app'
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,20 +84,40 @@ export function CheckoutButton({
   const [main, ...others] = choices
   return (
     <div className={cn('flex flex-col items-center gap-2', className)}>
-      <Button variant="custom" size={null}
-        className={cn(
-          ctaClassName(ctaToneSchema.enum.secondary),
-          'w-full justify-center disabled:opacity-60'
-        )}
-        disabled={busy}
-        onClick={() => start(main)}
-        type="button"
-      >
-        {main.label}
-      </Button>
+      {surface === 'app' ? (
+        <Button
+          className="w-full justify-center rounded-lg"
+          disabled={busy}
+          onClick={() => start(main)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {busy ? 'Opening Stripe…' : main.label}
+        </Button>
+      ) : (
+        <Button
+          variant="custom"
+          size={null}
+          className={cn(
+            ctaClassName(ctaToneSchema.enum.secondary),
+            'w-full justify-center disabled:opacity-60'
+          )}
+          disabled={busy}
+          onClick={() => start(main)}
+          type="button"
+        >
+          {main.label}
+        </Button>
+      )}
       {others.map((choice) => (
         <Button variant="custom" size={null}
-          className="text-[13px] text-white/60 underline-offset-4 hover:text-white hover:underline disabled:opacity-60"
+          className={cn(
+            'text-[13px] underline-offset-4 hover:underline disabled:opacity-60',
+            surface === 'app'
+              ? 'text-muted-foreground hover:text-foreground'
+              : 'text-white/60 hover:text-white'
+          )}
           disabled={busy}
           key={choice.label}
           onClick={() => start(choice)}
@@ -104,15 +127,33 @@ export function CheckoutButton({
         </Button>
       ))}
       {needsWorkspace ? (
-        <p className="text-center text-[13px] text-white/70" role="alert">
+        <p
+          className={cn(
+            'text-center text-[13px]',
+            surface === 'app' ? 'text-muted-foreground' : 'text-white/70'
+          )}
+          role="alert"
+        >
           Create a workspace first.{' '}
-          <Link className="text-white underline underline-offset-4" href="/onboarding">
+          <Link
+            className={cn(
+              'underline underline-offset-4',
+              surface === 'app' ? 'text-foreground' : 'text-white'
+            )}
+            href="/onboarding"
+          >
             Set one up
           </Link>
         </p>
       ) : null}
       {error ? (
-        <p className="text-center text-[13px] text-red-300" role="alert">
+        <p
+          className={cn(
+            'text-center text-[13px]',
+            surface === 'app' ? 'text-destructive' : 'text-red-300'
+          )}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}

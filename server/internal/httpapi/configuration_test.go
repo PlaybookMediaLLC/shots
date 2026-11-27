@@ -28,6 +28,8 @@ type fakeConfiguration struct {
 	releaseUpdate       product.UpdateReleaseInput
 	founderHubError     error
 	founderHubActor     *product.Actor
+	aiProviderKey       *string
+	aiSettingsError     error
 }
 
 func TestWorkspaceCreationPreservesSettingsContract(t *testing.T) {
@@ -102,6 +104,40 @@ func (f *fakeConfiguration) GetWorkspace(context.Context, string) (*product.Work
 }
 func (f *fakeConfiguration) UpdateWorkspace(_ context.Context, _ product.Actor, input product.UpdateWorkspaceInput) (*product.Workspace, error) {
 	return &product.Workspace{ID: "workspace-1", Name: input.Name, Slug: input.Slug}, nil
+}
+func (f *fakeConfiguration) UpdateWorkspaceAISettings(_ context.Context, _ product.Actor, input product.UpdateWorkspaceAISettingsInput) (*product.Workspace, error) {
+	if f.aiSettingsError != nil {
+		return nil, f.aiSettingsError
+	}
+	settings := &ent.WorkspaceSettings{ID: "workspace-1", AiAgentEnabled: true, AiModelDefaults: input.AIModelDefaults}
+	if input.AIAgentEnabled != nil {
+		settings.AiAgentEnabled = *input.AIAgentEnabled
+	}
+	if input.AIInstructions.Set {
+		settings.AiInstructions = input.AIInstructions.Value
+	}
+	if input.AIProviderAPIKey.Set {
+		if input.AIProviderAPIKey.Value == nil || strings.TrimSpace(*input.AIProviderAPIKey.Value) == "" {
+			f.aiProviderKey = nil
+		} else {
+			trimmed := strings.TrimSpace(*input.AIProviderAPIKey.Value)
+			if len(trimmed) < 16 || len(trimmed) > 512 || strings.ContainsAny(trimmed, " \t\r\n") {
+				return nil, product.ErrInvalidInput
+			}
+			f.aiProviderKey = &trimmed
+			sealed := "sealed-test-ciphertext"
+			hint := "sk-or-…" + trimmed[len(trimmed)-4:]
+			settings.AiProviderKeyEncrypted = &sealed
+			settings.AiProviderKeyHint = &hint
+		}
+	}
+	return &product.Workspace{ID: "workspace-1", Name: "Workspace", Slug: "workspace", WorkspaceSettings: settings}, nil
+}
+func (f *fakeConfiguration) GetWorkspaceAIProviderKey(context.Context, product.Actor) (*string, error) {
+	if f.aiSettingsError != nil {
+		return nil, f.aiSettingsError
+	}
+	return f.aiProviderKey, nil
 }
 func (f *fakeConfiguration) ListMembers(context.Context, string) ([]product.WorkspaceMember, error) {
 	return []product.WorkspaceMember{}, nil
@@ -802,6 +838,92 @@ func TestWritingDefaultsRejectMachineCredentials(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden || config.profileOrganization != "" {
 		t.Fatalf("machine read allowed: %d %s", response.Code, response.Body)
+	}
+}
+
+func TestWorkspaceAISettingsRouteValidatesAndUpdates(t *testing.T) {
+	config := &fakeConfiguration{}
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", config)
+
+	okResp := configurationRequest(handler, http.MethodPut, "/v1/workspace/ai-settings",
+		`{"aiAgentEnabled":false,"aiModelDefaults":{"default":{"tier":"balanced","effort":"medium"},"editors":{"tier":"fast","effort":"low"}},"aiInstructions":"Cite PR numbers.","aiProviderApiKey":"sk-or-v1-testkey1234567890abcd"}`)
+	if okResp.Code != http.StatusOK {
+		t.Fatalf("valid ai settings status=%d body=%s", okResp.Code, okResp.Body.String())
+	}
+	if strings.Contains(okResp.Body.String(), "sk-or-v1-testkey1234567890abcd") || strings.Contains(okResp.Body.String(), "sealed-test-ciphertext") {
+		t.Fatalf("ai settings response must never leak raw or sealed API key: %s", okResp.Body.String())
+	}
+	var updated struct {
+		Settings struct {
+			AIAgentEnabled    bool           `json:"aiAgentEnabled"`
+			AIInstructions    *string        `json:"aiInstructions"`
+			AIModelDefaults   map[string]any `json:"aiModelDefaults"`
+			HasAIProviderKey  bool           `json:"hasAiProviderKey"`
+			AIProviderKeyHint *string        `json:"aiProviderKeyHint"`
+		} `json:"settings"`
+	}
+	if err := json.Unmarshal(okResp.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("decode ok response: %v", err)
+	}
+	if updated.Settings.AIAgentEnabled || updated.Settings.AIInstructions == nil || *updated.Settings.AIInstructions != "Cite PR numbers." || len(updated.Settings.AIModelDefaults) != 2 || !updated.Settings.HasAIProviderKey || updated.Settings.AIProviderKeyHint == nil || *updated.Settings.AIProviderKeyHint != "sk-or-…abcd" {
+		t.Fatalf("unexpected settings response: %+v", updated.Settings)
+	}
+
+	keyResp := configurationRequest(handler, http.MethodGet, "/v1/workspace/ai-provider-key", "")
+	if keyResp.Code != http.StatusOK || keyResp.Header().Get("Cache-Control") != "no-store" || !strings.Contains(keyResp.Body.String(), `"apiKey":"sk-or-v1-testkey1234567890abcd"`) {
+		t.Fatalf("get ai provider key status=%d cc=%q body=%s", keyResp.Code, keyResp.Header().Get("Cache-Control"), keyResp.Body.String())
+	}
+
+	cleared := configurationRequest(handler, http.MethodPut, "/v1/workspace/ai-settings", `{"aiInstructions":null,"aiProviderApiKey":null}`)
+	if cleared.Code != http.StatusOK || !strings.Contains(cleared.Body.String(), `"aiInstructions":null`) || !strings.Contains(cleared.Body.String(), `"hasAiProviderKey":false`) {
+		t.Fatalf("clear ai settings status=%d body=%s", cleared.Code, cleared.Body.String())
+	}
+	clearedKey := configurationRequest(handler, http.MethodGet, "/v1/workspace/ai-provider-key", "")
+	if clearedKey.Code != http.StatusOK || clearedKey.Header().Get("Cache-Control") != "no-store" || !strings.Contains(clearedKey.Body.String(), `"apiKey":null`) {
+		t.Fatalf("cleared ai provider key status=%d cc=%q body=%s", clearedKey.Code, clearedKey.Header().Get("Cache-Control"), clearedKey.Body.String())
+	}
+
+	for name, body := range map[string]string{
+		"invalid slot":      `{"aiModelDefaults":{"unknown":{"tier":"fast"}}}`,
+		"invalid tier":      `{"aiModelDefaults":{"default":{"tier":"ultra"}}}`,
+		"invalid effort":    `{"aiModelDefaults":{"default":{"tier":"fast","effort":"max"}}}`,
+		"null effort":       `{"aiModelDefaults":{"default":{"tier":"fast","effort":null}}}`,
+		"non-string effort": `{"aiModelDefaults":{"default":{"tier":"fast","effort":123}}}`,
+		"extra slot key":    `{"aiModelDefaults":{"default":{"tier":"fast","extra":true}}}`,
+		"too long prompt":   `{"aiInstructions":"` + strings.Repeat("a", 4001) + `"}`,
+		"short api key":     `{"aiProviderApiKey":"sk-short"}`,
+		"space in api key":  `{"aiProviderApiKey":"sk-or-v1-has space inside"}`,
+		"too long api key":  `{"aiProviderApiKey":"` + strings.Repeat("k", 513) + `"}`,
+	} {
+		resp := configurationRequest(handler, http.MethodPut, "/v1/workspace/ai-settings", body)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("%s expected 400 got %d body=%s", name, resp.Code, resp.Body.String())
+		}
+	}
+
+	config.aiSettingsError = product.ErrAIKeyEncryptionUnavailable
+	unavail := configurationRequest(handler, http.MethodPut, "/v1/workspace/ai-settings", `{"aiProviderApiKey":"sk-or-v1-testkey1234567890abcd"}`)
+	if unavail.Code != http.StatusServiceUnavailable {
+		t.Fatalf("missing encryption key expected 503 got %d", unavail.Code)
+	}
+	config.aiSettingsError = product.ErrAIKeyDecryptionFailed
+	decryptFail := configurationRequest(handler, http.MethodGet, "/v1/workspace/ai-provider-key", "")
+	if decryptFail.Code != http.StatusServiceUnavailable {
+		t.Fatalf("decrypt failure expected 503 got %d", decryptFail.Code)
+	}
+	config.aiSettingsError = nil
+
+	config.readError = publishing.ErrForbidden
+	deniedKey := configurationRequest(handler, http.MethodGet, "/v1/workspace/ai-provider-key", "")
+	if deniedKey.Code != http.StatusForbidden {
+		t.Fatalf("unauthorized ai key read expected 403 got %d", deniedKey.Code)
+	}
+	config.readError = nil
+
+	config.authorizationError = publishing.ErrForbidden
+	denied := configurationRequest(handler, http.MethodPut, "/v1/workspace/ai-settings", `{"aiAgentEnabled":true}`)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("unauthorized ai settings update expected 403 got %d", denied.Code)
 	}
 }
 

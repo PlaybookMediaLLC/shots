@@ -90,6 +90,54 @@ func (_c *WorkspaceSettingsCreate) SetNillableAiAgentEnabled(v *bool) *Workspace
 	return _c
 }
 
+// SetAiModelDefaults sets the "ai_model_defaults" field.
+func (_c *WorkspaceSettingsCreate) SetAiModelDefaults(v map[string]interface{}) *WorkspaceSettingsCreate {
+	_c.mutation.SetAiModelDefaults(v)
+	return _c
+}
+
+// SetAiInstructions sets the "ai_instructions" field.
+func (_c *WorkspaceSettingsCreate) SetAiInstructions(v string) *WorkspaceSettingsCreate {
+	_c.mutation.SetAiInstructions(v)
+	return _c
+}
+
+// SetNillableAiInstructions sets the "ai_instructions" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableAiInstructions(v *string) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetAiInstructions(*v)
+	}
+	return _c
+}
+
+// SetAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field.
+func (_c *WorkspaceSettingsCreate) SetAiProviderKeyEncrypted(v string) *WorkspaceSettingsCreate {
+	_c.mutation.SetAiProviderKeyEncrypted(v)
+	return _c
+}
+
+// SetNillableAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableAiProviderKeyEncrypted(v *string) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetAiProviderKeyEncrypted(*v)
+	}
+	return _c
+}
+
+// SetAiProviderKeyHint sets the "ai_provider_key_hint" field.
+func (_c *WorkspaceSettingsCreate) SetAiProviderKeyHint(v string) *WorkspaceSettingsCreate {
+	_c.mutation.SetAiProviderKeyHint(v)
+	return _c
+}
+
+// SetNillableAiProviderKeyHint sets the "ai_provider_key_hint" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableAiProviderKeyHint(v *string) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetAiProviderKeyHint(*v)
+	}
+	return _c
+}
+
 // SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
 func (_c *WorkspaceSettingsCreate) SetReleaseReadinessEnabled(v bool) *WorkspaceSettingsCreate {
 	_c.mutation.SetReleaseReadinessEnabled(v)
@@ -293,6 +341,22 @@ func (_c *WorkspaceSettingsCreate) createSpec() (*WorkspaceSettings, *sqlgraph.C
 	if value, ok := _c.mutation.AiAgentEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldAiAgentEnabled, field.TypeBool, value)
 		_node.AiAgentEnabled = value
+	}
+	if value, ok := _c.mutation.AiModelDefaults(); ok {
+		_spec.SetField(workspacesettings.FieldAiModelDefaults, field.TypeJSON, value)
+		_node.AiModelDefaults = value
+	}
+	if value, ok := _c.mutation.AiInstructions(); ok {
+		_spec.SetField(workspacesettings.FieldAiInstructions, field.TypeString, value)
+		_node.AiInstructions = &value
+	}
+	if value, ok := _c.mutation.AiProviderKeyEncrypted(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyEncrypted, field.TypeString, value)
+		_node.AiProviderKeyEncrypted = &value
+	}
+	if value, ok := _c.mutation.AiProviderKeyHint(); ok {
+		_spec.SetField(workspacesettings.FieldAiProviderKeyHint, field.TypeString, value)
+		_node.AiProviderKeyHint = &value
 	}
 	if value, ok := _c.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)

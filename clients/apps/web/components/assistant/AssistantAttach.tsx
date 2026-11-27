@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { PaperclipIcon } from '@phosphor-icons/react/dist/ssr/Paperclip'
+import { SpinnerGapIcon } from '@phosphor-icons/react/dist/ssr/SpinnerGap'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,20 +25,24 @@ function base64Of(blob: Blob) {
   })
 }
 
-/** The image as a JPEG at most 1024px on its long side, so it fits the request. */
-async function shrunk(file: File) {
+/** Resize an image file to at most 1024px JPEG base64 for inline assistant attachments. */
+export async function prepareImageFile(file: File): Promise<{ name: string; data: string }> {
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height))
-  const canvas = new OffscreenCanvas(
-    Math.max(1, Math.round(bitmap.width * scale)),
-    Math.max(1, Math.round(bitmap.height * scale))
-  )
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return base64Of(await canvas.convertToBlob({ quality: 0.85, type: 'image/jpeg' }))
+  try {
+    const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height))
+    const canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(bitmap.width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale))
+    )
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    const data = await base64Of(await canvas.convertToBlob({ quality: 0.85, type: 'image/jpeg' }))
+    return { data, name: file.name || 'pasted-image.jpg' }
+  } finally {
+    bitmap.close()
+  }
 }
 
-/** Attach an image to the next message, or a voice memo to write it from. */
+/** Attach an image to the next message, or a voice memo file to transcribe from. */
 export function AssistantAttach({
   onImage,
   onTranscript,
@@ -52,7 +57,7 @@ export function AssistantAttach({
     setBusy(true)
     try {
       if (file.type.startsWith('image/')) {
-        onImage({ data: await shrunk(file), name: file.name })
+        onImage(await prepareImageFile(file))
         return
       }
       const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
@@ -89,12 +94,16 @@ export function AssistantAttach({
         size={null}
         variant="custom"
         aria-label="Attach an image or voice memo"
-        title="Attach an image or voice memo (transcription uses AI credits)"
+        title="Attach an image or voice memo (or paste / drop images)"
         disabled={busy}
         className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40"
         onClick={() => input.current?.click()}
       >
-        <PaperclipIcon className="size-3.5" aria-hidden="true" />
+        {busy ? (
+          <SpinnerGapIcon className="size-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <PaperclipIcon className="size-3.5" aria-hidden="true" />
+        )}
       </Button>
     </>
   )
