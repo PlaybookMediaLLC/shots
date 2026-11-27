@@ -6,6 +6,7 @@ import {
   editorMore,
   expect,
   expectSaved,
+  type Locator,
   openNewBatch,
   saveBatchDrafts,
   test,
@@ -113,16 +114,18 @@ test(
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('ArrowLeft')
     await expect(resize).toHaveAttribute('aria-valuenow', String(initialWidth + 64))
-    // The wider sidebar reflows the page and a scrollbar can shift the handle
-    // a moment later; measure it only once it has stopped moving.
-    await expect
-      .poll(async () => {
-        const before = JSON.stringify(await resize.boundingBox())
-        // eslint-disable-next-line no-restricted-syntax -- Two measurements a moment apart prove the handle stopped moving.
-        await page.waitForTimeout(200)
-        return before === JSON.stringify(await resize.boundingBox())
-      })
-      .toBe(true)
+    // A wider sidebar reflows the page a moment later; measure only what has
+    // stopped moving.
+    const settled = (target: Locator) =>
+      expect
+        .poll(async () => {
+          const before = JSON.stringify(await target.boundingBox())
+          // eslint-disable-next-line no-restricted-syntax -- Two measurements a moment apart prove it stopped moving.
+          await page.waitForTimeout(200)
+          return before === JSON.stringify(await target.boundingBox())
+        })
+        .toBe(true)
+    await settled(resize)
     const handle = await resize.boundingBox()
     expect(handle).not.toBeNull()
     await page.mouse.move(handle!.x + 2, handle!.y + 80)
@@ -131,7 +134,11 @@ test(
     await page.mouse.up()
     await expect(resize).toHaveAttribute('aria-valuenow', String(initialWidth + 144))
     const destination = page.locator('[data-post-number="3"]')
-    await page.getByRole('img', { name: 'Drag post 1', exact: true }).hover()
+    // This resize reflows the page too. A grip that slides away between the
+    // hover and the press never starts a drag.
+    const grip = page.getByRole('img', { name: 'Drag post 1', exact: true })
+    await settled(grip)
+    await grip.hover()
     await page.mouse.down()
     // Two moves deliver native dragover; wait for the drop cue before releasing.
     await destination.hover()

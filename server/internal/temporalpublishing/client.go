@@ -104,13 +104,16 @@ func (s *Scheduler) StartDelete(ctx context.Context, organizationID, postID, req
 	return err
 }
 
-func (s *Scheduler) StartMissingWorkflow(ctx context.Context) error {
-	_, err := s.client.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
-		ID:                       MissingWorkflowID,
-		TaskQueue:                s.config.WorkflowTaskQueue,
-		WorkflowIDConflictPolicy: enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
-		WorkflowIDReusePolicy:    enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
-	}, MissingWorkflowName)
+// CancelMissingWorkflow stops the retired hourly recovery loop if an execution
+// is still open. MissingPostWorkflow remains registered for replay safety while
+// that cancellation settles.
+func (s *Scheduler) CancelMissingWorkflow(ctx context.Context) error {
+	err := s.client.CancelWorkflow(ctx, MissingWorkflowID, "")
+	var missing *serviceerror.NotFound
+	var alreadyRequested *serviceerror.CancellationAlreadyRequested
+	if errors.As(err, &missing) || errors.As(err, &alreadyRequested) {
+		return nil
+	}
 	return err
 }
 

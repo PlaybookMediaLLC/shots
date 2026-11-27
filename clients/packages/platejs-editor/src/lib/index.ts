@@ -22,6 +22,7 @@ export { MarkdownJoiner, markdownJoinerTransform } from "./markdown-streaming";
 export { nid } from "./nid";
 export { isSafeUrl, openSafeUrl } from "./safe-url";
 export {
+  type EditorAIAction,
   type EditorAIEndpoint,
   type EditorAIServices,
   type EditorServices,

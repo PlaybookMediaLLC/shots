@@ -34,6 +34,8 @@ import {
   commentPlugin,
   discussionPlugin,
   type TDiscussion,
+  AIKit,
+  CopilotKit,
 } from '@shots/platejs-editor/plugins'
 import { Editor, EditorContainer, EditorStatic, Toolbar, ToolbarButton } from '@shots/platejs-editor/ui'
 import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
@@ -591,6 +593,7 @@ function DraftEditorSession({
 }: DraftEditorProps & { onRetry: () => void; takeIssued: () => DraftCollaboration['issued'] }) {
   // Read once: later saves must not re-seed the plugin and reset its state.
   const [initialDiscussions] = React.useState(storedDiscussions)
+  const withAI = Boolean(services.ai) && !readOnly
   const plugins = React.useMemo(() => {
     const live = collaboration
       ? createYjsPlugin(
@@ -624,9 +627,15 @@ function DraftEditorSession({
       excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts', 'exitBreak'].filter(
         (key) => !hosted.some((plugin) => plugin.key === key)
       ),
-      additionalPlugins: live
-        ? [PostBreakPlugin, OverLimitPlugin, ...hosted, live]
-        : [PostBreakPlugin, OverLimitPlugin, ...hosted],
+      // The AI menu and inline suggestions load only where the host offers AI. They come
+      // first, so Tab accepts a suggestion before anything else takes the key.
+      additionalPlugins: [
+        ...(withAI ? [...CopilotKit, ...AIKit] : []),
+        PostBreakPlugin,
+        OverLimitPlugin,
+        ...hosted,
+        ...(live ? [live] : []),
+      ],
       // Comments and suggestions are authored by the signed-in member, not
       // the upstream demo users.
       overridePlugins: [
@@ -701,6 +710,7 @@ function DraftEditorSession({
     takeIssued,
     user.id,
     user.name,
+    withAI,
   ])
   // Mentions offer the signed-in member and the handles the workspace already
   // writes, instead of the upstream demo list.

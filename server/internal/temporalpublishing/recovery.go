@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -27,6 +28,9 @@ func NewRecoveryActivities(store *publishing.Repository, scheduler *Scheduler) *
 }
 
 func (a *RecoveryActivities) Recover(ctx context.Context) (int, error) {
+	if os.Getenv("PUBLISHING_PAUSED") == "true" {
+		return 0, nil
+	}
 	now := time.Now().UTC()
 	return a.dispatch(ctx, now.Add(-recoveryLookback), now)
 }
@@ -35,6 +39,9 @@ func (a *RecoveryActivities) Recover(ctx context.Context) (int, error) {
 // settles posts whose workflow stopped mid-publication, then starts stable
 // post workflows; all provider sends remain in the publishing worker.
 func (a *RecoveryActivities) DispatchDue(ctx context.Context) (int, error) {
+	if os.Getenv("PUBLISHING_PAUSED") == "true" {
+		return 0, nil
+	}
 	// A failed sweep must not stop due posts from starting; the job reports both.
 	released, sweep := a.ReleaseStalled(ctx)
 	started, err := a.dispatch(ctx, time.Time{}, time.Now().UTC())

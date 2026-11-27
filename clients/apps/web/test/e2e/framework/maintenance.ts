@@ -12,21 +12,20 @@ export function getMaintenanceHeaders(): Record<string, string> {
   return { [maintenanceSecretHeader]: secret }
 }
 
-/** Ask the real Temporal worker to dispatch queued jobs without waiting for its minute tick. */
+/** Ask the real Temporal worker to dispatch queued outbox jobs immediately. */
 export async function triggerTenantOutbox(): Promise<void> {
   const base = process.env.E2E_TEMPORAL_UI_URL ?? 'http://127.0.0.1:8233'
-  const schedule = new URL(
-    '/api/v1/namespaces/default/schedules/platform-maintenance-tenant-outbox',
-    base
-  )
-  const session = await fetch(schedule, { signal: AbortSignal.timeout(15_000) })
-  if (!session.ok) throw new Error(`Temporal schedule lookup returned ${session.status}.`)
+  const namespace = new URL('/api/v1/namespaces/default', base)
+  const session = await fetch(namespace, { signal: AbortSignal.timeout(15_000) })
+  if (!session.ok) throw new Error(`Temporal namespace lookup returned ${session.status}.`)
   const cookies = session.headers.getSetCookie().map((cookie) => cookie.split(';')[0])
   const csrf = z
     .string()
     .min(1)
     .parse(cookies.find((cookie) => cookie.startsWith('_csrf='))?.slice(6))
-  const response = await fetch(`${schedule}/patch`, {
+  const workflowId = `e2e-tenant-outbox-${randomUUID()}`
+  const workflow = new URL(`/api/v1/namespaces/default/workflows/${workflowId}`, base)
+  const response = await fetch(workflow, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -36,10 +35,20 @@ export async function triggerTenantOutbox(): Promise<void> {
     body: JSON.stringify({
       requestId: randomUUID(),
       identity: 'shots-browser-tests',
-      patch: { triggerImmediately: { overlapPolicy: 'SCHEDULE_OVERLAP_POLICY_BUFFER_ONE' } },
+      workflowType: { name: 'platform-maintenance-v1' },
+      taskQueue: { name: 'platform-maintenance' },
+      workflowExecutionTimeout: '120s',
+      input: {
+        payloads: [
+          {
+            metadata: { encoding: Buffer.from('json/plain').toString('base64') },
+            data: Buffer.from(JSON.stringify('tenant-outbox')).toString('base64'),
+          },
+        ],
+      },
     }),
     signal: AbortSignal.timeout(15_000),
   })
   if (!response.ok) throw new Error(`Temporal outbox trigger returned ${response.status}.`)
-  z.strictObject({}).parse(await response.json())
+  z.object({ runId: z.string().min(1) }).parse(await response.json())
 }

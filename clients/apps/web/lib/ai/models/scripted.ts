@@ -7,6 +7,11 @@ import type {
 } from '@ai-sdk/provider'
 import { simulateReadableStream } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
+import {
+  DOCUMENT_COPILOT_INSTRUCTIONS,
+  DOCUMENT_EDITOR_INSTRUCTIONS,
+  DOCUMENT_REVIEW_INSTRUCTIONS,
+} from '@/lib/ai/prompts/document-editor'
 import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 /**
@@ -1002,6 +1007,22 @@ const STUDIO_EDITS: {
   },
 ]
 
+/** The post editor's three prompts: inline suggestion, review and the AI menu. */
+function scriptPostEditor(system: string, text: string): string | null {
+  if (system.startsWith(DOCUMENT_COPILOT_INSTRUCTIONS)) return ' and measure the result.'
+  if (system.startsWith(DOCUMENT_REVIEW_INSTRUCTIONS)) {
+    // Quote the opening words of the first line of the document the editor sent.
+    const document = text.match(/<Document>([\s\S]*?)<\/Document>/)?.[1] ?? ''
+    const line = document.split('\n').find((part) => /^[A-Za-z]/.test(part.trim()))?.trim()
+    const content = line?.split(' ').slice(0, 3).join(' ')
+    return JSON.stringify({
+      comments: content ? [{ comment: 'Open with the result.', content }] : [],
+    })
+  }
+  if (system.startsWith(DOCUMENT_EDITOR_INSTRUCTIONS)) return 'Scripted editor draft.'
+  return null
+}
+
 /** A generated answer as the stream the same model would send. */
 function toStream(result: LanguageModelV4GenerateResult) {
   const parts = result.content.flatMap((part, index): LanguageModelV4StreamPart[] => {
@@ -1034,6 +1055,8 @@ export function createScriptedModel(modelId: string): LanguageModelV4 {
       if (systemText(options).startsWith('Transcribe this voice memo faithfully')) {
         return respond([{type:'text',text:'Today we shipped a small improvement. Check the measured results before adding numbers.'}])
       }
+      const editor = scriptPostEditor(systemText(options), readPrompt(options).text)
+      if (editor) return respond([{ text: editor, type: 'text' }])
       const names = toolNames(options)
       const { calls, results, text } = readPrompt(options)
       const submit = SUBMIT_TOOLS.find((name) => names.includes(name))

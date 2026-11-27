@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { defineContract } from '@/lib/api/contract'
+import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
 import { onlyInlineFiles } from '@/lib/assistant/attachments'
 import { INTERNAL_HREF_MAX, pageContextSchema } from '@/lib/assistant/page-context'
+import { draftChannelSchema } from '@/lib/write/document'
 
 /** Roles the browser may send. It may not inject system or operator messages. */
 export const editorMessageRoleSchema = z.enum(['user', 'assistant', 'tool'])
@@ -101,4 +103,82 @@ export const workspaceAssistantContract = defineContract({
   output: workspaceAssistantResponseSchema,
   path: '/api/ai/assistant',
   summary: 'Answer one turn of the workspace assistant with the page it is asked from',
+})
+
+/** Most messages one document-editor AI request may carry. */
+export const MAX_DOCUMENT_MESSAGES = 40
+
+/** Roles the document editor may send; it may not inject system messages. */
+export const documentMessageRoleSchema = z.enum(['user', 'assistant'])
+
+/** What the document AI menu asks for (the editor's tool names). */
+export const documentToolNameSchema = z.enum(['comment', 'edit', 'generate'])
+
+/**
+ * One document AI menu request, as the AI SDK chat transport posts it.
+ * `system` is the editor's rendering of the document and selection: it is
+ * untrusted user content, so the server passes it to the model as context and
+ * never as instructions.
+ */
+export const documentChatRequestSchema = z.looseObject({
+  ctx: z.looseObject({ toolName: documentToolNameSchema.nullable().optional() }).optional(),
+  messages: z
+    .array(
+      z.looseObject({
+        parts: z.array(z.looseObject({ type: z.string() })).max(100),
+        role: documentMessageRoleSchema,
+      })
+    )
+    .min(1)
+    .max(MAX_DOCUMENT_MESSAGES),
+  system: z.string().max(120_000).optional(),
+})
+
+/**
+ * The draft the document editor writes, and the platform being edited, so the
+ * AI writes in that draft's voice (its social set's, for that channel). Without
+ * them, or for a draft the caller cannot see, the workspace voice applies.
+ */
+export const documentVoiceQuerySchema = z.object({
+  channel: draftChannelSchema.optional(),
+  draftId: contentDraftIdSchema.optional(),
+})
+
+/** `POST /api/ai/document`: streams AI SDK UI message parts. */
+export const documentChatContract = defineContract({
+  body: documentChatRequestSchema,
+  method: 'POST',
+  name: 'ai.document',
+  output: z.never(),
+  path: '/api/ai/document',
+  query: documentVoiceQuerySchema,
+  summary: 'Stream a document editor AI response',
+})
+
+/** One inline completion request from the document editor's copilot. */
+export const documentCopilotRequestSchema = z.object({
+  prompt: z.string().trim().min(1).max(8_000),
+})
+
+/** One comment the AI review leaves on a passage it quotes from the post. */
+export const documentReviewCommentSchema = z.object({
+  comment: z.string().trim().min(1).max(600),
+  content: z.string().trim().min(1).max(400),
+})
+
+/** One AI review comment. */
+export type DocumentReviewComment = z.infer<typeof documentReviewCommentSchema>
+
+/** The completion text, or `0` when the model has nothing worth suggesting. */
+export const documentCopilotResponseSchema = z.object({ text: z.string().min(1) })
+
+/** `POST /api/ai/document/copilot` */
+export const documentCopilotContract = defineContract({
+  body: documentCopilotRequestSchema,
+  method: 'POST',
+  name: 'ai.document-copilot',
+  output: documentCopilotResponseSchema,
+  path: '/api/ai/document/copilot',
+  query: documentVoiceQuerySchema,
+  summary: 'Suggest an inline completion in the document editor',
 })

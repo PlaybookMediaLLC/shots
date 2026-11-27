@@ -10,10 +10,11 @@ import {
   useChatChunk,
 } from "@platejs/ai/react";
 import { KEYS, PathApi } from "platejs";
-import { usePluginOption } from "platejs/react";
+import { type PlateEditor, usePluginOption } from "platejs/react";
 import type React from "react";
 import { useEffect } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
+import { aiWriter, discardOwnAI, recordAISuggestions } from "./ai-ownership";
 import { AIMenu } from "../ui/ai-menu";
 import { AIAnchorElement, AILeaf } from "../ui/ai-node";
 import { CursorOverlayKit } from "./cursor-overlay-kit";
@@ -24,7 +25,9 @@ const applyStreamingEdit = (
   content: string,
   split: boolean
 ): void => {
-  withAIBatch(editor, () => applyAISuggestions(editor, content), { split });
+  recordAISuggestions(editor as PlateEditor, () =>
+    withAIBatch(editor, () => applyAISuggestions(editor, content), { split })
+  );
 };
 
 export const aiChatPlugin = AIChatPlugin.extend({
@@ -108,6 +111,7 @@ export const aiChatPlugin = AIChatPlugin.extend({
               streamInsertChunk(editor, chunk, {
                 textProps: {
                   ai: true,
+                  aiBy: aiWriter(editor).id,
                 },
               });
 
@@ -133,10 +137,20 @@ export const aiChatPlugin = AIChatPlugin.extend({
   },
 });
 
+/**
+ * Discarding takes back this editor's own unaccepted AI text. Upstream undoes
+ * the last history batch, which in a shared document also held typed words.
+ */
+const DiscardingAIPlugin = AIPlugin.withComponent(AILeaf).extendTransforms(
+  ({ editor }) => ({
+    undo: () => discardOwnAI(editor),
+  })
+);
+
 export const AIKit = [
   ...CursorOverlayKit,
   ...MarkdownKit,
-  AIPlugin.withComponent(AILeaf),
+  DiscardingAIPlugin,
   aiChatPlugin,
 ];
 

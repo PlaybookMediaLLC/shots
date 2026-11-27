@@ -98,6 +98,20 @@ export const ASSISTANT_AI_RATE_LIMIT: RateLimitPolicy = {
   windowMs: 60_000,
 }
 
+/** Requests from the post editor's AI menu, per workspace. */
+export const EDITOR_AI_RATE_LIMIT: RateLimitPolicy = {
+  maxRequests: 60,
+  name: 'editor-ai',
+  windowMs: 60_000,
+}
+
+/** Inline suggestions ask on each pause in typing, so they get their own budget. */
+export const EDITOR_COPILOT_RATE_LIMIT: RateLimitPolicy = {
+  maxRequests: 90,
+  name: 'editor-copilot',
+  windowMs: 60_000,
+}
+
 /**
  * Link previews fetch an arbitrary public page plus its robots.txt, sitemap,
  * favicon, and images, so each workspace gets a budget that covers a batch

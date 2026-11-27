@@ -37,6 +37,10 @@ type SocialAnalyticsCollector interface {
 	CollectSocialAnalytics(context.Context) (int, error)
 }
 
+type dueAnalyticsCollector interface {
+	CollectDueAnalytics(context.Context) (int, error)
+}
+
 // SocialTokenRefresher renews connected channels' expiring OAuth tokens.
 type SocialTokenRefresher interface {
 	RefreshSocialTokens(context.Context) (int, error)
@@ -63,9 +67,21 @@ type OnboardingCanceller interface {
 	Cancel(ctx context.Context, organizationID string) error
 }
 
-// Serialize a job across replicas and manual invocations, including activity
-// retries. Session locks disappear if a worker loses its database connection.
+// Run executes a maintenance job under its PostgreSQL advisory lock, returning
+// (0, nil) immediately if another replica already holds the lock.
 func (s *Store) Run(ctx context.Context, job string) (int, error) {
+	return s.run(ctx, job, false)
+}
+
+// RunWait executes a maintenance job under its PostgreSQL advisory lock,
+// waiting for an in-flight holder to release it so explicit/on-demand triggers
+// (such as Temporal runs or E2E helpers) execute a fresh pass instead of
+// skipping on lock contention.
+func (s *Store) RunWait(ctx context.Context, job string) (int, error) {
+	return s.run(ctx, job, true)
+}
+
+func (s *Store) run(ctx context.Context, job string, wait bool) (int, error) {
 	handlers := map[string]func(context.Context) (int, error){
 		"frontend-deployments": func(ctx context.Context) (int, error) {
 			if p, ok := s.Events.(interface {
@@ -80,17 +96,13 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 		"audit-retention":        s.AuditRetention,
 		"notification-retention": s.NotificationRetention,
 		"notifications":          s.Notifications,
+		"notifications-maintain": s.NotificationsMaintain,
 		"account-deletions":      s.AccountDeletions,
 		"webhooks":               s.DeliverWebhooks,
 		"asset-cleanup":          s.AssetCleanup,
 		"voice-cleanup":          s.VoiceCleanup,
 		"voice-commands":         s.VoiceCommands,
-		"social-analytics": func(ctx context.Context) (int, error) {
-			if s.Analytics == nil {
-				return 0, nil
-			}
-			return s.Analytics.CollectSocialAnalytics(ctx)
-		},
+		"social-analytics":       s.runSocialAnalytics,
 		"social-token-refresh": func(ctx context.Context) (int, error) {
 			if s.Tokens == nil {
 				return 0, nil
@@ -102,18 +114,82 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("unknown maintenance job")
 	}
-	conn, err := s.DB.Conn(ctx)
-	if err != nil {
-		return 0, err
+	if wait {
+		return s.WithLockWait(ctx, job, handler)
 	}
-	defer conn.Close()
-	var locked bool
-	if err = conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(hashtextextended($1, 0))`, "maintenance/"+job).Scan(&locked); err != nil {
-		return 0, err
-	}
-	if !locked {
+	return s.WithLock(ctx, job, handler)
+}
+
+func (s *Store) runSocialAnalytics(ctx context.Context) (int, error) {
+	if s.Analytics == nil {
 		return 0, nil
 	}
+	total := 0
+	if due, ok := s.Analytics.(dueAnalyticsCollector); ok {
+		n, err := due.CollectDueAnalytics(ctx)
+		total += n
+		if err != nil {
+			return total, err
+		}
+	}
+	m, err := s.Analytics.CollectSocialAnalytics(ctx)
+	return total + m, err
+}
+
+// WithLock runs fn under the per-job PostgreSQL session advisory lock used to
+// serialize maintenance across worker replicas and retries. If another replica
+// holds the lock, it returns (0, nil) without invoking fn.
+func (s *Store) WithLock(ctx context.Context, job string, fn func(context.Context) (int, error)) (int, error) {
+	return s.withLock(ctx, job, false, fn)
+}
+
+// WithLockWait runs fn under the per-job PostgreSQL session advisory lock,
+// polling with capped backoff until the lock is free or ctx ends. Connections
+// are returned to the pool between attempts so waiting never pins a DB slot.
+func (s *Store) WithLockWait(ctx context.Context, job string, fn func(context.Context) (int, error)) (int, error) {
+	return s.withLock(ctx, job, true, fn)
+}
+
+func (s *Store) withLock(ctx context.Context, job string, wait bool, fn func(context.Context) (int, error)) (int, error) {
+	var conn *sql.Conn
+	backoff := 100 * time.Millisecond
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
+	for {
+		var err error
+		conn, err = s.DB.Conn(ctx)
+		if err != nil {
+			return 0, err
+		}
+		var locked bool
+		if err = conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(hashtextextended($1, 0))`, "maintenance/"+job).Scan(&locked); err != nil {
+			_ = conn.Close()
+			return 0, err
+		}
+		if locked {
+			break
+		}
+		_ = conn.Close()
+		if !wait {
+			return 0, nil
+		}
+		if timer == nil {
+			timer = time.NewTimer(backoff)
+		} else {
+			timer.Reset(backoff)
+		}
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-timer.C:
+		}
+		backoff = min(backoff*2, time.Second)
+	}
+	defer conn.Close()
 	defer func() {
 		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -122,7 +198,7 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
-	return handler(ctx)
+	return fn(ctx)
 }
 
 func transaction(ctx context.Context, db *sql.DB, f func(*sql.Tx) error) error {
@@ -200,11 +276,11 @@ func ids(ctx context.Context, db *sql.DB, query string, args ...any) ([]string, 
 	return result, rows.Err()
 }
 
-// DeliverWebhooks fans out and delivers outbound webhooks for most of a
-// minute; the schedule starts it again once it ends.
+// DeliverWebhooks drains queued outbound webhooks and returns immediately when
+// idle rather than holding a worker slot and Postgres lock for a full minute.
 func (s *Store) DeliverWebhooks(ctx context.Context) (int, error) {
 	if s.Webhooks == nil {
 		return 0, nil
 	}
-	return s.Webhooks.Run(ctx, 50*time.Second)
+	return s.Webhooks.Drain(ctx, 45*time.Second)
 }

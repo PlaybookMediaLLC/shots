@@ -14,6 +14,12 @@ export const EditorProposalSchema = z.object({
   content: z.string().trim().min(1).max(20_000),
 });
 
+/** One streamed review comment (`data-comment`). */
+export const EditorReviewCommentSchema = z.object({
+  comment: z.string().trim().min(1),
+  content: z.string().trim().min(1),
+});
+
 export const EditorToolNameSchema = z.enum(["comment", "edit", "generate"]);
 
 export type EditorProposal = z.infer<typeof EditorProposalSchema>;
@@ -22,6 +28,8 @@ export type EditorToolName = z.infer<typeof EditorToolNameSchema>;
 
 export type EditorAICommentEventDetail = {
   comment: string;
+  /** The passage the comment is about; without it, the current selection. */
+  content?: string;
   editorId: string;
 };
 
