@@ -63,7 +63,7 @@ boundary:
 | Durable scheduling and provider backoff | Temporal timers; classified `429` and safe `5xx` responses retry |
 | No automatic retry of provider mutations | submit activity has one attempt; timeout becomes `UNKNOWN_DELIVERY` |
 | Pending provider confirmation | V1 keeps read-only status checks for replay; V2 requires a confirmed direct receipt |
-| Missing-post recovery | `missing-post-workflow` runs immediately and hourly when `RUN_CRON=true` |
+| Missing-post recovery | `scheduled-posts` poller dispatches due posts every 30s (`missing-post-workflow` is retired and cancelled on boot; kept registered for replay) |
 | Durable outcome writes | receipt, failure and unknown writes retry for 24 hours; the provider ID is logged first |
 | Stalled-post recovery | the `scheduled-posts` job settles `PROCESSING` posts whose run closed: `UNKNOWN_DELIVERY` after a possible send, requeued otherwise |
 | Late publication window | a post that cannot start within an hour of its time fails as `MISSED_WINDOW` without sending |
@@ -289,8 +289,10 @@ days ago or whose workspace was purged, retry waiting command parses and
 expire unconfirmed proposals. Note, audio and transcript deletions are also
 written to the R2 deletion ledger.
 
-`PUBLISHING_PAUSED=true` holds every due post before any provider call, for a
-database restore ([runbook](../docs/deployment.md)).
+`PUBLISHING_PAUSED=true` holds every due post before any provider call (and
+skips due-post dispatch), and `MAINTENANCE_PAUSED=true` holds all maintenance
+pollers and Temporal maintenance jobs, for a database restore
+([runbook](../docs/deployment.md)).
 
 The Founder Hub phone app reaches the voice API through the gateway at
 `/api/founder-hub/voice/<suffix>`, with the methods, bodies and responses of

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"testing"
+	"time"
 )
 
 type fakeResolver map[string][]string
@@ -104,4 +105,84 @@ func TestSignatureAndSealing(t *testing.T) {
 	if Verify(secret, "evt_1", "2026-10-20T10:00:00Z", []byte(`{"id":"evt_x"}`), header) {
 		t.Fatal("the signature does not bind the body")
 	}
+}
+
+func TestDrainLoop(t *testing.T) {
+	t.Run("exits immediately when idle", func(t *testing.T) {
+		passes := 0
+		start := time.Now()
+		n, err := drainLoop(context.Background(), 5*time.Second,
+			func(context.Context) (int, error) { passes++; return 0, nil },
+			func(context.Context) (int, int, error) { return 0, 0, nil },
+		)
+		if err != nil || n != 0 || passes != 1 {
+			t.Fatalf("got n=%d passes=%d err=%v, want 0, 1, nil", n, passes, err)
+		}
+		if elapsed := time.Since(start); elapsed > time.Second {
+			t.Fatalf("idle drain slept for %v", elapsed)
+		}
+	})
+
+	t.Run("drains multiple batches including failed deliveries followed by healthy ones", func(t *testing.T) {
+		fanoutCounts := []int{2, 0, 0, 0}
+		attemptedCounts := []int{2, 50, 3, 0}
+		sentCounts := []int{2, 0, 3, 0}
+		pass := 0
+		n, err := drainLoop(context.Background(), 5*time.Second,
+			func(context.Context) (int, error) { return fanoutCounts[pass], nil },
+			func(context.Context) (int, int, error) {
+				a, s := attemptedCounts[pass], sentCounts[pass]
+				pass++
+				return a, s, nil
+			},
+		)
+		if err != nil || n != 7 || pass != 4 {
+			t.Fatalf("got n=%d pass=%d err=%v, want 7, 4, nil", n, pass, err)
+		}
+	})
+
+	t.Run("stops at maxDuration without error", func(t *testing.T) {
+		passes := 0
+		n, err := drainLoop(context.Background(), 0,
+			func(context.Context) (int, error) { passes++; return 1, nil },
+			func(context.Context) (int, int, error) { return 1, 1, nil },
+		)
+		if err != nil || n != 2 || passes != 1 {
+			t.Fatalf("got n=%d passes=%d err=%v, want 2, 1, nil", n, passes, err)
+		}
+	})
+
+	t.Run("propagates context cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		n, err := drainLoop(ctx, 5*time.Second,
+			func(context.Context) (int, error) { return 1, nil },
+			func(context.Context) (int, int, error) { cancel(); return 1, 1, nil },
+		)
+		if !errors.Is(err, context.Canceled) || n != 2 {
+			t.Fatalf("got n=%d err=%v, want 2, context.Canceled", n, err)
+		}
+	})
+
+	t.Run("aborts on fanout error without calling deliver", func(t *testing.T) {
+		boom := errors.New("fanout failed")
+		deliverCalled := false
+		n, err := drainLoop(context.Background(), 5*time.Second,
+			func(context.Context) (int, error) { return 0, boom },
+			func(context.Context) (int, int, error) { deliverCalled = true; return 0, 0, nil },
+		)
+		if !errors.Is(err, boom) || n != 0 || deliverCalled {
+			t.Fatalf("got n=%d deliverCalled=%v err=%v", n, deliverCalled, err)
+		}
+	})
+
+	t.Run("aborts on deliver error", func(t *testing.T) {
+		boom := errors.New("deliver failed")
+		n, err := drainLoop(context.Background(), 5*time.Second,
+			func(context.Context) (int, error) { return 1, nil },
+			func(context.Context) (int, int, error) { return 1, 0, boom },
+		)
+		if !errors.Is(err, boom) || n != 0 {
+			t.Fatalf("got n=%d err=%v, want 0, boom", n, err)
+		}
+	})
 }

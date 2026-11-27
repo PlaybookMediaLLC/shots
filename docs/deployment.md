@@ -55,18 +55,21 @@ order and keep publishing paused until step 5. `T` below is the restore point
 in UTC, written as RFC 3339 (`2026-11-10T12:00:00Z`).
 
 1. **Pause publishing and maintenance.**
-   - Add `TENANT_PUBLISHING_PAUSED=true` as a plain (not secret) variable on
-     `screenshot-studio-backend` in App Platform. While it is set, the first
-     step of every post workflow (`PreparePostPublication`) fails before it
-     claims the post: nothing reaches a provider, the post stays `SCHEDULED`,
-     and its workflow closes as failed after three tries. The pause is an
-     environment variable rather than a database setting because the database
+   - Add `TENANT_PUBLISHING_PAUSED=true` and `TENANT_MAINTENANCE_PAUSED=true`
+     as plain (not secret) variables on `screenshot-studio-backend` in App
+     Platform. While `TENANT_PUBLISHING_PAUSED=true` is set, `PreparePostPublication`
+     fails before claiming any post and `scheduled-posts` stops dispatching due
+     posts, so nothing reaches a provider and posts stay `SCHEDULED`. While
+     `TENANT_MAINTENANCE_PAUSED=true` is set, both the in-process maintenance
+     poller and Temporal-triggered maintenance jobs skip work cleanly. The pauses
+     are environment variables rather than database settings because the database
      is what is being restored. The cost is a redeploy of the backend to set
-     it and another to clear it, a few minutes each; backend deploys from the
-     `Social backend image` workflow keep it. Locally the variable is
-     `PUBLISHING_PAUSED=true` on the product worker.
-   - Pause every maintenance schedule in `screenshot-studio-publishing.kpisa`
-     (`temporal schedule list` shows the `platform-maintenance-*` IDs):
+     them and another to clear them, a few minutes each; backend deploys from the
+     `Social backend image` workflow keep them. Locally the variables are
+     `PUBLISHING_PAUSED=true` and `MAINTENANCE_PAUSED=true` on the product worker.
+   - Optionally pause the hourly/daily maintenance schedules in
+     `screenshot-studio-publishing.kpisa` (`temporal schedule list` shows the
+     `platform-maintenance-*` IDs):
      `temporal schedule toggle --schedule-id <id> --pause --reason "database restore"`.
      Restarts keep the pause.
    - Wait for sends that started before the pause:
@@ -129,10 +132,11 @@ in UTC, written as RFC 3339 (`2026-11-10T12:00:00Z`).
    purged, audit reason `ledger_replay`), each note's audio and each
    transcript likewise. The command prints how many entries it read and how
    many records it deleted again. A second run changes nothing. Asset bytes
-   still in R2 go once the outbox schedule resumes; voice audio goes at once,
+   still in R2 go once the outbox poller resumes; voice audio goes at once,
    and the voice sweep deletes it again once maintenance resumes.
-5. **Resume.** Remove `TENANT_PUBLISHING_PAUSED` (a redeploy), then unpause
-   the schedules (`temporal schedule toggle --schedule-id <id> --unpause`).
+5. **Resume.** Remove `TENANT_PUBLISHING_PAUSED` and `TENANT_MAINTENANCE_PAUSED`
+   (a redeploy), then unpause any paused schedules
+   (`temporal schedule toggle --schedule-id <id> --unpause`).
    The `scheduled-posts` job starts the held posts again. One due less than
    an hour ago publishes late; one more overdue fails as `MISSED_WINDOW`
    (`temporalpublishing.LatePublicationWindow`) and is never sent late, so
