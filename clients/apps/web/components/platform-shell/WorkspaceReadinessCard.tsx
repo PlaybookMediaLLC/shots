@@ -144,7 +144,7 @@ export function WorkspaceReadinessCard({
           variant="outline"
         >
           <SparkleIcon aria-hidden="true" className="size-3" />
-          Ask Shots to set up
+          Set up with AI
         </Button>
       ) : null}
     </div>

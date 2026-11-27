@@ -44,7 +44,7 @@ export function AssistantThreads({ abilityId, disabled }: { abilityId: string; d
   const load = () => {
     const seq = ++loadSeqRef.current
     const orgId = useAssistantStore.getState().organizationId
-    return client.assistantThread.list.query().then(
+    return queueChatWrite(() => client.assistantThread.list.query()).then(
       (items) => {
         if (seq !== loadSeqRef.current || useAssistantStore.getState().organizationId !== orgId)
           return
@@ -132,11 +132,21 @@ export function AssistantThreads({ abilityId, disabled }: { abilityId: string; d
             className="h-7 ps-8 text-xs"
           />
         </div>
-        <div className="max-h-64 space-y-0.5 overflow-y-auto">
+        <div className="max-h-64 space-y-0.5 overflow-y-auto" role="menu">
           {threads === null ? (
-            <p className="px-2 py-3 text-center text-xs text-muted-foreground">Loading…</p>
+            <p
+              aria-disabled="true"
+              className="px-2 py-3 text-center text-xs text-muted-foreground"
+              role="menuitem"
+            >
+              Loading…
+            </p>
           ) : visible.length === 0 ? (
-            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+            <p
+              aria-disabled="true"
+              className="px-2 py-3 text-center text-xs text-muted-foreground"
+              role="menuitem"
+            >
               {needle ? 'No matching chats' : 'No saved chats yet'}
             </p>
           ) : (
@@ -151,9 +161,11 @@ export function AssistantThreads({ abilityId, disabled }: { abilityId: string; d
                   )}
                 >
                   <Button
+                    aria-label={thread.title}
                     type="button"
                     variant="custom"
                     size={null}
+                    role="menuitem"
                     className="flex min-w-0 flex-1 items-center justify-between gap-2 text-start"
                     onClick={() => void resume(thread.id)}
                   >
@@ -179,6 +191,24 @@ export function AssistantThreads({ abilityId, disabled }: { abilityId: string; d
               )
             })
           )}
+          {current ? (
+            <div className="mt-1 border-t border-border pt-1">
+              <Button
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-xs text-destructive transition-colors hover:bg-destructive/10"
+                onClick={() => {
+                  setOpen(false)
+                  void remove(current)
+                }}
+                role="menuitem"
+                size={null}
+                type="button"
+                variant="custom"
+              >
+                <TrashIcon aria-hidden="true" className="size-3" />
+                Delete this chat
+              </Button>
+            </div>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>
