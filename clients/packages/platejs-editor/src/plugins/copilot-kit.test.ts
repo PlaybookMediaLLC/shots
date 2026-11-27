@@ -12,7 +12,7 @@ function makeEditor(value: Value) {
   });
   editor.setOption(CopilotPlugin, "completeOptions", {
     ...editor.getOptions(CopilotPlugin).completeOptions,
-    api: "/api/ai/document/copilot?channel=x&draftId=draft_1",
+    api: "https://copilot.example/complete",
   });
   return editor;
 }
