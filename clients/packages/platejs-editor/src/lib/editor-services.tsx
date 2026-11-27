@@ -50,6 +50,8 @@ export interface EditorAIServices {
   actions?: readonly EditorAIAction[];
   /** Streams AI SDK UI messages for the AI menu (generate, edit, comment). */
   chat?: EditorAIEndpoint;
+  /** Whether review comments persist in this editor; when false, review actions are hidden. */
+  comments?: boolean;
   /** Answers `{ prompt }` with `{ text }` for inline ghost-text completion. */
   copilot?: EditorAIEndpoint;
 }

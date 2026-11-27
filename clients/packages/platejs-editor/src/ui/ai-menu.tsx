@@ -690,7 +690,7 @@ Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
 
 const aiChatItemRegistry = aiChatItems as Record<string, AIChatItemDefinition>;
 
-const menuStateItems = {
+export const menuStateItems = {
   commentSuggestion: [
     {
       items: [
@@ -747,6 +747,27 @@ const menuStateItems = {
   ],
 };
 
+const COMMENT_MENU_ITEM_VALUES = new Set([
+  "addComment",
+  "reviewPost",
+  "reviewSelection",
+]);
+
+/** Removes review/comment menu actions when the host editor does not persist comments. */
+export function filterAICommentMenuGroups<
+  T extends { items: readonly { value: string }[] },
+>(groups: readonly T[], allowComments: boolean): T[] {
+  if (allowComments) return [...groups];
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !COMMENT_MENU_ITEM_VALUES.has(item.value)
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 function AIMenuItems() {
   const editor = useEditorRef();
   const [searchValue] = useComboboxValueState();
@@ -754,6 +775,8 @@ function AIMenuItems() {
   const aiEditor = usePluginOption(AIChatPlugin, "aiEditor");
   const toolName = usePluginOption(AIChatPlugin, "toolName");
   const isSelecting = useIsSelecting();
+  const aiServices = useEditorServices().ai;
+  const allowComments = aiServices?.comments !== false;
 
   const menuState = useMemo(() => {
     if (messages && messages.length > 0) {
@@ -766,12 +789,15 @@ function AIMenuItems() {
   }, [isSelecting, messages, toolName]);
 
   const menuGroups = useMemo(() => {
-    const items = menuStateItems[menuState] || [];
+    const items = filterAICommentMenuGroups(
+      menuStateItems[menuState] || [],
+      allowComments
+    );
 
     return filterMenuGroups(items, searchValue) || items;
-  }, [menuState, searchValue]);
+  }, [allowComments, menuState, searchValue]);
 
-  const hostActions = useEditorServices().ai?.actions;
+  const hostActions = aiServices?.actions;
   const hostGroups = useMemo(() => {
     if (!menuState.endsWith("Command")) return [];
     const wanted = searchValue.trim().toLowerCase();
