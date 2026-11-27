@@ -31,6 +31,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/httpx"
 	socialredis "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/redis"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/tenantpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
@@ -196,9 +197,9 @@ func main() {
 	}
 	server := &http.Server{
 		Addr: fmt.Sprintf(":%d", cfg.Port),
-		Handler: telemetry.Handler(httpapi.NewWithOnboarding(publishing.NewRepository(db.Client), scheduler, verifier, cfg.ServiceToken, configuration,
+		Handler: telemetry.Handler(httpx.Compress(httpapi.NewWithOnboarding(publishing.NewRepository(db.Client), scheduler, verifier, cfg.ServiceToken, configuration,
 			&onboarding.Service{Background: &temporalonboarding.Client{SeedSurfaces: os.Getenv("PLATFORM_ONBOARDING_SURFACES") == "enabled", Temporal: temporalClient},
-				FastPath: &onboarding.FastPath{Fetcher: onboarding.NewFetcher(), Model: model}, Store: configuration}), false),
+				FastPath: &onboarding.FastPath{Fetcher: onboarding.NewFetcher(), Model: model}, Store: configuration})), false),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -269,6 +270,6 @@ func publicHandler(configuration *product.Configuration, limiter product.QuotaCo
 	}
 	mux := http.NewServeMux()
 	mux.Handle(media.ProviderDeliveryPath, objects.ProviderDeliveryHandler())
-	mux.Handle("/", server.Handler(httpapi.NewAgentOAuth(clients, configuration)))
+	mux.Handle("/", httpx.Compress(server.Handler(httpapi.NewAgentOAuth(clients, configuration))))
 	return mux, nil
 }

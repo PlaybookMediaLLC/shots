@@ -1107,7 +1107,17 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		ids = append(ids, row.ID)
 	}
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftIDIn(ids...),
-		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(liveOrFailedStatuses...)).All(ctx)
+		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(liveOrFailedStatuses...)).
+		Select(
+			scheduledpost.FieldID,
+			scheduledpost.FieldContentDraftID,
+			scheduledpost.FieldChannelConnectionID,
+			scheduledpost.FieldStatus,
+			scheduledpost.FieldPublishedAt,
+			scheduledpost.FieldScheduledFor,
+			scheduledpost.FieldUpdatedAt,
+			scheduledpost.FieldCreatedAt,
+		).All(ctx)
 	if err != nil {
 		return nil, err
 	}

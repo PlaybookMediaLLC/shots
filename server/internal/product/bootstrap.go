@@ -5,11 +5,9 @@ import (
 	"os"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
@@ -79,42 +77,58 @@ func (c *Configuration) GetCurrentUser(ctx context.Context, actor Actor) (*Curre
 }
 
 func (c *Configuration) Bootstrap(ctx context.Context, actor Actor) (*BootstrapSnapshot, error) {
-	person, err := c.client.User.Get(ctx, actor.UserID)
-	if err != nil {
-		return nil, err
-	}
-	org, err := c.GetWorkspace(ctx, actor.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	if org == nil {
-		return nil, publishing.ErrNotFound
-	}
-	membership, err := c.client.Member.Query().Where(member.OrganizationID(actor.OrganizationID), member.UserID(actor.UserID)).Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-	organizations, err := c.ListWorkspaces(ctx, actor)
-	if err != nil {
-		return nil, err
-	}
-	channels, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
-		channelconnection.StatusEQ(channelconnection.StatusACTIVE)).Count(ctx)
-	if err != nil {
-		return nil, err
-	}
-	approvals, err := c.client.CampaignPost.Query().Where(campaignpost.OrganizationID(actor.OrganizationID),
-		campaignpost.StatusEQ(campaignpost.StatusREADY_FOR_REVIEW)).Count(ctx)
-	if err != nil {
-		return nil, err
-	}
-	attention, err := c.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
-		scheduledpost.StatusEQ(scheduledpost.StatusFAILED)).Count(ctx)
-	if err != nil {
-		return nil, err
-	}
-	entitlement, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(actor.OrganizationID)).Only(ctx)
-	if err != nil && !ent.IsNotFound(err) {
+	var (
+		person        *ent.User
+		org           *Workspace
+		membership    *ent.Member
+		organizations []ListedWorkspace
+		hasChannels   bool
+		approvals     int
+		attention     int
+		entitlement   *ent.WorkspaceEntitlement
+	)
+	if err := runParallel(ctx, 4,
+		func(ctx context.Context) error {
+			var err error
+			person, err = c.client.User.Get(ctx, actor.UserID)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			org, err = c.GetWorkspace(ctx, actor.OrganizationID)
+			if err == nil && org == nil {
+				return publishing.ErrNotFound
+			}
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			membership, err = c.client.Member.Query().Where(member.OrganizationID(actor.OrganizationID), member.UserID(actor.UserID)).Only(ctx)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			organizations, err = c.ListWorkspaces(ctx, actor)
+			return err
+		},
+		func(ctx context.Context) error {
+			return c.client.PlatformQuery(ctx, `SELECT
+				EXISTS(SELECT 1 FROM channel_connection WHERE "organizationId"=$1 AND status='ACTIVE'),
+				(SELECT COUNT(*)::int FROM campaign_post WHERE "organizationId"=$1 AND status='READY_FOR_REVIEW'),
+				(SELECT COUNT(*)::int FROM scheduled_post WHERE "organizationId"=$1 AND status='FAILED')`,
+				[]any{actor.OrganizationID}, func(row entsql.ColumnScanner) error {
+					return row.Scan(&hasChannels, &approvals, &attention)
+				})
+		},
+		func(ctx context.Context) error {
+			row, err := c.client.WorkspaceEntitlement.Query().Where(workspaceentitlement.ID(actor.OrganizationID)).Only(ctx)
+			if err != nil && !ent.IsNotFound(err) {
+				return err
+			}
+			entitlement = row
+			return nil
+		},
+	); err != nil {
 		return nil, err
 	}
 	result := &BootstrapSnapshot{Organizations: organizations}
@@ -133,7 +147,7 @@ func (c *Configuration) Bootstrap(ctx context.Context, actor Actor) (*BootstrapS
 		}{org.WorkspaceSettings.Locale, org.WorkspaceSettings.TimeZone, org.WorkspaceSettings.DefaultPublishTime}
 	}
 	result.Entitlements.Plan, result.Entitlements.Status, result.Entitlements.Features = evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
-	result.Capabilities.Publishing = channels > 0
+	result.Capabilities.Publishing = hasChannels
 	result.Capabilities.AIAgent = result.Entitlements.Features["workspace:paid"] && (org.WorkspaceSettings == nil || org.WorkspaceSettings.AiAgentEnabled)
 	result.Counters.Approvals, result.Counters.Attention = approvals, attention
 	return result, nil

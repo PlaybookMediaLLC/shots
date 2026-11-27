@@ -121,13 +121,26 @@ func (c *Configuration) ListPermissionGroups(ctx context.Context, actor Actor) (
 	if err != nil {
 		return nil, err
 	}
+	if len(groups) == 0 {
+		return []PermissionGroupRecord{}, nil
+	}
+	groupIDs := make([]string, 0, len(groups))
+	for _, group := range groups {
+		groupIDs = append(groupIDs, group.ID)
+	}
+	assignments, err := c.client.PermissionGroupMember.Query().
+		Where(permissiongroupmember.PermissionGroupIDIn(groupIDs...)).
+		Select(permissiongroupmember.FieldID, permissiongroupmember.FieldPermissionGroupID).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	membersByGroup := make(map[string][]string, len(groups))
+	for _, assignment := range assignments {
+		membersByGroup[assignment.PermissionGroupID] = append(membersByGroup[assignment.PermissionGroupID], assignment.ID)
+	}
 	records := make([]PermissionGroupRecord, 0, len(groups))
 	for _, group := range groups {
-		memberIDs, err := c.client.PermissionGroupMember.Query().Where(permissiongroupmember.PermissionGroupID(group.ID)).IDs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		records = append(records, permissionGroupRecord(group, memberIDs))
+		records = append(records, permissionGroupRecord(group, membersByGroup[group.ID]))
 	}
 	return records, nil
 }

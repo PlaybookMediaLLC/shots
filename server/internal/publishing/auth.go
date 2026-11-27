@@ -35,12 +35,14 @@ func (r *Repository) AuthorizeConnections(ctx context.Context, organizationID, u
 type recordAuthorizationKey struct{}
 type replayAuthorizationKey struct{}
 
-// AuthorizationMemo carries the role or session a middleware's check read to
-// the handler's first check of the same kind, so that check skips the session,
-// user, membership and workspace queries it would repeat.
+// AuthorizationMemo carries the role, session, API key or support grant a
+// middleware's check read to later checks on the same ent.Client, avoiding
+// repeated session, user, membership, API-key and workspace-deletion queries.
 type AuthorizationMemo struct {
 	last    atomic.Pointer[authorizedRole]
 	session atomic.Pointer[authorizedSession]
+	apiKey  atomic.Pointer[authorizedAPIKey]
+	support atomic.Pointer[authorizedSupportGrant]
 }
 
 // authorizedRole is an actor AuthorizeRole admitted, and the client it read with.
@@ -54,6 +56,18 @@ type authorizedSession struct {
 	client            *ent.Client
 	userID, sessionID string
 	current           *ent.Session
+}
+
+type authorizedAPIKey struct {
+	client                *ent.Client
+	organizationID, keyID string
+	key                   *ent.Apikey
+}
+
+type authorizedSupportGrant struct {
+	client                          *ent.Client
+	organizationID, userID, grantID string
+	expiresAt                       time.Time
 }
 
 // startedRunKey marks work a person already authorized when they started it.
@@ -328,9 +342,42 @@ func (r *Repository) AuthorizeAPIKeyScope(ctx context.Context, organizationID, k
 	return nil
 }
 
+// AuthorizeVerifiedAPIKey validates an already-loaded API key row's enabled,
+// expiry, and workspace operational state once and records it in the request's
+// AuthorizationMemo when present.
+func (r *Repository) AuthorizeVerifiedAPIKey(ctx context.Context, key *ent.Apikey) error {
+	if key == nil || key.ReferenceID == "" || key.ID == "" {
+		return ErrUnauthorized
+	}
+	if (key.Enabled != nil && !*key.Enabled) || (key.ExpiresAt != nil && !key.ExpiresAt.After(time.Now().UTC())) {
+		return ErrUnauthorized
+	}
+	if err := r.requireOperational(ctx, key.ReferenceID); err != nil {
+		return err
+	}
+	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		memo.apiKey.Store(&authorizedAPIKey{
+			client:         r.client,
+			organizationID: key.ReferenceID,
+			keyID:          key.ID,
+			key:            key,
+		})
+	}
+	return nil
+}
+
 func (r *Repository) apiKey(ctx context.Context, organizationID, keyID string) (*ent.Apikey, error) {
 	if organizationID == "" || keyID == "" {
 		return nil, ErrUnauthorized
+	}
+	if memo, _ := ctx.Value(replayAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		if last := memo.apiKey.Swap(nil); last != nil && last.client == r.client &&
+			last.organizationID == organizationID && last.keyID == keyID {
+			if last.key.ExpiresAt != nil && !last.key.ExpiresAt.After(time.Now().UTC()) {
+				return nil, ErrUnauthorized
+			}
+			return last.key, nil
+		}
 	}
 	key, err := r.client.Apikey.Query().Where(apikey.ID(keyID), apikey.ReferenceID(organizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
@@ -339,10 +386,10 @@ func (r *Repository) apiKey(ctx context.Context, organizationID, keyID string) (
 	if err != nil {
 		return nil, err
 	}
-	if (key.Enabled != nil && !*key.Enabled) || (key.ExpiresAt != nil && !key.ExpiresAt.After(time.Now().UTC())) {
-		return nil, ErrUnauthorized
+	if err := r.AuthorizeVerifiedAPIKey(ctx, key); err != nil {
+		return nil, err
 	}
-	return key, r.requireOperational(ctx, organizationID)
+	return key, nil
 }
 
 // AuthorizeSupportGrant rechecks a time-bound support grant for its user.
@@ -350,16 +397,35 @@ func (r *Repository) AuthorizeSupportGrant(ctx context.Context, organizationID, 
 	if organizationID == "" || userID == "" || grantID == "" {
 		return ErrUnauthorized
 	}
-	exists, err := r.client.SupportAccessGrant.Query().Where(
+	now := time.Now().UTC()
+	if memo, _ := ctx.Value(replayAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		if last := memo.support.Swap(nil); last != nil && last.client == r.client &&
+			last.organizationID == organizationID && last.userID == userID && last.grantID == grantID {
+			if !last.expiresAt.After(now) {
+				return ErrForbidden
+			}
+			return nil
+		}
+	}
+	grant, err := r.client.SupportAccessGrant.Query().Where(
 		supportaccessgrant.ID(grantID), supportaccessgrant.OrganizationID(organizationID),
-		supportaccessgrant.UserID(userID), supportaccessgrant.ExpiresAtGT(time.Now().UTC()),
+		supportaccessgrant.UserID(userID), supportaccessgrant.ExpiresAtGT(now),
 		supportaccessgrant.RevokedAtIsNil(),
-	).Exist(ctx)
+	).Select(supportaccessgrant.FieldID, supportaccessgrant.FieldExpiresAt).Only(ctx)
+	if ent.IsNotFound(err) {
+		return ErrForbidden
+	}
 	if err != nil {
 		return err
 	}
-	if !exists {
-		return ErrForbidden
+	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		memo.support.Store(&authorizedSupportGrant{
+			client:         r.client,
+			organizationID: organizationID,
+			userID:         userID,
+			grantID:        grantID,
+			expiresAt:      grant.ExpiresAt,
+		})
 	}
 	return nil
 }

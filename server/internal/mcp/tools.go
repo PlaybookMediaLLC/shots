@@ -293,14 +293,8 @@ func (s *Server) authorize(ctx context.Context, call principal, actor product.Ac
 	if operation.Entitlement.Feature != "workspace:use" {
 		features = append(features, operation.Entitlement.Feature)
 	}
-	for _, feature := range features {
-		decision, err := s.config.Product.GetFeatureDecision(ctx, actor, feature)
-		if err != nil {
-			return err
-		}
-		if !decision.Allowed {
-			return &product.FeatureNotEntitledError{Feature: feature, CurrentPlan: decision.CurrentPlan, RequiredPlan: decision.RequiredPlan}
-		}
+	if err := s.config.Product.CheckFeatures(ctx, actor, features...); err != nil {
+		return err
 	}
 	if operation.Entitlement.Quota != "" {
 		if _, err := s.config.Product.ConsumeWorkspaceQuota(ctx, actor, operation.Entitlement.Quota, 1); err != nil {

@@ -215,14 +215,28 @@ func (c *Configuration) ListStoreReviews(ctx context.Context, actor Actor, proje
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) == 0 {
+		return []StoreReviewRecord{}, nil
+	}
+	reviewIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		reviewIDs = append(reviewIDs, row.ID)
+	}
+	allComments, err := c.client.StoreReviewComment.Query().
+		Where(storereviewcomment.OrganizationID(actor.OrganizationID), storereviewcomment.ReviewIDIn(reviewIDs...)).
+		Order(ent.Asc(storereviewcomment.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	commentsByReview := make(map[string][]*ent.StoreReviewComment, len(rows))
+	for _, comment := range allComments {
+		if len(commentsByReview[comment.ReviewID]) < maxReviewComments {
+			commentsByReview[comment.ReviewID] = append(commentsByReview[comment.ReviewID], comment)
+		}
+	}
 	records := make([]StoreReviewRecord, 0, len(rows))
 	for _, row := range rows {
-		comments, err := c.client.StoreReviewComment.Query().Where(storereviewcomment.OrganizationID(actor.OrganizationID), storereviewcomment.ReviewID(row.ID)).
-			Order(ent.Asc(storereviewcomment.FieldCreatedAt)).Limit(maxReviewComments).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		records = append(records, reviewRecord(row, comments))
+		records = append(records, reviewRecord(row, commentsByReview[row.ID]))
 	}
 	return records, nil
 }

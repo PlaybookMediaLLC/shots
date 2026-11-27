@@ -2361,11 +2361,6 @@ var (
 		PrimaryKey: []*schema.Column{InvitationColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "invitation_organizationId",
-				Unique:  false,
-				Columns: []*schema.Column{InvitationColumns[1]},
-			},
-			{
 				Name:    "invitation_email",
 				Unique:  false,
 				Columns: []*schema.Column{InvitationColumns[2]},
@@ -2726,11 +2721,6 @@ var (
 				Name:    "member_organizationId_userId",
 				Unique:  true,
 				Columns: []*schema.Column{MemberColumns[1], MemberColumns[2]},
-			},
-			{
-				Name:    "member_organizationId",
-				Unique:  false,
-				Columns: []*schema.Column{MemberColumns[1]},
 			},
 			{
 				Name:    "member_userId",

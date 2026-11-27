@@ -570,6 +570,15 @@ func (c *Configuration) ListCreativeSetVersions(ctx context.Context, actor Actor
 	// ponytail: the newest 200 versions; page with a cursor if named versions outgrow that.
 	rows, err := c.client.PlatformCreativeSetVersion.Query().Where(platformcreativesetversion.CreativeSetID(creativeSetID),
 		platformcreativesetversion.OrganizationID(actor.OrganizationID)).
+		Select(
+			platformcreativesetversion.FieldID,
+			platformcreativesetversion.FieldCreativeSetID,
+			platformcreativesetversion.FieldKind,
+			platformcreativesetversion.FieldName,
+			platformcreativesetversion.FieldRevision,
+			platformcreativesetversion.FieldCreatedAt,
+			platformcreativesetversion.FieldCreatedByUserID,
+		).
 		Order(ent.Desc(platformcreativesetversion.FieldCreatedAt), ent.Desc(platformcreativesetversion.FieldID)).
 		Limit(creativeSetVersionListLimit).All(ctx)
 	if err != nil {
@@ -583,7 +592,8 @@ func (c *Configuration) ListCreativeSetVersions(ctx context.Context, actor Actor
 	}
 	names := map[string]string{}
 	if len(userIDs) > 0 {
-		people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).All(ctx)
+		people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).
+			Select(user.FieldID, user.FieldName, user.FieldEmail).All(ctx)
 		if err != nil {
 			return nil, err
 		}
