@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
+import { EditorFontsScope } from '@/components/platform-shell/EditorFontsScope'
 import { EditorWorkspace } from '@/components/platform-shell/EditorWorkspace'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -17,7 +18,7 @@ import { EditorAccessProvider } from '@/lib/platform/can-start-post'
 export default async function EditorsLayout({ children }: { children: ReactNode }) {
   const access = await getPageAccess(await headers())
   return (
-    <>
+    <EditorFontsScope>
       {children}
       {access?.hasOrganization && access.isWorkspaceOperational && access.hasPaidPlan ? (
         <PlatformShell
@@ -38,6 +39,6 @@ export default async function EditorsLayout({ children }: { children: ReactNode 
           </ErrorBoundary>
         </PlatformShell>
       ) : null}
-    </>
+    </EditorFontsScope>
   )
 }

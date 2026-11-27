@@ -28,7 +28,11 @@ type Scope<Tenant> = {
 
 /** Builds the scope runner and the model meter around one consume function. */
 export function createAiCreditMeter<Tenant extends { organizationId: string }>(
-  consume: ConsumeCredits<Tenant>
+  consume: ConsumeCredits<Tenant>,
+  options: {
+    /** Optional deferred runner (e.g. Next.js `after()`) for post-response credit settlement. */
+    scheduleSettlement?: (task: () => Promise<void>) => boolean
+  } = {}
 ) {
   const scopes = new AsyncLocalStorage<Scope<Tenant>>()
 
@@ -74,10 +78,15 @@ export function createAiCreditMeter<Tenant extends { organizationId: string }>(
     try {
       return await scopes.run(scope, run)
     } finally {
-      await Promise.all(scope.charges)
-      const credits = settleCredits(scope.carryUsd)
-      scope.carryUsd = 0
-      await charge(scope, credits)
+      const settle = async () => {
+        await Promise.all(scope.charges)
+        const credits = settleCredits(scope.carryUsd)
+        scope.carryUsd = 0
+        await charge(scope, credits)
+      }
+      if (!options.scheduleSettlement?.(settle)) {
+        await settle()
+      }
     }
   }
 

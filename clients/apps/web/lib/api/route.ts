@@ -10,6 +10,7 @@ import {
   toErrorBody,
 } from '@/lib/api/platform-errors'
 import { getRequestId, platformHeaders } from '@/lib/api/request-context'
+import { withRequestReads } from '@/lib/auth/request-reads'
 import { isCrossOriginCookieMutation } from '@/lib/security/request-origin'
 import { readBoundedText } from '@/lib/security/request-body'
 
@@ -288,7 +289,10 @@ export function route<C extends RouteContract, Access>(
     const startedAt = performance.now()
     // Next.js passes no params for routes without dynamic segments.
     const params = (await context?.params) ?? {}
-    const { access, response } = await runRoute(contract, erased, request, params)
+    const readScope = request.method === 'GET' || request.method === 'HEAD' ? new Map() : undefined
+    const { access, response } = await withRequestReads(readScope, () =>
+      runRoute(contract, erased, request, params)
+    )
     const requestId = getRequestId(request.headers)
     response.headers.set(platformHeaders['x-request-id'], requestId)
     if (!response.headers.has(platformHeaders['cache-control'])) {

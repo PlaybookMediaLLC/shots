@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "npm run dev -w screenshot-studio",
     "build": "npm run build -w screenshot-studio",
-    "build:sdk": "npm run build -w screenshot-studio-backend-sdk",
+    "build:sdk": "npm run build -w screenshot-studio-backend-sdk && npm run build -w shots-api-client",
     "api:generate": "npm run api:generate -w screenshot-studio",
     "format": "prettier --write apps/web/app/api apps/web/lib/api apps/web/lib/audit apps/web/lib/email apps/web/lib/tenant apps/web/lib/auth apps/web/lib/rate-limit.ts apps/web/lib/redis.ts apps/web/lib/screenshot-cache.ts apps/web/lib/screenshot-service.ts apps/web/lib/storage apps/web/test apps/web/playwright.config.ts packages/platejs-editor/test commitlint.config.mjs ../.github/workflows ../dev/e2e-plan.mjs",
     "format:check": "prettier --check apps/web/app/api apps/web/lib/api apps/web/lib/audit apps/web/lib/email apps/web/lib/tenant apps/web/lib/auth apps/web/lib/rate-limit.ts apps/web/lib/redis.ts apps/web/lib/screenshot-cache.ts apps/web/lib/screenshot-service.ts apps/web/lib/storage apps/web/test apps/web/playwright.config.ts packages/platejs-editor/test commitlint.config.mjs ../.github/workflows ../dev/e2e-plan.mjs",

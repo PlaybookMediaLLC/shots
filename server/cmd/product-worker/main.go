@@ -57,7 +57,7 @@ func main() {
 		slog.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
-	db, err := database.Open(ctx, cfg.DatabaseURL)
+	db, err := database.OpenWithOptions(ctx, cfg.DatabaseURL, database.PoolConfigFromEnv(15, 8))
 	if err != nil {
 		slog.Error("database unavailable", "error", err)
 		os.Exit(1)
@@ -84,13 +84,8 @@ func main() {
 		os.Exit(1)
 	}
 	tenantObjects := media.NewTenantObjects(objectStore)
-	// The social Ent projection and canonical scheduled_post use the same DB.
-	provider, closeShared, err := tenantpublishing.OpenShared(ctx, cfg.DatabaseURL, repository, tenantObjects)
-	if err != nil {
-		slog.Error("direct social publisher unavailable", "error", err)
-		os.Exit(1)
-	}
-	defer closeShared()
+	// The social Ent projection and canonical scheduled_post share the worker DB pool.
+	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects)
 	activities := temporalpublishing.NewActivities(repository, provider)
 	scheduler := temporalpublishing.NewScheduler(temporalClient, temporalpublishing.SchedulerConfig{
 		ActivityTaskQueue: cfg.ActivityTaskQueue, ActivityTimeout: cfg.ActivityTimeout,
@@ -99,8 +94,9 @@ func main() {
 	})
 	recovery := temporalpublishing.NewRecoveryActivities(repository, scheduler)
 	workflowWorker := worker.New(temporalClient, cfg.WorkflowTaskQueue, worker.Options{
-		MaxHeartbeatThrottleInterval: 15 * time.Second,
-		OnFatalError:                 func(err error) { slog.Error("Temporal workflow worker failed", "error", err); stop() },
+		MaxConcurrentActivityExecutionSize: max(1, 20/cfg.WorkerConcurrencyDivider),
+		MaxHeartbeatThrottleInterval:       15 * time.Second,
+		OnFatalError:                       func(err error) { slog.Error("Temporal workflow worker failed", "error", err); stop() },
 	})
 	workflowWorker.RegisterWorkflowWithOptions(temporalpublishing.PostWorkflowV1, workflow.RegisterOptions{Name: temporalpublishing.WorkflowNameV1})
 	workflowWorker.RegisterWorkflowWithOptions(temporalpublishing.PostWorkflowV2, workflow.RegisterOptions{Name: temporalpublishing.WorkflowNameV2})
@@ -144,14 +140,18 @@ func main() {
 		}
 	}
 
+	// Share one OpenRouter HTTP client across onboarding, release automation,
+	// and maintenance sweeps so connection pools are reused.
+	aiModel := platformai.FromEnvironment()
+
 	// The onboarding agent's background read (docs/rfcs/032) on its own queue.
 	// Onboarding spends no AI credits, so its store needs no quota meter.
 	onboardingStore := product.NewConfiguration(db.Client)
 	fetcher := onboarding.NewFetcher()
 	onboardingActivities := &temporalonboarding.Activities{Fetcher: fetcher, Store: onboardingStore,
 		Enricher: &enrichment.Enricher{Providers: enrichment.FromEnvironment(fetcher), Store: onboardingStore}}
-	if model := platformai.FromEnvironment(); model != nil {
-		onboardingActivities.Model = model
+	if aiModel != nil {
+		onboardingActivities.Model = aiModel
 	}
 	var onboardingWorker worker.Worker
 	if !slices.Contains(cfg.ExcludedQueues, temporalonboarding.TaskQueue) {
@@ -206,8 +206,8 @@ func main() {
 	}
 	// Paid workflow copy needs a model and the credit meter that bills it;
 	// without both this worker never advertises the ai capability.
-	if model := platformai.FromEnvironment(); model != nil {
-		automationStore.WithAutomationModel(model)
+	if aiModel != nil {
+		automationStore.WithAutomationModel(aiModel)
 	}
 	if renderer := product.AutomationRendererFromEnvironment(); renderer != nil {
 		// One signed web client renders creatives and lays out canvases.
@@ -310,12 +310,19 @@ func main() {
 	}
 
 	if cfg.RunMaintenance {
-		retention, err := database.Open(ctx, cfg.AuditRetentionDatabaseURL)
-		if err != nil {
-			slog.Error("audit retention database unavailable")
-			os.Exit(1)
+		retentionSQL := db.SQL
+		if cfg.AuditRetentionDatabaseURL != cfg.DatabaseURL {
+			retentionPool := database.PoolConfigFromEnv(2, 1)
+			retentionPool.MaxOpenConns = 2
+			retentionPool.MaxIdleConns = 1
+			retention, err := database.OpenWithOptions(ctx, cfg.AuditRetentionDatabaseURL, retentionPool)
+			if err != nil {
+				slog.Error("audit retention database unavailable")
+				os.Exit(1)
+			}
+			defer retention.Close()
+			retentionSQL = retention.SQL
 		}
-		defer retention.Close()
 		events := product.NewConfiguration(db.Client).WithWebhooks(cfg.WebhookEncryptionKey, nil).WithCapturer(capture.FromEnvironment()).WithPostMetrics(provider).WithAnalytics(provider)
 		if objectStore != nil {
 			events.WithObjectStore(objectStore)
@@ -323,7 +330,11 @@ func main() {
 		if renderer := product.AutomationRendererFromEnvironment(); renderer != nil {
 			events.WithAutomationRenderer(renderer)
 		}
-		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
+		automationDispatcher := &temporalreleaseautomation.Client{Temporal: temporalClient}
+		events.WithAutomationDispatcher(automationDispatcher)
+		if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
+			events.WithKitDispatcher(automationDispatcher)
+		}
 		if deploymentCaptureEnabled {
 			events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
 		}
@@ -331,10 +342,12 @@ func main() {
 			events.WithGitHubApp(github)
 		}
 		// The voice-commands sweep retries parses that waited on the model.
-		if model := platformai.FromEnvironment(); model != nil {
-			events.WithAutomationModel(model)
+		if aiModel != nil {
+			events.WithAutomationModel(aiModel)
 		}
-		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: notifications.New(db.SQL, db.Client), DB: db.SQL, RetentionDB: retention.SQL, Objects: tenantObjects, Events: events,
+		activityService := notifications.New(db.SQL, db.Client)
+		activityService.DispatchWorkers = 4
+		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: activityService, DB: db.SQL, RetentionDB: retentionSQL, Objects: tenantObjects, Events: events,
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),
 			Webhooks:   webhooks.NewDispatcher(db.SQL, cfg.WebhookEncryptionKey),
@@ -342,7 +355,8 @@ func main() {
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
 			BackgroundActivityContext:          ctx,
-			MaxConcurrentActivityExecutionSize: max(1, 2/cfg.WorkerConcurrencyDivider), OnFatalError: func(err error) { slog.Error("maintenance worker failed"); stop() },
+			MaxConcurrentActivityExecutionSize: max(1, 4/cfg.WorkerConcurrencyDivider),
+			OnFatalError:                       func(err error) { slog.Error("maintenance worker failed"); stop() },
 		})
 		// Temporal runs (scheduled or on-demand/E2E) wait for any in-flight
 		// poller lock so explicit triggers always execute a fresh pass.

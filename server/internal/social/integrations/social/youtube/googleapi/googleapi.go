@@ -98,7 +98,7 @@ func Send(req *http.Request, out any) error {
 		return err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return err
 	}

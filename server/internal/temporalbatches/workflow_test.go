@@ -7,6 +7,7 @@ import (
 
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/workflow"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
@@ -99,5 +100,33 @@ func TestWorkflowMarksAnItemWithNoAnswerAndGoesOn(t *testing.T) {
 	// Retried by Temporal, then marked; the next step finishes the run.
 	if store.unconfirmed != 1 {
 		t.Fatalf("unconfirmed=%d", store.unconfirmed)
+	}
+}
+
+func TestWorkflowContinuesAsNewWithRegisteredName(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	store := &fakeStore{steps: []func() (*product.BatchRunStep, error){
+		func() (*product.BatchRunStep, error) {
+			return &product.BatchRunStep{Done: false}, nil
+		},
+	}}
+	activities := &Activities{Publisher: &fakePublisher{}, Store: store}
+	env.RegisterWorkflowWithOptions(Workflow, workflow.RegisterOptions{Name: WorkflowName})
+	env.RegisterActivityWithOptions(activities.Next, activity.RegisterOptions{Name: NextActivity})
+	env.RegisterActivityWithOptions(activities.Unconfirmed, activity.RegisterOptions{Name: UnconfirmedActivity})
+	env.ExecuteWorkflow(WorkflowName, Input{OrganizationID: "org", RunID: "run"})
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("expected workflow to complete via ContinueAsNew")
+	}
+	var continueErr *workflow.ContinueAsNewError
+	if !errors.As(env.GetWorkflowError(), &continueErr) {
+		t.Fatalf("expected ContinueAsNewError, got %v", env.GetWorkflowError())
+	}
+	if continueErr.WorkflowType.Name != WorkflowName {
+		t.Fatalf("expected ContinueAsNew workflow name %q, got %q", WorkflowName, continueErr.WorkflowType.Name)
+	}
+	if store.calls != batchMaxIterationsPerRun*batchItemsPerActivity {
+		t.Fatalf("expected %d store calls before ContinueAsNew, got %d", batchMaxIterationsPerRun*batchItemsPerActivity, store.calls)
 	}
 }

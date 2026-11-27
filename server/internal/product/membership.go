@@ -11,6 +11,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
@@ -36,11 +37,26 @@ func (c *Configuration) ListMembers(ctx context.Context, organizationID string) 
 	if err != nil {
 		return nil, err
 	}
+	if len(members) == 0 {
+		return []WorkspaceMember{}, nil
+	}
+	userIDs := make([]string, 0, len(members))
+	for _, membership := range members {
+		userIDs = append(userIDs, membership.UserID)
+	}
+	people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	peopleByID := make(map[string]*ent.User, len(people))
+	for _, person := range people {
+		peopleByID[person.ID] = person
+	}
 	items := make([]WorkspaceMember, 0, len(members))
 	for _, membership := range members {
-		person, err := c.client.User.Get(ctx, membership.UserID)
-		if err != nil {
-			return nil, err
+		person, ok := peopleByID[membership.UserID]
+		if !ok {
+			return nil, publishing.ErrNotFound
 		}
 		items = append(items, *workspaceMemberRecord(membership, person))
 	}
@@ -65,7 +81,7 @@ func (c *Configuration) ListInvitations(ctx context.Context, organizationID stri
 	}
 	invitations, err := c.client.Invitation.Query().Where(
 		invitation.OrganizationID(organizationID), invitation.Status("pending"),
-	).Order(ent.Desc(invitation.FieldCreatedAt)).All(ctx)
+	).Order(ent.Desc(invitation.FieldCreatedAt)).Limit(500).All(ctx)
 	if err != nil {
 		return nil, err
 	}

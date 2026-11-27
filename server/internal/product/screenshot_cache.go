@@ -165,22 +165,59 @@ func (c *Configuration) ListScreenshotCache(ctx context.Context, filter Screensh
 	return entries, nil
 }
 
-// PurgeScreenshotCache removes each object before deleting its cache row.
+// PurgeScreenshotCache removes each object before deleting its cache row,
+// chunked in batches of 100 with bounded parallel storage deletes.
 func (c *Configuration) PurgeScreenshotCache(ctx context.Context, filter ScreenshotCacheFilter) (int, error) {
 	where, err := screenshotCacheWhere(filter)
 	if err != nil {
 		return 0, err
 	}
-	if c.objects != nil {
-		rows, err := c.client.ScreenshotCache.Query().Where(where).All(ctx)
-		if err != nil {
-			return 0, err
+	if c.objects == nil {
+		return c.client.ScreenshotCache.Delete().Where(where).Exec(ctx)
+	}
+	const (
+		purgeBatchSize = 100
+		deleteWorkers  = 8
+	)
+	total := 0
+	for {
+		if ctx.Err() != nil {
+			return total, ctx.Err()
 		}
+		rows, err := c.client.ScreenshotCache.Query().Where(where).
+			Select(screenshotcache.FieldID, screenshotcache.FieldURLHash).
+			Limit(purgeBatchSize).All(ctx)
+		if err != nil {
+			return total, err
+		}
+		if len(rows) == 0 {
+			return total, nil
+		}
+		ids := make([]string, 0, len(rows))
+		tasks := make([]func(context.Context) error, 0, len(rows))
 		for _, row := range rows {
-			if err := c.objects.Delete(ctx, screenshotCacheObjectKey(row.URLHash)); err != nil {
-				return 0, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
-			}
+			ids = append(ids, row.ID)
+			hash := row.URLHash
+			tasks = append(tasks, func(taskCtx context.Context) error {
+				if err := c.objects.Delete(taskCtx, screenshotCacheObjectKey(hash)); err != nil {
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
+					return fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+				}
+				return nil
+			})
+		}
+		if err := runParallel(ctx, deleteWorkers, tasks...); err != nil {
+			return total, err
+		}
+		deleted, err := c.client.ScreenshotCache.Delete().Where(screenshotcache.IDIn(ids...)).Exec(ctx)
+		if err != nil {
+			return total, err
+		}
+		total += deleted
+		if len(rows) < purgeBatchSize {
+			return total, nil
 		}
 	}
-	return c.client.ScreenshotCache.Delete().Where(where).Exec(ctx)
 }

@@ -76,8 +76,14 @@ var ErrNotEligible = errors.New("tenant resource is no longer eligible for dispa
 func (c *Configuration) HandleOutboxEvent(ctx context.Context, eventID, organizationID, eventType, aggregateID string) (bool, error) {
 	switch eventType {
 	case EventKitPrepare:
+		if c.kitDispatcher != nil {
+			return true, c.kitDispatcher.StartKitPrepare(ctx, organizationID, aggregateID)
+		}
 		return true, c.processKitPreparation(ctx, organizationID, aggregateID)
 	case EventKitExport:
+		if c.kitDispatcher != nil {
+			return true, c.kitDispatcher.StartKitExport(ctx, organizationID, aggregateID)
+		}
 		return true, c.processKitExport(ctx, organizationID, aggregateID)
 	case EventGitHubObservation:
 		return true, c.processGitHubObservation(ctx, organizationID, aggregateID)

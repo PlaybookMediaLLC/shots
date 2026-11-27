@@ -240,7 +240,15 @@ export default async function HomePage({
             <UpcomingQueue tenant={sessionTenant(access, access.organization.id, requestHeaders)} />
           </Suspense>
         ) : null}
-        {!releaseView ? <NeedsAttention /> : null}
+        {!releaseView ? (
+          <NeedsAttention
+            initialIdentity={
+              access.organization
+                ? { userId: access.session.user.id, workspaceId: access.organization.id }
+                : undefined
+            }
+          />
+        ) : null}
         <SidebarLink href={gated('/library?view=brand')} className="platform-home home-brand group">
           <span className="flex items-center gap-3">
             <span className="grid size-8 shrink-0 place-items-center">

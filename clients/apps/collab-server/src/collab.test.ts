@@ -308,7 +308,11 @@ test("a demotion published while a connection is being admitted is re-checked", 
     await settle();
     release.resolve();
     const context = await admission;
-    assert.equal(connectionConfig.readOnly, false, "admitted with the old grant");
+    assert.equal(
+      connectionConfig.readOnly,
+      false,
+      "admitted with the old grant"
+    );
     await hooks.connected({
       connection: member,
       context,
@@ -691,6 +695,189 @@ test("Story Sets share presence only and drop a member once the removal is publi
       client.provider.destroy();
       client.doc.destroy();
     }
+    await server.destroy();
+  }
+});
+
+test("push mode avoids per-frame epoch HTTP calls and revokes on applyEpoch", async () => {
+  const { backend, grants } = fakeBackend();
+  let epochCalls = 0;
+  const origEpochs = backend.epochs;
+  backend.epochs = async (orgs) => {
+    epochCalls += 1;
+    return origEpochs(orgs);
+  };
+  const hooks = collabHooks(backend, () => {}, undefined, {
+    isPushLive: () => true,
+    pollMs: 60_000,
+  });
+  const server = new Server({
+    port: 0,
+    quiet: true,
+    debounce: 50,
+    ...hooks,
+  });
+  await server.listen();
+  const editor = connect(server.address.port, "editor-token");
+  const viewer = connect(server.address.port, "viewer-token");
+  try {
+    await until(() => editor.events.synced && viewer.events.synced, "sync");
+    const callsBefore = epochCalls;
+    for (let i = 0; i < 5; i++) {
+      editor.doc.getText("t").insert(i, "a");
+      await new Promise((resolve) => setTimeout(resolve, 15));
+    }
+    await until(() => viewer.doc.getText("t").toString() === "aaaaa", "edits");
+    assert.equal(
+      epochCalls - callsBefore,
+      0,
+      "push mode must not poll epochs on frames"
+    );
+
+    delete grants["viewer-token"];
+    hooks.applyEpoch("org", 1);
+    await until(() => viewer.events.closed, "viewer closed via push");
+  } finally {
+    editor.provider.destroy();
+    editor.doc.destroy();
+    viewer.provider.destroy();
+    viewer.doc.destroy();
+    await server.destroy();
+  }
+});
+
+test("memoryWriterTokens evicts least-recently-used entries at capacity", async () => {
+  const tokens = memoryWriterTokens(2);
+  await tokens.set("doc-1", "t1");
+  await tokens.set("doc-2", "t2");
+  // Touch doc-1 so doc-2 becomes LRU.
+  assert.equal(await tokens.get("doc-1"), "t1");
+  await tokens.set("doc-3", "t3");
+  assert.equal(await tokens.get("doc-2"), undefined);
+  assert.equal(await tokens.get("doc-1"), "t1");
+  assert.equal(await tokens.get("doc-3"), "t3");
+});
+
+test("onStoreDocument retries transient 503 errors without closing connections", async () => {
+  const { backend, stored } = fakeBackend();
+  let attempts = 0;
+  const origStore = backend.store;
+  backend.store = async (draftId, token, state) => {
+    attempts += 1;
+    if (attempts === 1) {
+      throw new CollabBackendError("Temporary outage", 503);
+    }
+    return origStore(draftId, token, state);
+  };
+  const server = new Server({
+    port: 0,
+    quiet: true,
+    debounce: 50,
+    ...collabHooks(backend, () => {}, undefined, {
+      isPushLive: () => true,
+      pollMs: 60_000,
+    }),
+  });
+  await server.listen();
+  const editor = connect(server.address.port, "editor-token");
+  try {
+    await until(() => editor.events.synced, "sync");
+    editor.doc.getText("t").insert(0, "saved after retry");
+    await until(() => stored.length === 1, "retry succeeded");
+    assert.equal(attempts, 2);
+    assert.equal(editor.events.closed, false);
+  } finally {
+    editor.provider.destroy();
+    editor.doc.destroy();
+    await server.destroy();
+  }
+});
+
+test("push mode catches revocation pushed while the org's first connection is authenticating", async () => {
+  const { backend, grants } = fakeBackend();
+  const origAuthorize = backend.authorize;
+  let releaseFirst!: () => void;
+  let firstInFlight!: () => void;
+  const firstStarted = new Promise<void>((resolve) => {
+    firstInFlight = resolve;
+  });
+  let authorizeCalls = 0;
+  backend.authorize = async (token, documentName) => {
+    authorizeCalls += 1;
+    const grant = await origAuthorize(token, documentName);
+    if (authorizeCalls === 1) {
+      firstInFlight();
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+    }
+    return grant;
+  };
+  const hooks = collabHooks(backend, () => {}, undefined, {
+    isPushLive: () => true,
+    pollMs: 60_000,
+  });
+  const server = new Server({
+    port: 0,
+    quiet: true,
+    ...hooks,
+  });
+  await server.listen();
+  const viewer = connect(server.address.port, "viewer-token");
+  try {
+    await firstStarted;
+    // Revoke and push while NO connection is tracked in `open` yet.
+    delete grants["viewer-token"];
+    hooks.applyEpoch("org", 1);
+    releaseFirst();
+    await until(() => viewer.events.closed, "first connection closed on race");
+    assert.ok(authorizeCalls >= 2, "expected post-admission recheck");
+  } finally {
+    viewer.provider.destroy();
+    viewer.doc.destroy();
+    await server.destroy();
+  }
+});
+
+test("syncEpochs returns false when backend epoch read fails", async () => {
+  const { backend } = fakeBackend();
+  backend.epochs = async () => {
+    throw new CollabBackendError("Backend unavailable", 503);
+  };
+  const hooks = collabHooks(backend, () => {}, undefined, {
+    isPushLive: () => false,
+    pollMs: 60_000,
+  });
+  assert.equal(await hooks.syncEpochs(), false);
+  await hooks.onDestroy();
+});
+
+test("onStoreDocument does not retry definitive 403 refusals", async () => {
+  const { backend } = fakeBackend();
+  let attempts = 0;
+  backend.store = async () => {
+    attempts += 1;
+    throw new CollabBackendError("Forbidden", 403);
+  };
+  const server = new Server({
+    port: 0,
+    quiet: true,
+    debounce: 50,
+    ...collabHooks(backend, () => {}, undefined, {
+      isPushLive: () => true,
+      pollMs: 60_000,
+    }),
+  });
+  await server.listen();
+  const editor = connect(server.address.port, "editor-token");
+  try {
+    await until(() => editor.events.synced, "sync");
+    editor.doc.getText("t").insert(0, "forbidden save");
+    await until(() => editor.events.closed, "editor closed on 403 store");
+    assert.equal(attempts, 1, "403 must not be retried");
+  } finally {
+    editor.provider.destroy();
+    editor.doc.destroy();
     await server.destroy();
   }
 });

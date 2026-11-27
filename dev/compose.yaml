@@ -105,6 +105,12 @@ services:
 
   postgres:
     image: postgres:16-bookworm
+    command:
+      - postgres
+      - -c
+      - statement_timeout=30000
+      - -c
+      - idle_in_transaction_session_timeout=30000
     env_file: ../.local/dev.env
     environment:
       POSTGRES_DB: postgres
@@ -125,7 +131,7 @@ services:
 
   redis:
     image: redis:7.4-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy volatile-lru
     ports:
       - '127.0.0.1:63799:6379'
     volumes:

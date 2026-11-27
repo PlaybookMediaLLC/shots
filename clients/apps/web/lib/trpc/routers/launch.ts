@@ -8,7 +8,7 @@ import { draftCampaignPlan, planCaptureUrls } from '@/lib/ai/launch/plan'
 import { produceCampaign } from '@/lib/ai/launch/produce'
 import { proposeCampaignRevision } from '@/lib/ai/launch/revise'
 import { draftReleaseSpec } from '@/lib/ai/launch/spec'
-import { withAiCredits } from '@/lib/ai/metering'
+import { scheduleAfterResponse, withAiCredits } from '@/lib/ai/metering'
 import { LAUNCH_AI_RATE_LIMIT } from '@/lib/api/rate-limit-policy'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { backendSDK } from '@/lib/backend/sdk'
@@ -319,7 +319,7 @@ export const launchRouter = router({
       .query(async ({ ctx, input }) => {
         return { revision: await getRevision(ctx.access, input.revisionId) }
       }),
-    /** Apply the primary change and the chosen related updates; re-render changed designs. */
+    /** Apply the primary change and the chosen related updates; re-render changed designs asynchronously. */
     accept: organizationProcedure('release:create')
       .input(
         z.object({
@@ -330,38 +330,59 @@ export const launchRouter = router({
       .mutation(async ({ ctx, input }) => {
         const result = await applyRevision(ctx.access, input.revisionId, input.related)
         let rendered = 0
+        let renderingInBackground = false
         if (result.designIds.length > 0 && (await isDesignRendererReady())) {
-          const lazy: { renderer: Promise<DesignRenderer> | null } = { renderer: null }
-          const getRenderer = () => (lazy.renderer ??= createDesignRenderer())
-          try {
-            for (const designId of result.designIds) {
-              const design = await getDesign(ctx.access, designId)
-              if (!design) continue
-              const render = await renderDesignForTenant(ctx.access, getRenderer, design)
-              rendered += 1
-              // Every render is reviewed, including the ones a reviewer asked for.
-              const imageBytes = await render.readBytes()
-              const critique = await withAiCredits(ctx.access, () =>
-                reviewRevisedRender({
-                  campaignId: result.revision.campaignId,
-                  imageBytes,
-                  tenant: ctx.access,
-                  texts: design.document.texts.map((text) => text.text),
-                })
-              ).catch(() => null)
-              if (critique) {
-                await backendSDK(ctx.access).setLaunchDesignCritique(design.id, critique)
+          const rerenderDesigns = async (): Promise<number> => {
+            const lazy: { renderer: Promise<DesignRenderer> | null } = { renderer: null }
+            const getRenderer = () => (lazy.renderer ??= createDesignRenderer())
+            let completed = 0
+            try {
+              const queue = [...result.designIds]
+              const concurrency = Math.min(4, queue.length)
+              const workers = Array.from({ length: concurrency }, async () => {
+                while (queue.length > 0) {
+                  const designId = queue.shift()
+                  if (!designId) return
+                  const design = await getDesign(ctx.access, designId)
+                  if (!design) continue
+                  const render = await renderDesignForTenant(ctx.access, getRenderer, design)
+                  completed += 1
+                  // Every render is reviewed, including the ones a reviewer asked for.
+                  const imageBytes = await render.readBytes()
+                  const critique = await withAiCredits(ctx.access, () =>
+                    reviewRevisedRender({
+                      campaignId: result.revision.campaignId,
+                      imageBytes,
+                      tenant: ctx.access,
+                      texts: design.document.texts.map((text) => text.text),
+                    })
+                  ).catch(() => null)
+                  if (critique) {
+                    await backendSDK(ctx.access).setLaunchDesignCritique(design.id, critique)
+                  }
+                }
+              })
+              const settled = await Promise.allSettled(workers)
+              for (const outcome of settled) {
+                if (outcome.status === 'rejected') {
+                  console.error('Re-render after revision failed.', {
+                    reason:
+                      outcome.reason instanceof Error ? outcome.reason.message : 'unknown',
+                  })
+                }
               }
+            } finally {
+              await lazy.renderer?.then((renderer) => renderer.close()).catch(() => undefined)
             }
-          } catch (error) {
-            console.error('Re-render after revision failed.', {
-              reason: error instanceof Error ? error.message : 'unknown',
-            })
-          } finally {
-            if (lazy.renderer) await (await lazy.renderer).close().catch(() => undefined)
+            return completed
+          }
+          if (scheduleAfterResponse(() => rerenderDesigns().then(() => undefined))) {
+            renderingInBackground = true
+          } else {
+            rendered = await rerenderDesigns()
           }
         }
-        return { rendered, revision: result.revision }
+        return { rendered, renderingInBackground, revision: result.revision }
       }),
     discard: organizationProcedure('release:create')
       .input(z.object({ revisionId: z.string().cuid() }))

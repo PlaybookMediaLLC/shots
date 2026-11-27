@@ -88,7 +88,7 @@ func (Member) Fields() []ent.Field {
 func (Member) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("organization_id", "user_id").Unique(),
-		index.Fields("organization_id"), index.Fields("user_id"),
+		index.Fields("user_id"),
 	}
 }
 
@@ -110,7 +110,7 @@ func (Invitation) Fields() []ent.Field {
 	}
 }
 func (Invitation) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("organization_id"), index.Fields("email"), index.Fields("organization_id", "status", "created_at")}
+	return []ent.Index{index.Fields("email"), index.Fields("organization_id", "status", "created_at")}
 }
 
 type WorkspaceSettings struct{ ent.Schema }

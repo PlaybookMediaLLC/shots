@@ -10,6 +10,7 @@ import (
 	"image"
 	"io"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/medialimits"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/mediavideo"
 )
+
+// assetDecodeSem caps concurrent full image/PDF decodes during upload
+// completion to avoid OOM spikes under concurrent large uploads.
+var assetDecodeSem = make(chan struct{}, min(4, max(1, runtime.GOMAXPROCS(0))))
 
 // Upload checks (RFC 025): an upload's bytes must be what it says it is,
 // checked from storage when it completes, so a renamed file cannot pass as
@@ -49,51 +54,79 @@ var sniffedTypes = map[string]string{
 
 // verifyAssetBytes checks an object's bytes against its declared type.
 func verifyAssetBytes(mediaType string, object io.Reader) error {
+	_, err := verifyAssetBytesWithDimensions(context.Background(), mediaType, object)
+	return err
+}
+
+func acquireDecodeSlot(ctx context.Context) (func(), error) {
+	select {
+	case assetDecodeSem <- struct{}{}:
+		return func() { <-assetDecodeSem }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// verifyAssetBytesWithDimensions checks an object's bytes against its declared
+// type and returns image dimensions when an image was inspected.
+func verifyAssetBytesWithDimensions(ctx context.Context, mediaType string, object io.Reader) (*image.Config, error) {
 	reader := bufio.NewReaderSize(object, 4096)
 	head, _ := reader.Peek(512)
 	if mediaType == "application/pdf" {
 		if !bytes.HasPrefix(head, []byte("%PDF-")) {
-			return invalid("This file is not a PDF.")
+			return nil, invalid("This file is not a PDF.")
 		}
+		release, err := acquireDecodeSlot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		pages, known := countPDFPages(reader)
 		if !known {
-			return invalid("This PDF is malformed, encrypted, or has an unreadable page tree.")
+			return nil, invalid("This PDF is malformed, encrypted, or has an unreadable page tree.")
 		}
 		if pages > medialimits.Limits.PDFPages {
-			return invalid("LinkedIn takes documents of up to 300 pages; this one has " + strconv.Itoa(pages) + ".")
+			return nil, invalid("LinkedIn takes documents of up to 300 pages; this one has " + strconv.Itoa(pages) + ".")
 		}
-		return nil
+		return nil, nil
 	}
 	want, checked := sniffedTypes[mediaType]
 	if !checked {
-		return nil
+		return nil, nil
 	}
 	got := http.DetectContentType(head)
 	if !strings.HasPrefix(got, want) {
-		return invalid("This file's contents are not a " + mediaType + " file.")
+		return nil, invalid("This file's contents are not a " + mediaType + " file.")
 	}
 	if strings.HasPrefix(mediaType, "image/") {
+		release, err := acquireDecodeSlot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		data, err := io.ReadAll(io.LimitReader(reader, int64(medialimits.Limits.PaidImageBytes)+1))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(data) > medialimits.Limits.PaidImageBytes {
-			return invalid("The image exceeds 20 MB.")
+			return nil, invalid("The image exceeds 20 MB.")
 		}
-		if _, err := decodeAssetDimensions(bytes.NewReader(data)); err != nil {
-			return err
+		dimensions, err := decodeAssetDimensions(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
 		}
 		if mediaType == "image/gif" {
 			if err := mediaimage.ValidateGIF(data, mediaimage.GIFLimits{MaxWidth: 65535, MaxHeight: 65535, MaxFrames: 1000, MaxCanvasPixels: 300000000}); err != nil {
-				return invalid(err.Error())
+				return nil, invalid(err.Error())
 			}
-			return nil
+			return dimensions, nil
 		}
 		if _, _, err := image.Decode(bytes.NewReader(data)); err != nil {
-			return invalid("The image is incomplete or cannot be decoded.")
+			return nil, invalid("The image is incomplete or cannot be decoded.")
 		}
+		return dimensions, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // countPDFPages shares the same parser with the native document publisher.
@@ -133,22 +166,24 @@ func (p *partHashes) close() {
 	}
 }
 
-// uploadedContent is what verification read: the bytes' SHA-256 and, for an
-// MP4 or QuickTime movie, what the container holds.
+// uploadedContent is what verification read: the bytes' SHA-256, image
+// dimensions, and, for an MP4 or QuickTime movie, what the container holds.
 type uploadedContent struct {
-	video  *mediavideo.Info
-	sha256 string
+	dimensions *image.Config
+	video      *mediavideo.Info
+	sha256     string
 }
 
 // verifyUploadedContent consumes at most the reserved size plus one byte. Neither
 // a dishonest Content-Length nor a caller-supplied checksum establishes readiness.
 // partDigests, when given, are each upload part's expected SHA-256.
-func verifyUploadedContent(source io.Reader, mediaType string, size int, digest *string, partDigests ...string) (uploadedContent, error) {
+func verifyUploadedContent(ctx context.Context, source io.Reader, mediaType string, size int, digest *string, partDigests ...string) (uploadedContent, error) {
 	hash := sha256.New()
 	parts := &partHashes{}
 	limited := &io.LimitedReader{R: source, N: int64(size) + 1}
 	reader := bufio.NewReader(io.TeeReader(limited, io.MultiWriter(hash, parts)))
-	if err := verifyAssetBytes(mediaType, reader); err != nil {
+	dimensions, err := verifyAssetBytesWithDimensions(ctx, mediaType, reader)
+	if err != nil {
 		return uploadedContent{}, err
 	}
 	var video *mediavideo.Info
@@ -175,5 +210,5 @@ func verifyUploadedContent(source io.Reader, mediaType string, size int, digest 
 	if probeErr != nil {
 		return uploadedContent{}, invalid("This file is not a complete MP4 or MOV video. Export it again and upload the whole file.")
 	}
-	return uploadedContent{video: video, sha256: fmt.Sprintf("%x", hash.Sum(nil))}, nil
+	return uploadedContent{dimensions: dimensions, video: video, sha256: fmt.Sprintf("%x", hash.Sum(nil))}, nil
 }

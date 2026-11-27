@@ -3,20 +3,17 @@ import {
   BaseCodeLinePlugin,
   BaseCodeSyntaxPlugin,
 } from "@platejs/code-block";
-import { all, createLowlight } from "lowlight";
-
+import { sharedLowlight } from "../lib/lowlight";
 import {
   CodeBlockElementStatic,
   CodeLineElementStatic,
   CodeSyntaxLeafStatic,
 } from "../ui/code-block-node-static";
 
-const lowlight = createLowlight(all);
-
 export const BaseCodeBlockKit = [
   BaseCodeBlockPlugin.configure({
     node: { component: CodeBlockElementStatic },
-    options: { lowlight },
+    options: { lowlight: sharedLowlight },
   }),
   BaseCodeLinePlugin.withComponent(CodeLineElementStatic),
   BaseCodeSyntaxPlugin.withComponent(CodeSyntaxLeafStatic),

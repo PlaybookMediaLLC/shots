@@ -559,44 +559,54 @@ func (c *Configuration) analyticsReport(ctx context.Context, connection *ent.Cha
 	if coverage != nil {
 		result.CoverageStart = &coverage.ObservedAt
 	}
-	latest := map[string]*ent.AnalyticsSnapshot{}
+	type latestSnap struct {
+		observedAt time.Time
+		counters   map[string]float64
+	}
+	latest := map[string]latestSnap{}
 	subjects := make([]string, 0, len(posts))
 	for _, post := range posts {
 		subjects = append(subjects, post.RemoteID)
 	}
 	if len(subjects) > 0 {
-		snaps, e := c.client.AnalyticsSnapshot.Query().Where(
-			analyticssnapshot.OrganizationID(connection.OrganizationID), analyticssnapshot.ConnectionID(connection.ID),
-			analyticssnapshot.KindEQ(analyticssnapshot.KindPost), analyticssnapshot.CollectedAtLTE(asOf),
-			analyticssnapshot.SubjectIDIn(subjects...), func(s *sql.Selector) {
-				newer := sql.Table(analyticssnapshot.Table).As("newer")
-				s.Where(sql.NotExists(sql.Select(newer.C(analyticssnapshot.FieldID)).From(newer).Where(sql.And(
-					sql.ColumnsEQ(newer.C(analyticssnapshot.FieldConnectionID), s.C(analyticssnapshot.FieldConnectionID)),
-					sql.ColumnsEQ(newer.C(analyticssnapshot.FieldKind), s.C(analyticssnapshot.FieldKind)),
-					sql.ColumnsEQ(newer.C(analyticssnapshot.FieldSubjectID), s.C(analyticssnapshot.FieldSubjectID)),
-					sql.LTE(newer.C(analyticssnapshot.FieldCollectedAt), asOf),
-					sql.Or(
-						sql.ColumnsGT(newer.C(analyticssnapshot.FieldObservedAt), s.C(analyticssnapshot.FieldObservedAt)),
-						sql.And(sql.ColumnsEQ(newer.C(analyticssnapshot.FieldObservedAt), s.C(analyticssnapshot.FieldObservedAt)), sql.ColumnsGT(newer.C(analyticssnapshot.FieldCollectedAt), s.C(analyticssnapshot.FieldCollectedAt))),
-						sql.And(sql.ColumnsEQ(newer.C(analyticssnapshot.FieldObservedAt), s.C(analyticssnapshot.FieldObservedAt)), sql.ColumnsEQ(newer.C(analyticssnapshot.FieldCollectedAt), s.C(analyticssnapshot.FieldCollectedAt)), sql.ColumnsGT(newer.C(analyticssnapshot.FieldID), s.C(analyticssnapshot.FieldID))),
-					),
-				))))
-			},
-		).All(ctx)
+		e := c.client.PlatformQuery(ctx, `SELECT latest."subjectId", latest."observedAt", latest.counters
+			FROM unnest($4::text[]) AS sub(subject_id)
+			CROSS JOIN LATERAL (
+				SELECT s."subjectId", s."observedAt", s.counters
+				FROM analytics_snapshot s
+				WHERE s."organizationId"=$1 AND s."connectionId"=$2 AND s.kind='post'
+				  AND s."subjectId"=sub.subject_id AND s."collectedAt"<=$3
+				ORDER BY s."observedAt" DESC, s."collectedAt" DESC, s.id DESC
+				LIMIT 1
+			) latest`,
+			[]any{connection.OrganizationID, connection.ID, asOf, subjects},
+			func(row sql.ColumnScanner) error {
+				var subjectID string
+				var observedAt time.Time
+				var raw []byte
+				if err := row.Scan(&subjectID, &observedAt, &raw); err != nil {
+					return err
+				}
+				counters := map[string]float64{}
+				if len(raw) > 0 {
+					if err := json.Unmarshal(raw, &counters); err != nil {
+						return err
+					}
+				}
+				latest[subjectID] = latestSnap{observedAt: observedAt, counters: counters}
+				return nil
+			})
 		if e != nil {
 			return nil, e
-		}
-		for _, snap := range snaps {
-			latest[snap.SubjectID] = snap
 		}
 	}
 	all := []AnalyticsRow{}
 	selected := []AnalyticsRow{}
 	for _, p := range posts {
 		row := AnalyticsRow{ID: p.ID, RemoteID: p.RemoteID, Excerpt: p.Excerpt, URL: p.URL, PublishedAt: p.PublishedAt, Status: string(p.Availability), ThreadRootID: p.ThreadRootID, ThreadPosition: p.ThreadPosition, IsReply: p.IsReply, Metrics: map[string]float64{}}
-		if s := latest[p.RemoteID]; s != nil {
-			row.Metrics = deriveMetrics(s.Counters)
-			at := s.ObservedAt
+		if s, ok := latest[p.RemoteID]; ok {
+			row.Metrics = deriveMetrics(s.counters)
+			at := s.observedAt
 			row.ObservedAt = &at
 		}
 		if q.Scope == "all" || row.IsReply {
@@ -634,11 +644,11 @@ func (c *Configuration) analyticsReport(ctx context.Context, connection *ent.Cha
 		if goalZone != nil {
 			start, e := time.ParseInLocation("2006-01-02", g.EffectiveDate, goalZone)
 			if e == nil {
-				qualifying, e := c.client.AnalyticsPost.Query().Where(analyticspost.OrganizationID(connection.OrganizationID), analyticspost.ConnectionID(connection.ID), analyticspost.PublishedAtGTE(start), analyticspost.PublishedAtLTE(time.Now()), analyticspost.IsReply(false), analyticspost.ThreadPosition(0)).All(ctx)
+				qualifying, e := c.client.AnalyticsPost.Query().Where(analyticspost.OrganizationID(connection.OrganizationID), analyticspost.ConnectionID(connection.ID), analyticspost.PublishedAtGTE(start), analyticspost.PublishedAtLTE(time.Now()), analyticspost.IsReply(false), analyticspost.ThreadPosition(0)).Select(analyticspost.FieldPublishedAt).All(ctx)
 				if e != nil {
 					return nil, e
 				}
-				times := []time.Time{}
+				times := make([]time.Time, 0, len(qualifying))
 				for _, p := range qualifying {
 					times = append(times, p.PublishedAt)
 				}

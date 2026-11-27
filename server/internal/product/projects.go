@@ -526,6 +526,15 @@ func (c *Configuration) ListProjectVersions(ctx context.Context, actor Actor, pr
 	// ponytail: the newest 200 versions; page with a cursor if named versions outgrow that.
 	rows, err := c.client.ProjectVersion.Query().Where(projectversion.ProjectID(projectID),
 		projectversion.OrganizationID(actor.OrganizationID)).
+		Select(
+			projectversion.FieldID,
+			projectversion.FieldProjectID,
+			projectversion.FieldKind,
+			projectversion.FieldName,
+			projectversion.FieldRevision,
+			projectversion.FieldCreatedAt,
+			projectversion.FieldCreatedByUserID,
+		).
 		Order(ent.Desc(projectversion.FieldCreatedAt), ent.Desc(projectversion.FieldID)).
 		Limit(projectVersionListLimit).All(ctx)
 	if err != nil {
@@ -539,7 +548,8 @@ func (c *Configuration) ListProjectVersions(ctx context.Context, actor Actor, pr
 	}
 	names := map[string]string{}
 	if len(userIDs) > 0 {
-		people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).All(ctx)
+		people, err := c.client.User.Query().Where(user.IDIn(userIDs...)).
+			Select(user.FieldID, user.FieldName, user.FieldEmail).All(ctx)
 		if err != nil {
 			return nil, err
 		}

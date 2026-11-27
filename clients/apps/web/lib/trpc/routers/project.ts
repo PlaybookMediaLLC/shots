@@ -7,6 +7,7 @@ import {
   projectDocumentInputSchema,
   projectDuplicateInputSchema,
   projectListInputSchema,
+  projectRecentSummaryInputSchema,
   projectRefInputSchema,
   projectRenameInputSchema,
   projectRestoreInputSchema,
@@ -22,6 +23,7 @@ import {
   getProjectVersion,
   listProjects,
   listProjectVersions,
+  listRecentWork,
   renameProject,
   restoreProjectVersion,
   updateProjectDocument,
@@ -42,6 +44,9 @@ function found<T>(value: T | null | false, what = 'Project'): T {
  * history. A document write based on an older revision fails with `CONFLICT`.
  */
 export const projectRouter = router({
+  recentSummary: tenantProcedure(READ)
+    .input(projectRecentSummaryInputSchema)
+    .query(({ ctx, input }) => listRecentWork(ctx.tenant, input.limit)),
   list: tenantProcedure(READ)
     .input(projectListInputSchema)
     .query(({ ctx, input }) => listProjects(ctx.tenant, input)),

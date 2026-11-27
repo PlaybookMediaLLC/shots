@@ -107,6 +107,47 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if !owned {
 		return nil, publishing.ErrNotFound
 	}
+	// Pre-check whether the post already has an active schedule so an idempotent
+	// retry does not charge monthly quota or fail if the quota is full.
+	prePost, err := c.client.CampaignPost.Query().Where(campaignpost.ID(postID), campaignpost.CampaignID(campaignID),
+		campaignpost.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	isActiveReplay := false
+	if prePost.Status == campaignpost.StatusSCHEDULED && prePost.ScheduledPostID != nil {
+		existingScheduled, err := c.client.ScheduledPost.Query().Where(scheduledpost.ID(*prePost.ScheduledPostID),
+			scheduledpost.OrganizationID(actor.OrganizationID)).Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		switch existingScheduled.Status {
+		case scheduledpost.StatusCANCELLED, scheduledpost.StatusFAILED:
+		case scheduledpost.StatusUNKNOWN_DELIVERY:
+			return nil, conflict("This post may already be live. Check the channel before scheduling it again.")
+		default:
+			if existingScheduled.ChannelConnectionID != input.ChannelConnectionID {
+				return nil, publishing.ErrConflict
+			}
+			isActiveReplay = true
+		}
+	}
+	var refund func()
+	committed := false
+	defer func() {
+		if !committed && refund != nil {
+			refund()
+		}
+	}()
+	if !isActiveReplay {
+		refund, err = c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
+		if err != nil {
+			return nil, err
+		}
+	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -218,23 +259,21 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if !scheduledAt.After(time.Now()) {
 		return nil, ErrInvalidInput
 	}
-	eligible, err := c.auth.IsEligible(ctx, actor.OrganizationID, *variantID, input.ChannelConnectionID)
+	eligible, err := publishing.NewRepository(tx.Client()).IsEligible(ctx, actor.OrganizationID, *variantID, input.ChannelConnectionID)
 	if err != nil {
 		return nil, err
 	}
 	if !eligible {
 		return nil, publishing.ErrNotEligible
 	}
-	refund, err := c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
-	if err != nil {
-		return nil, err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			refund()
+	if refund == nil {
+		bound := *c
+		bound.client = tx.Client()
+		refund, err = bound.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
+		if err != nil {
+			return nil, err
 		}
-	}()
+	}
 	key, guard := "campaign-post:"+postID, []predicate.CampaignPost{
 		campaignpost.StatusEQ(campaignpost.StatusAPPROVED), campaignpost.ScheduledPostIDIsNil()}
 	if prior != nil {

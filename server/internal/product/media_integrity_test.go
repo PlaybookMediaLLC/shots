@@ -2,6 +2,7 @@ package product
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -21,16 +22,16 @@ func TestUploadVerifiesStoredBytesAndChecksum(t *testing.T) {
 		t.Fatal(err)
 	}
 	digest := fmt.Sprintf("%x", sha256.Sum256(body.Bytes()))
-	if _, err := verifyUploadedContent(bytes.NewReader(body.Bytes()), "image/png", body.Len(), &digest); err != nil {
+	if _, err := verifyUploadedContent(context.Background(), bytes.NewReader(body.Bytes()), "image/png", body.Len(), &digest); err != nil {
 		t.Fatal(err)
 	}
 	for _, size := range []int{body.Len() - 1, body.Len() + 1} {
-		if _, err := verifyUploadedContent(bytes.NewReader(body.Bytes()), "image/png", size, &digest); err == nil {
+		if _, err := verifyUploadedContent(context.Background(), bytes.NewReader(body.Bytes()), "image/png", size, &digest); err == nil {
 			t.Fatal("dishonest size accepted")
 		}
 	}
 	wrong := fmt.Sprintf("%064d", 0)
-	if _, err := verifyUploadedContent(bytes.NewReader(body.Bytes()), "image/png", body.Len(), &wrong); err == nil {
+	if _, err := verifyUploadedContent(context.Background(), bytes.NewReader(body.Bytes()), "image/png", body.Len(), &wrong); err == nil {
 		t.Fatal("wrong checksum accepted")
 	}
 	if err := verifyAssetBytes("application/pdf", bytes.NewReader([]byte("%PDF-1.7\nmalformed"))); err == nil {

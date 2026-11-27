@@ -109,6 +109,15 @@ export async function signAssetDownload(
   return (await orNull(backendSDK(context).signAssetDownload(assetId)))?.downloadUrl ?? null
 }
 
+/** Sign up to 100 uploaded workspace asset download URLs in one backend call. */
+export async function signAssetDownloads(
+  context: TenantContext,
+  assetIds: string[]
+): Promise<Record<string, string>> {
+  if (assetIds.length === 0) return {}
+  return (await backendSDK(context).signAssetDownloads(assetIds)).urls
+}
+
 export async function listAssets(
   context: TenantContext,
   options: {

@@ -81,7 +81,7 @@ export function RecentWork({
   const client = useTRPCClient()
   const query = useQuery({
     ...recentWorkQuery(client, organizationId, draftsEnabled, paidPlan, campaignsEnabled),
-    // Coming back from an editor shows the last list at once, then adds what was just saved.
+    // Coming back from an editor or Publish shows the last list at once, then adds what was just saved.
     refetchOnMount: 'always',
   })
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['type']>(null)

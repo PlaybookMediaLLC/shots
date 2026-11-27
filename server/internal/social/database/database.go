@@ -21,6 +21,13 @@ import (
 type Database struct {
 	Client *ent.Client
 	SQL    *stdsql.DB
+	shared bool
+}
+
+// WrapSQL creates a social Ent client backed by an existing shared SQL pool.
+// Closing the returned Database is a no-op; the pool owner closes db.
+func WrapSQL(db *stdsql.DB) *Database {
+	return &Database{Client: ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db))), SQL: db, shared: true}
 }
 
 func Open(ctx context.Context, databaseURL string) (*Database, error) {
@@ -29,7 +36,7 @@ func Open(ctx context.Context, databaseURL string) (*Database, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	db := telemetry.OpenDB("social", stdlib.GetConnector(*config, stdlib.OptionAfterConnect(func(_ context.Context, conn *pgx.Conn) error {
-		registerUTCTimestamps(conn.TypeMap())
+		RegisterUTCTimestamps(conn.TypeMap())
 		return nil
 	})))
 	db.SetConnMaxIdleTime(5 * time.Minute)
@@ -46,7 +53,7 @@ func Open(ctx context.Context, databaseURL string) (*Database, error) {
 }
 
 func (d *Database) Close() error {
-	if d == nil {
+	if d == nil || d.shared {
 		return nil
 	}
 	return d.Client.Close()
@@ -57,7 +64,7 @@ func (d *Database) Close() error {
 // whose local zone is not UTC would store shifted values. Converting every
 // written timestamp to UTC keeps the stored values correct whatever the
 // process time zone; reads already come back as UTC.
-func registerUTCTimestamps(m *pgtype.Map) {
+func RegisterUTCTimestamps(m *pgtype.Map) {
 	m.RegisterType(&pgtype.Type{Name: "timestamp", OID: pgtype.TimestampOID, Codec: &utcTimestampCodec{}})
 }
 

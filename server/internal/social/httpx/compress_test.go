@@ -87,6 +87,30 @@ func TestCompress(t *testing.T) {
 	if rec = get("/png", "gzip"); rec.Header().Get("Content-Encoding") != "" || rec.Header().Get("Vary") != "" {
 		t.Fatalf("image/png is not compressible: %v", rec.Header())
 	}
+
+	// Partial content / Content-Range responses must never be compressed so byte offsets remain intact.
+	partialHandler := Compress(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Range", "bytes 0-1999/4000")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte(strings.Repeat("a", 2000)))
+	}))
+	req := httptest.NewRequest("GET", "/partial", nil)
+	req.Header.Set("Accept-Encoding", "br, gzip")
+	rec = httptest.NewRecorder()
+	partialHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPartialContent || rec.Header().Get("Content-Encoding") != "" || rec.Body.Len() != 2000 {
+		t.Fatalf("206 must not compress: status=%d enc=%q len=%d", rec.Code, rec.Header().Get("Content-Encoding"), rec.Body.Len())
+	}
+
+	// Verify pooled writers reset cleanly across back-to-back requests.
+	for range 3 {
+		rec = get("/big", "br")
+		body, _ := io.ReadAll(brotli.NewReader(rec.Body))
+		if !strings.Contains(string(body), strings.Repeat("a", 2000)) {
+			t.Fatal("pooled br writer corrupted response")
+		}
+	}
 }
 
 // Express's res.send: Content-Length, weak ETag, 304 on If-None-Match.

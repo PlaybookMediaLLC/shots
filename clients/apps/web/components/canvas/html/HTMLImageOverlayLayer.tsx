@@ -73,6 +73,7 @@ function OverlayElement({
       >
         <img
           src={overlayImg.src}
+          crossOrigin={overlayImg.src.startsWith('blob:') || overlayImg.src.startsWith('data:') ? undefined : 'anonymous'}
           alt="Shadow overlay"
           draggable={false}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -117,6 +118,7 @@ function OverlayElement({
     >
       <img
         src={overlayImg.src}
+        crossOrigin={overlayImg.src.startsWith('blob:') || overlayImg.src.startsWith('data:') ? undefined : 'anonymous'}
         alt="Overlay"
         draggable={false}
         style={{

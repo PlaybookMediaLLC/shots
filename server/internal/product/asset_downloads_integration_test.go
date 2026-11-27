@@ -166,3 +166,46 @@ func TestAssetDownloadDiscardsBytesWhenRemovedDuringStorageRead(t *testing.T) {
 		t.Fatalf("returned bytes after removal: %q %v", body, err)
 	}
 }
+
+func TestSignAssetDownloadsBatchIsolationAndLimits(t *testing.T) {
+	w, _, uploadedID := downloadFixture(t)
+	pendingID := uuid.NewString()
+	if _, err := w.db.Client.Asset.Create().SetID(pendingID).SetOrganizationID(w.org).
+		SetObjectKey("org/" + w.org + "/input/" + pendingID + "/1/pending.png").SetMediaType("image/png").SetBytes(13).SetStatus("PENDING").Save(w.ctx); err != nil {
+		t.Fatal(err)
+	}
+	foreign, _, foreignID := downloadFixture(t)
+	_ = foreign
+
+	urls, err := w.repo.SignAssetDownloads(w.ctx, w.owner, []string{uploadedID, uploadedID, pendingID, foreignID})
+	if err != nil {
+		t.Fatalf("SignAssetDownloads: %v", err)
+	}
+	if len(urls) != 1 || urls[uploadedID] == "" {
+		t.Fatalf("expected only uploaded own asset, got %+v", urls)
+	}
+	if _, ok := urls[pendingID]; ok {
+		t.Fatalf("unexpected pending asset URL: %+v", urls)
+	}
+	if _, ok := urls[foreignID]; ok {
+		t.Fatalf("unexpected foreign asset URL: %+v", urls)
+	}
+	if u, err := url.Parse(urls[uploadedID]); err != nil || u.Path != "/api/v1/assets/"+uploadedID+"/content" || u.Query().Get("downloadToken") == "" {
+		t.Fatalf("unexpected batch signed URL: %q (%v)", urls[uploadedID], err)
+	}
+
+	empty, err := w.repo.SignAssetDownloads(w.ctx, w.owner, nil)
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("empty batch: %+v %v", empty, err)
+	}
+	if _, err := w.repo.SignAssetDownloads(w.ctx, w.owner, []string{"not-a-uuid"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("invalid UUID: expected ErrInvalidInput, got %v", err)
+	}
+	tooMany := make([]string, maxBatchSignDownloads+1)
+	for i := range tooMany {
+		tooMany[i] = uuid.NewString()
+	}
+	if _, err := w.repo.SignAssetDownloads(w.ctx, w.owner, tooMany); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("over limit: expected ErrInvalidInput, got %v", err)
+	}
+}

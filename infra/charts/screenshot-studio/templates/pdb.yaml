@@ -1,0 +1,21 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- $minReplicas := .Values.replicaCount }}
+{{- if .Values.autoscaling.enabled }}
+{{- $minReplicas = .Values.autoscaling.minReplicas }}
+{{- end }}
+{{- if ge (int .Values.podDisruptionBudget.minAvailable) (int $minReplicas) }}
+{{- fail "podDisruptionBudget.minAvailable must be strictly less than effective minimum replicas to avoid blocking node drains" }}
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "screenshot-studio.fullname" . }}
+  labels:
+    {{- include "screenshot-studio.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: app
+      {{- include "screenshot-studio.selectorLabels" . | nindent 6 }}
+{{- end }}

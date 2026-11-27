@@ -7,9 +7,11 @@ package socialconnect
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -85,6 +87,25 @@ type Connector struct {
 	store         redis.Store
 }
 
+// OpenWithShared reads social tables through an existing shared SQL pool and
+// OAuth state through store, avoiding duplicate DB/Redis pools.
+func OpenWithShared(sqlDB *stdsql.DB, product *productent.Client, store redis.Store) (*Connector, error) {
+	if store == nil {
+		store = redis.NewMemory()
+	}
+	storage, err := upload.CreateStorage()
+	if err != nil {
+		return nil, err
+	}
+	db := socialdatabase.WrapSQL(sqlDB)
+	manager := social.NewManager(notifications.New(sqlDB, nil))
+	return &Connector{
+		tenants: EntTenants{Client: product}, manager: manager, store: store,
+		integrations:  integration.NewService(integration.NewRepository(db.Client, storage), nil, manager, nil, nil, store, storage),
+		organizations: organizations.NewRepository(db.Client),
+	}, nil
+}
+
 // Open reads social tables from the product database and OAuth state from
 // REDIS_URL (in memory when unset). The caller owns the close function.
 func Open(ctx context.Context, databaseURL string, product *productent.Client) (*Connector, func() error, error) {
@@ -97,9 +118,16 @@ func Open(ctx context.Context, databaseURL string, product *productent.Client) (
 		db.Close()
 		return nil, nil, err
 	}
+	closeAll := func() error {
+		var closeErr error
+		if closer, ok := store.(io.Closer); ok {
+			closeErr = errors.Join(closeErr, closer.Close())
+		}
+		return errors.Join(closeErr, db.Close())
+	}
 	storage, err := upload.CreateStorage()
 	if err != nil {
-		db.Close()
+		_ = closeAll()
 		return nil, nil, err
 	}
 	manager := social.NewManager(notifications.New(db.SQL, nil))
@@ -107,7 +135,7 @@ func Open(ctx context.Context, databaseURL string, product *productent.Client) (
 		tenants: EntTenants{Client: product}, manager: manager, store: store,
 		integrations:  integration.NewService(integration.NewRepository(db.Client, storage), nil, manager, nil, nil, store, storage),
 		organizations: organizations.NewRepository(db.Client),
-	}, db.Close, nil
+	}, closeAll, nil
 }
 
 var errMismatch = socialapi.NewError(http.StatusConflict, false, "social organization does not match this workspace")

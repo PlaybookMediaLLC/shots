@@ -113,7 +113,7 @@ func (c *Configuration) acceptGitHubEvent(ctx context.Context, delivery string, 
 	}
 	defer tx.Rollback()
 	result := &GitHubEventAcceptance{}
-	origin, err := c.githubDeliveryOrigin(ctx, delivery)
+	origin, err := githubDeliveryOriginWithClient(ctx, tx.Client(), delivery)
 	if err != nil {
 		return nil, err
 	}

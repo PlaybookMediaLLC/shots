@@ -114,14 +114,11 @@ export async function loadWrite(
     sets.find((set) => set.visibility === 'WORKSPACE') ??
     sets[0]
   const tab: WriteTab = query.tab ?? 'drafts'
-  const [[page, posts, planned], tags, failedPage] = await Promise.all([
+  const [[page, posts, planned], tags] = await Promise.all([
     early && early.setId === activeSet?.id
       ? early.library
       : readLibrary(query, activeSet?.id, experiments.tags, activeSet?.timeZone),
     activeSet && experiments.tags ? listDraftTags(tenant, activeSet.id) : Promise.resolve([]),
-    // The Failed tab's count. shortcut: reads a page of drafts for a number, and stops at
-    // 100; add a backend count if this shows up in page load times.
-    listContentDrafts(tenant, { limit: 100, socialSetId: activeSet?.id, view: 'failed' }),
   ])
   const library = [...page.pinned, ...page.items].map((draft) =>
     libraryDraft(contentDraftSchema.parse(draft))
@@ -164,7 +161,7 @@ export async function loadWrite(
     activeSet: activeSet ?? null,
     advancedScheduling,
     experiments,
-    failedCount: failedPage.pinned.length + failedPage.items.length,
+    failedCount: page.failedCount,
     library,
     hasMore: page.nextCursor !== null,
     query: { ...query, tab },

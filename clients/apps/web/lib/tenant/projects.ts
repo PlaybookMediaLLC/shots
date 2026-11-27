@@ -53,6 +53,17 @@ export async function listProjects(context: TenantContext, query: ProjectListInp
   }
 }
 
+/** Lightweight metadata for the workspace's newest projects and canvases (omits document payloads). */
+export async function listRecentWork(context: TenantContext, limit?: number) {
+  const page = await backendSDK(context).listRecentWork(limit)
+  return {
+    items: page.items.map((item) => ({
+      ...item,
+      updatedAt: new Date(item.updatedAt),
+    })),
+  }
+}
+
 /** Create a project from a stored-form document (no local images). */
 export async function createProject(
   context: TenantContext,

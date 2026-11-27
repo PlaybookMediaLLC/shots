@@ -207,27 +207,33 @@ async function renderCanvasIntoCampaign(
 ) {
   if (!request.campaignId || !request.captureAssetIds?.length || !(await isDesignRendererReady()))
     return
-  const existing = await listCampaignDesigns(tenant, request.campaignId)
+  const campaignId = request.campaignId
+  const existing = await listCampaignDesigns(tenant, campaignId)
   const lazy: { renderer?: Promise<DesignRenderer> } = {}
   const getRenderer = () => (lazy.renderer ??= createDesignRenderer())
   try {
-    for (const [index, artboard] of artboards.slice(0, MAX_CANVAS_RENDERS).entries()) {
-      const name = `Workflow ${request.nodeId} · canvas ${index + 1}`
-      const reused = existing.find((item) => item.name === name)
-      const design =
-        (reused ? await getDesign(tenant, reused.id) : null) ??
-        (await createDesign(tenant, {
-          campaignId: request.campaignId,
-          document: artboard.document,
-          name,
-        }))
-      const rendered = await renderDesignForTenant(tenant, getRenderer, design)
-      await backendSDK(tenant).linkCampaignAsset(request.campaignId, rendered.asset.id, {
-        caption: `${title} · ${index + 1}`,
-        kind: 'design-render',
+    const settled = await Promise.allSettled(
+      artboards.slice(0, MAX_CANVAS_RENDERS).map(async (artboard, index) => {
+        const name = `Workflow ${request.nodeId} · canvas ${index + 1}`
+        const reused = existing.find((item) => item.name === name)
+        const design =
+          (reused ? await getDesign(tenant, reused.id) : null) ??
+          (await createDesign(tenant, {
+            campaignId,
+            document: artboard.document,
+            name,
+          }))
+        const rendered = await renderDesignForTenant(tenant, getRenderer, design)
+        await backendSDK(tenant).linkCampaignAsset(campaignId, rendered.asset.id, {
+          caption: `${title} · ${index + 1}`,
+          kind: 'design-render',
+        })
       })
+    )
+    for (const outcome of settled) {
+      if (outcome.status === 'rejected') throw outcome.reason
     }
   } finally {
-    if (lazy.renderer) await (await lazy.renderer).close().catch(() => undefined)
+    await lazy.renderer?.then((renderer) => renderer.close()).catch(() => undefined)
   }
 }

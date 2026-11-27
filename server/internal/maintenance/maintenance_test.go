@@ -867,3 +867,30 @@ func TestAssetCleanupRetiresOnlyUnneededMedia(t *testing.T) {
 		t.Fatalf("uploads aborted: %v", o.aborted)
 	}
 }
+
+func TestDrainRetryDelayBounds(t *testing.T) {
+	cases := []struct {
+		attempts int
+		minSec   int
+		maxSec   int
+	}{
+		{0, 22, 38},
+		{1, 22, 38},
+		{2, 45, 75},
+		{8, 2700, 4500},
+		{20, 2700, 4500},
+	}
+	for _, tc := range cases {
+		seen := map[int]bool{}
+		for range 50 {
+			got := drainRetryDelay(tc.attempts)
+			if got < tc.minSec || got > tc.maxSec {
+				t.Fatalf("drainRetryDelay(%d) = %d, want [%d, %d]", tc.attempts, got, tc.minSec, tc.maxSec)
+			}
+			seen[got] = true
+		}
+		if len(seen) < 2 {
+			t.Fatalf("drainRetryDelay(%d) produced no jitter spread", tc.attempts)
+		}
+	}
+}

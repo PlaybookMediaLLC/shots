@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ids"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/tiktok"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ssrf"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 )
 
@@ -336,13 +338,13 @@ func (p *Provider) oauth(ctx context.Context, path string, payload map[string]st
 		return "", "", "", nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
+	res, err := ssrf.Client().Do(req)
 	if err != nil {
 		return "", "", "", nil, err
 	}
 	defer res.Body.Close()
 	var raw bytes.Buffer
-	if _, err := raw.ReadFrom(res.Body); err != nil {
+	if _, err := raw.ReadFrom(io.LimitReader(res.Body, 1<<20)); err != nil {
 		return "", "", "", nil, err
 	}
 	response, err := parseEnvelope(raw.Bytes())

@@ -10,8 +10,10 @@ import {
   useEditorMounted,
   withHOC,
 } from "platejs/react";
+import { lazy, Suspense } from "react";
 import LiteYouTubeEmbed from "react-lite-youtube-embed";
-import ReactPlayer from "react-player";
+
+const ReactPlayer = lazy(() => import("react-player"));
 
 import { cn } from "../lib/utils";
 
@@ -105,14 +107,16 @@ export const MediaVideoElement = withHOC(
                   className="aspect-video overflow-hidden rounded-md bg-black"
                   ref={handleRef}
                 >
-                  <ReactPlayer
-                    controls
-                    height="100%"
-                    preload="metadata"
-                    // Opening just past the start shows a frame: many videos begin on black.
-                    src={`${unsafeUrl}#t=0.1`}
-                    width="100%"
-                  />
+                  <Suspense fallback={null}>
+                    <ReactPlayer
+                      controls
+                      height="100%"
+                      preload="metadata"
+                      // Opening just past the start shows a frame: many videos begin on black.
+                      src={`${unsafeUrl}#t=0.1`}
+                      width="100%"
+                    />
+                  </Suspense>
                 </div>
               )}
 

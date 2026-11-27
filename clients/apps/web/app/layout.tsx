@@ -1,35 +1,7 @@
 import { AppThemeProvider } from '@/components/platform-shell/AppThemeProvider'
 import type { Metadata, Viewport } from 'next'
 import { OG_DEFAULTS, SITE_URL } from '@/lib/seo/metadata'
-import {
-  Geist,
-  Geist_Mono,
-  Caveat,
-  Inter,
-  Poppins,
-  Space_Grotesk,
-  Outfit,
-  Plus_Jakarta_Sans,
-  DM_Sans,
-  Playfair_Display,
-  Lora,
-  Libre_Baskerville,
-  Bebas_Neue,
-  Righteous,
-  Pacifico,
-  Dancing_Script,
-  JetBrains_Mono,
-  Fira_Code,
-  Sora,
-  Manrope,
-  Raleway,
-  Oswald,
-  Montserrat,
-  Lexend,
-  Work_Sans,
-  Urbanist,
-  Albert_Sans,
-} from 'next/font/google'
+import { Geist, Geist_Mono, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { AppToaster } from '@/components/platform-shell/AppToaster'
 import { HydrationMarker } from '@/components/platform-shell/HydrationMarker'
@@ -44,7 +16,7 @@ import { ConsentBanner } from '@/components/ConsentBanner'
 import { PRODUCT_FACTS, atLeast } from '@/lib/seo/product-facts'
 import { installDeploymentRecovery } from '@/lib/platform/deployment-recovery'
 
-// System UI fonts
+// Core UI & landing fonts; the 23 canvas/editor fonts live in lib/typography/editor-fonts.ts.
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -63,206 +35,17 @@ const inter = Inter({
   display: 'swap',
 })
 
-const poppins = Poppins({
-  variable: '--font-poppins',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const spaceGrotesk = Space_Grotesk({
-  variable: '--font-space-grotesk',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-})
-
-const outfit = Outfit({
-  variable: '--font-outfit',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: '--font-plus-jakarta-sans',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
-})
-
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
-  preload: false,
-  subsets: ['latin'],
-  weight: 'variable',
-})
-
-const sora = Sora({
-  variable: '--font-sora',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
-})
-
-const manrope = Manrope({
-  variable: '--font-manrope',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
-})
-
-const raleway = Raleway({
-  variable: '--font-raleway',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const montserrat = Montserrat({
-  variable: '--font-montserrat',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const lexend = Lexend({
-  variable: '--font-lexend',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const workSans = Work_Sans({
-  variable: '--font-work-sans',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const urbanist = Urbanist({
-  variable: '--font-urbanist',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-const albertSans = Albert_Sans({
-  variable: '--font-albert-sans',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-})
-
-// Display/Condensed fonts
-const oswald = Oswald({
-  variable: '--font-oswald',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700'],
-})
-
-const bebasNeue = Bebas_Neue({
-  variable: '--font-bebas-neue',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400'],
-})
-
-const righteous = Righteous({
-  variable: '--font-righteous',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400'],
-})
-
-// Serif fonts
-const playfairDisplay = Playfair_Display({
-  variable: '--font-playfair-display',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800', '900'],
-})
-
-const lora = Lora({
-  variable: '--font-lora',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-})
-
-const libreBaskerville = Libre_Baskerville({
-  variable: '--font-libre-baskerville',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400', '700'],
-})
-
-// Handwriting/Script fonts
-const caveat = Caveat({
-  variable: '--font-caveat',
-  preload: false,
-  subsets: ['latin'],
-})
-
-const pacifico = Pacifico({
-  variable: '--font-pacifico',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400'],
-})
-
-const dancingScript = Dancing_Script({
-  variable: '--font-dancing-script',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-})
-
-// Monospace fonts
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains-mono',
   preload: false,
   subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
 })
 
-const firaCode = Fira_Code({
-  variable: '--font-fira-code',
-  preload: false,
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-})
-
-// Combine all font variables
 const fontVariables = [
   geistSans.variable,
   geistMono.variable,
   inter.variable,
-  poppins.variable,
-  spaceGrotesk.variable,
-  outfit.variable,
-  plusJakartaSans.variable,
-  dmSans.variable,
-  sora.variable,
-  manrope.variable,
-  raleway.variable,
-  montserrat.variable,
-  lexend.variable,
-  workSans.variable,
-  urbanist.variable,
-  albertSans.variable,
-  oswald.variable,
-  bebasNeue.variable,
-  righteous.variable,
-  playfairDisplay.variable,
-  lora.variable,
-  libreBaskerville.variable,
-  caveat.variable,
-  pacifico.variable,
-  dancingScript.variable,
   jetbrainsMono.variable,
-  firaCode.variable,
 ].join(' ')
 
 export const metadata: Metadata = {

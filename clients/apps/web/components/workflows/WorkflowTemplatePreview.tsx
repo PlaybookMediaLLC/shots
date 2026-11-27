@@ -25,7 +25,7 @@ import {
   type WorkflowTemplate,
   type WorkflowTemplateInput,
 } from '@/lib/workflows/templates'
-import { FAMILY_NAMES } from './workflow-canvas'
+import { FAMILY_NAMES } from './workflow-ui'
 
 /**
  * What sets a template apart, in words: what starts it, its rule, and what you get.

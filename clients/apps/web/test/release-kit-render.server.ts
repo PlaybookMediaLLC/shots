@@ -6,7 +6,7 @@ import sharp from 'sharp'
 import { POST } from '../app/api/internal/kit-renders/route'
 import { kitRenderContract } from '../lib/api/contracts/internal'
 import { kitRenderRequestSchema } from '../lib/releases/kit-render-schema'
-import { renderKitSnapshot } from '../lib/releases/kit-render'
+import { fetchBoundedAssetBytes, renderKitSnapshot } from '../lib/releases/kit-render'
 import { watermarkKitPreview } from '../lib/releases/kit-preview'
 
 const request = (document: unknown) =>
@@ -120,6 +120,16 @@ test('draft images require exact pinned bytes and a same-audience bundle file', 
   assert.match(Buffer.from(output.body, 'base64').toString(), /screenshot-image\.png/)
   input.assets.image = `data:image/png;base64,${Buffer.from('changed').toString('base64')}`
   await assert.rejects(renderKitSnapshot(input), /pinned asset changed/)
+
+  // Signed assetUrls allow Go to omit base64 payloads while preserving pinning checks.
+  const signedInput = request([
+    { id: 'picture', type: 'img', url: 'asset:image', children: [{ text: '' }] },
+  ])
+  signedInput.snapshot.assets = input.snapshot.assets
+  signedInput.assetUrls = { image: 'https://r2.example.test/signed/image.png?sig=ok' }
+  signedInput.assetPaths.image = 'sales/screenshot-image.png'
+  const signedOutput = await renderKitSnapshot(signedInput)
+  assert.match(Buffer.from(signedOutput.body, 'base64').toString(), /screenshot-image\.png/)
 })
 
 test('draft preview is visibly watermarked without changing retained output bytes', async () => {
@@ -142,4 +152,61 @@ test('draft preview is visibly watermarked without changing retained output byte
   assert.notDeepEqual(output, image)
   assert.equal((await sharp(output).metadata()).width, 800)
   assert.equal(preview.watermark, 'PREVIEW — NOT APPROVED FOR DISTRIBUTION')
+})
+
+test('fetchBoundedAssetBytes enforces protocol, redirect:error, exact length, and SHA-256', async (t) => {
+  const payload = Buffer.from('deterministic-kit-png-bytes')
+  const sha = createHash('sha256').update(payload).digest('hex')
+
+  // Reject non-http(s) URLs in both schema and fetcher.
+  assert.equal(
+    kitRenderRequestSchema.safeParse({
+      organizationId: 'org',
+      artifactId: 'art',
+      snapshot: {
+        kind: 'DRAFT',
+        sourceId: 'src',
+        revision: '1',
+        document: '[]',
+        markdown: '',
+        outputId: '',
+        assets: [],
+      },
+      assetUrls: { img: 'file:///etc/passwd' },
+      assetPaths: {},
+    }).success,
+    false
+  )
+  await assert.rejects(
+    fetchBoundedAssetBytes('file:///etc/passwd', payload.length, sha),
+    /URL is invalid/
+  )
+
+  let seenRedirect: RequestRedirect | undefined
+  t.mock.method(globalThis, 'fetch', async (_url: string | URL, init?: RequestInit) => {
+    seenRedirect = init?.redirect
+    return new Response(payload, { status: 200 })
+  })
+  const ok = await fetchBoundedAssetBytes('https://r2.internal/a.png', payload.length, sha)
+  assert.deepEqual(ok, payload)
+  assert.equal(seenRedirect, 'error')
+
+  // Wrong SHA-256 fails closed.
+  await assert.rejects(
+    fetchBoundedAssetBytes('https://r2.internal/a.png', payload.length, '0'.repeat(64)),
+    /pinned asset changed/
+  )
+
+  // Oversized stream cancels early and fails closed.
+  await assert.rejects(
+    fetchBoundedAssetBytes('https://r2.internal/a.png', payload.length - 1, sha),
+    /pinned asset changed/
+  )
+
+  // Non-200 response fails closed.
+  t.mock.method(globalThis, 'fetch', async () => new Response('missing', { status: 404 }))
+  await assert.rejects(
+    fetchBoundedAssetBytes('https://r2.internal/missing.png', payload.length, sha),
+    /could not be loaded/
+  )
 })

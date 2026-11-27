@@ -27,7 +27,7 @@ import {
   type AutomationDefinition,
 } from '@/lib/api/contracts/release-automation'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
-import { FAMILY_NAMES } from './workflow-canvas'
+import { FAMILY_NAMES } from './workflow-ui'
 import { RunStatusPill, relativeTime } from './workflow-ui'
 import { WorkflowArchiveButton } from './WorkflowArchiveButton'
 import { WorkflowRunLink } from './WorkflowRunLink'

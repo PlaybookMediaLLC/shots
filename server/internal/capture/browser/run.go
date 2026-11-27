@@ -209,6 +209,8 @@ type scope struct {
 	close           func()
 }
 
+const pollInterval = 350 * time.Millisecond
+
 // open builds a fresh isolated context: no service workers, WebSockets, or
 // workers, no downloads, and every HTTP request held against the host and
 // method policy.
@@ -217,15 +219,20 @@ func open(ctx context.Context, browser *rod.Browser, hosts, postPaths []string) 
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
+	dispose := func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser.Context(closeCtx))
+	}
 	s, err := openPage(ctx, isolated, hosts, postPaths)
 	if err != nil {
-		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser)
+		dispose()
 		return nil, err
 	}
 	closePage := s.close
 	s.close = func() {
 		closePage()
-		_ = proto.TargetDisposeBrowserContext{BrowserContextID: isolated.BrowserContextID}.Call(browser)
+		dispose()
 	}
 	return s, nil
 }
@@ -236,14 +243,19 @@ func openPage(ctx context.Context, browser *rod.Browser, hosts, postPaths []stri
 	if err != nil {
 		return nil, &Failure{Code: ProviderUnavailable}
 	}
+	closeTab := func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = page.Context(closeCtx).Close()
+	}
 	s, stop, err := guard(ctx, browser, page, hosts, postPaths)
 	if err != nil {
-		_ = page.Close()
+		closeTab()
 		return nil, err
 	}
 	s.close = func() {
 		stop()
-		_ = page.Close()
+		closeTab()
 	}
 	return s, nil
 }
@@ -265,7 +277,7 @@ func guard(ctx context.Context, browser *rod.Browser, page *rod.Page, hosts, pos
 		}
 	}
 	router := page.HijackRequests()
-	if err := router.Add("*", "", func(hijack *rod.Hijack) {
+	enforce := func(hijack *rod.Hijack) {
 		if requestAllowed(hijack.Request.Method(), hijack.Request.URL().String(), hosts, postPaths) {
 			hijack.ContinueRequest(&proto.FetchContinueRequest{})
 			return
@@ -275,8 +287,12 @@ func guard(ctx context.Context, browser *rod.Browser, page *rod.Page, hosts, pos
 			s.refusedDocument.Store(true)
 		}
 		hijack.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
-	}); err != nil {
-		return nil, nil, &Failure{Code: ProviderUnavailable}
+	}
+	// Intercept only network HTTP(S) traffic so inline data:/blob:/about: loads skip CDP Fetch round-trips.
+	for _, pattern := range []string{"http://*", "https://*"} {
+		if err := router.Add(pattern, "", enforce); err != nil {
+			return nil, nil, &Failure{Code: ProviderUnavailable}
+		}
 	}
 	go router.Run()
 	// A dialog would stall the page until its deadline; nothing here answers yes.
@@ -361,7 +377,7 @@ func (s *scope) waitFor(ctx context.Context, selector string, timeout time.Durat
 				return &Failure{Code: NeedsAuth}
 			}
 			return &Failure{Code: missing}
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 }
@@ -467,7 +483,7 @@ func (s *scope) waitAccountText(ctx context.Context, expected, requested string)
 		select {
 		case <-waitCtx.Done():
 			return &Failure{Code: NeedsAuth}
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(pollInterval):
 		}
 	}
 }

@@ -8,7 +8,7 @@ import { SCREENSHOT_RATE_LIMIT } from '@/lib/api/rate-limit-policy'
 import { checkRateLimit, type RateLimitResult } from '@/lib/rate-limit'
 import {
   cacheScreenshot,
-  getCachedScreenshot,
+  getCachedScreenshotBytes,
   invalidateCache,
   normalizeUrl,
 } from '@/lib/screenshot-cache'
@@ -17,7 +17,6 @@ import {
   captureScreenshot,
   getScreenshotFailure,
 } from '@/lib/screenshot-service'
-import { isBlankImage } from '@/lib/screenshot-blank'
 import { requirePaidAccess } from '@/lib/api/require-account'
 
 export const maxDuration = 60
@@ -78,15 +77,14 @@ async function refreshCache(input: ScreenshotRequest, url: string): Promise<void
   }
 }
 
-async function loadCachedScreenshot(input: ScreenshotRequest, url: string): Promise<string | null> {
+async function loadCachedScreenshot(input: ScreenshotRequest, url: string): Promise<Buffer | null> {
   if (input.forceRefresh) {
     return null
   }
 
   try {
-    const cached = await getCachedScreenshot(getCacheKey(url, input))
-    // Blank captures were cached before they were detected; recapture those.
-    return cached && !(await isBlankImage(Buffer.from(cached, 'base64'))) ? cached : null
+    // Blank captures are already rejected before caching inside captureScreenshot.
+    return await getCachedScreenshotBytes(getCacheKey(url, input))
   } catch (error) {
     console.warn('Cache check failed:', error)
     return null
@@ -106,19 +104,44 @@ async function storeScreenshot(
 }
 
 type ScreenshotResponseInput = {
+  bytes?: Buffer
   cached: boolean
   input: ScreenshotRequest
-  screenshot: string
+  screenshot?: string
   strategy?: 'microlink'
   url: string
 }
 
-function screenshotResponse(response: ScreenshotResponseInput): NextResponse {
+function wantsRawPng(request: NextRequest): boolean {
+  const accept = request.headers.get('accept') ?? ''
+  return accept.includes('image/png') && !accept.includes('application/json')
+}
+
+function sniffImageMediaType(bytes: Buffer): 'image/jpeg' | 'image/png' {
+  return bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8 ? 'image/jpeg' : 'image/png'
+}
+
+function screenshotResponse(request: NextRequest, response: ScreenshotResponseInput): NextResponse {
+  if (wantsRawPng(request)) {
+    const image = response.bytes ?? Buffer.from(response.screenshot ?? '', 'base64')
+    const view =
+      image.buffer instanceof ArrayBuffer
+        ? new Uint8Array(image.buffer, image.byteOffset, image.byteLength)
+        : new Uint8Array(image)
+    return new NextResponse(view, {
+      headers: {
+        'Cache-Control': 'private, no-store',
+        'Content-Type': sniffImageMediaType(image),
+        'X-Screenshot-Cache': response.cached ? 'HIT' : 'MISS',
+      },
+      status: 200,
+    })
+  }
   return NextResponse.json({
     cached: response.cached,
     colorScheme: response.input.colorScheme,
     deviceType: response.input.deviceType,
-    screenshot: response.screenshot,
+    screenshot: response.screenshot ?? response.bytes?.toString('base64') ?? '',
     strategy: response.strategy,
     url: response.url,
   })
@@ -198,14 +221,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     assertPublicCaptureUrl(input.url)
     const url = normalizeUrl(input.url)
     await refreshCache(input, url)
-    const cachedScreenshot = await loadCachedScreenshot(input, url)
-    if (cachedScreenshot) {
-      return screenshotResponse({ cached: true, input, screenshot: cachedScreenshot, url })
+    const cachedBytes = await loadCachedScreenshot(input, url)
+    if (cachedBytes?.length) {
+      return screenshotResponse(request, { bytes: cachedBytes, cached: true, input, url })
     }
 
     const capture = await captureScreenshot({ ...input, url })
     await storeScreenshot(input, url, capture.screenshot)
-    return screenshotResponse({
+    return screenshotResponse(request, {
       cached: false,
       input,
       screenshot: capture.screenshot,

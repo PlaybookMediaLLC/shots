@@ -33,6 +33,8 @@ var apiURL = "https://open.tiktokapis.com"
 // pollInterval is the legacy blocking post's wait between status checks.
 var pollInterval = 20 * time.Second
 
+var tiktokUploadClient = &http.Client{Timeout: 5 * time.Minute}
+
 // TikTok video chunk constraints: a chunk must be between 5MB and 64MB.
 // When the whole file fits in a single chunk (<= 64MB) we upload it in one
 // request; otherwise we split it into 10MB chunks (the final chunk carries
@@ -212,12 +214,12 @@ func plainFetch(ctx context.Context, method, target string, headers map[string]s
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := ssrf.Client().Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	return json.NewDecoder(res.Body).Decode(out)
+	return json.NewDecoder(io.LimitReader(res.Body, 10<<20)).Decode(out)
 }
 
 type tokenResponse struct {
@@ -611,16 +613,17 @@ func uploadChunk(ctx context.Context, uploadURL, path string, start, end, videoS
 	req.ContentLength = end - start + 1
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, videoSize))
-	res, err := http.DefaultClient.Do(req)
+	res, err := tiktokUploadClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode == 200 || res.StatusCode == 201 || res.StatusCode == 206 {
+		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
 		return nil
 	}
 	text := "{}"
-	if data, err := io.ReadAll(res.Body); err == nil {
+	if data, err := io.ReadAll(io.LimitReader(res.Body, 1<<20)); err == nil {
 		text = string(data)
 	}
 	value := "Failed to upload the video to TikTok"

@@ -1611,6 +1611,14 @@ export type BackendProject = {
   updatedByUserId: string | null
 }
 
+/** Lightweight project or canvas metadata for navigation recents (omits document payload). */
+export type BackendRecentWorkItem = {
+  id: string
+  kind: 'project' | 'canvas'
+  name: string
+  updatedAt: string
+}
+
 /** How a project version came to be. */
 export type BackendProjectVersionKind = 'autosave' | 'named' | 'restore' | 'duplicate'
 
@@ -2366,9 +2374,10 @@ export class BackendSDKError extends Error {
     message: string,
     readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503,
     /** The backend's error body, e.g. a quota's limit and reset time. */
-    readonly details: Record<string, unknown> = {}
+    readonly details: Record<string, unknown> = {},
+    options?: ErrorOptions
   ) {
-    super(message)
+    super(message, options)
     this.name = 'BackendSDKError'
   }
 }
@@ -2420,6 +2429,68 @@ export type BackendStorePublishingCredential = {
   createdAt: string
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+const HEAVY_REQUEST_TIMEOUT_MS = 60_000
+const MAX_GET_RETRIES = 2
+const RETRYABLE_STATUSES = new Set([502, 503, 504])
+const HEAVY_PATH_PREFIXES = [
+  'v1/assets/',
+  'v1/release-kits/',
+  'v1/onboarding/',
+  'v1/capture',
+  'v1/ai/',
+  'v1/voice-commands',
+  'v1/workflows/',
+]
+
+function defaultTimeoutForRequest(
+  path: string,
+  responseType?: 'bytes' | 'response'
+): number {
+  if (responseType === 'bytes' || responseType === 'response') {
+    return HEAVY_REQUEST_TIMEOUT_MS
+  }
+  const normalized = path.replace(/^\/+/, '')
+  if (HEAVY_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+    return HEAVY_REQUEST_TIMEOUT_MS
+  }
+  return DEFAULT_REQUEST_TIMEOUT_MS
+}
+
+function combineAbortSignals(
+  timeoutMs: number,
+  callerSignal?: AbortSignal
+): AbortSignal | undefined {
+  const timeoutSignal =
+    Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined
+  if (!timeoutSignal) return callerSignal
+  if (!callerSignal) return timeoutSignal
+  return AbortSignal.any([callerSignal, timeoutSignal])
+}
+
+async function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) return
+  await new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+function isTimeoutError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'TimeoutError'
+}
+
 export class ScreenshotStudioBackendSDK {
   private readonly baseURL: string
 
@@ -2443,27 +2514,86 @@ export class ScreenshotStudioBackendSDK {
       method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
       rawBody?: BodyInit
       responseType?: 'bytes' | 'response'
+      signal?: AbortSignal
+      timeoutMs?: number
     } = {}
   ) {
-    let response: Response
-    try {
-      response = await this.fetcher(new URL(path, this.baseURL), {
-        body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
-        cache: 'no-store',
-        headers: {
-          authorization: `Bearer ${this.serviceToken}`,
-          'content-type': 'application/json',
-          'x-organization-id': this.scope.organizationId,
-          'x-request-id': this.scope.requestId,
-          ...principalHeaders(this.scope),
-          ...init.headers,
-        },
-        method: init.method ?? 'GET',
-      })
-    } catch {
+    const method = init.method ?? 'GET'
+    const timeoutMs = init.timeoutMs ?? defaultTimeoutForRequest(path, init.responseType)
+    const canRetry =
+      method === 'GET' && init.responseType !== 'response' && init.rawBody === undefined
+    const maxAttempts = canRetry ? MAX_GET_RETRIES + 1 : 1
+    const url = new URL(path, this.baseURL)
+    const body =
+      init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body))
+    const headers = {
+      authorization: `Bearer ${this.serviceToken}`,
+      'content-type': 'application/json',
+      'x-organization-id': this.scope.organizationId,
+      'x-request-id': this.scope.requestId,
+      ...principalHeaders(this.scope),
+      ...init.headers,
+    }
+
+    let response: Response | undefined
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let headerTimer: ReturnType<typeof setTimeout> | undefined
+      let requestSignal: AbortSignal | undefined
+      if (init.responseType === 'response') {
+        // Bound response headers only; once streaming begins, body transfer is bounded by Go's write deadline.
+        if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+          const headerController = new AbortController()
+          headerTimer = setTimeout(() => {
+            headerController.abort(new DOMException('The operation timed out.', 'TimeoutError'))
+          }, timeoutMs)
+          requestSignal = init.signal
+            ? AbortSignal.any([init.signal, headerController.signal])
+            : headerController.signal
+        } else {
+          requestSignal = init.signal
+        }
+      } else {
+        requestSignal = combineAbortSignals(timeoutMs, init.signal)
+      }
+      try {
+        response = await this.fetcher(url, {
+          body,
+          cache: 'no-store',
+          headers,
+          method,
+          signal: requestSignal,
+        })
+      } catch (err) {
+        const shouldRetry =
+          canRetry && attempt < maxAttempts - 1 && !init.signal?.aborted && !isTimeoutError(err)
+        if (shouldRetry) {
+          const delayMs = 75 * 2 ** attempt + Math.floor(Math.random() * 50)
+          await sleepWithAbort(delayMs, init.signal).catch(() => undefined)
+          if (!init.signal?.aborted) continue
+        }
+        throw new BackendSDKError('Publishing backend is unavailable.', 503, {}, { cause: err })
+      } finally {
+        if (headerTimer !== undefined) clearTimeout(headerTimer)
+      }
+      if (
+        canRetry &&
+        attempt < maxAttempts - 1 &&
+        RETRYABLE_STATUSES.has(response.status) &&
+        !init.signal?.aborted
+      ) {
+        await response.body?.cancel().catch(() => undefined)
+        const delayMs = 75 * 2 ** attempt + Math.floor(Math.random() * 50)
+        await sleepWithAbort(delayMs, init.signal).catch(() => undefined)
+        if (!init.signal?.aborted) continue
+      }
+      break
+    }
+    if (!response) {
       throw new BackendSDKError('Publishing backend is unavailable.', 503)
     }
-    if (init.responseType === 'response' && response.status === 416) return response as T
+    if (init.responseType === 'response' && (response.status === 304 || response.status === 416)) {
+      return response as T
+    }
     if (!response.ok) {
       const error = (await response.json().catch(() => null)) as
         ({ error?: string } & Record<string, unknown>) | null
@@ -3056,6 +3186,13 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ downloadUrl: string }>(`v1/assets/${encodeURIComponent(id)}/download-url`)
   }
 
+  async signAssetDownloads(assetIds: string[]) {
+    return this.request<{ urls: Record<string, string> }>('v1/assets/sign-downloads', {
+      body: { assetIds },
+      method: 'POST',
+    })
+  }
+
   /** Server-side asset read through the backend, where a browser URL is unreachable. */
   async readAsset(id: string) {
     return this.request<Uint8Array>(`v1/assets/${encodeURIComponent(id)}/bytes`, {
@@ -3072,10 +3209,13 @@ export class ScreenshotStudioBackendSDK {
   }
 
   /** Redeem an opaque grant; Go rechecks its original principal on every read. */
-  async readAssetDownload(id: string, token: string, range?: string) {
+  async readAssetDownload(id: string, token: string, range?: string, ifNoneMatch?: string) {
+    const headers: Record<string, string> = {}
+    if (range) headers.range = range
+    if (ifNoneMatch) headers['if-none-match'] = ifNoneMatch
     return this.request<Response>(`v1/internal/assets/${encodeURIComponent(id)}/download`, {
       body: { token },
-      headers: range ? { range } : {},
+      headers,
       method: 'POST',
       responseType: 'response',
     })
@@ -3460,6 +3600,7 @@ export class ScreenshotStudioBackendSDK {
       if (value !== undefined && value !== '') params.set(key, String(value))
     }
     return this.request<{
+      failedCount?: number
       items: BackendContentDraft[]
       nextCursor: string | null
       pinned: BackendContentDraft[]
@@ -4480,6 +4621,13 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  async listRecentWork(limit?: number) {
+    const params = new URLSearchParams()
+    if (limit !== undefined) params.set('limit', String(limit))
+    const suffix = params.size ? `?${params}` : ''
+    return this.request<{ items: BackendRecentWorkItem[] }>(`v1/recent-work${suffix}`)
+  }
+
   async listProjects(query: BackendProjectListQuery = {}) {
     const params = new URLSearchParams()
     for (const [key, value] of Object.entries(query)) {
@@ -5016,6 +5164,19 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ base64: string }>(
       `v1/internal/screenshot-cache/${encodeURIComponent(urlHash)}/object`
     )
+  }
+
+  /** Streams raw image bytes from the screenshot cache, falling back to legacy JSON base64 during rolling deploys. */
+  async getScreenshotCacheImage(urlHash: string): Promise<Uint8Array> {
+    const response = await this.request<Response>(
+      `v1/internal/screenshot-cache/${encodeURIComponent(urlHash)}/object`,
+      { headers: { accept: 'image/png' }, responseType: 'response' }
+    )
+    if (response.headers.get('content-type')?.includes('application/json')) {
+      const payload = (await response.json()) as { base64?: string }
+      return Buffer.from(payload.base64 ?? '', 'base64')
+    }
+    return new Uint8Array(await response.arrayBuffer())
   }
 
   async putScreenshotCacheObject(urlHash: string, body: Uint8Array) {
@@ -5955,6 +6116,15 @@ export class ScreenshotStudioBackendSDK {
       conversation: BackendConversation
       messages: BackendConversationMessage[]
     }>(`v1/conversations/${encodeURIComponent(conversationId)}`)
+  }
+
+  /** A conversation, its 200 newest messages, and the newest 10 traced runs with steps. */
+  async getConversationView(conversationId: string) {
+    return this.request<{
+      conversation: BackendConversation
+      messages: BackendConversationMessage[]
+      runs: Array<{ run: BackendAgentRun; steps: BackendLaunchRunStep[] }>
+    }>(`v1/conversations/${encodeURIComponent(conversationId)}/view`)
   }
 
   /** Answers 409 for an archived conversation. */

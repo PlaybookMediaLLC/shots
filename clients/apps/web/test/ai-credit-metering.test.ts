@@ -335,3 +335,58 @@ test('a paid one-time Checkout session grants its packs once, by session id', ()
     null
   )
 })
+
+test('scheduleSettlement defers remainder settlement when accepted and falls back inline when declined', async () => {
+  const charges: number[] = []
+  let remaining = 50
+  const consume = async (_tenant: { organizationId: string }, amount: number) => {
+    charges.push(amount)
+    remaining -= amount
+    return remaining
+  }
+
+  // Accepted deferred settlement: withAiCredits returns before the remainder settles,
+  // and running the scheduled task settles it afterwards (even when run() throws).
+  const deferredTasks: Array<() => Promise<void>> = []
+  const deferred = createAiCreditMeter(consume, {
+    scheduleSettlement: (task) => {
+      deferredTasks.push(task)
+      return true
+    },
+  })
+  const out = await deferred.withAiCredits(tenant, async () => {
+    await (
+      await deferred.meter.admit()
+    )(0.004)
+    return 'fast-reply'
+  })
+  assert.equal(out, 'fast-reply')
+  assert.deepEqual(charges, [0])
+  assert.equal(deferredTasks.length, 1)
+  await deferredTasks.shift()!()
+  assert.deepEqual(charges, [0, 1])
+
+  await assert.rejects(
+    deferred.withAiCredits(tenant, async () => {
+      await (
+        await deferred.meter.admit()
+      )(0.003)
+      throw new Error('stream aborted')
+    }),
+    /stream aborted/
+  )
+  assert.equal(deferredTasks.length, 1)
+  await deferredTasks.shift()!()
+  assert.deepEqual(charges, [0, 1, 0, 1])
+
+  // Declined deferred settlement: settles synchronously before withAiCredits resolves.
+  const inline = createAiCreditMeter(consume, {
+    scheduleSettlement: () => false,
+  })
+  await inline.withAiCredits(tenant, async () => {
+    await (
+      await inline.meter.admit()
+    )(0.002)
+  })
+  assert.deepEqual(charges, [0, 1, 0, 1, 0, 1])
+})

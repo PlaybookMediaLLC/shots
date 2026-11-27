@@ -11,6 +11,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"os"
@@ -149,6 +150,48 @@ func (b *Base) Fetch(ctx context.Context, url string, req Request) (*Response, e
 	return b.fetch(ctx, url, req, 0, "", false)
 }
 
+const (
+	// maxAPIResponseBytes bounds provider API responses held in Go memory.
+	maxAPIResponseBytes = 10 << 20
+	// defaultMediaReadLimit caps unparameterized media downloads.
+	defaultMediaReadLimit = 256 << 20
+	// maxInlineRetryWait caps inline retry sleeps before handing back to Temporal.
+	maxInlineRetryWait = 30 * time.Second
+)
+
+func readLimitedBody(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("response body exceeds %d bytes", limit)
+	}
+	return data, nil
+}
+
+func (b *Base) retryWait(header http.Header, rateLimited bool, retries int) time.Duration {
+	if b.RetryDelay <= 0 {
+		return 0
+	}
+	shift := min(retries, 4)
+	delay := b.RetryDelay * time.Duration(1<<shift)
+	if delay > maxInlineRetryWait {
+		delay = maxInlineRetryWait
+	}
+	if jitterSpan := delay / 4; jitterSpan > 0 {
+		delay += time.Duration(rand.Int64N(int64(jitterSpan)))
+	}
+	if rateLimited && b.RetryDelay >= time.Second {
+		if until := RetryAt(header, time.Now()); !until.IsZero() {
+			if wait := time.Until(until); wait > delay && wait <= maxInlineRetryWait {
+				delay = wait
+			}
+		}
+	}
+	return delay
+}
+
 // fetch sends req; resent says an earlier send of this write may have
 // committed (a 500 or a `retry` answer), so a later limit proves nothing.
 func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, message string, resent bool) (*Response, error) {
@@ -176,7 +219,7 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 	if err != nil {
 		return nil, err
 	}
-	data, readErr := io.ReadAll(res.Body)
+	data, readErr := readLimitedBody(res.Body, maxAPIResponseBytes)
 	res.Body.Close()
 	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusCreated {
 		if readErr != nil {
@@ -227,7 +270,7 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 		value = handled.Value
 	}
 	if rateLimited || serverError || (handled != nil && handled.Type == "retry") {
-		if err := b.Sleep(ctx, b.RetryDelay); err != nil {
+		if err := b.Sleep(ctx, b.retryWait(res.Header, rateLimited, retries)); err != nil {
 			return nil, err
 		}
 		ambiguous := write && (serverError || handled != nil && handled.Type == "retry")
@@ -300,15 +343,15 @@ type ResponseError struct {
 
 func (e *ResponseError) Error() string { return fmt.Sprintf("status %d: %s", e.Status, e.Body) }
 
-// Do sends req with the SSRF-safe client and turns a non-2xx answer into a
-// ResponseError, for use inside RunStreamedUpload.
+// Do sends req with the SSRF-safe streaming client and turns a non-2xx answer
+// into a ResponseError, for use inside RunStreamedUpload.
 func Do(req *http.Request) (*Response, error) {
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := readLimitedBody(res.Body, maxAPIResponseBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +481,7 @@ func (b *Base) get(ctx context.Context, url string, headers map[string]string, l
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +498,7 @@ func (b *Base) get(ctx context.Context, url string, headers map[string]string, l
 
 func readMediaBytes(reader io.Reader, limit int64) ([]byte, error) {
 	if limit <= 0 {
-		return io.ReadAll(reader)
+		limit = defaultMediaReadLimit
 	}
 	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
 	if err == nil && int64(len(data)) > limit {
@@ -491,6 +534,7 @@ func (b *Base) MediaSize(ctx context.Context, path, identifier string) (int64, e
 	if err != nil {
 		return 0, err
 	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
 	res.Body.Close()
 	length, _ := strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
 	if res.StatusCode == http.StatusPartialContent {
@@ -543,7 +587,7 @@ func (b *Base) rangeRead(ctx context.Context, path string, start, end int64, ide
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 	req.Header.Set("Accept-Encoding", "identity")
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +595,11 @@ func (b *Base) rangeRead(ctx context.Context, path string, start, end int64, ide
 	if res.StatusCode != http.StatusPartialContent {
 		return nil, temporalx.BadBody(identifier, "{}", "{}", fmt.Sprintf("Media server did not honor the range request (status %d)", res.StatusCode))
 	}
-	return io.ReadAll(res.Body)
+	expected := end - start + 1
+	if expected <= 0 {
+		expected = defaultMediaReadLimit
+	}
+	return readLimitedBody(res.Body, expected)
 }
 
 // MediaStream opens the media for streaming; the caller closes it.
@@ -564,7 +612,7 @@ func (b *Base) MediaStream(ctx context.Context, path, identifier string) (io.Rea
 		return nil, err
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return nil, err
 	}

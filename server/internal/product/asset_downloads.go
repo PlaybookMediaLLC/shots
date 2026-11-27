@@ -98,6 +98,20 @@ func (c *Configuration) ReadAssetDownload(ctx context.Context, assetID, token, r
 	return c.ReadAsset(ctx, grant.Actor, assetID)
 }
 
+// OpenAssetDownloadStream streams an expiring download grant directly from
+// object storage with Range and ETag/304 revalidation support.
+func (c *Configuration) OpenAssetDownloadStream(ctx context.Context, assetID, token, requestID, rangeHeader, ifNoneMatch string) (*AssetStream, error) {
+	grant, err := c.openDownloadGrant(token)
+	if err != nil {
+		return nil, err
+	}
+	if grant.AssetID != assetID || grant.KitExportID != "" || grant.ReleaseID != "" {
+		return nil, publishing.ErrUnauthorized
+	}
+	grant.Actor.RequestID = requestID
+	return c.OpenAssetStream(ctx, grant.Actor, assetID, rangeHeader, ifNoneMatch)
+}
+
 // Both owned assets and retained kit exports share the existing encrypted,
 // short-lived principal grant. Each reader validates its own resource fields.
 func (c *Configuration) openDownloadGrant(token string) (assetDownloadGrant, error) {

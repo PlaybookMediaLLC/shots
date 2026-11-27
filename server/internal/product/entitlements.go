@@ -104,3 +104,24 @@ func (c *Configuration) GetFeatureDecision(ctx context.Context, actor Actor, fea
 	}
 	return &FeatureDecision{Allowed: summary.Features[feature], CurrentPlan: summary.Plan, RequiredPlan: requiredPlan}, nil
 }
+
+// CheckFeatures authorizes and evaluates every requested feature against a
+// single WorkspaceEntitlement lookup, returning FeatureNotEntitledError for the
+// first disallowed feature in order.
+func (c *Configuration) CheckFeatures(ctx context.Context, actor Actor, features ...string) error {
+	for _, feature := range features {
+		if _, ok := minimumFeaturePlan[feature]; !ok {
+			return ErrInvalidInput
+		}
+	}
+	summary, err := c.entitlementSummary(ctx, actor)
+	if err != nil {
+		return err
+	}
+	for _, feature := range features {
+		if err := requireFeature(summary.Features, summary.Plan, feature); err != nil {
+			return err
+		}
+	}
+	return nil
+}

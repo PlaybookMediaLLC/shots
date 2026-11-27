@@ -370,7 +370,7 @@ func put(ctx context.Context, mediaPath, writeURL, contentType, acl string, cont
 		return err
 	}
 	get.Header.Set("Accept-Encoding", "identity")
-	file, err := ssrf.Client().Do(get)
+	file, err := ssrf.StreamingClient().Do(get)
 	if err != nil {
 		return err
 	}
@@ -385,7 +385,7 @@ func put(ctx context.Context, mediaPath, writeURL, contentType, acl string, cont
 	req.ContentLength = contentLength
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("x-amz-acl", acl)
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return err
 	}
@@ -393,7 +393,7 @@ func put(ctx context.Context, mediaPath, writeURL, contentType, acl string, cont
 	// A rejected PUT would otherwise publish the post with an empty
 	// attachment - the file id exists but no bytes were stored.
 	if !communityutil.OK(res.StatusCode) {
-		text, err := io.ReadAll(res.Body)
+		text, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 		if err != nil {
 			text = []byte("{}")
 		}

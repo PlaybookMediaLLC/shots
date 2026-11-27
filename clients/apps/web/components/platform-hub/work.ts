@@ -159,6 +159,43 @@ export async function loadWork(
 /** Every workspace's recent work: invalidate it after a project or canvas changes. */
 export const RECENT_WORK_KEY = ['platform', 'recent-work'] as const
 
+/** Lightweight recent screenshot/canvas entry for sidebar navigation (no document blob). */
+export type RecentWorkSummaryItem = {
+  id: string
+  href: string
+  title: string
+  type: 'Screenshot' | 'Canvas'
+  updatedAt: Date
+}
+
+/**
+ * Lightweight sidebar recents: one metadata-only query for the workspace's
+ * newest screenshots and canvases, sharing `RECENT_WORK_KEY` invalidation.
+ */
+export function recentWorkSummaryQuery(
+  client: ReturnType<typeof useTRPCClient>,
+  organizationId: string,
+  limit = 5
+) {
+  return {
+    queryKey: [...RECENT_WORK_KEY, 'summary', organizationId, limit] as const,
+    staleTime: 30_000,
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RecentWorkSummaryItem[]> => {
+      const { items } = await client.project.recentSummary.query({ limit }, { signal })
+      return items.map((item) => ({
+        id: item.id,
+        href:
+          item.kind === 'canvas'
+            ? `/canvas/${item.id}`
+            : `/editor?project=${encodeURIComponent(item.id)}`,
+        title: item.name,
+        type: item.kind === 'canvas' ? 'Canvas' : 'Screenshot',
+        updatedAt: new Date(item.updatedAt),
+      }))
+    },
+  }
+}
+
 /** Home's recent work, shared with search so opening search after Home reads nothing again. */
 export function recentWorkQuery(
   client: ReturnType<typeof useTRPCClient>,

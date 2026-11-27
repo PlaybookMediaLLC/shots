@@ -28,6 +28,26 @@ func TestEmbeddedMigrationsAreTimestampOrdered(t *testing.T) {
 	}
 }
 
+func TestNoTransactionMigrationStatementSplitting(t *testing.T) {
+	scriptBytes, err := files.ReadFile("sql/20261127090000_performance_indexes.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(scriptBytes)
+	if !isNoTransaction(script) {
+		t.Fatal("expected 20261127090000_performance_indexes.sql to declare no-transaction directive")
+	}
+	stmts := splitStatements(script)
+	if len(stmts) != 23 {
+		t.Fatalf("expected 23 statements in performance_indexes migration, got %d", len(stmts))
+	}
+	for _, stmt := range stmts {
+		if strings.Contains(stmt, "SET LOCAL") {
+			t.Fatalf("no-transaction migration must not contain SET LOCAL: %s", stmt)
+		}
+	}
+}
+
 func TestApplyFreshDatabaseAndIsIdempotent(t *testing.T) {
 	url := os.Getenv("PLATFORM_MIGRATION_TEST_DATABASE_URL")
 	if url == "" {

@@ -5,7 +5,7 @@ export type DiffRow =
   | { kind: 'del'; before: number }
 
 /** Lines compared by the longest common subsequence; both sides above this compare as replaced. */
-const LCS_LIMIT = 4_000
+const LCS_LIMIT = 1_000
 
 /**
  * A line diff of `before` against `after`, in reading order, with 1-based

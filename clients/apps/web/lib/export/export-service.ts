@@ -125,6 +125,7 @@ async function capture3DTransformWithModernScreenshot(
     width: elementRect.width,
     height: elementRect.height,
     backgroundColor: null,
+    fetch: { requestInit: { mode: 'cors', cache: 'no-cache' } },
     filter: shouldIncludeInExport,
     onCloneNode: cleanExportClone,
   });
@@ -181,6 +182,7 @@ async function exportHTMLCanvas(
     backgroundColor: null,
     width: originalWidth,
     height: originalHeight,
+    fetch: { requestInit: { mode: 'cors', cache: 'no-cache' } },
     // Exclude editor-only controls and blur regions. Blur is composited in a
     // post-processing pass because backdrop-filter cannot be rasterized here.
     filter: shouldIncludeInExport,

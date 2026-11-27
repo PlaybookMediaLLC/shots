@@ -122,12 +122,12 @@ func neynar(ctx context.Context, method, path string, query url.Values, body, ou
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := farcasterHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 	if err != nil {
 		return err
 	}
@@ -136,6 +136,8 @@ func neynar(ctx context.Context, method, path string, query url.Values, body, ou
 	}
 	return json.Unmarshal(data, out)
 }
+
+var farcasterHTTPClient = &http.Client{Timeout: 30 * time.Second}
 
 type Signer struct {
 	SignerUUID  string `json:"signerUuid"`

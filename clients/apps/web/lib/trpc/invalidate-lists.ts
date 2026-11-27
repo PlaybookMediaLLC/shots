@@ -43,7 +43,12 @@ export function invalidateListsLink(queryClient: QueryClient): TRPCLink<AppRoute
               void queryClient.invalidateQueries({ queryKey: RECENT_WORK_KEY })
               void queryClient.invalidateQueries({ queryKey: ['shell-search'] })
             }
-            if (changesList) void queryClient.invalidateQueries({ queryKey: [[resource, 'list']] })
+            if (changesList) {
+              void queryClient.invalidateQueries({ queryKey: [[resource, 'list']] })
+              if (resource === 'project' || resource === 'creativeSet') {
+                void queryClient.invalidateQueries({ queryKey: RECENT_WORK_KEY })
+              }
+            }
             if (changesRun)
               void queryClient.invalidateQueries({ queryKey: [['onboarding', 'latest']] })
             observer.next(value)

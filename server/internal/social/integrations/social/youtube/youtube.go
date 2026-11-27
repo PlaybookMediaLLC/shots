@@ -460,7 +460,7 @@ func probeUploadSession(ctx context.Context, accessToken, uploadURI string, vide
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, readErr := io.ReadAll(res.Body)
+	body, readErr := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 
 	if res.StatusCode == 200 || res.StatusCode == 201 {
 		return &probeResult{videoID: videoID(body)}, nil
@@ -698,12 +698,12 @@ func uploadChunk(ctx context.Context, accessToken string, data pendingData, star
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "video/mp4")
 	req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, data.VideoSize))
-	res, err := ssrf.Client().Do(req)
+	res, err := ssrf.StreamingClient().Do(req)
 	if err != nil {
 		return 0, "", err
 	}
 	defer res.Body.Close()
-	text, readErr := io.ReadAll(res.Body)
+	text, readErr := io.ReadAll(io.LimitReader(res.Body, 10<<20))
 
 	// more bytes expected, resume from the offset the session reports
 	if res.StatusCode == 308 {
@@ -761,7 +761,7 @@ func setThumbnail(ctx context.Context, accessToken, videoID, thumbnail string) e
 	}
 	defer image.Body.Close()
 	if image.StatusCode < 200 || image.StatusCode > 299 {
-		data, _ := io.ReadAll(image.Body)
+		data, _ := io.ReadAll(io.LimitReader(image.Body, 1<<20))
 		return &googleapi.Error{Status: image.StatusCode, Body: string(data)}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,

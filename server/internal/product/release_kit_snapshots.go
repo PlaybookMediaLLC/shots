@@ -215,7 +215,7 @@ func kitSnapshotSourcesLocal(value any) bool {
 		for key, child := range v {
 			if text, ok := child.(string); ok {
 				media := slices.Contains([]string{"src", "fontUrl", "backgroundImage", "poster"}, key) || (key == "url" && slices.Contains([]string{"img", "image", "media"}, kind)) || (key == "value" && kind == "image")
-				if media && text != "" && !strings.HasPrefix(text, "asset:") && !designBuiltinPath.MatchString(text) {
+				if media && text != "" && !strings.HasPrefix(text, "asset:") && !isBuiltinOrMediaSource(text) {
 					return false
 				}
 			}

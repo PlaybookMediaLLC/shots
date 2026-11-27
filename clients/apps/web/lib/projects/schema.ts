@@ -53,6 +53,13 @@ export const projectListInputSchema = z.object({
 /** One of {@link projectListInputSchema}. */
 export type ProjectListInput = z.infer<typeof projectListInputSchema>
 
+/** Input of `project.recentSummary` (lightweight sidebar recents). */
+export const projectRecentSummaryInputSchema = z.object({
+  limit: z.number().int().min(1).max(20).optional(),
+})
+/** One of {@link projectRecentSummaryInputSchema}. */
+export type ProjectRecentSummaryInput = z.infer<typeof projectRecentSummaryInputSchema>
+
 /** Input of `project.create`. The document is checked by `parseDesignDocument`. */
 export const projectCreateInputSchema = z.object({
   document: z.unknown(),

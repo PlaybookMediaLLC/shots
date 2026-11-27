@@ -6,21 +6,18 @@ import {
   CodeLinePlugin,
   CodeSyntaxPlugin,
 } from "@platejs/code-block/react";
-import { all, createLowlight } from "lowlight";
-
+import { sharedLowlight } from "../lib/lowlight";
 import {
   CodeBlockElement,
   CodeLineElement,
   CodeSyntaxLeaf,
 } from "../ui/code-block-node";
 
-const lowlight = createLowlight(all);
-
 export const CodeBlockKit = [
   CodeBlockPlugin.configure({
     inputRules: [CodeBlockRules.markdown({ on: "match" })],
     node: { component: CodeBlockElement },
-    options: { lowlight },
+    options: { lowlight: sharedLowlight },
     shortcuts: { toggle: { keys: "mod+alt+8" } },
   }),
   CodeLinePlugin.withComponent(CodeLineElement),

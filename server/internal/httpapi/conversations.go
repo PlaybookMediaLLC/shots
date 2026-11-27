@@ -15,6 +15,7 @@ func (s *Server) registerConversations(mux *http.ServeMux) {
 	handle("GET /v1/conversations", s.listConversations)
 	handle("POST /v1/conversations", s.createConversation)
 	handle("GET /v1/conversations/{id}", s.getConversation)
+	handle("GET /v1/conversations/{id}/view", s.getConversationView)
 	handle("PATCH /v1/conversations/{id}", s.updateConversation)
 	handle("POST /v1/conversations/{id}/messages", s.appendConversationMessage)
 }
@@ -50,6 +51,13 @@ func (s *Server) createConversation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getConversation(w http.ResponseWriter, r *http.Request) {
 	if id, ok := launchID(w, r, "id"); ok {
 		result, err := s.configuration.GetConversation(r.Context(), workspaceActor(r), id)
+		writeLaunch(w, http.StatusOK, result, err)
+	}
+}
+
+func (s *Server) getConversationView(w http.ResponseWriter, r *http.Request) {
+	if id, ok := launchID(w, r, "id"); ok {
+		result, err := s.configuration.GetConversationView(r.Context(), workspaceActor(r), id)
 		writeLaunch(w, http.StatusOK, result, err)
 	}
 }

@@ -290,7 +290,8 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, mount string) 
 		s.challenge(w, mount)
 		return
 	}
-	key, err := s.config.Product.VerifyAPIKey(r.Context(), token)
+	memo := &publishing.AuthorizationMemo{}
+	key, err := s.config.Product.VerifyAPIKey(publishing.RecordAuthorization(r.Context(), memo), token)
 	switch {
 	case errors.Is(err, publishing.ErrUnauthorized):
 		s.challenge(w, mount, Param{"error", "invalid_token"},
@@ -304,6 +305,7 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, mount string) 
 			"error_description": "A required dependency is unavailable."})
 		return
 	}
+	r = r.WithContext(publishing.ReplayAuthorization(r.Context(), memo))
 	call := principal{key: key, requestID: requestID(r), client: clientName(key, r)}
 	w.Header().Set("X-Request-Id", call.requestID)
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)

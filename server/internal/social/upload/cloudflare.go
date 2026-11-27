@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -220,8 +221,15 @@ func (s *CloudflareStorage) ReadFile(ctx context.Context, fileName string) (stri
 		return "", err
 	}
 	defer out.Body.Close()
-	data, err := io.ReadAll(out.Body)
-	return string(data), err
+	const maxReadFileBytes = 10 << 20
+	data, err := io.ReadAll(io.LimitReader(out.Body, maxReadFileBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > maxReadFileBytes {
+		return "", fmt.Errorf("file %q exceeds %d bytes", fileName, maxReadFileBytes)
+	}
+	return string(data), nil
 }
 
 func (s *CloudflareStorage) WriteFile(ctx context.Context, fileName, body, contentType string) error {

@@ -212,6 +212,13 @@ func (f *fakeConfiguration) CompleteAssetUpload(context.Context, product.Actor, 
 func (f *fakeConfiguration) SignAssetDownload(context.Context, product.Actor, string) (string, error) {
 	return "https://media.example.test/download", nil
 }
+func (f *fakeConfiguration) SignAssetDownloads(_ context.Context, _ product.Actor, ids []string) (map[string]string, error) {
+	urls := make(map[string]string, len(ids))
+	for _, id := range ids {
+		urls[id] = "https://media.example.test/download/" + id
+	}
+	return urls, nil
+}
 
 func (f *fakeConfiguration) ReadAssetDownload(context.Context, string, string, string) ([]byte, string, error) {
 	return []byte("asset bytes"), "image/png", nil

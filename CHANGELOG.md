@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.56.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.55.0...v2.56.0) (2026-11-27)
+
+
+### Features
+
+* **ai:** enhance unified assistant UX, add AI settings, and enforce Haiku-only BYOK ([e33f46d](https://github.com/PlaybookMediaLLC/shots/commit/e33f46dd02782cac118fef04680243629e3161b8))
+* **ai:** enhance unified assistant UX, add AI settings, and enforce Haiku-only BYOK ([d67eaf8](https://github.com/PlaybookMediaLLC/shots/commit/d67eaf8b1fab9c9e168946fe6920dc052dc8f400))
+* **backend:** save private assistant chats ([c1478ce](https://github.com/PlaybookMediaLLC/shots/commit/c1478cea9673ade3429a2713b3d059e5c656d8f8))
+* **docs:** add Fumadocs MDX documentation site matching console theme ([#658](https://github.com/PlaybookMediaLLC/shots/issues/658)) ([3c7114f](https://github.com/PlaybookMediaLLC/shots/commit/3c7114f8ce5ddd4ca4b6d47ec3cbdd4259f8d922))
+* one streaming AI assistant on every page and editor ([d708335](https://github.com/PlaybookMediaLLC/shots/commit/d708335aa953a5161ef5a14b89a3199df2344c03))
+* **web:** give the post editor its AI menu, review and suggestions ([30b2cd1](https://github.com/PlaybookMediaLLC/shots/commit/30b2cd158f2b40d117e75090127324332c766b18))
+* **web:** give the post editor its AI menu, review and suggestions ([5f6bc35](https://github.com/PlaybookMediaLLC/shots/commit/5f6bc3567e45287b6457f4f92857020d9b2d55d7))
+* **web:** one streaming AI assistant on every page and editor ([9617723](https://github.com/PlaybookMediaLLC/shots/commit/96177233963963a50c159babf0ec29959a64fbd1))
+
+
+### Bug Fixes
+
+* **web:** discard only your own AI text, and say why an AI request failed ([fcd4f98](https://github.com/PlaybookMediaLLC/shots/commit/fcd4f98f037401a199b2df65863f45cdd1a492ea))
+* **web:** flatten the assistant panel and cover the remaining fixes ([17a3780](https://github.com/PlaybookMediaLLC/shots/commit/17a378018ce79dfb302020de3bf8b74d4f602547))
+* **web:** keep the assistant clear of the page and tidy its composer ([dd2ccd2](https://github.com/PlaybookMediaLLC/shots/commit/dd2ccd23ca4662b2c69a051fc3d8b30dff1307cf))
+* **web:** remove the shadows from the assistant side panel ([040c30f](https://github.com/PlaybookMediaLLC/shots/commit/040c30fd0f591a57044f8ef537e1cc760c80c981))
+* **web:** restore saved-chat menu semantics, readiness CTA, and Settings count ([d242ee6](https://github.com/PlaybookMediaLLC/shots/commit/d242ee6c86dfc69587027590f4de9fac53add90e))
+
+
+### Performance Improvements
+
+* codebase-wide performance remediation (Phases 0–6) ([2a96270](https://github.com/PlaybookMediaLLC/shots/commit/2a96270fa9beefeafa2514e372c8d7aa63ebd968))
+* **phase-0:** consolidate pools, bound timeouts/streams, and fix Temporal cliffs ([6b46b36](https://github.com/PlaybookMediaLLC/shots/commit/6b46b368d002d9830f592db6543233c6e7e9c0d9))
+* **phase-1:** add CONCURRENTLY indexes, query projections, N+1 batching, and compression ([550d733](https://github.com/PlaybookMediaLLC/shots/commit/550d733757c1b41038f1c01979788269fa7e2fb1))
+* **phase-2:** add collab epoch push, batch notifications/drains, and harden background workers ([e557c8c](https://github.com/PlaybookMediaLLC/shots/commit/e557c8cb4a945b5d3b7d199a097b0ffc2cf0f895))
+* **phase-3:** split bundles, scope editor fonts/CSS, direct R2 CDN, and slim sidebar recents ([7222d21](https://github.com/PlaybookMediaLLC/shots/commit/7222d217aebd33f22ac3ee4efde93c0420c0bef9))
+* **phase-4:** optimize canvas/composer rendering, dedup SSR reads, and batch asset signing ([c716054](https://github.com/PlaybookMediaLLC/shots/commit/c716054f01a8ae1669b713528f8c6baf3a2ab91f))
+* **phase-5:** pool design renderer, async kit workflows, and optimize AI/capture paths ([3ce7fcf](https://github.com/PlaybookMediaLLC/shots/commit/3ce7fcf21e503d580d9437e722c5003088d79491))
+* **phase-6:** harden container memory limits, DB/Redis timeouts, Helm HPA/PDB, and Dockerfiles ([a25be57](https://github.com/PlaybookMediaLLC/shots/commit/a25be5752eb2e86bef19f7bcd99fa018b76e8d6f))
+* **temporal:** move frequent maintenance pollers off Temporal Schedules ([9a7f615](https://github.com/PlaybookMediaLLC/shots/commit/9a7f615ed4580749f9218254c12e8bb6e6df1c93))
+* **temporal:** move frequent maintenance pollers off Temporal Schedules ([465cc4b](https://github.com/PlaybookMediaLLC/shots/commit/465cc4b1c5d768f977eb9e898033ea2c959da5a0))
+
 ## [2.55.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.54.0...v2.55.0) (2026-11-24)
 
 

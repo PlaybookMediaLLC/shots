@@ -64,10 +64,28 @@ func IsSafePublicHTTPSURL(ctx context.Context, value string) bool {
 // services on a private network).
 func Disabled() bool { return os.Getenv("DISABLE_SSRF_PROTECTION") == "true" }
 
-var guarded = &http.Client{Transport: newTransport()}
+// DefaultTimeout bounds ordinary outbound API and webhook requests.
+const DefaultTimeout = 30 * time.Second
+
+var guardedTransport = newGuardedTransport()
+
+var guarded = &http.Client{
+	Transport: guardedTransport,
+	Timeout:   DefaultTimeout,
+}
+
+var unguarded = &http.Client{
+	Timeout: DefaultTimeout,
+}
+
+var guardedStreaming = &http.Client{
+	Transport: guardedTransport,
+}
+
+var unguardedStreaming = &http.Client{}
 
 var publicOnly = &http.Client{
-	Transport: newTransport(),
+	Transport: guardedTransport,
 	Timeout:   10 * time.Second,
 	CheckRedirect: func(*http.Request, []*http.Request) error {
 		return errors.New("instance redirects are not allowed")
@@ -79,7 +97,7 @@ var publicOnly = &http.Client{
 // Redirects are refused so credentials cannot leave the chosen instance.
 func PublicClient() *http.Client { return publicOnly }
 
-func newTransport() *http.Transport {
+func newGuardedTransport() *http.Transport {
 	dialer := &net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -96,15 +114,27 @@ func newTransport() *http.Transport {
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = dialer.DialContext
+	transport.ResponseHeaderTimeout = 30 * time.Second
+	transport.MaxIdleConnsPerHost = 16
 	transport.Proxy = nil
 	return transport
 }
 
-// Client returns the SSRF-safe client, or the default client when protection
-// is disabled. It has no overall timeout; callers bound requests with ctx.
+// Client returns the SSRF-safe client (or a bounded unguarded client when
+// protection is disabled), with a 30-second total timeout.
 func Client() *http.Client {
 	if Disabled() {
-		return http.DefaultClient
+		return unguarded
 	}
 	return guarded
+}
+
+// StreamingClient returns the SSRF-safe client (or unguarded when disabled)
+// with bounded dial and response-header timeouts but no overall body-transfer
+// deadline, for large media uploads and downloads bounded by ctx.
+func StreamingClient() *http.Client {
+	if Disabled() {
+		return unguardedStreaming
+	}
+	return guardedStreaming
 }
