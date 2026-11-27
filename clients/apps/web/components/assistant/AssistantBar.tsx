@@ -1,11 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { ArrowUpIcon } from '@phosphor-icons/react/dist/ssr/ArrowUp'
+import { MicrophoneIcon } from '@phosphor-icons/react/dist/ssr/Microphone'
 import { MinusIcon } from '@phosphor-icons/react/dist/ssr/Minus'
 import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/ssr/SidebarSimple'
+import { SpinnerGapIcon } from '@phosphor-icons/react/dist/ssr/SpinnerGap'
 import { StopIcon } from '@phosphor-icons/react/dist/ssr/Stop'
 import { TargetIcon } from '@phosphor-icons/react/dist/ssr/Target'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
@@ -20,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { useKeys } from '@/components/write/shortcuts'
+import { useVoiceDictation } from '@/hooks/use-voice-dictation'
 import { EDITOR_ASK_MAX, EDITOR_ASK_PARAM } from '@/lib/ai/editor-ask'
 import {
   ASSISTANT_ASK_MAX,
@@ -29,7 +42,8 @@ import {
 } from '@/lib/assistant/ability'
 import type { PageContext } from '@/lib/assistant/page-context'
 import { savedEntries } from '@/lib/assistant/saved-thread'
-import { useTRPCClient } from '@/lib/trpc/react'
+import { tierRequiresApiKey } from '@/lib/ai/models/tiers'
+import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { ATTACHMENTS_MAX } from '@/lib/assistant/attachments'
 import { platformArea } from '@/lib/platform/navigation'
@@ -37,19 +51,23 @@ import { withoutLocale } from '@/lib/settings/appearance'
 import { cn } from '@/lib/utils'
 import {
   closeAssistant,
+  loadStoredAssistantMode,
   openAssistant,
   pushAssistantEntry,
   queueChatWrite,
   setAssistantMode,
+  setAssistantModelOverride,
   startAssistantOver,
   syncAssistantOrganization,
   toggleAssistant,
+  updateAssistantActivity,
   useAssistantStore,
 } from './assistant-store'
+import { AssistantContextRibbon } from './AssistantContextRibbon'
 import { AssistantMark } from './AssistantMark'
 import { AssistantThreads } from './AssistantThreads'
-import { AssistantAttach } from './AssistantAttach'
-import { AssistantMessage, AssistantPending } from './AssistantMessage'
+import { AssistantAttach, prepareImageFile } from './AssistantAttach'
+import { AssistantMessage, AssistantPending, scrollThreadIfPinned } from './AssistantMessage'
 import { useAssistantRegistry } from './AssistantProvider'
 import { useAiAvailable } from './useAiAvailable'
 import { workspaceAbility } from './workspace-ability'
@@ -84,12 +102,29 @@ export function AssistantBar({
 }) {
   const registry = useAssistantRegistry()
   const available = useAiAvailable()
+  const trpc = useTRPC()
   const client = useTRPCClient()
+  const queryClient = useQueryClient()
   const path = withoutLocale(usePathname())
   const searchParams = useSearchParams()
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [images, setImages] = useState<{ name: string; data: string }[]>([])
+  const [draggingOver, setDraggingOver] = useState(false)
+
+  const dictation = useVoiceDictation({
+    onTranscript: (transcript) => {
+      setText((current) => `${current} ${transcript}`.trim().slice(0, ASSISTANT_ASK_MAX))
+      input.current?.focus()
+    },
+  })
+
+  useEffect(() => {
+    const stored = loadStoredAssistantMode()
+    if (stored && useAssistantStore.getState().modeOverride === null) {
+      useAssistantStore.setState({ modeOverride: stored })
+    }
+  }, [])
 
   const entries = useAssistantStore((state) => state.entries)
   const open = useAssistantStore((state) => state.open)
@@ -102,10 +137,22 @@ export function AssistantBar({
   const thread = useRef<HTMLOListElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
 
-  // Reset conversation memory and abort in-flight requests whenever workspace changes.
+  // Reset conversation memory, local attachments/draft, and dictation whenever workspace changes.
+  const cancelDictation = dictation.cancel
   useEffect(() => {
+    const previous = useAssistantStore.getState().organizationId
     syncAssistantOrganization(organizationId)
-  }, [organizationId])
+    if (previous !== null && previous !== organizationId) {
+      setText('')
+      setImages([])
+      cancelDictation()
+    }
+  }, [cancelDictation, organizationId])
+
+  // Stop any live microphone recording if the assistant is hidden or AI becomes unavailable.
+  useEffect(() => {
+    if (!open || !available) cancelDictation()
+  }, [available, cancelDictation, open])
 
   // Next sets the title after navigating; follow it.
   useEffect(() => {
@@ -138,8 +185,8 @@ export function AssistantBar({
   }, [ability.selection])
 
   // A different ability starts its own conversation (a running one is stopped first,
-  // so it cannot change the surface the person moved to),
-  // resets any manual dock/bar override, and opens automatically when prominent.
+  // so it cannot change the surface the person moved to), preserves any persisted
+  // Dock/Bar preference, and opens automatically when prominent.
   const prominent = ability.prominent === true
   useEffect(() => {
     if (conversationAbility === ability.id) return
@@ -148,11 +195,14 @@ export function AssistantBar({
       return
     }
     startAssistantOver(ability.id)
-    useAssistantStore.setState({ modeOverride: null, open: prominent })
+    useAssistantStore.setState({
+      modeOverride: loadStoredAssistantMode(),
+      open: prominent,
+    })
   }, [ability.id, conversationAbility, prominent, running])
 
   useEffect(() => {
-    thread.current?.scrollTo({ top: thread.current.scrollHeight })
+    scrollThreadIfPinned(thread.current)
   }, [entries, running])
 
   // Keep the multiline composer height sized tightly to its content.
@@ -194,7 +244,8 @@ export function AssistantBar({
   // Applied after the ability's own conversation starts, which would otherwise close the bar.
   const prefill = useAssistantStore((state) => state.prefill)
   useEffect(() => {
-    if (!shown || !prefill || prefill.abilityId !== ability.id) return
+    if (!shown || !prefill) return
+    if (prefill.abilityId !== '*' && prefill.abilityId !== ability.id) return
     if (conversationAbility !== ability.id) return
     useAssistantStore.setState({ prefill: null })
     setText(prefill.text.slice(0, ASSISTANT_ASK_MAX))
@@ -238,45 +289,78 @@ export function AssistantBar({
   }, [ability.surface, activeSelection, area, path, registry, title])
 
   const send = useCallback(
-    async (value: string) => {
-      const ask = value.trim().slice(0, ASSISTANT_ASK_MAX)
+    async (value: string, overrideImages?: readonly string[]) => {
+      if (dictation.state !== 'idle') return
+      const attached = overrideImages ? [...overrideImages] : images.map((image) => image.data)
+      const ask = (
+        value.trim() || (attached.length > 0 ? 'Inspect this image and help me with it.' : '')
+      ).slice(0, ASSISTANT_ASK_MAX)
       if (!ask || useAssistantStore.getState().controller !== null) return
       if (useAssistantStore.getState().abilityId !== ability.id) startAssistantOver(ability.id)
       const controller = new AbortController()
-      useAssistantStore.setState({ controller })
+      useAssistantStore.setState({ controller, statusLabel: '' })
       pushAssistantEntry({ kind: 'user', text: ask })
       const memory = useAssistantStore.getState().memory
-      const attached = images.map((image) => image.data)
-      setImages([])
+      if (!overrideImages) setImages([])
       // A run that outlives its thread (a workspace switch) adds nothing to the next one.
-      const push = (entry: AssistantEntry) => {
-        if (useAssistantStore.getState().memory === memory) pushAssistantEntry(entry)
+      const push = (entry: AssistantEntry) =>
+        useAssistantStore.getState().memory === memory ? pushAssistantEntry(entry) : undefined
+      const updateActivity = (id: number, next: 'running' | 'done' | 'error') => {
+        if (useAssistantStore.getState().memory === memory) updateAssistantActivity(id, next)
       }
       try {
+        const currentStore = useAssistantStore.getState()
         await ability.run({
           ask,
+          ...(currentStore.contextRefs.length > 0
+            ? { contextRefs: currentStore.contextRefs }
+            : {}),
+          ...(currentStore.effortOverride ? { effort: currentStore.effortOverride } : {}),
           memory,
+          ...(currentStore.modelTierOverride ? { modelTier: currentStore.modelTierOverride } : {}),
           ...(attached.length > 0 ? { images: attached } : {}),
           page: buildPageContext(),
           push,
+          status: (statusLabel) => {
+            if (useAssistantStore.getState().memory === memory)
+              useAssistantStore.setState({ statusLabel })
+          },
           stream: (draft) => {
             if (useAssistantStore.getState().memory === memory) useAssistantStore.setState({ draft })
           },
           selection: activeSelection,
           signal: controller.signal,
+          updateActivity,
         })
       } catch (error) {
+        const message = controller.signal.aborted
+          ? 'Stopped.'
+          : error instanceof Error
+            ? error.message
+            : 'Something went wrong.'
+        const isApiKeyError = /OpenRouter API key/i.test(message)
+        if (isApiKeyError) {
+          const latest = useAssistantStore.getState()
+          if (latest.modelTierOverride && tierRequiresApiKey(latest.modelTierOverride)) {
+            setAssistantModelOverride(null, latest.effortOverride)
+          }
+          void queryClient.invalidateQueries({ queryKey: trpc.workspace.readiness.queryKey() })
+        }
+        const isCreditError = !isApiKeyError && /credit|quota|billing/i.test(message)
+        const hasTextPrompt = value.trim().length > 0
         push({
+          ...(isApiKeyError
+            ? { actionHref: '/settings/ai-models', actionLabel: 'Manage AI models' }
+            : isCreditError
+              ? { actionHref: '/settings/billing', actionLabel: 'View billing & credits' }
+              : {}),
           kind: 'error',
-          text: controller.signal.aborted
-            ? 'Stopped.'
-            : error instanceof Error
-              ? error.message
-              : 'Something went wrong.',
+          ...(!controller.signal.aborted && hasTextPrompt ? { retryAsk: ask } : {}),
+          text: message,
         })
       } finally {
         if (useAssistantStore.getState().controller === controller)
-          useAssistantStore.setState({ controller: null })
+          useAssistantStore.setState({ controller: null, statusLabel: '' })
         const state = useAssistantStore.getState()
         const kept = savedEntries(state.entries)
         if (state.memory === memory && kept.length > 0) {
@@ -286,22 +370,80 @@ export function AssistantBar({
           // The chat works without being saved, so a failure only says so.
           void queueChatWrite(() =>
             client.assistantThread.save.mutate({
-                entries: kept,
-                id,
-                title: title.trim().slice(0, 120) || 'Chat',
-              })
+              entries: kept,
+              id,
+              title: title.trim().slice(0, 120) || 'Chat',
+            })
           ).catch(() => toast.error('This chat could not be saved.', { id: 'assistant-save' }))
         }
       }
     },
-    [ability, activeSelection, buildPageContext, client, images]
+    [
+      ability,
+      activeSelection,
+      buildPageContext,
+      client,
+      dictation.state,
+      images,
+      queryClient,
+      trpc.workspace.readiness,
+    ]
   )
+
+  const addImageFiles = useCallback(async (files: readonly File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/')).slice(0, ATTACHMENTS_MAX)
+    if (imageFiles.length === 0) return
+    try {
+      const prepared = await Promise.all(imageFiles.map((file) => prepareImageFile(file)))
+      setImages((current) => [...current, ...prepared].slice(-ATTACHMENTS_MAX))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'That image could not be attached.')
+    }
+  }, [])
+
+  const onComposerPaste = useCallback(
+    (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = [...event.clipboardData.items]
+      const files = items
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null)
+      if (files.length === 0) return
+      event.preventDefault()
+      void addImageFiles(files)
+    },
+    [addImageFiles]
+  )
+
+  const onPanelDrop = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      event.preventDefault()
+      setDraggingOver(false)
+      const files = [...event.dataTransfer.files]
+      if (files.length > 0) void addImageFiles(files)
+    },
+    [addImageFiles]
+  )
+
+  const onPanelDragOver = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    setDraggingOver(true)
+  }, [])
+
+  const onPanelDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDraggingOver(false)
+    }
+  }, [])
 
   if (!registry || !available || !registry.slot) return null
 
+  const canSend = (text.trim().length > 0 || images.length > 0) && dictation.state === 'idle'
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!text.trim() || running) return
+    if (!canSend || running) return
     const next = text
     setText('')
     void send(next)
@@ -322,7 +464,7 @@ export function AssistantBar({
     }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
-      if (!text.trim() || running) return
+      if (!canSend || running) return
       const next = text
       setText('')
       void send(next)
@@ -480,15 +622,20 @@ export function AssistantBar({
       {images.map((image, index) => (
         <li
           key={`${image.name}-${index}`}
-          className="inline-flex max-w-48 items-center gap-1 rounded-full border border-foreground/15 bg-card px-2.5 py-0.5 text-[0.71875rem]"
+          className="inline-flex max-w-52 items-center gap-1.5 rounded-lg border border-foreground/15 bg-card p-1 pe-1.5 text-[0.71875rem]"
         >
+          <img
+            src={`data:image/jpeg;base64,${image.data}`}
+            alt={image.name}
+            className="size-7 shrink-0 rounded object-cover"
+          />
           <span className="truncate">{image.name}</span>
           <Button
             type="button"
             variant="custom"
             size={null}
             aria-label={`Remove ${image.name}`}
-            className="grid size-4 place-items-center rounded-full text-muted-foreground hover:text-foreground"
+            className="grid size-4 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
             onClick={() => setImages((current) => current.filter((_, at) => at !== index))}
           >
             <XIcon className="size-2.5" aria-hidden="true" />
@@ -498,10 +645,69 @@ export function AssistantBar({
     </ul>
   ) : null
 
+  const formatTimer = (total: number) =>
+    `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+
+  const voiceControl = canEdit && dictation.supported ? (
+    dictation.state === 'recording' ? (
+      <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
+        <span className="size-1.5 animate-pulse rounded-full bg-destructive" aria-hidden="true" />
+        <span className="tabular-nums">{formatTimer(dictation.seconds)}</span>
+        <Button
+          type="button"
+          size={null}
+          variant="custom"
+          aria-label="Finish voice dictation"
+          title="Finish & transcribe"
+          className="grid size-5 place-items-center rounded-full bg-destructive text-destructive-foreground"
+          onClick={dictation.stop}
+        >
+          <StopIcon className="size-2.5" aria-hidden="true" weight="fill" />
+        </Button>
+        <Button
+          type="button"
+          size={null}
+          variant="custom"
+          aria-label="Cancel voice dictation"
+          title="Cancel recording"
+          className="grid size-5 place-items-center rounded-full text-destructive/80 hover:text-destructive"
+          onClick={dictation.cancel}
+        >
+          <XIcon className="size-2.5" aria-hidden="true" />
+        </Button>
+      </div>
+    ) : (
+      <Button
+        type="button"
+        size={null}
+        variant="custom"
+        aria-label="Dictate with microphone"
+        title={
+          dictation.state === 'transcribing'
+            ? 'Transcribing voice…'
+            : 'Dictate prompt with microphone (uses AI credits)'
+        }
+        disabled={running || dictation.state === 'transcribing'}
+        className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40"
+        onClick={() => void dictation.start()}
+      >
+        {dictation.state === 'transcribing' ? (
+          <SpinnerGapIcon className="size-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <MicrophoneIcon className="size-3.5" aria-hidden="true" />
+        )}
+      </Button>
+    )
+  ) : null
+
   const composer = (
     <form
       onSubmit={submit}
-      className={cn('assistant-bar', mode === 'dock' && 'assistant-bar-dock')}
+      className={cn(
+        'assistant-bar',
+        mode === 'dock' && 'assistant-bar-dock',
+        draggingOver && 'ring-2 ring-ring/50'
+      )}
     >
       {mode === 'bar' ? (
         <>
@@ -519,6 +725,7 @@ export function AssistantBar({
       />
       <Textarea
         ref={input}
+        data-assistant-composer
         aria-label="Ask the assistant"
         placeholder={ability.placeholder}
         value={text}
@@ -526,8 +733,10 @@ export function AssistantBar({
         maxLength={ASSISTANT_ASK_MAX}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={onComposerKeyDown}
+        onPaste={onComposerPaste}
         className="assistant-textarea"
       />
+      {voiceControl}
       {running ? (
         <Button
           type="button"
@@ -545,7 +754,7 @@ export function AssistantBar({
           size={null}
           variant="custom"
           aria-label="Send"
-          disabled={!text.trim()}
+          disabled={!canSend}
           className="grid size-8 shrink-0 place-items-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-30"
         >
           <ArrowUpIcon className="size-4" aria-hidden="true" />
@@ -553,6 +762,7 @@ export function AssistantBar({
       )}
       {mode === 'bar' && entries.length === 0 ? (
         <>
+          <AssistantThreads abilityId={ability.id} disabled={running} />
           <Button
             type="button"
             size={null}
@@ -588,7 +798,10 @@ export function AssistantBar({
         data-board-control
         data-export-exclude
         data-mode="dock"
-        className="assistant assistant-dock"
+        onDragLeave={onPanelDragLeave}
+        onDragOver={onPanelDragOver}
+        onDrop={onPanelDrop}
+        className={cn('assistant assistant-dock', draggingOver && 'ring-2 ring-ring/40')}
       >
         <header className="flex shrink-0 items-center gap-2 border-b border-foreground/[0.08] px-3 py-2.5 text-[0.8125rem]">
           <AssistantMark className="shrink-0" />
@@ -643,6 +856,7 @@ export function AssistantBar({
                 key={entry.id}
                 entry={entry}
                 canUndo={!running && entry === lastChange}
+                onRetry={(prompt) => void send(prompt, [])}
                 target={ability.target}
               />
             ))
@@ -654,6 +868,7 @@ export function AssistantBar({
         <div className="shrink-0 space-y-1.5 border-t border-foreground/[0.08] p-2.5">
           {attachmentChips}
           {scopeChip}
+          <AssistantContextRibbon disabled={running} mode="dock" surface={ability.surface} />
           {composer}
         </div>
       </section>
@@ -663,6 +878,9 @@ export function AssistantBar({
         data-board-control
         data-export-exclude
         data-mode="bar"
+        onDragLeave={onPanelDragLeave}
+        onDragOver={onPanelDragOver}
+        onDrop={onPanelDrop}
         className="assistant"
       >
         {entries.length > 0 ? (
@@ -682,6 +900,7 @@ export function AssistantBar({
                   key={entry.id}
                   entry={entry}
                   canUndo={!running && entry === lastChange}
+                  onRetry={(prompt) => void send(prompt, [])}
                   target={ability.target}
                 />
               ))}
@@ -712,6 +931,7 @@ export function AssistantBar({
         ) : null}
         {attachmentChips}
         {scopeChip}
+        <AssistantContextRibbon disabled={running} mode="bar" surface={ability.surface} />
         {composer}
       </section>
     )

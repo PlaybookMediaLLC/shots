@@ -62,6 +62,11 @@ const rules = [
     error: { message: 'slow', status: 429 },
   },
   {
+    id: 'badbyok',
+    match: { textContains: 'badbyokkey' },
+    error: { message: 'Invalid OpenRouter API key', status: 401 },
+  },
+  {
     fault: { afterChunks: 1, kind: 'disconnect' },
     id: 'cut',
     match: { stream: true, textContains: 'cutoff' },
@@ -101,6 +106,10 @@ before(async () => {
     const url = new URL(String(input instanceof Request ? input.url : input))
     if (url.origin === AI) {
       if (init?.body) sent.push(JSON.parse(String(init.body)))
+      const headers = new Headers(
+        init?.headers ?? (input instanceof Request ? input.headers : undefined)
+      )
+      sentAuth.push(headers.get('authorization'))
       return network(input, init)
     }
     assert.equal(url.hostname, 'backend.test', `unexpected request to ${url.origin}`)
@@ -115,16 +124,29 @@ after(async () => {
 })
 beforeEach(() => emulator.reset())
 
-/** The bodies the provider sent to the emulator. */
-const sent: { provider?: unknown }[] = []
+/** The bodies and Authorization headers the provider sent to the emulator. */
+const sent: { model?: string; provider?: unknown }[] = []
+const sentAuth: (string | null)[] = []
+let stubHasByokKey = false
+let stubByokKey: string | null = null
+let quotaConsumeCalls = 0
 
 /** What the Go backend answers for one assistant turn. */
 function backend(url: URL): Response {
   const path = decodeURIComponent(url.pathname)
   if (path.startsWith('/v1/entitlements/features/'))
     return Response.json({ allowed: true, currentPlan: 'pro', feature: 'x', requiredPlan: 'pro' })
-  if (path === '/v1/workspace') return Response.json({ workspace: { workspaceSettings: null } })
-  if (path === '/v1/quotas/consume') return Response.json({ remaining: 999 })
+  if (path === '/v1/workspace')
+    return Response.json({
+      workspace: {
+        workspaceSettings: stubHasByokKey ? { aiAgentEnabled: true, hasAiProviderKey: true } : null,
+      },
+    })
+  if (path === '/v1/workspace/ai-provider-key') return Response.json({ apiKey: stubByokKey })
+  if (path === '/v1/quotas/consume') {
+    quotaConsumeCalls += 1
+    return Response.json({ remaining: 999 })
+  }
   if (path === '/v1/launch/brand') return Response.json({ kit: null, profile: null, voice: null })
   if (path === '/v1/content-drafts/draft-1/writing-context')
     return Response.json({
@@ -279,4 +301,96 @@ test('a stream cut off mid-reply fails the turn', async () => {
     (error: Error) => !/no rule|strict|unmatched/i.test(error.message)
   )
   assert.ok((await calls()).includes('"cut"'), 'the cut-off rule did not answer')
+})
+
+test('balanced and deep tiers are refused with 403 until the workspace connects its own API key', async () => {
+  stubHasByokKey = false
+  stubByokKey = null
+  const before = sent.length
+  for (const tier of ['balanced', 'deep'] as const) {
+    await assert.rejects(
+      turn.runWorkspaceAssistantTurn(access('creator'), {
+        messages: [{ content: 'hello', role: 'user' }],
+        modelTier: tier,
+        page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+      }),
+      (error: unknown) =>
+        error instanceof turn.AssistantRefusal &&
+        error.status === 403 &&
+        /OpenRouter API key/i.test(error.message)
+    )
+  }
+  // Concurrent key removal between getWorkspace (hasAiProviderKey=true) and key fetch (apiKey=null) also fails closed.
+  stubHasByokKey = true
+  stubByokKey = null
+  try {
+    await assert.rejects(
+      turn.runWorkspaceAssistantTurn(access('creator'), {
+        messages: [{ content: 'hello', role: 'user' }],
+        modelTier: 'balanced',
+        page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+      }),
+      (error: unknown) => error instanceof turn.AssistantRefusal && error.status === 403
+    )
+  } finally {
+    stubHasByokKey = false
+  }
+  assert.equal(sent.length, before, 'refused BYOK turns must never hit the provider')
+})
+
+test('a connected workspace BYOK key unlocks balanced/deep, routes with the workspace key, preserves privacy, isolates fast/tenants, and maps 401 cleanly', async () => {
+  stubHasByokKey = true
+  stubByokKey = 'sk-or-v1-workspace-byok-key-9999'
+  const quotaBefore = quotaConsumeCalls
+  try {
+    const balanced = await turn.runWorkspaceAssistantTurn(access('creator'), {
+      messages: [{ content: 'hello', role: 'user' }],
+      modelTier: 'balanced',
+      page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+    })
+    assert.equal(balanced.text, 'Hello from emulate.')
+    assert.equal(sent.at(-1)?.model, 'anthropic/claude-sonnet-5.5')
+    assert.equal(sentAuth.at(-1), 'Bearer sk-or-v1-workspace-byok-key-9999')
+    assert.deepEqual(sent.at(-1)?.provider, { data_collection: 'deny' })
+    assert.equal(quotaConsumeCalls, quotaBefore, 'BYOK balanced turns must not bill Shots credits')
+
+    // Rotating to a second key on `deep` never reuses cached credentials from the first key.
+    stubByokKey = 'sk-or-v1-second-tenant-key-5555'
+    const deep = await turn.runWorkspaceAssistantTurn(access('creator'), {
+      messages: [{ content: 'hello', role: 'user' }],
+      modelTier: 'deep',
+      page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+    })
+    assert.equal(deep.text, 'Hello from emulate.')
+    assert.equal(sent.at(-1)?.model, 'anthropic/claude-opus-5.5')
+    assert.equal(sentAuth.at(-1), 'Bearer sk-or-v1-second-tenant-key-5555')
+    assert.equal(quotaConsumeCalls, quotaBefore, 'BYOK deep turns must not bill Shots credits')
+
+    // Managed `fast` (Haiku) still uses the platform key and bills Shots credits even when BYOK is connected.
+    const fast = await turn.runWorkspaceAssistantTurn(access('creator'), {
+      messages: [{ content: 'hello', role: 'user' }],
+      modelTier: 'fast',
+      page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+    })
+    assert.equal(fast.text, 'Hello from emulate.')
+    assert.equal(sent.at(-1)?.model, 'anthropic/claude-haiku-5.5')
+    assert.equal(sentAuth.at(-1), 'Bearer emulated')
+    assert.ok(quotaConsumeCalls > quotaBefore, 'managed Haiku must still bill Shots credits')
+
+    // Invalid/revoked BYOK keys returning 401 from OpenRouter map to a friendly 403 AssistantRefusal.
+    await assert.rejects(
+      turn.runWorkspaceAssistantTurn(access('creator'), {
+        messages: [{ content: 'badbyokkey', role: 'user' }],
+        modelTier: 'balanced',
+        page: { area: 'create', entities: [], facts: [], path: '/create', title: 'Create' },
+      }),
+      (error: unknown) =>
+        error instanceof turn.AssistantRefusal &&
+        error.status === 403 &&
+        /rejected or has insufficient credits/i.test(error.message)
+    )
+  } finally {
+    stubHasByokKey = false
+    stubByokKey = null
+  }
 })

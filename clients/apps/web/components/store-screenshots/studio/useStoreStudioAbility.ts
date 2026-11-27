@@ -13,9 +13,10 @@ import {
   runUnifiedAssistant,
 } from '@/components/assistant/run-unified-assistant'
 import { useEditorActive } from '@/components/platform-shell/EditorActiveContext'
+import { storeModelCommandSchema } from '@/lib/store-screenshots/commands/schema'
 import { copyLengthSchema, copyToneSchema } from '@/lib/api/contracts/store-screenshots'
 import type { AssistantEntry, AssistantQuickAction } from '@/lib/assistant/ability'
-import { type Command, commandSchema } from '@/lib/store-screenshots/commands/schema'
+import type { Command } from '@/lib/store-screenshots/commands/schema'
 import type { TextLayer } from '@/lib/store-screenshots/document/schema'
 import { decodeSpans, encodeSpans, pendingTranslations } from '@/lib/store-screenshots/localization'
 import { requestJson } from './dialogs/request'
@@ -163,14 +164,14 @@ export function useStoreStudioAbility(
           }
           const validated: Command[] = []
           for (const raw of parsed.data.commands) {
-            const cmd = commandSchema.safeParse(raw)
+            const cmd = storeModelCommandSchema.safeParse(raw)
             if (!cmd.success) {
               return {
                 type: 'error-text',
                 value: `Invalid store command: ${cmd.error.message.slice(0, 400)}`,
               }
             }
-            validated.push(cmd.data)
+            validated.push(cmd.data as Command)
           }
           const ok = store.getState().dispatchMany(validated, parsed.data.summary)
           if (!ok) {

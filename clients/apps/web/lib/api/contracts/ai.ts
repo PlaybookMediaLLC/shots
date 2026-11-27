@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { aiEffortSchema, aiModelTierSchema } from '@/lib/ai/models/tiers'
 import { defineContract } from '@/lib/api/contract'
 import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
 import { onlyInlineFiles } from '@/lib/assistant/attachments'
@@ -27,18 +28,32 @@ export const assistantPendingToolCallSchema = z.object({
 /** One pending tool call returned by the unified assistant. */
 export type AssistantPendingToolCall = z.infer<typeof assistantPendingToolCallSchema>
 
+/** A workspace item explicitly pinned into the assistant's context scope. */
+export const assistantContextRefSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  kind: z.enum(['brand-kit', 'campaign', 'surface']),
+  label: z.string().trim().min(1).max(120).optional(),
+})
+
+/** One explicitly pinned context item. */
+export type AssistantContextRef = z.infer<typeof assistantContextRefSchema>
+
 /**
  * One turn (or tool-continuation step) of the unified assistant: the
  * conversation so far, the page and active editing surface, optional selection
- * scope, and which client-executed surface tools are available right now.
+ * scope, optional model/effort override, pinned workspace context, and which
+ * client-executed surface tools are available right now.
  */
 export const workspaceAssistantRequestSchema = z.object({
   clientTools: z.array(z.string().max(64)).max(MAX_ASSISTANT_CLIENT_TOOLS).default([]),
+  contextRefs: z.array(assistantContextRefSchema).max(6).default([]),
+  effort: aiEffortSchema.optional(),
   messages: z
     .array(z.looseObject({ role: editorMessageRoleSchema }))
     .min(1)
     .max(MAX_ASSISTANT_MESSAGES)
     .refine(onlyInlineFiles, 'Attach images inline: JPEG, PNG, or WebP.'),
+  modelTier: aiModelTierSchema.optional(),
   page: pageContextSchema,
   selection: z.string().max(200).nullable().default(null),
 })

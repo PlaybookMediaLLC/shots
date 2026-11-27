@@ -223,6 +223,8 @@ type ConfigurationStore interface {
 	SetActiveWorkspace(context.Context, product.Actor, string) error
 	GetWorkspace(context.Context, string) (*product.Workspace, error)
 	UpdateWorkspace(context.Context, product.Actor, product.UpdateWorkspaceInput) (*product.Workspace, error)
+	UpdateWorkspaceAISettings(context.Context, product.Actor, product.UpdateWorkspaceAISettingsInput) (*product.Workspace, error)
+	GetWorkspaceAIProviderKey(context.Context, product.Actor) (*string, error)
 	ListMembers(context.Context, string) ([]product.WorkspaceMember, error)
 	ListInvitations(context.Context, string) ([]product.WorkspaceInvitation, error)
 	UpdateMemberRole(context.Context, product.Actor, string, string) (*product.WorkspaceMember, error)
@@ -914,6 +916,8 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		})
 	case errors.Is(err, product.ErrWebhooksUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "webhooks_unavailable", "error": err.Error()})
+	case errors.Is(err, product.ErrAIKeyEncryptionUnavailable), errors.Is(err, product.ErrAIKeyDecryptionFailed):
+		writeError(w, http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, publishing.ErrSocialSetSlotTaken):
 		writeError(w, http.StatusConflict, publishing.ErrSocialSetSlotTaken.Error())
 	case errors.Is(err, publishing.ErrAccountInAnotherSet):

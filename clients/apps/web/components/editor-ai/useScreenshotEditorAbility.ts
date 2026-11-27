@@ -137,12 +137,14 @@ const applyBrandKitInputSchema = z.object({
 const captureIntoCanvasInputSchema = z.object({
   colorScheme: z.enum(['light', 'dark']).default('dark'),
   deviceType: z.enum(['desktop', 'mobile']).default('desktop'),
-  url: z.string().url().max(500),
+  url: z.string().url().max(2_000),
 })
 const presetInputSchema = z.object({ name: z.string().trim().max(120).optional() })
 const insertAssetInputSchema = z.object({
   assetId: z.string().min(1).max(120),
   placement: z.enum(['overlay', 'main']).default('overlay'),
+  x: z.number().min(0).max(1).optional(),
+  y: z.number().min(0).max(1).optional(),
 })
 
 async function snapshotParts(text: string): Promise<ToolResultPart['output']> {
@@ -483,8 +485,10 @@ export function createScreenshotEditorToolExecutor(
           } else {
             signal?.throwIfAborted()
             const canvas = useImageStore.getState().canvasDimensions
-            const x = canvas ? Math.round(canvas.canvasW * 0.5) : 400
-            const y = canvas ? Math.round(canvas.canvasH * 0.5) : 300
+            const nx = parsed.data.x ?? 0.5
+            const ny = parsed.data.y ?? 0.5
+            const x = canvas ? Math.round(canvas.canvasW * nx) : Math.round(800 * nx)
+            const y = canvas ? Math.round(canvas.canvasH * ny) : Math.round(600 * ny)
             useImageStore.getState().addImageOverlay({
               flipX: false,
               flipY: false,

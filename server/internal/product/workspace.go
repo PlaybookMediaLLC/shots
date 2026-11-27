@@ -3,9 +3,17 @@ package product
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
+
+	entsql "entgo.io/ent/dialect/sql"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
@@ -19,6 +27,8 @@ import (
 
 var ErrInvalidInput = errors.New("invalid workspace input")
 var ErrRateLimited = errors.New("Too many invitation emails. Please try again later.")
+var ErrAIKeyEncryptionUnavailable = errors.New("API key encryption is not configured on this server")
+var ErrAIKeyDecryptionFailed = errors.New("The stored OpenRouter API key could not be decrypted. Re-enter it in Settings → Models & usage.")
 
 func (c *Configuration) AuthorizeSession(ctx context.Context, actor Actor) error {
 	_, err := c.auth.AuthorizeSession(ctx, actor.UserID, actor.SessionID)
@@ -361,4 +371,258 @@ func (c *Configuration) UpdateWorkspace(ctx context.Context, actor Actor, input 
 		return nil, err
 	}
 	return &Workspace{ID: org.ID, CreatedAt: org.CreatedAt, Logo: org.Logo, Name: org.Name, Slug: org.Slug, WorkspaceSettings: settings.Unwrap()}, nil
+}
+
+// UpdateWorkspaceAISettingsInput updates workspace-wide AI preferences without
+// touching organization identity fields (name, slug, logo).
+type UpdateWorkspaceAISettingsInput struct {
+	AIAgentEnabled   *bool          `json:"aiAgentEnabled"`
+	AIModelDefaults  map[string]any `json:"aiModelDefaults"`
+	AIInstructions   NullableString `json:"aiInstructions"`
+	AIProviderAPIKey NullableString `json:"aiProviderApiKey"`
+}
+
+func validAIProviderAPIKey(key string) bool {
+	if len(key) < 16 || len(key) > 512 {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < 0x21 || key[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+func formatAPIKeyHint(apiKey string) string {
+	suffix := apiKey[len(apiKey)-4:]
+	switch {
+	case strings.HasPrefix(apiKey, "sk-or-"):
+		return "sk-or-…" + suffix
+	case strings.HasPrefix(apiKey, "sk-"):
+		return "sk-…" + suffix
+	default:
+		return "…" + suffix
+	}
+}
+
+func deriveWorkspaceAIKey(root []byte) []byte {
+	sum := sha256.Sum256(append([]byte("shots-workspace-ai-key-v1:"), root...))
+	return sum[:]
+}
+
+func sealWorkspaceAIKey(key []byte, organizationID, secret string) (string, error) {
+	if len(key) != 32 {
+		return "", ErrAIKeyEncryptionUnavailable
+	}
+	block, err := aes.NewCipher(deriveWorkspaceAIKey(key))
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	aad := []byte("workspace-ai-key-v1:" + organizationID)
+	sealed := gcm.Seal(nil, nonce, []byte(secret), aad)
+	return base64.RawURLEncoding.EncodeToString(nonce) + "." + base64.RawURLEncoding.EncodeToString(sealed), nil
+}
+
+func openWorkspaceAIKey(key []byte, organizationID, sealed string) (string, error) {
+	if len(key) != 32 {
+		return "", ErrAIKeyEncryptionUnavailable
+	}
+	parts := strings.Split(sealed, ".")
+	if len(parts) != 2 {
+		return "", ErrAIKeyDecryptionFailed
+	}
+	nonce, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return "", ErrAIKeyDecryptionFailed
+	}
+	ciphertext, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", ErrAIKeyDecryptionFailed
+	}
+	block, err := aes.NewCipher(deriveWorkspaceAIKey(key))
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	if len(nonce) != gcm.NonceSize() {
+		return "", ErrAIKeyDecryptionFailed
+	}
+	aad := []byte("workspace-ai-key-v1:" + organizationID)
+	plain, err := gcm.Open(nil, nonce, ciphertext, aad)
+	if err != nil {
+		return "", ErrAIKeyDecryptionFailed
+	}
+	return string(plain), nil
+}
+
+func aiDefaultsContainBYOKTier(defaults map[string]any) bool {
+	for _, raw := range defaults {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if tier, _ := entry["tier"].(string); tier != "" && tier != "fast" {
+			return true
+		}
+	}
+	return false
+}
+
+func stripBYOKTiersFromDefaults(defaults map[string]any) map[string]any {
+	cleaned := make(map[string]any, len(defaults))
+	for slot, raw := range defaults {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if tier, _ := entry["tier"].(string); tier == "fast" {
+			cleaned[slot] = entry
+		}
+	}
+	return cleaned
+}
+
+func (c *Configuration) UpdateWorkspaceAISettings(ctx context.Context, actor Actor, input UpdateWorkspaceAISettingsInput) (*Workspace, error) {
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if err := workspaceAdministrator(ctx, tx, actor, "workspace:update"); err != nil {
+		return nil, err
+	}
+	org, err := tx.Organization.Query().Where(organization.ID(actor.OrganizationID), func(s *entsql.Selector) { s.ForUpdate() }).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	settings, err := tx.WorkspaceSettings.Query().Where(workspacesettings.ID(org.ID), func(s *entsql.Selector) { s.ForUpdate() }).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if settings == nil {
+		settings, err = tx.WorkspaceSettings.Create().SetID(org.ID).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	settingsUpdate := tx.WorkspaceSettings.UpdateOneID(org.ID)
+	aiAgentChanged := input.AIAgentEnabled != nil && *input.AIAgentEnabled != settings.AiAgentEnabled
+	if input.AIAgentEnabled != nil {
+		settingsUpdate.SetAiAgentEnabled(*input.AIAgentEnabled)
+	}
+	hasExistingKey := settings.AiProviderKeyEncrypted != nil && *settings.AiProviderKeyEncrypted != ""
+	hasKeyAfter := hasExistingKey
+	keyAuditAction := ""
+	if input.AIProviderAPIKey.Set {
+		if input.AIProviderAPIKey.Value == nil || strings.TrimSpace(*input.AIProviderAPIKey.Value) == "" {
+			settingsUpdate.ClearAiProviderKeyEncrypted().ClearAiProviderKeyHint()
+			hasKeyAfter = false
+			if hasExistingKey {
+				keyAuditAction = "product.workspace_ai_provider_key_removed"
+			}
+		} else {
+			trimmed := strings.TrimSpace(*input.AIProviderAPIKey.Value)
+			if !validAIProviderAPIKey(trimmed) {
+				return nil, invalid("Enter a valid OpenRouter API key.")
+			}
+			sealed, err := sealWorkspaceAIKey(c.webhookKey, org.ID, trimmed)
+			if err != nil {
+				return nil, err
+			}
+			settingsUpdate.SetAiProviderKeyEncrypted(sealed).SetAiProviderKeyHint(formatAPIKeyHint(trimmed))
+			hasKeyAfter = true
+			keyAuditAction = "product.workspace_ai_provider_key_updated"
+		}
+	}
+	if input.AIModelDefaults != nil {
+		if !hasKeyAfter && aiDefaultsContainBYOKTier(input.AIModelDefaults) {
+			return nil, invalid("Balanced and Deep models require your own OpenRouter API key.")
+		}
+		settingsUpdate.SetAiModelDefaults(input.AIModelDefaults)
+	} else if !hasKeyAfter && aiDefaultsContainBYOKTier(settings.AiModelDefaults) {
+		// Removing the workspace BYOK key resets any Balanced/Deep defaults back to Haiku.
+		settingsUpdate.SetAiModelDefaults(stripBYOKTiersFromDefaults(settings.AiModelDefaults))
+	}
+	if input.AIInstructions.Set {
+		if input.AIInstructions.Value == nil || strings.TrimSpace(*input.AIInstructions.Value) == "" {
+			settingsUpdate.ClearAiInstructions()
+		} else {
+			settingsUpdate.SetAiInstructions(strings.TrimSpace(*input.AIInstructions.Value))
+		}
+	}
+	settings, err = settingsUpdate.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.workspace_ai_settings_updated", "organization", org.ID); err != nil {
+		return nil, err
+	}
+	if keyAuditAction != "" {
+		if err := appendConfigurationAudit(ctx, tx, actor, keyAuditAction, "organization", org.ID); err != nil {
+			return nil, err
+		}
+	}
+	if aiAgentChanged {
+		action := "product.workspace_ai_agent_disabled"
+		if *input.AIAgentEnabled {
+			action = "product.workspace_ai_agent_enabled"
+		}
+		if err := appendConfigurationAudit(ctx, tx, actor, action, "organization", org.ID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &Workspace{ID: org.ID, CreatedAt: org.CreatedAt, Logo: org.Logo, Name: org.Name, Slug: org.Slug, WorkspaceSettings: settings.Unwrap()}, nil
+}
+
+// GetWorkspaceAIProviderKey decrypts the workspace's BYOK OpenRouter API key
+// for server-side assistant execution. Never exposed to browser clients.
+func (c *Configuration) GetWorkspaceAIProviderKey(ctx context.Context, actor Actor) (*string, error) {
+	if !actor.IsSession() {
+		return nil, publishing.ErrForbidden
+	}
+	if err := c.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	if err := requireNotDenied(ctx, c.client, actor, "workspace:read"); err != nil {
+		return nil, err
+	}
+	settings, err := c.client.WorkspaceSettings.Query().
+		Where(workspacesettings.ID(actor.OrganizationID)).
+		Select(workspacesettings.FieldAiAgentEnabled, workspacesettings.FieldAiProviderKeyEncrypted).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !settings.AiAgentEnabled {
+		return nil, publishing.ErrForbidden
+	}
+	if settings.AiProviderKeyEncrypted == nil || *settings.AiProviderKeyEncrypted == "" {
+		return nil, nil
+	}
+	plain, err := openWorkspaceAIKey(c.webhookKey, actor.OrganizationID, *settings.AiProviderKeyEncrypted)
+	if err != nil {
+		return nil, err
+	}
+	return &plain, nil
 }

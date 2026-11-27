@@ -173018,6 +173018,10 @@ type WorkspaceSettingsMutation struct {
 	time_zone                  *string
 	default_publish_time       *string
 	ai_agent_enabled           *bool
+	ai_model_defaults          *map[string]interface{}
+	ai_instructions            *string
+	ai_provider_key_encrypted  *string
+	ai_provider_key_hint       *string
 	release_readiness_enabled  *bool
 	disabled_experiments       *[]string
 	appenddisabled_experiments []string
@@ -173326,6 +173330,202 @@ func (m *WorkspaceSettingsMutation) ResetAiAgentEnabled() {
 	m.ai_agent_enabled = nil
 }
 
+// SetAiModelDefaults sets the "ai_model_defaults" field.
+func (m *WorkspaceSettingsMutation) SetAiModelDefaults(value map[string]interface{}) {
+	m.ai_model_defaults = &value
+}
+
+// AiModelDefaults returns the value of the "ai_model_defaults" field in the mutation.
+func (m *WorkspaceSettingsMutation) AiModelDefaults() (r map[string]interface{}, exists bool) {
+	v := m.ai_model_defaults
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAiModelDefaults returns the old "ai_model_defaults" field's value of the WorkspaceSettings entity.
+// If the WorkspaceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceSettingsMutation) OldAiModelDefaults(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAiModelDefaults is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAiModelDefaults requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAiModelDefaults: %w", err)
+	}
+	return oldValue.AiModelDefaults, nil
+}
+
+// ClearAiModelDefaults clears the value of the "ai_model_defaults" field.
+func (m *WorkspaceSettingsMutation) ClearAiModelDefaults() {
+	m.ai_model_defaults = nil
+	m.clearedFields[workspacesettings.FieldAiModelDefaults] = struct{}{}
+}
+
+// AiModelDefaultsCleared returns if the "ai_model_defaults" field was cleared in this mutation.
+func (m *WorkspaceSettingsMutation) AiModelDefaultsCleared() bool {
+	_, ok := m.clearedFields[workspacesettings.FieldAiModelDefaults]
+	return ok
+}
+
+// ResetAiModelDefaults resets all changes to the "ai_model_defaults" field.
+func (m *WorkspaceSettingsMutation) ResetAiModelDefaults() {
+	m.ai_model_defaults = nil
+	delete(m.clearedFields, workspacesettings.FieldAiModelDefaults)
+}
+
+// SetAiInstructions sets the "ai_instructions" field.
+func (m *WorkspaceSettingsMutation) SetAiInstructions(s string) {
+	m.ai_instructions = &s
+}
+
+// AiInstructions returns the value of the "ai_instructions" field in the mutation.
+func (m *WorkspaceSettingsMutation) AiInstructions() (r string, exists bool) {
+	v := m.ai_instructions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAiInstructions returns the old "ai_instructions" field's value of the WorkspaceSettings entity.
+// If the WorkspaceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceSettingsMutation) OldAiInstructions(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAiInstructions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAiInstructions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAiInstructions: %w", err)
+	}
+	return oldValue.AiInstructions, nil
+}
+
+// ClearAiInstructions clears the value of the "ai_instructions" field.
+func (m *WorkspaceSettingsMutation) ClearAiInstructions() {
+	m.ai_instructions = nil
+	m.clearedFields[workspacesettings.FieldAiInstructions] = struct{}{}
+}
+
+// AiInstructionsCleared returns if the "ai_instructions" field was cleared in this mutation.
+func (m *WorkspaceSettingsMutation) AiInstructionsCleared() bool {
+	_, ok := m.clearedFields[workspacesettings.FieldAiInstructions]
+	return ok
+}
+
+// ResetAiInstructions resets all changes to the "ai_instructions" field.
+func (m *WorkspaceSettingsMutation) ResetAiInstructions() {
+	m.ai_instructions = nil
+	delete(m.clearedFields, workspacesettings.FieldAiInstructions)
+}
+
+// SetAiProviderKeyEncrypted sets the "ai_provider_key_encrypted" field.
+func (m *WorkspaceSettingsMutation) SetAiProviderKeyEncrypted(s string) {
+	m.ai_provider_key_encrypted = &s
+}
+
+// AiProviderKeyEncrypted returns the value of the "ai_provider_key_encrypted" field in the mutation.
+func (m *WorkspaceSettingsMutation) AiProviderKeyEncrypted() (r string, exists bool) {
+	v := m.ai_provider_key_encrypted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAiProviderKeyEncrypted returns the old "ai_provider_key_encrypted" field's value of the WorkspaceSettings entity.
+// If the WorkspaceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceSettingsMutation) OldAiProviderKeyEncrypted(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAiProviderKeyEncrypted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAiProviderKeyEncrypted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAiProviderKeyEncrypted: %w", err)
+	}
+	return oldValue.AiProviderKeyEncrypted, nil
+}
+
+// ClearAiProviderKeyEncrypted clears the value of the "ai_provider_key_encrypted" field.
+func (m *WorkspaceSettingsMutation) ClearAiProviderKeyEncrypted() {
+	m.ai_provider_key_encrypted = nil
+	m.clearedFields[workspacesettings.FieldAiProviderKeyEncrypted] = struct{}{}
+}
+
+// AiProviderKeyEncryptedCleared returns if the "ai_provider_key_encrypted" field was cleared in this mutation.
+func (m *WorkspaceSettingsMutation) AiProviderKeyEncryptedCleared() bool {
+	_, ok := m.clearedFields[workspacesettings.FieldAiProviderKeyEncrypted]
+	return ok
+}
+
+// ResetAiProviderKeyEncrypted resets all changes to the "ai_provider_key_encrypted" field.
+func (m *WorkspaceSettingsMutation) ResetAiProviderKeyEncrypted() {
+	m.ai_provider_key_encrypted = nil
+	delete(m.clearedFields, workspacesettings.FieldAiProviderKeyEncrypted)
+}
+
+// SetAiProviderKeyHint sets the "ai_provider_key_hint" field.
+func (m *WorkspaceSettingsMutation) SetAiProviderKeyHint(s string) {
+	m.ai_provider_key_hint = &s
+}
+
+// AiProviderKeyHint returns the value of the "ai_provider_key_hint" field in the mutation.
+func (m *WorkspaceSettingsMutation) AiProviderKeyHint() (r string, exists bool) {
+	v := m.ai_provider_key_hint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAiProviderKeyHint returns the old "ai_provider_key_hint" field's value of the WorkspaceSettings entity.
+// If the WorkspaceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceSettingsMutation) OldAiProviderKeyHint(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAiProviderKeyHint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAiProviderKeyHint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAiProviderKeyHint: %w", err)
+	}
+	return oldValue.AiProviderKeyHint, nil
+}
+
+// ClearAiProviderKeyHint clears the value of the "ai_provider_key_hint" field.
+func (m *WorkspaceSettingsMutation) ClearAiProviderKeyHint() {
+	m.ai_provider_key_hint = nil
+	m.clearedFields[workspacesettings.FieldAiProviderKeyHint] = struct{}{}
+}
+
+// AiProviderKeyHintCleared returns if the "ai_provider_key_hint" field was cleared in this mutation.
+func (m *WorkspaceSettingsMutation) AiProviderKeyHintCleared() bool {
+	_, ok := m.clearedFields[workspacesettings.FieldAiProviderKeyHint]
+	return ok
+}
+
+// ResetAiProviderKeyHint resets all changes to the "ai_provider_key_hint" field.
+func (m *WorkspaceSettingsMutation) ResetAiProviderKeyHint() {
+	m.ai_provider_key_hint = nil
+	delete(m.clearedFields, workspacesettings.FieldAiProviderKeyHint)
+}
+
 // SetReleaseReadinessEnabled sets the "release_readiness_enabled" field.
 func (m *WorkspaceSettingsMutation) SetReleaseReadinessEnabled(b bool) {
 	m.release_readiness_enabled = &b
@@ -173519,7 +173719,7 @@ func (m *WorkspaceSettingsMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WorkspaceSettingsMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 13)
 	if m.description != nil {
 		fields = append(fields, workspacesettings.FieldDescription)
 	}
@@ -173534,6 +173734,18 @@ func (m *WorkspaceSettingsMutation) Fields() []string {
 	}
 	if m.ai_agent_enabled != nil {
 		fields = append(fields, workspacesettings.FieldAiAgentEnabled)
+	}
+	if m.ai_model_defaults != nil {
+		fields = append(fields, workspacesettings.FieldAiModelDefaults)
+	}
+	if m.ai_instructions != nil {
+		fields = append(fields, workspacesettings.FieldAiInstructions)
+	}
+	if m.ai_provider_key_encrypted != nil {
+		fields = append(fields, workspacesettings.FieldAiProviderKeyEncrypted)
+	}
+	if m.ai_provider_key_hint != nil {
+		fields = append(fields, workspacesettings.FieldAiProviderKeyHint)
 	}
 	if m.release_readiness_enabled != nil {
 		fields = append(fields, workspacesettings.FieldReleaseReadinessEnabled)
@@ -173565,6 +173777,14 @@ func (m *WorkspaceSettingsMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultPublishTime()
 	case workspacesettings.FieldAiAgentEnabled:
 		return m.AiAgentEnabled()
+	case workspacesettings.FieldAiModelDefaults:
+		return m.AiModelDefaults()
+	case workspacesettings.FieldAiInstructions:
+		return m.AiInstructions()
+	case workspacesettings.FieldAiProviderKeyEncrypted:
+		return m.AiProviderKeyEncrypted()
+	case workspacesettings.FieldAiProviderKeyHint:
+		return m.AiProviderKeyHint()
 	case workspacesettings.FieldReleaseReadinessEnabled:
 		return m.ReleaseReadinessEnabled()
 	case workspacesettings.FieldDisabledExperiments:
@@ -173592,6 +173812,14 @@ func (m *WorkspaceSettingsMutation) OldField(ctx context.Context, name string) (
 		return m.OldDefaultPublishTime(ctx)
 	case workspacesettings.FieldAiAgentEnabled:
 		return m.OldAiAgentEnabled(ctx)
+	case workspacesettings.FieldAiModelDefaults:
+		return m.OldAiModelDefaults(ctx)
+	case workspacesettings.FieldAiInstructions:
+		return m.OldAiInstructions(ctx)
+	case workspacesettings.FieldAiProviderKeyEncrypted:
+		return m.OldAiProviderKeyEncrypted(ctx)
+	case workspacesettings.FieldAiProviderKeyHint:
+		return m.OldAiProviderKeyHint(ctx)
 	case workspacesettings.FieldReleaseReadinessEnabled:
 		return m.OldReleaseReadinessEnabled(ctx)
 	case workspacesettings.FieldDisabledExperiments:
@@ -173643,6 +173871,34 @@ func (m *WorkspaceSettingsMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAiAgentEnabled(v)
+		return nil
+	case workspacesettings.FieldAiModelDefaults:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAiModelDefaults(v)
+		return nil
+	case workspacesettings.FieldAiInstructions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAiInstructions(v)
+		return nil
+	case workspacesettings.FieldAiProviderKeyEncrypted:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAiProviderKeyEncrypted(v)
+		return nil
+	case workspacesettings.FieldAiProviderKeyHint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAiProviderKeyHint(v)
 		return nil
 	case workspacesettings.FieldReleaseReadinessEnabled:
 		v, ok := value.(bool)
@@ -173705,6 +173961,18 @@ func (m *WorkspaceSettingsMutation) ClearedFields() []string {
 	if m.FieldCleared(workspacesettings.FieldDescription) {
 		fields = append(fields, workspacesettings.FieldDescription)
 	}
+	if m.FieldCleared(workspacesettings.FieldAiModelDefaults) {
+		fields = append(fields, workspacesettings.FieldAiModelDefaults)
+	}
+	if m.FieldCleared(workspacesettings.FieldAiInstructions) {
+		fields = append(fields, workspacesettings.FieldAiInstructions)
+	}
+	if m.FieldCleared(workspacesettings.FieldAiProviderKeyEncrypted) {
+		fields = append(fields, workspacesettings.FieldAiProviderKeyEncrypted)
+	}
+	if m.FieldCleared(workspacesettings.FieldAiProviderKeyHint) {
+		fields = append(fields, workspacesettings.FieldAiProviderKeyHint)
+	}
 	return fields
 }
 
@@ -173721,6 +173989,18 @@ func (m *WorkspaceSettingsMutation) ClearField(name string) error {
 	switch name {
 	case workspacesettings.FieldDescription:
 		m.ClearDescription()
+		return nil
+	case workspacesettings.FieldAiModelDefaults:
+		m.ClearAiModelDefaults()
+		return nil
+	case workspacesettings.FieldAiInstructions:
+		m.ClearAiInstructions()
+		return nil
+	case workspacesettings.FieldAiProviderKeyEncrypted:
+		m.ClearAiProviderKeyEncrypted()
+		return nil
+	case workspacesettings.FieldAiProviderKeyHint:
+		m.ClearAiProviderKeyHint()
 		return nil
 	}
 	return fmt.Errorf("unknown WorkspaceSettings nullable field %s", name)
@@ -173744,6 +174024,18 @@ func (m *WorkspaceSettingsMutation) ResetField(name string) error {
 		return nil
 	case workspacesettings.FieldAiAgentEnabled:
 		m.ResetAiAgentEnabled()
+		return nil
+	case workspacesettings.FieldAiModelDefaults:
+		m.ResetAiModelDefaults()
+		return nil
+	case workspacesettings.FieldAiInstructions:
+		m.ResetAiInstructions()
+		return nil
+	case workspacesettings.FieldAiProviderKeyEncrypted:
+		m.ResetAiProviderKeyEncrypted()
+		return nil
+	case workspacesettings.FieldAiProviderKeyHint:
+		m.ResetAiProviderKeyHint()
 		return nil
 	case workspacesettings.FieldReleaseReadinessEnabled:
 		m.ResetReleaseReadinessEnabled()

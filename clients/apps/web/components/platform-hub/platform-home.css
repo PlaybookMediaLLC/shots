@@ -910,7 +910,7 @@
   align-items: center;
   gap: 8px;
   padding: 5px 5px 5px 14px;
-  border-radius: 999px;
+  border-radius: 22px;
 }
 .assistant-bar:focus-within {
   border-color: color-mix(in srgb, var(--foreground) 22%, transparent);

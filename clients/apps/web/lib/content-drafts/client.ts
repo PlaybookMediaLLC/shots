@@ -57,12 +57,13 @@ export function duplicatePosts(error: unknown): DuplicatePost[] | null {
 /** One API call with the session cookie; a failure throws its message and status. */
 export async function call<T>(
   path: string,
-  init: { body?: unknown; method?: string } = {}
+  init: { body?: unknown; method?: string; signal?: AbortSignal } = {}
 ): Promise<T> {
   const response = await fetch(path, {
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
     headers: init.body === undefined ? undefined : { 'content-type': 'application/json' },
     method: init.method ?? 'GET',
+    signal: init.signal,
   })
   const body = (await response.json().catch(() => null)) as {
     error?: string
