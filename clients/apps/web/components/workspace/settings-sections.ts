@@ -14,6 +14,7 @@ import { z } from 'zod'
 export const settingGroupSchema = z.enum([
   'personal',
   'workspace',
+  'ai',
   'brand',
   'publishing',
   'integrations',
@@ -38,6 +39,7 @@ type SettingSectionDefinition = {
 export const SETTING_GROUPS: { id: SettingGroup; title: string }[] = [
   { id: 'personal', title: 'My account' },
   { id: 'workspace', title: 'Workspace & team' },
+  { id: 'ai', title: 'AI & Agents' },
   { id: 'brand', title: 'Brand resources & content' },
   { id: 'publishing', title: 'Publishing' },
   { id: 'integrations', title: 'Integrations' },
@@ -134,6 +136,31 @@ const SECTIONS = [
     title: 'Create workspace',
   },
   {
+    description: 'Default AI models per surface, reasoning effort, and monthly AI credit usage.',
+    group: 'ai',
+    id: 'ai-models',
+    keywords: 'model effort credits quota haiku sonnet opus claude tier usage',
+    slug: 'ai-models',
+    title: 'Models & usage',
+  },
+  {
+    description:
+      'Standing workspace rules followed by Shots AI across Ask AI and in-editor copilots.',
+    group: 'ai',
+    id: 'ai-instructions',
+    keywords: 'prompt rules custom instructions guidelines memory system',
+    slug: 'ai-instructions',
+    title: 'Instructions',
+  },
+  {
+    description: 'Connect Claude, ChatGPT, Cursor, and other AI agents to this workspace over MCP.',
+    group: 'ai',
+    id: 'agents',
+    keywords: 'mcp oauth claude cursor codex plugin skill',
+    slug: 'ai-agents',
+    title: 'AI agents',
+  },
+  {
     description: 'Brand voice for AI copy, plus colors and typography for visuals.',
     group: 'brand',
     id: 'brand',
@@ -183,13 +210,6 @@ const SECTIONS = [
     id: 'integrations',
     slug: 'integrations',
     title: 'Integrations',
-  },
-  {
-    description: 'Connect Claude, ChatGPT, Cursor, and other AI agents to this workspace over MCP.',
-    group: 'integrations',
-    id: 'agents',
-    slug: 'ai-agents',
-    title: 'AI agents',
   },
   {
     description: 'Single sign-on and SCIM provisioning controls.',

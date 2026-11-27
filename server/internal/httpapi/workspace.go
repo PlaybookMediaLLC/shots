@@ -50,6 +50,8 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("POST /v1/workspaces/active", s.authenticateSession(http.HandlerFunc(s.setActiveWorkspace)))
 	mux.Handle("GET /v1/workspace", s.authenticateProduct(http.HandlerFunc(s.getWorkspace)))
 	mux.Handle("PATCH /v1/workspace", s.authenticateProduct(http.HandlerFunc(s.updateWorkspace)))
+	mux.Handle("PUT /v1/workspace/ai-settings", s.authenticateProduct(http.HandlerFunc(s.updateWorkspaceAISettings)))
+	mux.Handle("GET /v1/workspace/ai-provider-key", s.authenticateProduct(http.HandlerFunc(s.getWorkspaceAIProviderKey)))
 	mux.Handle("GET /v1/workspace/members", s.authenticateProduct(http.HandlerFunc(s.listWorkspaceMembers)))
 	mux.Handle("GET /v1/workspace/invitations", s.authenticateProduct(http.HandlerFunc(s.listWorkspaceInvitations)))
 	mux.Handle("POST /v1/workspace/invitations", s.authenticateProduct(http.HandlerFunc(s.inviteWorkspaceMember)))
@@ -527,6 +529,80 @@ func (s *Server) updateWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, workspaceMutationResponse(workspace))
 }
 
+var (
+	validAISlots   = map[string]bool{"default": true, "assistant": true, "editors": true, "writing": true, "campaigns": true}
+	validAITiers   = map[string]bool{"fast": true, "balanced": true, "deep": true}
+	validAIEfforts = map[string]bool{"low": true, "medium": true, "high": true}
+)
+
+func validWorkspaceAISettings(input product.UpdateWorkspaceAISettingsInput) bool {
+	if input.AIInstructions.Set && input.AIInstructions.Value != nil {
+		if utf8.RuneCountInString(*input.AIInstructions.Value) > 4000 {
+			return false
+		}
+	}
+	for slot, raw := range input.AIModelDefaults {
+		if !validAISlots[slot] {
+			return false
+		}
+		if raw == nil {
+			continue
+		}
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			return false
+		}
+		for key := range entry {
+			if key != "tier" && key != "effort" {
+				return false
+			}
+		}
+		tier, _ := entry["tier"].(string)
+		if !validAITiers[tier] {
+			return false
+		}
+		if rawEffort, hasEffort := entry["effort"]; hasEffort {
+			effort, ok := rawEffort.(string)
+			if !ok || !validAIEfforts[effort] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (s *Server) updateWorkspaceAISettings(w http.ResponseWriter, r *http.Request) {
+	actor, ok := s.configurationActor(w, r)
+	if !ok {
+		return
+	}
+	var input product.UpdateWorkspaceAISettingsInput
+	if decodeJSON(r, &input) != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !validWorkspaceAISettings(input) {
+		writeError(w, http.StatusBadRequest, "invalid workspace AI settings")
+		return
+	}
+	workspace, err := s.configuration.UpdateWorkspaceAISettings(r.Context(), actor, input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, workspaceMutationResponse(workspace))
+}
+
+func (s *Server) getWorkspaceAIProviderKey(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := s.configuration.GetWorkspaceAIProviderKey(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"apiKey": apiKey})
+}
+
 func validWorkspaceUpdate(input product.UpdateWorkspaceInput) bool {
 	if input.DefaultPublishTime != nil && !publishTimePattern.MatchString(*input.DefaultPublishTime) {
 		return false
@@ -571,6 +647,10 @@ func workspaceMutationResponse(workspace *product.Workspace) map[string]any {
 	if workspace.CreationMember != nil {
 		// Older creation clients validate this shape strictly; read new settings after creation.
 		delete(settings, "releaseReadinessEnabled")
+		delete(settings, "aiModelDefaults")
+		delete(settings, "aiInstructions")
+		delete(settings, "hasAiProviderKey")
+		delete(settings, "aiProviderKeyHint")
 		var metadata json.RawMessage
 		if workspace.Metadata != nil {
 			metadata = json.RawMessage(*workspace.Metadata)
@@ -585,10 +665,15 @@ func workspaceSettingsResponse(settings *ent.WorkspaceSettings) map[string]any {
 	if settings == nil {
 		return nil
 	}
+	hasAIKey := settings.AiProviderKeyEncrypted != nil && *settings.AiProviderKeyEncrypted != ""
 	return map[string]any{
 		"organizationId": settings.ID, "description": settings.Description,
 		"locale": settings.Locale, "timeZone": settings.TimeZone,
 		"defaultPublishTime": settings.DefaultPublishTime, "aiAgentEnabled": settings.AiAgentEnabled,
+		"aiModelDefaults":         settings.AiModelDefaults,
+		"aiInstructions":          settings.AiInstructions,
+		"hasAiProviderKey":        hasAIKey,
+		"aiProviderKeyHint":       settings.AiProviderKeyHint,
 		"releaseReadinessEnabled": settings.ReleaseReadinessEnabled,
 		"createdAt":               settings.CreatedAt, "updatedAt": settings.UpdatedAt,
 	}

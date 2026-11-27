@@ -29,6 +29,24 @@ function lineStream() {
   }
 }
 
+function streamFailureDetails(error: unknown) {
+  const statusCode =
+    error &&
+    typeof error === 'object' &&
+    'statusCode' in error &&
+    typeof (error as { statusCode?: unknown }).statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : undefined
+  const name = error instanceof Error ? error.name : 'unknown'
+  const message =
+    error instanceof Error && error.name === 'AssistantRefusal'
+      ? error.message
+      : error instanceof Error && error.name === 'WorkspaceQuotaError'
+        ? 'You have used all AI credits for this period. Add credits in Billing to continue.'
+        : 'The assistant stopped before it finished. Try again.'
+  return { message, name, statusCode }
+}
+
 /**
  * Answer with the lines `run` sends, as newline-delimited JSON. A failure
  * before the first line rejects, so the route can still answer with a status;
@@ -48,10 +66,9 @@ export async function streamLines(
   const done = run(send)
     .catch((error: unknown) => {
       if (!sent) throw error
-      console.error('Assistant turn failed mid-stream.', {
-        reason: error instanceof Error ? error.message : 'unknown',
-      })
-      send({ error: 'The assistant stopped before it finished. Try again.', type: 'error' })
+      const { message, name, statusCode } = streamFailureDetails(error)
+      console.error('Assistant turn failed mid-stream.', { name, statusCode })
+      send({ error: message, type: 'error' })
     })
     .finally(lines.close)
   await Promise.race([first.promise, done])

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AI_INSTRUCTIONS_MAX, aiModelDefaultsSchema } from '@/lib/ai/models/tiers'
 import { organizationRoles } from '@/lib/auth/permissions'
 import { workspaceCreateSchema, workspaceNameSchema, workspaceSlugSchema } from './input-schemas'
 
@@ -77,6 +78,25 @@ export const workspaceTransferOwnershipSchema = workspaceMemberIdSchema
 export const workspaceDeleteSchema = z.object({
   confirmation: z.string().trim().min(2).max(100),
 })
+
+const aiProviderApiKeySchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || /^[\x21-\x7e]{16,512}$/.test(value),
+    'Enter a valid OpenRouter API key (16–512 characters, no spaces).'
+  )
+  .nullable()
+  .optional()
+
+export const workspaceAiSettingsUpdateSchema = z.object({
+  aiAgentEnabled: z.boolean().optional(),
+  aiInstructions: z.string().trim().max(AI_INSTRUCTIONS_MAX).nullable().optional(),
+  aiModelDefaults: aiModelDefaultsSchema.optional(),
+  aiProviderApiKey: aiProviderApiKeySchema,
+})
+
+export type WorkspaceAiSettingsUpdateInput = z.infer<typeof workspaceAiSettingsUpdateSchema>
 
 export type WorkspaceCreateInput = z.infer<typeof workspaceCreateSchema>
 export type WorkspaceInviteInput = z.infer<typeof workspaceInviteSchema>

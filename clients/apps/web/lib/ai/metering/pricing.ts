@@ -29,6 +29,7 @@ export const MODEL_PRICES: Readonly<Record<string, ModelPrice>> = {
   'anthropic/claude-opus-5.5': { cacheRead: 0.2, cacheWrite: 5, input: 4, output: 20 },
   'anthropic/claude-sonnet-5.5': { cacheRead: 0.2, cacheWrite: 2.5, input: 2, output: 10 },
   'anthropic/claude-haiku-4.5': { cacheRead: 0.1, cacheWrite: 1.25, input: 1, output: 5 },
+  'google/gemini-2.5-flash': { cacheRead: 0.075, cacheWrite: 0.3, input: 0.3, output: 2.5 },
 }
 
 /** An unlisted model is priced as the most expensive one, so the meter never undercharges. */

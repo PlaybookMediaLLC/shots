@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -734,6 +735,51 @@ func TestConcurrentWorkersDoNotDuplicateOutboxSideEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect(t, s.DB, 1, `SELECT count(*) FROM audit_log WHERE action='product.outbox_dispatched'`)
+}
+
+func TestWithLockWaitAcquiresAfterReleaseAndRespectsCancel(t *testing.T) {
+	s, _ := setup(t)
+	held := make(chan struct{})
+	release := make(chan struct{})
+	holderDone := make(chan error, 1)
+	go func() {
+		_, err := s.WithLock(context.Background(), "wait-test", func(context.Context) (int, error) {
+			close(held)
+			<-release
+			return 1, nil
+		})
+		holderDone <- err
+	}()
+	<-held
+
+	cancelCtx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	calledOnCancel := false
+	if _, err := s.WithLockWait(cancelCtx, "wait-test", func(context.Context) (int, error) {
+		calledOnCancel = true
+		return 1, nil
+	}); !errors.Is(err, context.DeadlineExceeded) || calledOnCancel {
+		t.Fatalf("cancelled wait: err=%v called=%v", err, calledOnCancel)
+	}
+
+	waited := make(chan int, 1)
+	go func() {
+		n, err := s.WithLockWait(context.Background(), "wait-test", func(context.Context) (int, error) {
+			return 42, nil
+		})
+		if err != nil {
+			t.Errorf("WithLockWait failed: %v", err)
+		}
+		waited <- n
+	}()
+	time.Sleep(120 * time.Millisecond)
+	close(release)
+	if err := <-holderDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := <-waited; got != 42 {
+		t.Fatalf("WithLockWait returned %d, want 42", got)
+	}
 }
 func TestStaleCommunicationsRequireReviewOnlyAfterAttempt(t *testing.T) {
 	s, _ := setup(t)

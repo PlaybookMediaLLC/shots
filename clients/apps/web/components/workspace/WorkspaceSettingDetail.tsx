@@ -40,6 +40,14 @@ const SocialSetSettings = dynamic(() =>
 const WebhookSettings = dynamic(() =>
   import('@/components/settings/WebhookSettings').then((m) => m.WebhookSettings)
 )
+const WorkspaceAiInstructionsSettings = dynamic(() =>
+  import('@/components/settings/WorkspaceAiInstructionsSettings').then(
+    (m) => m.WorkspaceAiInstructionsSettings
+  )
+)
+const WorkspaceAiModelsSettings = dynamic(() =>
+  import('@/components/settings/WorkspaceAiModelsSettings').then((m) => m.WorkspaceAiModelsSettings)
+)
 const VoiceSettings = dynamic(() =>
   import('@/components/voice/VoiceSettings').then((m) => m.VoiceSettings)
 )
@@ -149,6 +157,21 @@ const SETTINGS_CONTENT = {
   roles: () => <WorkspaceRolesSettings />,
   voice: () => <VoiceSettings />,
   'new-team': ({ email, userId }) => <NewTeamSettings email={email} userId={userId} />,
+  'ai-models': ({ can, organization }) => (
+    <WorkspaceAiModelsSettings
+      canManage={can('workspace:update')}
+      canManageBilling={can('billing:manage')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
+  'ai-instructions': ({ can, organization }) => (
+    <WorkspaceAiInstructionsSettings
+      canManage={can('workspace:update')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
   brand: ({ can }) => <WorkspaceBrandSettings canManage={can('workspace:update')} />,
   product: ({ can }) => (
     <>

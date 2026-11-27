@@ -5,6 +5,7 @@ import {
   cancelWorkspaceDeletion,
   createWorkspace,
   getWorkspace,
+  getWorkspaceReadiness,
   inviteWorkspaceMember,
   leaveWorkspace,
   listWorkspaceInvitations,
@@ -17,9 +18,11 @@ import {
   setActiveWorkspace,
   transferWorkspaceOwnership,
   updateWorkspace,
+  updateWorkspaceAiSettings,
   updateWorkspaceMemberRole,
 } from '@/lib/workspace/service'
 import {
+  workspaceAiSettingsUpdateSchema,
   workspaceCreateSchema,
   workspaceDeleteSchema,
   workspaceInvitationIdSchema,
@@ -81,9 +84,15 @@ export const workspaceRouter = router({
   transferOwnership: sensitiveOrganizationProcedure('workspace:transfer_ownership')
     .input(workspaceTransferOwnershipSchema)
     .mutation(async ({ ctx, input }) => transferWorkspaceOwnership(ctx.access, input.memberId)),
+  readiness: organizationProcedure('workspace:read').query(async ({ ctx }) =>
+    getWorkspaceReadiness(ctx.access)
+  ),
   update: organizationProcedure('workspace:update')
     .input(workspaceUpdateSchema)
     .mutation(async ({ ctx, input }) => updateWorkspace(ctx.access, input)),
+  updateAiSettings: organizationProcedure('workspace:update')
+    .input(workspaceAiSettingsUpdateSchema)
+    .mutation(async ({ ctx, input }) => updateWorkspaceAiSettings(ctx.access, input)),
   updateMemberRole: organizationProcedure('member:update_role')
     .input(workspaceRoleChangeSchema)
     .mutation(async ({ ctx, input }) =>

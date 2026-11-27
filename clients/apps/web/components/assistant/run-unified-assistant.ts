@@ -45,6 +45,7 @@ export const TOOL_ACTIVITY_LABELS: Record<string, string> = {
   insertWorkspaceAsset: 'Inserting library asset',
   inspectCanvas: 'Inspecting canvas',
   inspectStoreSet: 'Inspecting App Store set',
+  inspectWorkspaceSetup: 'Checking workspace setup',
   listBrandKits: 'Checking brand kits',
   listCampaigns: 'Checking campaigns',
   listProductSurfaces: 'Checking product surfaces',
@@ -120,30 +121,62 @@ export type ClientToolExecutor = (
 export async function runUnifiedAssistant({
   ask,
   clientTools = [],
+  contextRefs = [],
+  effort,
   executeClientTool,
   images,
   memory,
+  modelTier,
   page,
   push,
   selection = null,
   signal,
+  status,
   stream,
+  updateActivity,
 }: AbilityRun & {
   clientTools?: readonly string[]
   executeClientTool?: ClientToolExecutor
 }): Promise<void> {
+  // Snapshot prior clean conversation so stopping mid-turn never wipes earlier turns.
+  const previousMemory = [...memory.current]
   const base = recentMessages(memory.current, MAX_ASSISTANT_MESSAGES - 1)
   let current: unknown[] = [...base, { content: userContent(ask, images), role: 'user' }]
-  const seenActivity = new Set<string>()
+  const activityIds = new Map<string, number>()
+  const runningActivityIds = new Set<number>()
+
+  const markActivity = (toolName: string, next: 'running' | 'done' | 'error') => {
+    const id = activityIds.get(toolName)
+    if (id !== undefined) {
+      updateActivity?.(id, next)
+      if (next === 'running') runningActivityIds.add(id)
+      else runningActivityIds.delete(id)
+    } else if (!SILENT_TOOLS.has(toolName)) {
+      const created = push({
+        done: next === 'done',
+        kind: 'activity',
+        status: next,
+        text: describeToolActivity(toolName),
+      })
+      if (typeof created === 'number') {
+        activityIds.set(toolName, created)
+        if (next === 'running') runningActivityIds.add(created)
+      }
+    }
+  }
 
   try {
     for (let trip = 0; trip < MAX_ROUND_TRIPS; trip += 1) {
       signal?.throwIfAborted()
+      const wireContextRefs = contextRefs.map(({ id, kind }) => ({ id, kind }))
       const response = await fetch('/api/ai/assistant', {
         body: JSON.stringify({
           ...(clientTools.length > 0 ? { clientTools } : {}),
+          ...(wireContextRefs.length > 0 ? { contextRefs: wireContextRefs } : {}),
+          ...(effort ? { effort } : {}),
           // Every round trip adds messages, so each request is trimmed to the contract limit.
           messages: recentMessages(current, MAX_ASSISTANT_MESSAGES),
+          ...(modelTier ? { modelTier } : {}),
           page,
           ...(selection ? { selection } : {}),
         }),
@@ -160,15 +193,48 @@ export async function runUnifiedAssistant({
         throw new Error(error)
       }
       let text = ''
+      let hasStatus = false
+      let rafId: number | null = null
+      const emitStream = (value: string) => {
+        if (!stream) return
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          stream(value)
+          return
+        }
+        if (rafId !== null) return
+        rafId = window.requestAnimationFrame(() => {
+          rafId = null
+          stream(text)
+        })
+      }
+      const runningInStep: string[] = []
       const reply = await readReply(response, (line) => {
         if (line.type === 'text') {
+          if (hasStatus) {
+            hasStatus = false
+            status?.('')
+          }
           text += line.text
-          stream?.(text)
-        } else if (!seenActivity.has(line.name) && !SILENT_TOOLS.has(line.name)) {
-          seenActivity.add(line.name)
-          push({ kind: 'activity', text: describeToolActivity(line.name) })
+          emitStream(text)
+        } else if (!SILENT_TOOLS.has(line.name)) {
+          runningInStep.push(line.name)
+          markActivity(line.name, 'running')
+          hasStatus = true
+          status?.(`${describeToolActivity(line.name)}…`)
         }
-      }).finally(() => stream?.(''))
+      }).finally(() => {
+        if (rafId !== null && typeof window !== 'undefined') {
+          window.cancelAnimationFrame(rafId)
+          rafId = null
+        }
+        stream?.('')
+        if (hasStatus) status?.('')
+      })
+      const pendingNames = new Set(reply.pendingToolCalls.map((call) => call.toolName))
+      for (const name of runningInStep) {
+        if (!pendingNames.has(name)) markActivity(name, 'done')
+      }
+
       current = [...current, ...reply.messages]
       // A reply with calls still to answer is not saved: stopped here, it would block the thread.
       if (reply.pendingToolCalls.length === 0) memory.current = current
@@ -185,6 +251,8 @@ export async function runUnifiedAssistant({
       const results: ToolResultPart[] = []
       for (const call of reply.pendingToolCalls) {
         signal?.throwIfAborted()
+        markActivity(call.toolName, 'running')
+        status?.(`${describeToolActivity(call.toolName)}…`)
         let output: ToolResultPart['output']
         try {
           output = executeClientTool
@@ -198,6 +266,7 @@ export async function runUnifiedAssistant({
             value: `${call.toolName} failed: ${error instanceof Error ? error.message : 'unknown'}`,
           }
         }
+        markActivity(call.toolName, output.type === 'error-text' ? 'error' : 'done')
         results.push({
           output,
           toolCallId: call.toolCallId,
@@ -205,12 +274,19 @@ export async function runUnifiedAssistant({
           type: 'tool-result',
         })
       }
+      status?.('')
       current = trimSnapshots([...current, { content: results, role: 'tool' }])
       memory.current = current
     }
   } catch (error) {
-    // An aborted turn may have changed the surface part way; start clean next turn.
-    if (signal?.aborted) memory.current = []
+    // Restore the last clean boundary before this aborted turn instead of wiping prior conversation memory.
+    if (signal?.aborted) memory.current = previousMemory
+    for (const id of runningActivityIds) {
+      updateActivity?.(id, 'error')
+    }
+    runningActivityIds.clear()
     throw error
+  } finally {
+    status?.('')
   }
 }

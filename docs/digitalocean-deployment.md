@@ -201,29 +201,41 @@ do not establish successful social publishing: no channels were connected or
 customer posts sent. The initial deployment did not activate maintenance; the Go maintenance rollout
 is described below.
 
-## Temporal maintenance
+## Maintenance and Temporal schedules
 
-The tenant orchestrator inside `screenshot-studio-backend` owns these durable schedules, among others, in
-`screenshot-studio-publishing.kpisa`, on task queue `platform-maintenance`:
+The tenant orchestrator inside `screenshot-studio-backend` splits maintenance
+into two layers so high-frequency DB polling does not incur Temporal Cloud
+Schedule action overhead while destructive/retention sweeps keep durable
+Temporal audit history:
 
-| Schedule ID | Cadence (UTC) | Go handler |
-| --- | --- | --- |
-| `platform-maintenance-tenant-outbox` | Every minute | Outbox dispatch and deleted-asset cleanup |
-| `platform-maintenance-audit-drains` | Every minute | Signed CloudEvents delivery |
-| `platform-maintenance-communications` | Every minute | Consented release announcement delivery through Resend |
-| `platform-maintenance-workspace-cleanup` | Every minute | Due workspace deletion after its grace period |
-| `platform-maintenance-scheduled-posts` | Every minute | Start the existing stable-ID publishing workflows for due posts |
-| `platform-maintenance-audit-retention` | Daily at 03:05 | Expired audit deletion, honoring legal holds |
-| `platform-maintenance-notification-retention` | Daily at 04:05 | Notifications and delivery records older than 90 days, honoring legal holds |
+1. **Temporal Schedules** (`screenshot-studio-publishing.kpisa`, task queue
+   `platform-maintenance`):
 
-`RUN_MAINTENANCE=true` enables registration and the Go worker. Each schedule
-skips overlapping runs and has bounded activity retries. Minute schedules catch
-up only five minutes; retention catches up one day. Existing schedules are
-updated on restart without clearing an operator's pause. To stop scheduled work,
-pause these schedules in Temporal before disabling the worker; disabling a worker
-alone leaves scheduled executions queued. The hourly publishing recovery loop
-remains a backstop and uses the same post workflow IDs, so it does not start a
-second provider delivery path.
+   | Schedule ID | Cadence (UTC) | Go handler |
+   | --- | --- | --- |
+   | `platform-maintenance-workspace-cleanup` | Hourly | Due workspace deletion after its 14-day grace period |
+   | `platform-maintenance-account-deletions` | Hourly | Due account deletions after their grace period |
+   | `platform-maintenance-asset-cleanup` | Hourly | Abandoned upload cleanup |
+   | `platform-maintenance-voice-cleanup` | Hourly | Abandoned voice uploads and removed-member purges |
+   | `platform-maintenance-audit-retention` | Daily at 03:05 | Expired audit deletion, honoring legal holds |
+   | `platform-maintenance-outbox-retention` | Daily at 03:35 | Delivered prunable outbox retention (>30 days) |
+   | `platform-maintenance-notification-retention` | Daily at 04:05 | Notifications and delivery records older than 90 days, honoring legal holds |
+
+2. **In-process Go poller** (`maintenance.Scheduler`, serialized across replicas
+   by PostgreSQL advisory locks): `webhooks`, `tenant-outbox`, `notifications`,
+   `scheduled-posts`, `audit-drains`, `communications`, `frontend-deployments`,
+   `voice-commands`, `social-token-refresh`, `social-analytics`, and hourly
+   `notifications-maintain`. All job names remain registered on
+   `platform-maintenance-v1` for manual on-demand Temporal execution.
+
+`RUN_MAINTENANCE=true` enables both the Temporal maintenance worker/schedules
+and the in-process poller. On boot, `Reconcile` skips unchanged schedules,
+preserves operator pause state, and deletes retired legacy schedules. Set
+`TENANT_MAINTENANCE_PAUSED=true` (locally `MAINTENANCE_PAUSED=true`) to hold
+all maintenance work cleanly during a database restore; pausing the Temporal
+schedules stops new scheduled triggers as well. The retired hourly
+`missing-post-workflow` loop is cancelled on startup and superseded by the
+`scheduled-posts` poller, which uses the same stable `post_<id>` workflow IDs.
 
 These jobs execute entirely in Go. They do not invoke TypeScript, a web endpoint,
 or Trigger.dev. The old Trigger task directory, SDK, project configuration,

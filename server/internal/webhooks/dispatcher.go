@@ -57,27 +57,31 @@ func NewDispatcher(db *sql.DB, key []byte) *Dispatcher {
 	return &Dispatcher{DB: db, Key: key, HTTP: NewHTTPClient(), Workers: 8}
 }
 
-// Run drains ready outbox webhook events and due deliveries for up to window,
-// exiting immediately once idle so empty runs do not pin a maintenance worker
-// slot or advisory-lock connection.
-func (d *Dispatcher) Run(ctx context.Context, window time.Duration) (int, error) {
-	deadline := time.Now().Add(window)
+// Drain fans out and delivers queued webhooks until a pass finds no work or
+// maxDuration elapses, returning immediately when the queue is empty instead of
+// sleeping idle.
+func (d *Dispatcher) Drain(ctx context.Context, maxDuration time.Duration) (int, error) {
+	return drainLoop(ctx, maxDuration, d.Fanout, d.deliverBatch)
+}
+
+func drainLoop(ctx context.Context, maxDuration time.Duration, fanout func(context.Context) (int, error), deliver func(context.Context) (attempted, sent int, err error)) (int, error) {
+	deadline := time.Now().Add(maxDuration)
 	total := 0
 	for {
-		fanned, err := d.Fanout(ctx)
+		fanned, err := fanout(ctx)
 		if err != nil {
 			return total, err
 		}
-		sent, attempted, err := d.deliverBatch(ctx)
+		attempted, sent, err := deliver(ctx)
 		if err != nil {
 			return total, err
 		}
 		total += fanned + sent
-		if (fanned == 0 && attempted == 0) || !time.Now().Before(deadline) {
+		if fanned == 0 && attempted == 0 {
 			return total, nil
 		}
-		if ctx.Err() != nil {
-			return total, nil
+		if ctx.Err() != nil || !time.Now().Before(deadline) {
+			return total, ctx.Err()
 		}
 	}
 }
@@ -142,7 +146,7 @@ type claim struct {
 // delivery is then tried again, so a receiver may see it twice and should
 // deduplicate on the event ID.
 func (d *Dispatcher) Deliver(ctx context.Context) (int, error) {
-	sent, _, err := d.deliverBatch(ctx)
+	_, sent, err := d.deliverBatch(ctx)
 	return sent, err
 }
 
@@ -202,7 +206,7 @@ func (d *Dispatcher) deliverBatch(ctx context.Context) (int, int, error) {
 	}
 	close(queue)
 	wait.Wait()
-	return sent, len(due), firstErr
+	return len(due), sent, firstErr
 }
 
 func (d *Dispatcher) deliverOne(ctx context.Context, id string) (bool, error) {

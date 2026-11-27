@@ -59,6 +59,7 @@ import { AssistantLauncher } from '@/components/assistant/AssistantBar'
 import { SettingsNav } from '@/components/settings/SettingsNav'
 import { RememberVisits } from './PageVisits'
 import { ThemeToggle } from './ThemeToggle'
+import { WorkspaceReadinessCard } from './WorkspaceReadinessCard'
 
 type NavItem = {
   href: string
@@ -352,13 +353,17 @@ function PlanCard() {
 function SidebarFooter({
   collapsed,
   navigation,
+  onNavigate,
   organizationName,
   paidPlan,
+  workspaceId,
 }: {
   collapsed: boolean
   navigation?: { expanded: boolean; ready: boolean; setTemporary: (value: boolean) => void }
+  onNavigate?: () => void
   organizationName: string
   paidPlan: boolean
+  workspaceId?: string
 }) {
   const t = useTranslations('platformNavigation')
   // As in Polar, the settings sidebar drops the plan card and the docs link.
@@ -373,6 +378,9 @@ function SidebarFooter({
       )}
     >
       {!collapsed && !paidPlan && !settings ? <PlanCard /> : null}
+      {!collapsed && paidPlan && !settings && workspaceId ? (
+        <WorkspaceReadinessCard onNavigate={onNavigate} workspaceId={workspaceId} />
+      ) : null}
       <div
         className={cn(
           'flex items-center gap-0.5',
@@ -603,6 +611,7 @@ export function PlatformSidebar({
           navigation={navigation}
           organizationName={organizationName}
           paidPlan={paidPlan}
+          workspaceId={notificationIdentity?.workspaceId}
         />
       </aside>
 
@@ -653,8 +662,10 @@ export function PlatformSidebar({
               </div>
               <SidebarFooter
                 collapsed={false}
+                onNavigate={() => setMobileOpen(false)}
                 organizationName={organizationName}
                 paidPlan={paidPlan}
+                workspaceId={notificationIdentity?.workspaceId}
               />
             </SheetContent>
           </Sheet>

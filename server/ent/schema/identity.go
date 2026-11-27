@@ -127,6 +127,14 @@ func (WorkspaceSettings) Fields() []ent.Field {
 		field.String("default_publish_time").StorageKey("defaultPublishTime").Default("09:00"),
 		// The workspace AI agent kill switch (docs/rfcs/027-ai-sdk-marketing-tools.md).
 		field.Bool("ai_agent_enabled").StorageKey("aiAgentEnabled").Default(true),
+		// Per-surface model tier and reasoning effort defaults for Shots AI.
+		field.JSON("ai_model_defaults", map[string]any{}).StorageKey("aiModelDefaults").Optional(),
+		// Workspace-wide standing AI instructions layered alongside brand voice.
+		field.Text("ai_instructions").StorageKey("aiInstructions").Optional().Nillable(),
+		// AES-256-GCM sealed OpenRouter BYOK API key enabling Balanced/Deep model tiers.
+		field.Text("ai_provider_key_encrypted").StorageKey("aiProviderKeyEncrypted").Optional().Nillable().Sensitive(),
+		// Masked display hint for the saved BYOK key (e.g. "sk-or-…a9f2").
+		field.String("ai_provider_key_hint").StorageKey("aiProviderKeyHint").Optional().Nillable(),
 		// Manual release qualification is enabled explicitly for a workspace.
 		field.Bool("release_readiness_enabled").StorageKey("releaseReadinessEnabled").Default(false),
 		// Experiments an owner or admin turned off for everyone (RFC 024).

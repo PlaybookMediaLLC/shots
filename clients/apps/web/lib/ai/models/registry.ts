@@ -9,10 +9,11 @@
 import { customProvider, type LanguageModel, wrapLanguageModel } from 'ai'
 import { aiCreditMeter } from '@/lib/ai/metering'
 import { MODEL_ROLES, type ModelRole } from './catalog'
-import { type EnvSource, resolveModelIds } from './env'
+import { type EnvSource, parseModelEnv, resolveModelIds } from './env'
 import { createModelMiddleware, type ModelMiddlewareOptions } from './middleware'
 import { openRouterLanguageModel } from './provider'
 import { createScriptedModel, isScriptedModelEnabled } from './scripted'
+import { AI_MODEL_TIERS, type AiEffort, type AiModelTier, tierRequiresApiKey } from './tiers'
 
 /**
  * Role-addressed access to language models.
@@ -34,6 +35,12 @@ export type ModelRegistry = {
    * @returns the provider model id, e.g. `"gpt-4o-mini"`.
    */
   modelId(role: ModelRole): string
+  /**
+   * Returns a language model for a curated user-selectable tier and reasoning
+   * effort. When `byokApiKey` is supplied, constructs a fresh uncached provider
+   * bound to the workspace key without charging Shots credits.
+   */
+  tieredModel(tier: AiModelTier, effort?: AiEffort, byokApiKey?: string): LanguageModel
 }
 
 /**
@@ -74,6 +81,7 @@ export type ModelRegistryOptions = ModelMiddlewareOptions & {
 export function createModelRegistry(options: ModelRegistryOptions = {}): ModelRegistry {
   const { env, ...middlewareOptions } = options
   const modelIds = resolveModelIds(env)
+  const envOverrides = parseModelEnv(env)
 
   const languageModels = {} as Record<ModelRole, LanguageModel>
   // End-to-end tests run without a provider key; see ./scripted.ts.
@@ -88,10 +96,49 @@ export function createModelRegistry(options: ModelRegistryOptions = {}): ModelRe
   }
 
   const provider = customProvider({ languageModels })
+  const tieredCache = new Map<string, LanguageModel>()
 
   return {
     languageModel: (role: ModelRole) => provider.languageModel(role),
     modelId: (role: ModelRole) => modelIds[role],
+    tieredModel: (tier: AiModelTier, effort?: AiEffort, byokApiKey?: string) => {
+      const trimmedKey = byokApiKey?.trim()
+      if (tierRequiresApiKey(tier) && !trimmedKey) {
+        throw new Error(`Model tier "${tier}" requires a workspace OpenRouter API key.`)
+      }
+      const role: ModelRole = tier === 'deep' ? 'deep' : tier === 'balanced' ? 'drafting' : 'fast'
+      const override =
+        tier === 'deep'
+          ? envOverrides.PLATFORM_AI_MODEL_DEEP
+          : tier === 'balanced'
+            ? envOverrides.PLATFORM_AI_MODEL_DRAFTING
+            : envOverrides.PLATFORM_AI_MODEL_FAST
+      const targetId = override ?? AI_MODEL_TIERS[tier].modelId
+      if (trimmedKey) {
+        // Never cache tenant-bound credentials in the shared registry, and skip
+        // Shots credit metering because OpenRouter bills the workspace key directly.
+        return wrapLanguageModel({
+          model: scripted
+            ? createScriptedModel(targetId)
+            : openRouterLanguageModel(targetId, effort, trimmedKey),
+          middleware: createModelMiddleware(role, targetId, {
+            ...middlewareOptions,
+            meter: undefined,
+          }),
+        })
+      }
+      const key = `${tier}:${effort ?? ''}`
+      const cached = tieredCache.get(key)
+      if (cached) return cached
+      const wrapped = wrapLanguageModel({
+        model: scripted
+          ? createScriptedModel(targetId)
+          : openRouterLanguageModel(targetId, effort),
+        middleware: createModelMiddleware(role, targetId, middlewareOptions),
+      })
+      tieredCache.set(key, wrapped)
+      return wrapped
+    },
   }
 }
 

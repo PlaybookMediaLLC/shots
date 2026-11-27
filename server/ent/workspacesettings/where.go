@@ -89,6 +89,21 @@ func AiAgentEnabled(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiAgentEnabled, v))
 }
 
+// AiInstructions applies equality check predicate on the "ai_instructions" field. It's identical to AiInstructionsEQ.
+func AiInstructions(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiInstructions, v))
+}
+
+// AiProviderKeyEncrypted applies equality check predicate on the "ai_provider_key_encrypted" field. It's identical to AiProviderKeyEncryptedEQ.
+func AiProviderKeyEncrypted(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyHint applies equality check predicate on the "ai_provider_key_hint" field. It's identical to AiProviderKeyHintEQ.
+func AiProviderKeyHint(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiProviderKeyHint, v))
+}
+
 // ReleaseReadinessEnabled applies equality check predicate on the "release_readiness_enabled" field. It's identical to ReleaseReadinessEnabledEQ.
 func ReleaseReadinessEnabled(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldReleaseReadinessEnabled, v))
@@ -382,6 +397,241 @@ func AiAgentEnabledEQ(v bool) predicate.WorkspaceSettings {
 // AiAgentEnabledNEQ applies the NEQ predicate on the "ai_agent_enabled" field.
 func AiAgentEnabledNEQ(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldAiAgentEnabled, v))
+}
+
+// AiModelDefaultsIsNil applies the IsNil predicate on the "ai_model_defaults" field.
+func AiModelDefaultsIsNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIsNull(FieldAiModelDefaults))
+}
+
+// AiModelDefaultsNotNil applies the NotNil predicate on the "ai_model_defaults" field.
+func AiModelDefaultsNotNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotNull(FieldAiModelDefaults))
+}
+
+// AiInstructionsEQ applies the EQ predicate on the "ai_instructions" field.
+func AiInstructionsEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiInstructions, v))
+}
+
+// AiInstructionsNEQ applies the NEQ predicate on the "ai_instructions" field.
+func AiInstructionsNEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldAiInstructions, v))
+}
+
+// AiInstructionsIn applies the In predicate on the "ai_instructions" field.
+func AiInstructionsIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIn(FieldAiInstructions, vs...))
+}
+
+// AiInstructionsNotIn applies the NotIn predicate on the "ai_instructions" field.
+func AiInstructionsNotIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotIn(FieldAiInstructions, vs...))
+}
+
+// AiInstructionsGT applies the GT predicate on the "ai_instructions" field.
+func AiInstructionsGT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGT(FieldAiInstructions, v))
+}
+
+// AiInstructionsGTE applies the GTE predicate on the "ai_instructions" field.
+func AiInstructionsGTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGTE(FieldAiInstructions, v))
+}
+
+// AiInstructionsLT applies the LT predicate on the "ai_instructions" field.
+func AiInstructionsLT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLT(FieldAiInstructions, v))
+}
+
+// AiInstructionsLTE applies the LTE predicate on the "ai_instructions" field.
+func AiInstructionsLTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLTE(FieldAiInstructions, v))
+}
+
+// AiInstructionsContains applies the Contains predicate on the "ai_instructions" field.
+func AiInstructionsContains(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContains(FieldAiInstructions, v))
+}
+
+// AiInstructionsHasPrefix applies the HasPrefix predicate on the "ai_instructions" field.
+func AiInstructionsHasPrefix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasPrefix(FieldAiInstructions, v))
+}
+
+// AiInstructionsHasSuffix applies the HasSuffix predicate on the "ai_instructions" field.
+func AiInstructionsHasSuffix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasSuffix(FieldAiInstructions, v))
+}
+
+// AiInstructionsIsNil applies the IsNil predicate on the "ai_instructions" field.
+func AiInstructionsIsNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIsNull(FieldAiInstructions))
+}
+
+// AiInstructionsNotNil applies the NotNil predicate on the "ai_instructions" field.
+func AiInstructionsNotNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotNull(FieldAiInstructions))
+}
+
+// AiInstructionsEqualFold applies the EqualFold predicate on the "ai_instructions" field.
+func AiInstructionsEqualFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEqualFold(FieldAiInstructions, v))
+}
+
+// AiInstructionsContainsFold applies the ContainsFold predicate on the "ai_instructions" field.
+func AiInstructionsContainsFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContainsFold(FieldAiInstructions, v))
+}
+
+// AiProviderKeyEncryptedEQ applies the EQ predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedNEQ applies the NEQ predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedNEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedIn applies the In predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIn(FieldAiProviderKeyEncrypted, vs...))
+}
+
+// AiProviderKeyEncryptedNotIn applies the NotIn predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedNotIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotIn(FieldAiProviderKeyEncrypted, vs...))
+}
+
+// AiProviderKeyEncryptedGT applies the GT predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedGT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGT(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedGTE applies the GTE predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedGTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGTE(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedLT applies the LT predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedLT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLT(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedLTE applies the LTE predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedLTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLTE(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedContains applies the Contains predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedContains(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContains(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedHasPrefix applies the HasPrefix predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedHasPrefix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasPrefix(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedHasSuffix applies the HasSuffix predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedHasSuffix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasSuffix(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedIsNil applies the IsNil predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedIsNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIsNull(FieldAiProviderKeyEncrypted))
+}
+
+// AiProviderKeyEncryptedNotNil applies the NotNil predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedNotNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotNull(FieldAiProviderKeyEncrypted))
+}
+
+// AiProviderKeyEncryptedEqualFold applies the EqualFold predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedEqualFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEqualFold(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyEncryptedContainsFold applies the ContainsFold predicate on the "ai_provider_key_encrypted" field.
+func AiProviderKeyEncryptedContainsFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContainsFold(FieldAiProviderKeyEncrypted, v))
+}
+
+// AiProviderKeyHintEQ applies the EQ predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintNEQ applies the NEQ predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintNEQ(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintIn applies the In predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIn(FieldAiProviderKeyHint, vs...))
+}
+
+// AiProviderKeyHintNotIn applies the NotIn predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintNotIn(vs ...string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotIn(FieldAiProviderKeyHint, vs...))
+}
+
+// AiProviderKeyHintGT applies the GT predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintGT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGT(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintGTE applies the GTE predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintGTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGTE(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintLT applies the LT predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintLT(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLT(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintLTE applies the LTE predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintLTE(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLTE(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintContains applies the Contains predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintContains(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContains(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintHasPrefix applies the HasPrefix predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintHasPrefix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasPrefix(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintHasSuffix applies the HasSuffix predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintHasSuffix(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldHasSuffix(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintIsNil applies the IsNil predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintIsNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIsNull(FieldAiProviderKeyHint))
+}
+
+// AiProviderKeyHintNotNil applies the NotNil predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintNotNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotNull(FieldAiProviderKeyHint))
+}
+
+// AiProviderKeyHintEqualFold applies the EqualFold predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintEqualFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEqualFold(FieldAiProviderKeyHint, v))
+}
+
+// AiProviderKeyHintContainsFold applies the ContainsFold predicate on the "ai_provider_key_hint" field.
+func AiProviderKeyHintContainsFold(v string) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldContainsFold(FieldAiProviderKeyHint, v))
 }
 
 // ReleaseReadinessEnabledEQ applies the EQ predicate on the "release_readiness_enabled" field.

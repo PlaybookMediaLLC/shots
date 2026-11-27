@@ -113,11 +113,15 @@ export function useCanvasCopilot({
   )
 
   // A run stops when its artboard stops being the open one, or the canvas closes.
-  const running = useRef<{ id: string; controller: AbortController } | null>(null)
+  const running = useRef<{
+    controller: AbortController
+    id: string
+    openedArtboard: boolean
+  } | null>(null)
   // The artboard the conversation's memory is about; another starts the model afresh.
   const remembered = useRef<string | null>(null)
   useEffect(() => {
-    if (running.current && running.current.id !== activeId)
+    if (running.current?.openedArtboard && running.current.id !== activeId)
       running.current.controller.abort(new Error('Stopped: the artboard was closed.'))
   }, [activeId])
   useEffect(() => () => running.current?.controller.abort(new Error('Stopped.')), [])
@@ -167,7 +171,20 @@ export function useCanvasCopilot({
               ? ['Make the headline punchier on every artboard']
               : ['Give the screenshot a soft shadow']),
           ],
-          run: async ({ ask, images, memory, page, push, signal, stream }) => {
+          run: async ({
+            ask,
+            contextRefs,
+            effort,
+            images,
+            memory,
+            modelTier,
+            page,
+            push,
+            signal,
+            status,
+            stream,
+            updateActivity,
+          }) => {
             // "every artboard", "all the slides", "each page": the request runs on each in turn,
             // up to a cap, so a misread request cannot run on (and charge for) a whole deck.
             const across = ACROSS_ARTBOARDS.test(ask)
@@ -181,35 +198,55 @@ export function useCanvasCopilot({
             for (const id of ids) {
               if (signal.aborted) throw new Error('Stopped.')
               const at = order.findIndex((item) => item.id === id) + 1
-              if (ids.length > 1) push({ kind: 'note', text: `Artboard ${at} of ${ids.length}…` })
-              if (editor.current.activeId !== id || !editor.current.ready) {
-                if (editor.current.activeId !== id) onEdit(id)
-                if (ids.length === 1) push({ kind: 'note', text: `Opening artboard ${at}…` })
-                await opened(id, signal)
-              }
               const controller = new AbortController()
               const stop = () => controller.abort(signal.reason)
               signal.addEventListener('abort', stop)
-              running.current = { id, controller }
-              // Memory follows one artboard, so one's edits never steer another's.
-              // A resumed chat has memory before any artboard ran; keep it.
-              if (remembered.current !== null && remembered.current !== id) memory.current = []
-              remembered.current = id
               try {
+                const ensureOpen = async (waitSignal: AbortSignal = controller.signal) => {
+                  if (running.current) running.current.openedArtboard = true
+                  if (editor.current.activeId === id && editor.current.ready) return
+                  if (editor.current.activeId !== id) onEdit(id)
+                  if (ids.length === 1) push({ kind: 'note', text: `Opening artboard ${at}…` })
+                  await opened(id, waitSignal)
+                }
+                running.current = {
+                  controller,
+                  id,
+                  openedArtboard: ids.length > 1 || editor.current.activeId === id,
+                }
+                if (ids.length > 1) {
+                  push({ kind: 'note', text: `Artboard ${at} of ${ids.length}…` })
+                  await ensureOpen(controller.signal)
+                }
+                // Memory follows one artboard, so one's edits never steer another's.
+                // A resumed chat has memory before any artboard ran; keep it.
+                if (remembered.current !== null && remembered.current !== id) memory.current = []
+                remembered.current = id
                 await runUnifiedAssistant({
                   ask,
+                  contextRefs,
+                  effort,
                   images,
                   clientTools: [...SCREENSHOT_EDITOR_CLIENT_TOOLS, 'inspectBoard', 'editBoard'],
-                  executeClientTool,
+                  executeClientTool: async (call, context) => {
+                    // Board-level tools run without opening an artboard editor; artboard tools open lazily.
+                    if (call.toolName !== 'inspectBoard' && call.toolName !== 'editBoard') {
+                      await ensureOpen(context.signal ?? controller.signal)
+                    }
+                    return executeClientTool(call, context)
+                  },
                   memory,
+                  modelTier,
                   page,
                   push: (entry) => {
                     // Cards act on the live editor, so each stays with its artboard.
-                    push({ ...entry, target: id })
+                    return push({ ...entry, target: id })
                   },
                   selection: null,
                   signal: controller.signal,
+                  status,
                   stream,
+                  updateActivity,
                 })
               } finally {
                 signal.removeEventListener('abort', stop)

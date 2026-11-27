@@ -1,31 +1,27 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useAssistantAbility } from '@/components/assistant/AssistantProvider'
-import { editorAskHref } from '@/lib/ai/editor-ask'
+import { runUnifiedAssistant } from '@/components/assistant/run-unified-assistant'
 
 /**
- * Create's assistant ability: describe a visual, and a new screenshot opens
- * with the editor's copilot holding the request (the assistant bar reads `ask`).
- * Rendered only for members who may edit.
+ * Create's assistant ability: opens prominently on `/create` with visual-first
+ * suggestions, backed by the real unified workspace assistant so both creative
+ * starts (`startWork`) and workspace questions work seamlessly with attachments.
  */
 export function CreateVisualAbility() {
-  const router = useRouter()
   useAssistantAbility({
     id: 'create-visual',
-    label: 'New screenshot',
-    placeholder: 'Describe the visual you want, then add your screenshot',
+    label: 'Create',
+    placeholder: 'Describe a visual to start, or ask anything about your workspace',
     priority: 10,
     prominent: true,
     suggestions: [
-      'A dark hero shot for a new feature',
-      'A clean pricing page on a soft gradient',
-      'A phone mockup for our app release',
+      'Make a dark hero shot for a new feature',
+      'Make a clean pricing visual on a soft gradient',
+      'Start a product launch canvas',
+      'What did I work on lately?',
     ],
-    run: async ({ ask, push }) => {
-      push({ kind: 'note', text: 'Opening the editor with your request…' })
-      router.push(editorAskHref(ask))
-    },
+    run: (run) => runUnifiedAssistant({ ...run, clientTools: [] }),
   })
   return null
 }

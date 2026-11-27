@@ -354,22 +354,17 @@ func main() {
 			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, PostalAddress: cfg.CompanyPostalAddress},
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
-			MaxConcurrentActivityExecutionSize: max(1, 8/cfg.WorkerConcurrencyDivider),
+			BackgroundActivityContext:          ctx,
+			MaxConcurrentActivityExecutionSize: max(1, 4/cfg.WorkerConcurrencyDivider),
 			OnFatalError:                       func(err error) { slog.Error("maintenance worker failed"); stop() },
 		})
+		// Temporal runs (scheduled or on-demand/E2E) wait for any in-flight
+		// poller lock so explicit triggers always execute a fresh pass.
 		temporalmaintenance.Register(maintenanceWorker, temporalmaintenance.RunnerFunc(func(ctx context.Context, job string) (int, error) {
-			if job == "social-analytics" {
-				n, err := events.CollectDueAnalytics(ctx)
-				if err != nil {
-					return n, err
-				}
-				m, err := jobs.Run(ctx, job)
-				return n + m, err
-			}
 			if job == "scheduled-posts" {
-				return recovery.DispatchDue(ctx)
+				return jobs.WithLockWait(ctx, job, recovery.DispatchDue)
 			}
-			return jobs.Run(ctx, job)
+			return jobs.RunWait(ctx, job)
 		}))
 		if err := maintenanceWorker.Start(); err != nil {
 			slog.Error("maintenance worker did not start")
@@ -383,7 +378,31 @@ func main() {
 			slog.Error("maintenance schedules unavailable", "error", err)
 			os.Exit(1)
 		}
-		slog.Info("maintenance schedules ready", "count", len(temporalmaintenance.Jobs))
+		// Keep scheduled-posts on a dedicated slot so slow external-HTTP jobs
+		// (audit drains, communications, analytics) can never starve due posts.
+		var scheduledPostsJob, otherPollJobs []maintenance.PollJob
+		for _, job := range maintenance.DefaultPollJobs {
+			if job.Name == "scheduled-posts" {
+				scheduledPostsJob = append(scheduledPostsJob, job)
+			} else {
+				otherPollJobs = append(otherPollJobs, job)
+			}
+		}
+		stopScheduledPostsPoller := (&maintenance.Scheduler{
+			Runner: func(ctx context.Context, job string) (int, error) {
+				return jobs.WithLock(ctx, job, recovery.DispatchDue)
+			},
+			Jobs:          scheduledPostsJob,
+			MaxConcurrent: 1,
+		}).Start(ctx)
+		defer stopScheduledPostsPoller()
+		stopMaintenancePoller := (&maintenance.Scheduler{
+			Runner:        jobs.Run,
+			Jobs:          otherPollJobs,
+			MaxConcurrent: max(2, 3/cfg.WorkerConcurrencyDivider),
+		}).Start(ctx)
+		defer stopMaintenancePoller()
+		slog.Info("maintenance ready", "scheduled", len(temporalmaintenance.ScheduledJobs), "retired", len(temporalmaintenance.RetiredScheduleJobs), "polled", len(maintenance.DefaultPollJobs))
 	}
 
 	health := healthHandler(repository, temporalClient, cfg.Namespace)
@@ -421,15 +440,27 @@ func main() {
 		slog.Error("Temporal workflow worker did not start", "error", err)
 		os.Exit(1)
 	}
-	if cfg.RunCron {
-		if err := scheduler.StartMissingWorkflow(ctx); err != nil {
-			workflowWorker.Stop()
-			if activityWorker != nil {
-				activityWorker.Stop()
-			}
-			slog.Error("missing-post workflow did not start", "error", err)
-			os.Exit(1)
+	if cfg.RunCron || cfg.RunMaintenance {
+		// MissingPostWorkflow is superseded by the scheduled-posts maintenance
+		// poller and had no ContinueAsNew bound. Cancel any open execution cleanly;
+		// the workflow stays registered above for replay safety.
+		cancelCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		if err := scheduler.CancelMissingWorkflow(cancelCtx); err != nil {
+			slog.Warn("retired missing-post workflow could not be cancelled", "error", err)
 		}
+		cancel()
+	}
+	if cfg.RunCron && !cfg.RunMaintenance {
+		// Local dev with RUN_CRON=true and RUN_MAINTENANCE=false still dispatches due posts.
+		cronLocks := &maintenance.Store{DB: db.SQL}
+		stopCronPoller := (&maintenance.Scheduler{
+			Runner: func(ctx context.Context, job string) (int, error) {
+				return cronLocks.WithLock(ctx, job, recovery.DispatchDue)
+			},
+			Jobs:          []maintenance.PollJob{{Name: "scheduled-posts", Interval: time.Minute}},
+			MaxConcurrent: 1,
+		}).Start(ctx)
+		defer stopCronPoller()
 	}
 	<-ctx.Done()
 	workflowWorker.Stop()

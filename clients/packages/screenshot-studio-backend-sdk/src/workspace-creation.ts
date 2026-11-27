@@ -108,6 +108,8 @@ export const workspaceCreationResultSchema = z.strictObject({
     timeZone: z.string(),
     defaultPublishTime: z.string(),
     aiAgentEnabled: z.boolean(),
+    aiModelDefaults: z.record(z.string(), z.unknown()).nullable().optional(),
+    aiInstructions: z.string().nullable().optional(),
     releaseReadinessEnabled: z.boolean().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

@@ -23,6 +23,14 @@ const (
 	FieldDefaultPublishTime = "defaultPublishTime"
 	// FieldAiAgentEnabled holds the string denoting the ai_agent_enabled field in the database.
 	FieldAiAgentEnabled = "aiAgentEnabled"
+	// FieldAiModelDefaults holds the string denoting the ai_model_defaults field in the database.
+	FieldAiModelDefaults = "aiModelDefaults"
+	// FieldAiInstructions holds the string denoting the ai_instructions field in the database.
+	FieldAiInstructions = "aiInstructions"
+	// FieldAiProviderKeyEncrypted holds the string denoting the ai_provider_key_encrypted field in the database.
+	FieldAiProviderKeyEncrypted = "aiProviderKeyEncrypted"
+	// FieldAiProviderKeyHint holds the string denoting the ai_provider_key_hint field in the database.
+	FieldAiProviderKeyHint = "aiProviderKeyHint"
 	// FieldReleaseReadinessEnabled holds the string denoting the release_readiness_enabled field in the database.
 	FieldReleaseReadinessEnabled = "releaseReadinessEnabled"
 	// FieldDisabledExperiments holds the string denoting the disabled_experiments field in the database.
@@ -43,6 +51,10 @@ var Columns = []string{
 	FieldTimeZone,
 	FieldDefaultPublishTime,
 	FieldAiAgentEnabled,
+	FieldAiModelDefaults,
+	FieldAiInstructions,
+	FieldAiProviderKeyEncrypted,
+	FieldAiProviderKeyHint,
 	FieldReleaseReadinessEnabled,
 	FieldDisabledExperiments,
 	FieldCreatedAt,
@@ -111,6 +123,21 @@ func ByDefaultPublishTime(opts ...sql.OrderTermOption) OrderOption {
 // ByAiAgentEnabled orders the results by the ai_agent_enabled field.
 func ByAiAgentEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAiAgentEnabled, opts...).ToFunc()
+}
+
+// ByAiInstructions orders the results by the ai_instructions field.
+func ByAiInstructions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAiInstructions, opts...).ToFunc()
+}
+
+// ByAiProviderKeyEncrypted orders the results by the ai_provider_key_encrypted field.
+func ByAiProviderKeyEncrypted(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAiProviderKeyEncrypted, opts...).ToFunc()
+}
+
+// ByAiProviderKeyHint orders the results by the ai_provider_key_hint field.
+func ByAiProviderKeyHint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAiProviderKeyHint, opts...).ToFunc()
 }
 
 // ByReleaseReadinessEnabled orders the results by the release_readiness_enabled field.

@@ -92,3 +92,18 @@ export function internalHref(value: string): string | null {
   if (/[\\\s]/.test(href) || /^\/[^/?#]*:/.test(href)) return null
   return href
 }
+
+/** Validate a markdown link destination, allowing only safe in-app paths or http(s) URLs. */
+export function safeLinkHref(raw: string): { external: boolean; href: string } | null {
+  const internal = internalHref(raw)
+  if (internal) return { external: false, href: internal }
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return { external: true, href: parsed.toString() }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
