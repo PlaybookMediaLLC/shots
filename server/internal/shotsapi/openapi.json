@@ -6807,6 +6807,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -6912,6 +6918,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions",
                           "version",
                           "calendarVersion",
@@ -17264,6 +17271,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -17338,6 +17351,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions"
                         ],
                         "additionalProperties": false
@@ -18651,6 +18665,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -18725,6 +18745,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions"
                         ],
                         "additionalProperties": false
@@ -22250,6 +22271,67 @@
           }
         ],
         "summary": "List onboarding enrichment",
+        "tags": [
+          "Workspace"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "x-shots-entitlement": {
+          "feature": "workspace:paid",
+          "minimumPlan": "pro"
+        },
+        "description": "Verifies the calling workspace API key and returns redacted key metadata, granted scopes, and workspace identity. Useful for CLI setup and integration health checks.",
+        "operationId": "getCurrentKeyInfo",
+        "responses": {
+          "200": {
+            "description": "Redacted API key summary and workspace identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentKeyInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, invalid, disabled, or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The credential is not a workspace API key or lacks workspace access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Verify the calling workspace API key",
         "tags": [
           "Workspace"
         ]
@@ -29521,6 +29603,12 @@
                     "null"
                   ]
                 },
+                "xLinksStrippedCount": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "deletions": {
                   "default": [],
                   "type": "array",
@@ -29595,6 +29683,7 @@
                 "failureCode",
                 "publishedAt",
                 "deletedAt",
+                "xLinksStrippedCount",
                 "deletions"
               ],
               "additionalProperties": false
@@ -40867,6 +40956,12 @@
                     "null"
                   ]
                 },
+                "xLinksStrippedCount": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "deletions": {
                   "default": [],
                   "type": "array",
@@ -40941,6 +41036,7 @@
                 "failureCode",
                 "publishedAt",
                 "deletedAt",
+                "xLinksStrippedCount",
                 "deletions"
               ],
               "additionalProperties": false
@@ -42680,6 +42776,83 @@
         },
         "required": [
           "enrichment"
+        ],
+        "additionalProperties": false
+      },
+      "CurrentKeyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "properties": {
+              "expiresAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prefix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "start": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "expiresAt",
+              "id",
+              "name",
+              "prefix",
+              "scopes",
+              "start"
+            ],
+            "additionalProperties": false
+          },
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "slug"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "key",
+          "workspace"
         ],
         "additionalProperties": false
       },

@@ -315,6 +315,8 @@ export const contentDraftPostSchema = z.object({
   publishedAt: timestampSchema.nullable().default(null),
   /** When Shots deleted it from its platform; it stays published in Shots' record. */
   deletedAt: timestampSchema.nullable().default(null),
+  /** Total links stripped when publishing to X without the x_links add-on. */
+  xLinksStrippedCount: z.number().int().nonnegative().default(0),
   /** Each part of a requested delete, with its receipt. */
   deletions: z.array(postDeletionReceiptSchema).default([]),
 })

@@ -14,25 +14,27 @@ func TestResolveSubscriptionStanding(t *testing.T) {
 		name   string
 		row    *ent.WorkspaceEntitlement
 		plan   string
+		status string
 		active bool
 	}{
-		{"unsubscribed", nil, "free", true},
-		{"active", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active"}, "pro", true},
-		{"trial", &ent.WorkspaceEntitlement{Plan: "business", Status: "trialing", ValidUntil: &future}, "business", true},
-		{"cancelled", &ent.WorkspaceEntitlement{Plan: "pro", Status: "cancelled"}, "pro", false},
-		{"suspended", &ent.WorkspaceEntitlement{Plan: "enterprise", Status: "suspended"}, "enterprise", false},
-		{"expired", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active", ValidUntil: &past}, "pro", false},
-		{"expires now", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active", ValidUntil: &now}, "pro", false},
-		{"past due without grace", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due"}, "pro", false},
-		{"grace expires now", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &now}, "pro", false},
-		{"grace", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &future}, "pro", true},
-		{"grace cannot extend validity", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &future, ValidUntil: &past}, "pro", false},
-		{"unknown plan", &ent.WorkspaceEntitlement{Plan: "unexpected", Status: "active"}, "free", false},
+		{"unsubscribed", nil, "free", "active", true},
+		{"active", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active"}, "pro", "active", true},
+		{"trial", &ent.WorkspaceEntitlement{Plan: "business", Status: "trialing", ValidUntil: &future}, "business", "trialing", true},
+		{"cancelled", &ent.WorkspaceEntitlement{Plan: "pro", Status: "cancelled"}, "pro", "cancelled", false},
+		{"paused", &ent.WorkspaceEntitlement{Plan: "pro", Status: "paused"}, "pro", "paused", false},
+		{"suspended", &ent.WorkspaceEntitlement{Plan: "enterprise", Status: "suspended"}, "enterprise", "suspended", false},
+		{"expired", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active", ValidUntil: &past}, "pro", "active", false},
+		{"expires now", &ent.WorkspaceEntitlement{Plan: "pro", Status: "active", ValidUntil: &now}, "pro", "active", false},
+		{"past due without grace", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due"}, "pro", "past_due", false},
+		{"grace expires now", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &now}, "pro", "past_due", false},
+		{"grace", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &future}, "pro", "past_due", true},
+		{"grace cannot extend validity", &ent.WorkspaceEntitlement{Plan: "pro", Status: "past_due", GraceUntil: &future, ValidUntil: &past}, "pro", "past_due", false},
+		{"unknown plan", &ent.WorkspaceEntitlement{Plan: "unexpected", Status: "active"}, "free", "active", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			plan, _, active := Resolve(test.row, now)
-			if plan != test.plan || active != test.active {
-				t.Fatalf("plan=%s active=%t", plan, active)
+			plan, status, active := Resolve(test.row, now)
+			if plan != test.plan || status != test.status || active != test.active {
+				t.Fatalf("plan=%s status=%s active=%t, want plan=%s status=%s active=%t", plan, status, active, test.plan, test.status, test.active)
 			}
 		})
 	}

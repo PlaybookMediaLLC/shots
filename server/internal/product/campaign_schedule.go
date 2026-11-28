@@ -92,71 +92,17 @@ func nextCampaignPublishTime(now time.Time, timeZone, publishTime string) (time.
 	return result.UTC(), nil
 }
 
-func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, campaignID, postID string,
-	input ScheduleCampaignPostInput) (*ScheduleCampaignPostResult, error) {
-	if err := c.authorizeScheduling(ctx, actor); err != nil {
-		return nil, err
-	}
-	if input.ChannelConnectionID == "" {
-		return nil, ErrInvalidInput
-	}
-	owned, err := c.client.Campaign.Query().Where(campaign.ID(campaignID), campaign.OrganizationID(actor.OrganizationID)).Exist(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !owned {
-		return nil, publishing.ErrNotFound
-	}
-	// Pre-check whether the post already has an active schedule so an idempotent
-	// retry does not charge monthly quota or fail if the quota is full.
-	prePost, err := c.client.CampaignPost.Query().Where(campaignpost.ID(postID), campaignpost.CampaignID(campaignID),
-		campaignpost.OrganizationID(actor.OrganizationID)).Only(ctx)
-	if ent.IsNotFound(err) {
-		return nil, publishing.ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	isActiveReplay := false
-	if prePost.Status == campaignpost.StatusSCHEDULED && prePost.ScheduledPostID != nil {
-		existingScheduled, err := c.client.ScheduledPost.Query().Where(scheduledpost.ID(*prePost.ScheduledPostID),
-			scheduledpost.OrganizationID(actor.OrganizationID)).Only(ctx)
-		if err != nil {
-			return nil, err
-		}
-		switch existingScheduled.Status {
-		case scheduledpost.StatusCANCELLED, scheduledpost.StatusFAILED:
-		case scheduledpost.StatusUNKNOWN_DELIVERY:
-			return nil, conflict("This post may already be live. Check the channel before scheduling it again.")
-		default:
-			if existingScheduled.ChannelConnectionID != input.ChannelConnectionID {
-				return nil, publishing.ErrConflict
-			}
-			isActiveReplay = true
-		}
-	}
-	var refund func()
-	committed := false
-	defer func() {
-		if !committed && refund != nil {
-			refund()
-		}
-	}()
-	if !isActiveReplay {
-		refund, err = c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
-		if err != nil {
-			return nil, err
-		}
-	}
-	tx, err := c.client.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	if err := mutableCampaign(ctx, tx, actor, campaignID); err != nil {
-		return nil, err
-	}
-	post, err := tx.CampaignPost.Query().Where(campaignpost.ID(postID), campaignpost.CampaignID(campaignID),
+type validatedCampaignSchedule struct {
+	post        *ent.CampaignPost
+	prior       *ent.ScheduledPost
+	replay      *ScheduleCampaignPostResult
+	variantID   string
+	scheduledAt time.Time
+}
+
+func (c *Configuration) validateScheduleCampaignPost(ctx context.Context, db *ent.Client, actor Actor,
+	campaignID, postID string, input ScheduleCampaignPostInput) (*validatedCampaignSchedule, error) {
+	post, err := db.CampaignPost.Query().Where(campaignpost.ID(postID), campaignpost.CampaignID(campaignID),
 		campaignpost.OrganizationID(actor.OrganizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, publishing.ErrNotFound
@@ -168,7 +114,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	// may have reached the channel, so it is never replaced.
 	var prior *ent.ScheduledPost
 	if post.Status == campaignpost.StatusSCHEDULED && post.ScheduledPostID != nil {
-		scheduled, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(*post.ScheduledPostID),
+		scheduled, err := db.ScheduledPost.Query().Where(scheduledpost.ID(*post.ScheduledPostID),
 			scheduledpost.OrganizationID(actor.OrganizationID)).Only(ctx)
 		if err != nil {
 			return nil, err
@@ -182,7 +128,9 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 			if scheduled.ChannelConnectionID != input.ChannelConnectionID {
 				return nil, publishing.ErrConflict
 			}
-			return &ScheduleCampaignPostResult{Post: scheduledCampaignPostItem(post, scheduled), ScheduledPost: scheduled}, nil
+			return &validatedCampaignSchedule{
+				replay: &ScheduleCampaignPostResult{Post: scheduledCampaignPostItem(post, scheduled), ScheduledPost: scheduled},
+			}, nil
 		}
 	}
 	if (prior == nil && post.Status != campaignpost.StatusAPPROVED) || strings.TrimSpace(post.Copy) == "" {
@@ -192,13 +140,13 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 		return nil, conflict(fmt.Sprintf("This %s post is %d characters with the call to action; the limit is %d.", post.Channel, length, limit))
 	}
 	// The term list may have changed since the copy was approved.
-	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil,
+	if err := requireAllowedCopy(ctx, db, actor.OrganizationID, nil,
 		optionalText(post.Title), post.Copy, optionalText(post.CallToAction)); err != nil {
 		return nil, err
 	}
 	variantID := post.CreativeVariantID
 	if input.CreativeVariantID != nil {
-		variant, err := tx.CreativeVariant.Query().Where(creativevariant.ID(*input.CreativeVariantID),
+		variant, err := db.CreativeVariant.Query().Where(creativevariant.ID(*input.CreativeVariantID),
 			creativevariant.OrganizationID(actor.OrganizationID), creativevariant.StatusEQ(creativevariant.StatusAPPROVED),
 			creativevariant.DesignIDNotNil()).Only(ctx)
 		if err != nil && !ent.IsNotFound(err) {
@@ -206,7 +154,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 		}
 		owned := false
 		if variant != nil {
-			owned, err = tx.Design.Query().Where(design.ID(*variant.DesignID), design.CampaignID(campaignID),
+			owned, err = db.Design.Query().Where(design.ID(*variant.DesignID), design.CampaignID(campaignID),
 				design.OrganizationID(actor.OrganizationID)).Exist(ctx)
 			if err != nil {
 				return nil, err
@@ -220,7 +168,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if variantID == nil {
 		return nil, conflict("Approve a visual for this post before scheduling it.")
 	}
-	connection, err := tx.ChannelConnection.Query().Where(channelconnection.ID(input.ChannelConnectionID),
+	connection, err := db.ChannelConnection.Query().Where(channelconnection.ID(input.ChannelConnectionID),
 		channelconnection.OrganizationID(actor.OrganizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, publishing.ErrNotEligible
@@ -228,14 +176,14 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if err != nil {
 		return nil, err
 	}
-	if err := requireSharedAccount(ctx, tx.Client(), actor, connection); err != nil {
+	if err := requireSharedAccount(ctx, db, actor, connection); err != nil {
 		return nil, err
 	}
 	if !slices.Contains(campaignChannelPlatforms[post.Channel], connection.Platform) {
 		return nil, conflict("This channel cannot publish a " + post.Channel + " post.")
 	}
 	// The account's social set adds the phrases its voice avoids.
-	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, connection.SocialSetID,
+	if err := requireAllowedCopy(ctx, db, actor.OrganizationID, connection.SocialSetID,
 		optionalText(post.Title), post.Copy, optionalText(post.CallToAction)); err != nil {
 		return nil, err
 	}
@@ -243,7 +191,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if input.ScheduledAt != nil {
 		scheduledAt = input.ScheduledAt.UTC()
 	} else {
-		settings, err := tx.WorkspaceSettings.Get(ctx, actor.OrganizationID)
+		settings, err := db.WorkspaceSettings.Get(ctx, actor.OrganizationID)
 		if err != nil && !ent.IsNotFound(err) {
 			return nil, err
 		}
@@ -259,31 +207,86 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if !scheduledAt.After(time.Now()) {
 		return nil, ErrInvalidInput
 	}
-	eligible, err := publishing.NewRepository(tx.Client()).IsEligible(ctx, actor.OrganizationID, *variantID, input.ChannelConnectionID)
+	eligible, err := publishing.NewRepository(db).IsEligible(ctx, actor.OrganizationID, *variantID, input.ChannelConnectionID)
 	if err != nil {
 		return nil, err
 	}
 	if !eligible {
 		return nil, publishing.ErrNotEligible
 	}
-	if refund == nil {
-		bound := *c
-		bound.client = tx.Client()
-		refund, err = bound.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
-		if err != nil {
-			return nil, err
+	return &validatedCampaignSchedule{
+		post:        post,
+		prior:       prior,
+		variantID:   *variantID,
+		scheduledAt: scheduledAt,
+	}, nil
+}
+
+func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, campaignID, postID string,
+	input ScheduleCampaignPostInput) (*ScheduleCampaignPostResult, error) {
+	if err := c.authorizeScheduling(ctx, actor); err != nil {
+		return nil, err
+	}
+	if input.ChannelConnectionID == "" {
+		return nil, ErrInvalidInput
+	}
+	camp, err := c.client.Campaign.Query().Where(campaign.ID(campaignID), campaign.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, publishing.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if camp.Status == campaign.StatusARCHIVED {
+		return nil, conflict("Restore this archived campaign before making changes.")
+	}
+	// Validate copy, eligibility, and idempotent replay before charging monthly
+	// quota so rejected requests and active replays never hit the meter, and
+	// charge quota outside any DB transaction so Redis latency cannot hold a
+	// Postgres connection or campaign row lock.
+	validated, err := c.validateScheduleCampaignPost(ctx, c.client, actor, campaignID, postID, input)
+	if err != nil {
+		return nil, err
+	}
+	if validated.replay != nil {
+		return validated.replay, nil
+	}
+	refund, err := c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, 1)
+	if err != nil {
+		return nil, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			refund()
 		}
+	}()
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if err := mutableCampaign(ctx, tx, actor, campaignID); err != nil {
+		return nil, err
+	}
+	validated, err = c.validateScheduleCampaignPost(ctx, tx.Client(), actor, campaignID, postID, input)
+	if err != nil {
+		return nil, err
+	}
+	if validated.replay != nil {
+		validated.replay.ScheduledPost = validated.replay.ScheduledPost.Unwrap()
+		return validated.replay, nil
 	}
 	key, guard := "campaign-post:"+postID, []predicate.CampaignPost{
 		campaignpost.StatusEQ(campaignpost.StatusAPPROVED), campaignpost.ScheduledPostIDIsNil()}
-	if prior != nil {
-		key += ":" + prior.ID
-		guard = []predicate.CampaignPost{campaignpost.StatusEQ(campaignpost.StatusSCHEDULED), campaignpost.ScheduledPostID(prior.ID)}
+	if validated.prior != nil {
+		key += ":" + validated.prior.ID
+		guard = []predicate.CampaignPost{campaignpost.StatusEQ(campaignpost.StatusSCHEDULED), campaignpost.ScheduledPostID(validated.prior.ID)}
 	}
 	scheduled, err := tx.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
-		SetVariantID(*variantID).SetChannelConnectionID(input.ChannelConnectionID).
-		SetScheduledFor(scheduledAt).SetStatus(scheduledpost.StatusSCHEDULED).
-		SetCaption(post.Copy).SetIdempotencyKey(key).SetNillableScheduledByUserID(schedulerID(actor)).Save(ctx)
+		SetVariantID(validated.variantID).SetChannelConnectionID(input.ChannelConnectionID).
+		SetScheduledFor(validated.scheduledAt).SetStatus(scheduledpost.StatusSCHEDULED).
+		SetCaption(validated.post.Copy).SetIdempotencyKey(key).SetNillableScheduledByUserID(schedulerID(actor)).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			return nil, publishing.ErrConflict
@@ -292,7 +295,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	}
 	count, err := tx.CampaignPost.Update().Where(campaignpost.ID(postID), campaignpost.CampaignID(campaignID),
 		campaignpost.OrganizationID(actor.OrganizationID)).Where(guard...).SetStatus(campaignpost.StatusSCHEDULED).
-		SetScheduledAt(scheduledAt).SetScheduledPostID(scheduled.ID).SetCreativeVariantID(*variantID).Save(ctx)
+		SetScheduledAt(validated.scheduledAt).SetScheduledPostID(scheduled.ID).SetCreativeVariantID(validated.variantID).Save(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -185,6 +185,11 @@ func ApprovedVersion(v int) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedVersion, v))
 }
 
+// XLinksStrippedCount applies equality check predicate on the "x_links_stripped_count" field. It's identical to XLinksStrippedCountEQ.
+func XLinksStrippedCount(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldXLinksStrippedCount, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldCreatedAt, v))
@@ -1888,6 +1893,46 @@ func ApprovedVersionIsNil() predicate.ScheduledPost {
 // ApprovedVersionNotNil applies the NotNil predicate on the "approved_version" field.
 func ApprovedVersionNotNil() predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldNotNull(FieldApprovedVersion))
+}
+
+// XLinksStrippedCountEQ applies the EQ predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountNEQ applies the NEQ predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountNEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountIn applies the In predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldXLinksStrippedCount, vs...))
+}
+
+// XLinksStrippedCountNotIn applies the NotIn predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountNotIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldXLinksStrippedCount, vs...))
+}
+
+// XLinksStrippedCountGT applies the GT predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountGT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountGTE applies the GTE predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountGTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountLT applies the LT predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountLT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountLTE applies the LTE predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountLTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldXLinksStrippedCount, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

@@ -543,6 +543,9 @@ type WebhookDeliveryAttempt func(*sql.Selector)
 // WebhookSubscription is the predicate function for webhooksubscription builders.
 type WebhookSubscription func(*sql.Selector)
 
+// WorkspaceAddon is the predicate function for workspaceaddon builders.
+type WorkspaceAddon func(*sql.Selector)
+
 // WorkspaceCreditGrant is the predicate function for workspacecreditgrant builders.
 type WorkspaceCreditGrant func(*sql.Selector)
 
@@ -557,3 +560,6 @@ type WorkspaceGitHubInstallation func(*sql.Selector)
 
 // WorkspaceSettings is the predicate function for workspacesettings builders.
 type WorkspaceSettings func(*sql.Selector)
+
+// XLinkPostUsage is the predicate function for xlinkpostusage builders.
+type XLinkPostUsage func(*sql.Selector)

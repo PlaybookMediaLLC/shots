@@ -1,6 +1,6 @@
 ---
 title: Connect AI Agents to Shots
-description: Connect Claude Code, Claude.ai, ChatGPT, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, and OpenCode to a Shots workspace through the Shots MCP server.
+description: Connect Claude, ChatGPT, Codex, OpenCode, Grok, Grokbot, OpenClaw, Hermes, Cursor, Gemini, Muse, the Shots CLI, or any MCP client to a Shots workspace.
 keywords:
   - MCP
   - AI agents
@@ -9,11 +9,18 @@ keywords:
   - ChatGPT
   - Codex
   - OpenCode
+  - Gemini
+  - Grok
+  - Hermes
+  - OpenClaw
+  - Muse
 ---
 
 The **Shots MCP server** lets an AI agent write, schedule, and publish posts to your connected accounts with the exact same scopes, plan checks, and quotas as the [REST API](/api-reference). It can also read releases and campaigns, draft campaigns, upload assets, capture screenshots, and submit drafts for review.
 
 Posting requires the `post:publish` scope, which is off until you explicitly enable it. **Only a signed-in person approves, in Shots; no agent can approve.**
+
+Need a paste-ready manual for your agent? Fetch `/docs/agents/guide.md` (or per-client briefs like `/docs/agents/claude.md`, `/docs/agents/gemini.md`, and `/docs/agents/cursor.md`), or use **Copy for agent** in **Settings → Agents & API keys**.
 
 ## Publish From Your Agent
 
@@ -22,11 +29,11 @@ Ask your agent to write a post and specify which accounts and when. It discovers
 - **Only enable `post:publish` if you trust what drives the agent.** Text an agent reads from an external web page or file could attempt prompt injection. Add `post:schedule` if you also want the agent to cancel scheduled posts.
 - **Accounts must belong to a shared publishing profile.** Agents cannot see private profiles or connect new social accounts—connect them in **Settings → Channels** and share the profile in **Settings → Profiles** first.
 - **Media uploads require a file-capable client.** Claude Code, Codex, and OpenCode can upload files directly. Claude.ai and ChatGPT may only manage text, so attach media in Shots for those clients.
-- **Delivery takes up to a minute to start.** The agent can inspect per-account delivery results and live links with `listContentDraftPosts`.
+- **Delivery takes up to a minute to start.** The agent can inspect per-account delivery results and live links with `listContentDraftPosts`, or subscribe to the `post.completed` outbound webhook.
 
 ## Authentication & Scopes
 
-Every MCP call acts for one workspace. Header-based clients send a workspace API key as `Authorization: Bearer ss_...` (create one in **Settings → AI agents** with only the scopes needed). Claude.ai, Claude Desktop, and ChatGPT connect over OAuth—and Claude Code, Codex, and OpenCode can too: sign in to Shots, pick the allowed scopes, and approve. The issued token is listed and revocable in **Settings → AI agents**.
+Every MCP call acts for one workspace. Most clients connect over OAuth—sign in to Shots, pick the allowed scopes, and approve. Connected OAuth sessions are grouped and revocable in **Settings → Agents & API keys** (`/settings/ai-agents`). For the REST API (`/api/v1/*`), Meta Muse, or CLI scripts, create a scoped workspace API key and send it in `X-API-Key: ss_...` (MCP clients without OAuth also accept `Authorization: Bearer ss_...`).
 
 <ApiKeyScopesTable />
 

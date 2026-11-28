@@ -81,6 +81,8 @@ const (
 	FieldApprovedByUserID = "approvedByUserId"
 	// FieldApprovedVersion holds the string denoting the approved_version field in the database.
 	FieldApprovedVersion = "approvedVersion"
+	// FieldXLinksStrippedCount holds the string denoting the x_links_stripped_count field in the database.
+	FieldXLinksStrippedCount = "xLinksStrippedCount"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -143,6 +145,7 @@ var Columns = []string{
 	FieldScheduledByUserID,
 	FieldApprovedByUserID,
 	FieldApprovedVersion,
+	FieldXLinksStrippedCount,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -160,6 +163,8 @@ func ValidColumn(column string) bool {
 var (
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
+	// DefaultXLinksStrippedCount holds the default value on creation for the "x_links_stripped_count" field.
+	DefaultXLinksStrippedCount int
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -359,6 +364,11 @@ func ByApprovedByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByApprovedVersion orders the results by the approved_version field.
 func ByApprovedVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldApprovedVersion, opts...).ToFunc()
+}
+
+// ByXLinksStrippedCount orders the results by the x_links_stripped_count field.
+func ByXLinksStrippedCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldXLinksStrippedCount, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

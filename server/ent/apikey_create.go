@@ -116,6 +116,20 @@ func (_c *ApikeyCreate) SetNillableExpiresAt(v *time.Time) *ApikeyCreate {
 	return _c
 }
 
+// SetLastRequest sets the "last_request" field.
+func (_c *ApikeyCreate) SetLastRequest(v time.Time) *ApikeyCreate {
+	_c.mutation.SetLastRequest(v)
+	return _c
+}
+
+// SetNillableLastRequest sets the "last_request" field if the given value is not nil.
+func (_c *ApikeyCreate) SetNillableLastRequest(v *time.Time) *ApikeyCreate {
+	if v != nil {
+		_c.SetLastRequest(*v)
+	}
+	return _c
+}
+
 // SetPermissions sets the "permissions" field.
 func (_c *ApikeyCreate) SetPermissions(v string) *ApikeyCreate {
 	_c.mutation.SetPermissions(v)
@@ -286,6 +300,10 @@ func (_c *ApikeyCreate) createSpec() (*Apikey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.LastRequest(); ok {
+		_spec.SetField(apikey.FieldLastRequest, field.TypeTime, value)
+		_node.LastRequest = &value
 	}
 	if value, ok := _c.mutation.Permissions(); ok {
 		_spec.SetField(apikey.FieldPermissions, field.TypeString, value)

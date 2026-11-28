@@ -14,6 +14,16 @@
 
 ## Decision
 
+### Authorized expansion, 2026-11-28
+
+The unified **Agents & API keys** settings hub (`/settings/ai-agents`) separates OAuth-connected
+agents (grouped by client with multi-session expansion, scope summaries, debounced MCP
+`lastRequest` tracking, and atomic `POST /v1/agent-authorizations/revoke-client` bulk revocation)
+from REST/CLI API keys, expands `MCP_CLIENTS` to 13 OAuth-first agent guides with per-agent
+Markdown briefs (`/docs/agents/<agentId>.md`), adds `GET /api/v1/auth/me` and `shots-cli setup`,
+and adds `post.completed` and `connection.needs_reconnect` outbound webhooks. Least-privilege
+scopes, private social set isolation, and human-only approvals remain strictly enforced.
+
 ### Authorized expansion, 2026-11-05
 
 The owner authorized agents and API keys to publish, so people can post from Claude,

@@ -39,6 +39,8 @@ for earlier designs, not instructions to rebuild superseded architecture.
 
 **Scoped authorization (2026-11-13):** [Delete a published post](../scheduling/post-delete/implementation.md) removes what Shots published, from every adapter whose network has a delete call, through the REST API, the web app and MCP. It amends RFC 030, which had no unpublish. It reuses the scheduled post, its receipts, the publish permission and the Temporal worker, and adds one receipt table. Each delete is audited, and an API key needs the new `post:delete` scope.
 
+**Scoped authorization (2026-11-28):** The unified **Agents & API keys** surface amends [RFC 026](026-mcp-and-agent-integrations.md) and [RFC 024](024-settings-platform.md) to group OAuth-connected agent sessions with atomic bulk revocation, track debounced MCP `lastRequest` activity, expand the single-source client guide and per-agent Markdown briefs (`/docs/agents/<agent>.md`), add `post.completed` and `connection.needs_reconnect` outbound webhook events, expose `GET /api/v1/auth/me`, and extend `shots-cli` with `setup`, `whoami`, `accounts`, `posts`, `drafts`, and `releases`. All existing least-privilege scope, private-set isolation, and human-only approval invariants remain unchanged.
+
 ## Build order and exit gates
 
 **Scoped authorization (2026-11-14):** The [managed AI capture and sign-in recovery

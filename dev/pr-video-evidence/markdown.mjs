@@ -54,10 +54,17 @@ export function renderPrEvidenceMarkdown(manifest) {
 
   if (manifest.status === 'recorded') {
     const recordings = /** @type {Array<Record<string, unknown>>} */ (manifest.recordings ?? [])
+    // GitHub renders an inline playable <video> player only when the uploaded
+    // video URL appears alone in its own paragraph (blank lines above/below).
+    for (const rec of recordings) {
+      if (typeof rec.videoUrl === 'string' && rec.videoUrl.trim().length > 0) {
+        lines.push('', rec.videoUrl.trim())
+      }
+    }
     if (recordings.length === 1) {
-      lines.push(`Recording: ${formatRecordingLine(recordings[0])}`)
+      lines.push('', `Recording: ${formatRecordingLine(recordings[0])}`)
     } else {
-      lines.push('Recordings:')
+      lines.push('', 'Recordings:')
       for (const rec of recordings) {
         lines.push(`- ${formatRecordingLine(rec)}`)
       }

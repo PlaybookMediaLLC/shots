@@ -173,11 +173,13 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceaddon"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacecreditgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacegithubinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/xlinkpostusage"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/profile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
@@ -2022,6 +2024,14 @@ func init() {
 	publicationattemptDescStartedAt := publicationattemptFields[4].Descriptor()
 	// publicationattempt.DefaultStartedAt holds the default value on creation for the started_at field.
 	publicationattempt.DefaultStartedAt = publicationattemptDescStartedAt.Default.(func() time.Time)
+	// publicationattemptDescLinksStrippedCount is the schema descriptor for links_stripped_count field.
+	publicationattemptDescLinksStrippedCount := publicationattemptFields[11].Descriptor()
+	// publicationattempt.DefaultLinksStrippedCount holds the default value on creation for the links_stripped_count field.
+	publicationattempt.DefaultLinksStrippedCount = publicationattemptDescLinksStrippedCount.Default.(int)
+	// publicationattemptDescXLinkQuotaConsumed is the schema descriptor for x_link_quota_consumed field.
+	publicationattemptDescXLinkQuotaConsumed := publicationattemptFields[12].Descriptor()
+	// publicationattempt.DefaultXLinkQuotaConsumed holds the default value on creation for the x_link_quota_consumed field.
+	publicationattempt.DefaultXLinkQuotaConsumed = publicationattemptDescXLinkQuotaConsumed.Default.(bool)
 	readinesscommandreceiptFields := schema.ReadinessCommandReceipt{}.Fields()
 	_ = readinesscommandreceiptFields
 	// readinesscommandreceiptDescCommandKey is the schema descriptor for command_key field.
@@ -2482,12 +2492,16 @@ func init() {
 	scheduledpostDescIdempotencyKey := scheduledpostFields[21].Descriptor()
 	// scheduledpost.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	scheduledpost.IdempotencyKeyValidator = scheduledpostDescIdempotencyKey.Validators[0].(func(string) error)
+	// scheduledpostDescXLinksStrippedCount is the schema descriptor for x_links_stripped_count field.
+	scheduledpostDescXLinksStrippedCount := scheduledpostFields[34].Descriptor()
+	// scheduledpost.DefaultXLinksStrippedCount holds the default value on creation for the x_links_stripped_count field.
+	scheduledpost.DefaultXLinksStrippedCount = scheduledpostDescXLinksStrippedCount.Default.(int)
 	// scheduledpostDescCreatedAt is the schema descriptor for created_at field.
-	scheduledpostDescCreatedAt := scheduledpostFields[34].Descriptor()
+	scheduledpostDescCreatedAt := scheduledpostFields[35].Descriptor()
 	// scheduledpost.DefaultCreatedAt holds the default value on creation for the created_at field.
 	scheduledpost.DefaultCreatedAt = scheduledpostDescCreatedAt.Default.(func() time.Time)
 	// scheduledpostDescUpdatedAt is the schema descriptor for updated_at field.
-	scheduledpostDescUpdatedAt := scheduledpostFields[35].Descriptor()
+	scheduledpostDescUpdatedAt := scheduledpostFields[36].Descriptor()
 	// scheduledpost.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	scheduledpost.DefaultUpdatedAt = scheduledpostDescUpdatedAt.Default.(func() time.Time)
 	// scheduledpost.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2986,6 +3000,34 @@ func init() {
 	webhooksubscription.DefaultUpdatedAt = webhooksubscriptionDescUpdatedAt.Default.(func() time.Time)
 	// webhooksubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	webhooksubscription.UpdateDefaultUpdatedAt = webhooksubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	workspaceaddonFields := schema.WorkspaceAddon{}.Fields()
+	_ = workspaceaddonFields
+	// workspaceaddonDescStatus is the schema descriptor for status field.
+	workspaceaddonDescStatus := workspaceaddonFields[3].Descriptor()
+	// workspaceaddon.DefaultStatus holds the default value on creation for the status field.
+	workspaceaddon.DefaultStatus = workspaceaddonDescStatus.Default.(string)
+	// workspaceaddonDescProvider is the schema descriptor for provider field.
+	workspaceaddonDescProvider := workspaceaddonFields[4].Descriptor()
+	// workspaceaddon.DefaultProvider holds the default value on creation for the provider field.
+	workspaceaddon.DefaultProvider = workspaceaddonDescProvider.Default.(string)
+	// workspaceaddonDescCancelAtPeriodEnd is the schema descriptor for cancel_at_period_end field.
+	workspaceaddonDescCancelAtPeriodEnd := workspaceaddonFields[9].Descriptor()
+	// workspaceaddon.DefaultCancelAtPeriodEnd holds the default value on creation for the cancel_at_period_end field.
+	workspaceaddon.DefaultCancelAtPeriodEnd = workspaceaddonDescCancelAtPeriodEnd.Default.(bool)
+	// workspaceaddonDescVersion is the schema descriptor for version field.
+	workspaceaddonDescVersion := workspaceaddonFields[11].Descriptor()
+	// workspaceaddon.DefaultVersion holds the default value on creation for the version field.
+	workspaceaddon.DefaultVersion = workspaceaddonDescVersion.Default.(int)
+	// workspaceaddonDescCreatedAt is the schema descriptor for created_at field.
+	workspaceaddonDescCreatedAt := workspaceaddonFields[13].Descriptor()
+	// workspaceaddon.DefaultCreatedAt holds the default value on creation for the created_at field.
+	workspaceaddon.DefaultCreatedAt = workspaceaddonDescCreatedAt.Default.(func() time.Time)
+	// workspaceaddonDescUpdatedAt is the schema descriptor for updated_at field.
+	workspaceaddonDescUpdatedAt := workspaceaddonFields[14].Descriptor()
+	// workspaceaddon.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	workspaceaddon.DefaultUpdatedAt = workspaceaddonDescUpdatedAt.Default.(func() time.Time)
+	// workspaceaddon.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	workspaceaddon.UpdateDefaultUpdatedAt = workspaceaddonDescUpdatedAt.UpdateDefault.(func() time.Time)
 	workspacecreditgrantFields := schema.WorkspaceCreditGrant{}.Fields()
 	_ = workspacecreditgrantFields
 	// workspacecreditgrantDescCreatedAt is the schema descriptor for created_at field.
@@ -3074,4 +3116,14 @@ func init() {
 	workspacesettings.DefaultUpdatedAt = workspacesettingsDescUpdatedAt.Default.(func() time.Time)
 	// workspacesettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	workspacesettings.UpdateDefaultUpdatedAt = workspacesettingsDescUpdatedAt.UpdateDefault.(func() time.Time)
+	xlinkpostusageFields := schema.XLinkPostUsage{}.Fields()
+	_ = xlinkpostusageFields
+	// xlinkpostusageDescLinkCount is the schema descriptor for link_count field.
+	xlinkpostusageDescLinkCount := xlinkpostusageFields[5].Descriptor()
+	// xlinkpostusage.LinkCountValidator is a validator for the "link_count" field. It is called by the builders before save.
+	xlinkpostusage.LinkCountValidator = xlinkpostusageDescLinkCount.Validators[0].(func(int) error)
+	// xlinkpostusageDescConsumedAt is the schema descriptor for consumed_at field.
+	xlinkpostusageDescConsumedAt := xlinkpostusageFields[6].Descriptor()
+	// xlinkpostusage.DefaultConsumedAt holds the default value on creation for the consumed_at field.
+	xlinkpostusage.DefaultConsumedAt = xlinkpostusageDescConsumedAt.Default.(func() time.Time)
 }

@@ -23,6 +23,7 @@ func (s *Server) registerPlatformControls(mux *http.ServeMux) {
 	mux.Handle("POST /v1/source-releases", s.authenticateProduct(http.HandlerFunc(s.ingestSourceRelease)))
 	mux.Handle("POST /v1/internal/outbox-events/{id}/replay", s.authenticateService(http.HandlerFunc(s.replayOutboxEvent)))
 	mux.Handle("POST /v1/internal/billing/entitlements", s.authenticateService(http.HandlerFunc(s.syncWorkspaceEntitlement)))
+	mux.Handle("POST /v1/internal/billing/addons", s.authenticateService(http.HandlerFunc(s.syncWorkspaceAddon)))
 	mux.Handle("POST /v1/internal/billing/credit-grants", s.authenticateService(http.HandlerFunc(s.grantWorkspaceCredits)))
 	mux.Handle("GET /v1/entitlements/contract", s.authenticateProduct(http.HandlerFunc(s.getWorkspaceEntitlement)))
 }
@@ -189,6 +190,25 @@ func (s *Server) syncWorkspaceEntitlement(w http.ResponseWriter, r *http.Request
 	var conflict product.EntitlementConflictError
 	if errors.As(err, &conflict) {
 		// The billing facade retries against the current version.
+		writeJSON(w, http.StatusConflict, map[string]any{"currentVersion": conflict.Current, "error": conflict.Error()})
+		return
+	}
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) syncWorkspaceAddon(w http.ResponseWriter, r *http.Request) {
+	var input product.AddonSyncInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid billing add-on event")
+		return
+	}
+	result, err := s.configuration.SyncWorkspaceAddon(r.Context(), input)
+	var conflict product.EntitlementConflictError
+	if errors.As(err, &conflict) {
 		writeJSON(w, http.StatusConflict, map[string]any{"currentVersion": conflict.Current, "error": conflict.Error()})
 		return
 	}

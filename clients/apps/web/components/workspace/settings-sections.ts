@@ -104,7 +104,7 @@ const SECTIONS = [
     title: 'General',
   },
   {
-    description: 'Your plan, billing status, and AI credits.',
+    description: 'Manage your subscription, payment methods, and billing information.',
     group: 'workspace',
     id: 'billing',
     slug: 'billing',
@@ -157,12 +157,13 @@ const SECTIONS = [
     title: 'Instructions',
   },
   {
-    description: 'Connect Claude, ChatGPT, Cursor, and other AI agents to this workspace over MCP.',
+    description:
+      'Agents connect with OAuth and show up under connected agents. API keys are for the REST API, CLI, and clients without OAuth.',
     group: 'ai',
     id: 'agents',
-    keywords: 'mcp oauth claude cursor codex plugin skill',
+    keywords: 'mcp oauth api key claude chatgpt cursor codex opencode grok openclaw hermes gemini muse cli plugin skill',
     slug: 'ai-agents',
-    title: 'AI agents',
+    title: 'Agents & API keys',
   },
   {
     description: 'Brand voice for AI copy, plus colors and typography for visuals.',

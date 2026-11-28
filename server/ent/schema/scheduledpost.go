@@ -83,6 +83,8 @@ func (ScheduledPost) Fields() []ent.Field {
 		field.String("scheduled_by_user_id").StorageKey("scheduledByUserId").Optional().Nillable().Immutable(),
 		field.String("approved_by_user_id").StorageKey("approvedByUserId").Optional().Nillable().Immutable(),
 		field.Int("approved_version").StorageKey("approvedVersion").Optional().Nillable().Immutable(),
+		// Total links stripped when publishing to X without the x_links add-on.
+		field.Int("x_links_stripped_count").StorageKey("xLinksStrippedCount").Default(0),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

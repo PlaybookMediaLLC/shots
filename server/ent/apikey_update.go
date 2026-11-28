@@ -170,6 +170,26 @@ func (_u *ApikeyUpdate) ClearExpiresAt() *ApikeyUpdate {
 	return _u
 }
 
+// SetLastRequest sets the "last_request" field.
+func (_u *ApikeyUpdate) SetLastRequest(v time.Time) *ApikeyUpdate {
+	_u.mutation.SetLastRequest(v)
+	return _u
+}
+
+// SetNillableLastRequest sets the "last_request" field if the given value is not nil.
+func (_u *ApikeyUpdate) SetNillableLastRequest(v *time.Time) *ApikeyUpdate {
+	if v != nil {
+		_u.SetLastRequest(*v)
+	}
+	return _u
+}
+
+// ClearLastRequest clears the value of the "last_request" field.
+func (_u *ApikeyUpdate) ClearLastRequest() *ApikeyUpdate {
+	_u.mutation.ClearLastRequest()
+	return _u
+}
+
 // SetPermissions sets the "permissions" field.
 func (_u *ApikeyUpdate) SetPermissions(v string) *ApikeyUpdate {
 	_u.mutation.SetPermissions(v)
@@ -317,6 +337,12 @@ func (_u *ApikeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(apikey.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastRequest(); ok {
+		_spec.SetField(apikey.FieldLastRequest, field.TypeTime, value)
+	}
+	if _u.mutation.LastRequestCleared() {
+		_spec.ClearField(apikey.FieldLastRequest, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Permissions(); ok {
 		_spec.SetField(apikey.FieldPermissions, field.TypeString, value)
@@ -498,6 +524,26 @@ func (_u *ApikeyUpdateOne) ClearExpiresAt() *ApikeyUpdateOne {
 	return _u
 }
 
+// SetLastRequest sets the "last_request" field.
+func (_u *ApikeyUpdateOne) SetLastRequest(v time.Time) *ApikeyUpdateOne {
+	_u.mutation.SetLastRequest(v)
+	return _u
+}
+
+// SetNillableLastRequest sets the "last_request" field if the given value is not nil.
+func (_u *ApikeyUpdateOne) SetNillableLastRequest(v *time.Time) *ApikeyUpdateOne {
+	if v != nil {
+		_u.SetLastRequest(*v)
+	}
+	return _u
+}
+
+// ClearLastRequest clears the value of the "last_request" field.
+func (_u *ApikeyUpdateOne) ClearLastRequest() *ApikeyUpdateOne {
+	_u.mutation.ClearLastRequest()
+	return _u
+}
+
 // SetPermissions sets the "permissions" field.
 func (_u *ApikeyUpdateOne) SetPermissions(v string) *ApikeyUpdateOne {
 	_u.mutation.SetPermissions(v)
@@ -675,6 +721,12 @@ func (_u *ApikeyUpdateOne) sqlSave(ctx context.Context) (_node *Apikey, err erro
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(apikey.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastRequest(); ok {
+		_spec.SetField(apikey.FieldLastRequest, field.TypeTime, value)
+	}
+	if _u.mutation.LastRequestCleared() {
+		_spec.ClearField(apikey.FieldLastRequest, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Permissions(); ok {
 		_spec.SetField(apikey.FieldPermissions, field.TypeString, value)

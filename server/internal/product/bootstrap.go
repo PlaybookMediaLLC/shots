@@ -8,6 +8,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceaddon"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
@@ -39,9 +40,10 @@ type BootstrapSnapshot struct {
 		DefaultPublishTime string `json:"defaultPublishTime"`
 	} `json:"settings"`
 	Entitlements struct {
-		Features map[string]bool `json:"features"`
-		Plan     string          `json:"plan"`
-		Status   string          `json:"status"`
+		Addons   WorkspaceAddonsSummary `json:"addons"`
+		Features map[string]bool        `json:"features"`
+		Plan     string                 `json:"plan"`
+		Status   string                 `json:"status"`
 	} `json:"entitlements"`
 	Capabilities struct {
 		// AIAgent is the workspace's AI kill switch (on unless an admin turned it off).
@@ -86,6 +88,7 @@ func (c *Configuration) Bootstrap(ctx context.Context, actor Actor) (*BootstrapS
 		approvals     int
 		attention     int
 		entitlement   *ent.WorkspaceEntitlement
+		xLinksRow     *ent.WorkspaceAddon
 	)
 	if err := runParallel(ctx, 4,
 		func(ctx context.Context) error {
@@ -128,6 +131,17 @@ func (c *Configuration) Bootstrap(ctx context.Context, actor Actor) (*BootstrapS
 			entitlement = row
 			return nil
 		},
+		func(ctx context.Context) error {
+			row, err := c.client.WorkspaceAddon.Query().Where(
+				workspaceaddon.OrganizationID(actor.OrganizationID),
+				workspaceaddon.AddonKey(AddonXLinks),
+			).Only(ctx)
+			if err != nil && !ent.IsNotFound(err) {
+				return err
+			}
+			xLinksRow = row
+			return nil
+		},
 	); err != nil {
 		return nil, err
 	}
@@ -146,7 +160,13 @@ func (c *Configuration) Bootstrap(ctx context.Context, actor Actor) (*BootstrapS
 			DefaultPublishTime string `json:"defaultPublishTime"`
 		}{org.WorkspaceSettings.Locale, org.WorkspaceSettings.TimeZone, org.WorkspaceSettings.DefaultPublishTime}
 	}
-	result.Entitlements.Plan, result.Entitlements.Status, result.Entitlements.Features = evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
+	now := time.Now().UTC()
+	result.Entitlements.Plan, result.Entitlements.Status, result.Entitlements.Features = evaluateBootstrapEntitlement(entitlement, now)
+	if xLinks, err := c.summarizeXLinksRow(ctx, actor.OrganizationID, xLinksRow, result.Entitlements.Features["workspace:use"], now); err == nil {
+		result.Entitlements.Addons.XLinks = xLinks
+	} else {
+		return nil, err
+	}
 	result.Capabilities.Publishing = hasChannels
 	result.Capabilities.AIAgent = result.Entitlements.Features["workspace:paid"] && (org.WorkspaceSettings == nil || org.WorkspaceSettings.AiAgentEnabled)
 	result.Counters.Approvals, result.Counters.Attention = approvals, attention

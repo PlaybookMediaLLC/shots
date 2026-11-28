@@ -32,6 +32,8 @@ func (PublicationAttempt) Fields() []ent.Field {
 		// The provider's message, redacted (publishing.RedactProviderMessage); never shown raw to members.
 		field.String("provider_message").StorageKey("providerMessage").Optional().Nillable(),
 		field.String("remote_url").StorageKey("remoteUrl").Optional().Nillable(),
+		field.Int("links_stripped_count").StorageKey("linksStrippedCount").Default(0),
+		field.Bool("x_link_quota_consumed").StorageKey("xLinkQuotaConsumed").Default(false),
 	}
 }
 

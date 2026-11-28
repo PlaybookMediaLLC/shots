@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
@@ -33,6 +33,8 @@ const EVENT_LABELS: Record<WebhookEvent, { description: string; label: string }>
   'draft.scheduled': { description: 'A draft is scheduled for later publishing.', label: 'Draft Scheduled' },
   'draft.status_changed': { description: 'A draft changes status, such as draft to scheduled.', label: 'Draft Status Changed' },
   'draft.tags_changed': { description: 'Tags are added or removed.', label: 'Draft Tags Changed' },
+  'post.completed': { description: 'A post finishes publishing on an account, with its live URL or failure code.', label: 'Post Completed' },
+  'connection.needs_reconnect': { description: 'A connected social account stops renewing and needs to be reconnected.', label: 'Connection Needs Reconnect' },
 }
 
 const ERROR_LABELS: Record<string, string> = {
@@ -63,8 +65,16 @@ function SecretNotice({ onDone, secret }: { onDone: () => void; secret: string }
       <div className="flex gap-2">
         <Button
           onClick={async () => {
-            await navigator.clipboard.writeText(secret)
-            toast.success('Secret copied.')
+            if (!navigator.clipboard?.writeText) {
+              toast.error('Could not copy to clipboard.')
+              return
+            }
+            try {
+              await navigator.clipboard.writeText(secret)
+              toast.success('Secret copied.')
+            } catch {
+              toast.error('Could not copy to clipboard.')
+            }
           }}
           size="sm"
           type="button"
@@ -375,11 +385,83 @@ function WebhookRow({ onSecret, webhook }: { onSecret: (secret: string) => void;
   )
 }
 
+function QuickWebhookForm({ onCreated }: { onCreated: (secret: string) => void }) {
+  const queryClient = useQueryClient()
+  const [url, setUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+  const trimmed = url.trim()
+  const valid = httpsUrlSchema.safeParse(trimmed).success
+
+  async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault()
+    if (!valid || saving) return
+    setSaving(true)
+    try {
+      const host = (URL.parse(trimmed)?.hostname ?? 'Agent webhook').slice(0, 80)
+      const created = await settingsRequest('/api/v1/webhooks', webhookWithSecretSchema, {
+        body: {
+          events: ['post.completed', 'connection.needs_reconnect'],
+          name: host,
+          url: trimmed,
+        },
+        method: 'POST',
+      })
+      onCreated(created.secret)
+      setUrl('')
+      toast.success('Webhook endpoint saved.')
+      await queryClient.invalidateQueries({ queryKey: WEBHOOKS_KEY })
+    } catch (error) {
+      toast.error(settingsErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-3 rounded-xl border border-border bg-foreground/[0.015] p-4"
+      onSubmit={(event) => void handleSave(event)}
+    >
+      <div className="space-y-1">
+        <Label className="text-xs font-medium text-foreground" htmlFor="quick-webhook-url">
+          Quick endpoint setup
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Subscribe an HTTPS endpoint to <code className="font-mono">post.completed</code> and{' '}
+          <code className="font-mono">connection.needs_reconnect</code> with HMAC-SHA256 signing.
+        </p>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Input
+          aria-invalid={trimmed.length > 0 && !valid}
+          className="h-9 flex-1 font-mono text-xs"
+          id="quick-webhook-url"
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder="https://your-server.com/webhook"
+          type="url"
+          value={url}
+        />
+        <Button disabled={!valid || saving} size="sm" type="submit">
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 /**
- * Outbound webhooks (RFC 024): signed HTTPS deliveries of draft events to
- * your own systems, retried for a while and replayable after that.
+ * Outbound webhooks (RFC 024): signed HTTPS deliveries of draft and publishing
+ * events to your own systems, retried for a while and replayable after that.
  */
-export function WebhookSettings({ canManage }: { canManage: boolean }) {
+export function WebhookSettings({
+  canManage,
+  quickSetup = false,
+  returnFrom = '/settings/developers',
+}: {
+  canManage: boolean
+  quickSetup?: boolean
+  returnFrom?: string
+}) {
   const [secret, setSecret] = useState<string | null>(null)
   const webhooks = useQuery({
     enabled: canManage,
@@ -403,7 +485,7 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
         <div className="grid gap-4">
           {secret ? <SecretNotice onDone={() => setSecret(null)} secret={secret} /> : null}
           {planRequired ? (
-            <PlanRequired from="/settings/developers">Outbound webhooks need Pro.</PlanRequired>
+            <PlanRequired from={returnFrom}>Outbound webhooks need Pro.</PlanRequired>
           ) : webhooks.isError ? (
             <p className="text-sm text-red-700 dark:text-red-300" role="alert">
               {unavailable
@@ -412,6 +494,9 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
             </p>
           ) : null}
           {unavailable ? <Disclosure className="text-xs text-muted-foreground"><DisclosureTrigger>Administrator setup details</DisclosureTrigger><DisclosureContent><p>Configure PLATFORM_WEBHOOK_ENCRYPTION_KEY on the server to protect signing secrets.</p></DisclosureContent></Disclosure> : null}
+          {quickSetup && !webhooks.isPending && !unavailable && !planRequired && !webhooks.isError ? (
+            <QuickWebhookForm onCreated={setSecret} />
+          ) : null}
           {webhooks.data ? (
             webhooks.data.items.length > 0 ? (
               <Group>

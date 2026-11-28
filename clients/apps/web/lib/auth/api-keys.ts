@@ -6,21 +6,18 @@ import type { OrganizationApiKeyPrincipal } from './principal'
 import { auth } from './server'
 import { isWorkspaceOperational } from '@/lib/workspace/access'
 
-export async function requireOrganizationApiKeyScope(
+async function verifyApiKeyToContext(
   headers: Headers,
-  scope: ApiKeyScope
+  key: string,
+  scope?: ApiKeyScope
 ): Promise<TenantContext & { principal: OrganizationApiKeyPrincipal }> {
-  const key = headers.get('x-api-key')
-  if (!key) {
-    throw new AuthorizationError('An organization API key is required.', 401)
-  }
-
   const result = await auth.api.verifyApiKey({
-    body: { key, permissions: apiKeyScopePermissions[scope] },
+    body: scope ? { key, permissions: apiKeyScopePermissions[scope] } : { key },
   })
   if (!result.valid || !result.key || !result.key.referenceId) {
     const { message, status } = apiKeyRefusal(result.error)
-    throw new AuthorizationError(message, status)
+    const resolvedStatus = scope ? status : status === 429 ? 429 : 401
+    throw new AuthorizationError(message, resolvedStatus)
   }
   if (!(await isWorkspaceOperational(result.key.referenceId))) {
     throw new AuthorizationError('This workspace is unavailable.', 403)
@@ -36,4 +33,38 @@ export async function requireOrganizationApiKeyScope(
     },
     requestId: getRequestId(headers),
   }
+}
+
+export async function requireOrganizationApiKeyScope(
+  headers: Headers,
+  scope: ApiKeyScope
+): Promise<TenantContext & { principal: OrganizationApiKeyPrincipal }> {
+  const key = headers.get('x-api-key')
+  if (!key) {
+    throw new AuthorizationError('An organization API key is required.', 401)
+  }
+  return verifyApiKeyToContext(headers, key, scope)
+}
+
+/**
+ * Verifies any valid, enabled, non-expired workspace API key without requiring
+ * a specific scope (used by `GET /api/v1/auth/me` so least-privilege keys can
+ * introspect themselves). Session callers without `x-api-key` receive 403;
+ * missing, invalid, disabled, or expired keys receive 401.
+ */
+export async function requireOrganizationApiKey(
+  headers: Headers
+): Promise<TenantContext & { principal: OrganizationApiKeyPrincipal }> {
+  const key = headers.get('x-api-key')
+  if (!key) {
+    const session = await auth.api.getSession({ headers }).catch(() => null)
+    if (session?.user) {
+      throw new AuthorizationError(
+        'This endpoint requires an organization API key in X-API-Key; browser sessions cannot call it.',
+        403
+      )
+    }
+    throw new AuthorizationError('An organization API key is required.', 401)
+  }
+  return verifyApiKeyToContext(headers, key)
 }

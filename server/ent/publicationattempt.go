@@ -38,6 +38,10 @@ type PublicationAttempt struct {
 	ProviderMessage *string `json:"provider_message,omitempty"`
 	// RemoteURL holds the value of the "remote_url" field.
 	RemoteURL *string `json:"remote_url,omitempty"`
+	// LinksStrippedCount holds the value of the "links_stripped_count" field.
+	LinksStrippedCount int `json:"links_stripped_count,omitempty"`
+	// XLinkQuotaConsumed holds the value of the "x_link_quota_consumed" field.
+	XLinkQuotaConsumed bool `json:"x_link_quota_consumed,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PublicationAttemptQuery when eager-loading is set.
 	Edges        PublicationAttemptEdges `json:"edges"`
@@ -69,7 +73,9 @@ func (*PublicationAttempt) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case publicationattempt.FieldAttemptNumber:
+		case publicationattempt.FieldXLinkQuotaConsumed:
+			values[i] = new(sql.NullBool)
+		case publicationattempt.FieldAttemptNumber, publicationattempt.FieldLinksStrippedCount:
 			values[i] = new(sql.NullInt64)
 		case publicationattempt.FieldID, publicationattempt.FieldOrganizationID, publicationattempt.FieldScheduledPostID, publicationattempt.FieldOutcome, publicationattempt.FieldProviderPostID, publicationattempt.FieldFailureCode, publicationattempt.FieldProviderMessage, publicationattempt.FieldRemoteURL:
 			values[i] = new(sql.NullString)
@@ -162,6 +168,18 @@ func (_m *PublicationAttempt) assignValues(columns []string, values []any) error
 				_m.RemoteURL = new(string)
 				*_m.RemoteURL = value.String
 			}
+		case publicationattempt.FieldLinksStrippedCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field links_stripped_count", values[i])
+			} else if value.Valid {
+				_m.LinksStrippedCount = int(value.Int64)
+			}
+		case publicationattempt.FieldXLinkQuotaConsumed:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field x_link_quota_consumed", values[i])
+			} else if value.Valid {
+				_m.XLinkQuotaConsumed = value.Bool
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -244,6 +262,12 @@ func (_m *PublicationAttempt) String() string {
 		builder.WriteString("remote_url=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("links_stripped_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.LinksStrippedCount))
+	builder.WriteString(", ")
+	builder.WriteString("x_link_quota_consumed=")
+	builder.WriteString(fmt.Sprintf("%v", _m.XLinkQuotaConsumed))
 	builder.WriteByte(')')
 	return builder.String()
 }

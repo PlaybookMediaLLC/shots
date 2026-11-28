@@ -283,6 +283,16 @@ const POST_FAILURES: Record<string, { action: PostFailureAction | null; reason: 
     reason:
       'The account reached the platform’s daily posting limit, so nothing was sent. Reschedule it for after the limit resets.',
   },
+  X_LINK_STRIPPED_EMPTY: {
+    action: 'edit',
+    reason:
+      'This X post only contained a link and no media, and Links in X posts is off. Turn on Links in X posts in Billing settings or add text or media.',
+  },
+  X_LINK_QUOTA_EXCEEDED: {
+    action: 'reschedule',
+    reason:
+      'Your workspace has used all 40 X link posts in the last 30 days, so nothing was sent. Wait for the next rolling slot to open or remove the link and retry.',
+  },
   POST_OPTIONS: {
     action: 'edit',
     reason:

@@ -135,6 +135,10 @@ const (
 	// The platform's daily posting cap for the account was reached, so the post
 	// was refused.
 	FailureProviderDailyLimit = "PROVIDER_DAILY_LIMIT"
+	// The X post contained only links and no media while the Links in X posts add-on was off.
+	FailureXLinkStrippedEmpty = "X_LINK_STRIPPED_EMPTY"
+	// The workspace used all 40 X link posts in its rolling 30-day add-on window.
+	FailureXLinkQuotaExceeded = "X_LINK_QUOTA_EXCEEDED"
 	// Shots' publishing service is not configured or reachable.
 	FailurePublisherUnavailable = "PUBLISHER_UNAVAILABLE"
 	// Shots failed before the handoff, with no provider status.

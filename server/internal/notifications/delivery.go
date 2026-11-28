@@ -571,24 +571,23 @@ func (s *Service) dispatch(ctx context.Context) (bool, error) {
 		return true, err
 	}
 	d.encryptedPayload = encrypted
-	// Re-authorize after external channel discovery (Slack) so configuration or
-	// visibility changes made while Slack responded cannot reroute or leak a send.
-	if d.Channel == "slack" {
-		if env, out, err = s.prepare(ctx, d); err != nil {
-			return true, s.finish(ctx, d, Outcome{Status: "UNCERTAIN", Code: "PRE_SEND_CHECK_FAILED"})
-		}
-		if out.Status != "" {
-			return true, s.finish(ctx, d, out)
-		}
-		// Removal, disconnect and lease recovery can fence a claim independently of
-		// the current access checks. A later grant must not revive that old claim.
-		var ownsClaim bool
-		if err = s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM platform_notification_delivery WHERE id=$1 AND claim_token=$2 AND status='CLAIMED')`, d.ID, d.claimToken).Scan(&ownsClaim); err != nil {
-			return true, err
-		}
-		if !ownsClaim {
-			return true, nil
-		}
+	// Re-authorize after payload persistence (and Slack channel discovery) so
+	// membership, destination, visibility, or claim changes made right before
+	// dispatch cannot reroute or leak a send on any channel.
+	if env, out, err = s.prepare(ctx, d); err != nil {
+		return true, s.finish(ctx, d, Outcome{Status: "UNCERTAIN", Code: "PRE_SEND_CHECK_FAILED"})
+	}
+	if out.Status != "" {
+		return true, s.finish(ctx, d, out)
+	}
+	// Removal, disconnect and lease recovery can fence a claim independently of
+	// the current access checks. A later grant must not revive that old claim.
+	var ownsClaim bool
+	if err = s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM platform_notification_delivery WHERE id=$1 AND claim_token=$2 AND status='CLAIMED')`, d.ID, d.claimToken).Scan(&ownsClaim); err != nil {
+		return true, err
+	}
+	if !ownsClaim {
+		return true, nil
 	}
 	out, err = s.Send(ctx, d, env)
 	if err != nil && out.Status == "" {

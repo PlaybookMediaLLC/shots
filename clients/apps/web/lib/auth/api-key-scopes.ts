@@ -101,3 +101,36 @@ export function permissionsForApiKeyScopes(
   }
   return permissions
 }
+
+const knownApiKeyScopeSet: ReadonlySet<string> = new Set(apiKeyScopes)
+
+function parsePermissionsRecord(permissions: unknown): Record<string, unknown> | null {
+  if (typeof permissions === 'string') {
+    try {
+      return parsePermissionsRecord(JSON.parse(permissions) as unknown)
+    } catch {
+      return null
+    }
+  }
+  return permissions && typeof permissions === 'object' && !Array.isArray(permissions)
+    ? (permissions as Record<string, unknown>)
+    : null
+}
+
+/**
+ * Decode Better Auth's stored `{ resource: [action] }` permissions JSON back
+ * into sorted, canonical {@link ApiKeyScope} values. Unknown entries are dropped.
+ */
+export function scopesFromPermissions(permissions: unknown): ApiKeyScope[] {
+  const record = parsePermissionsRecord(permissions)
+  if (!record) return []
+  const scopes = new Set<ApiKeyScope>()
+  for (const [resource, actions] of Object.entries(record)) {
+    if (!Array.isArray(actions)) continue
+    for (const action of actions) {
+      const candidate = typeof action === 'string' ? `${resource}:${action}` : ''
+      if (knownApiKeyScopeSet.has(candidate)) scopes.add(candidate as ApiKeyScope)
+    }
+  }
+  return [...scopes].sort()
+}

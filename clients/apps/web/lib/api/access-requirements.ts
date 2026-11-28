@@ -67,6 +67,22 @@ export const memberAccessRequirementSchema = tenantAccessRequirementSchema
 export type MemberAccessRequirement = z.infer<typeof memberAccessRequirementSchema>
 
 /**
+ * What an API-key-only operation requires: any valid organization API key (no
+ * specific scope required), on a workspace with `workspace:use` and any
+ * optional plan feature and quota. Browser sessions are refused with 403.
+ */
+export const apiKeyOnlyAccessRequirementSchema = z
+  .object({
+    apiKeyOnly: z.literal(true),
+    feature: workspaceFeatureSchema.optional(),
+    quota: workspaceQuotaSchema.optional(),
+  })
+  .strict()
+
+/** One of {@link apiKeyOnlyAccessRequirementSchema}. */
+export type ApiKeyOnlyAccessRequirement = z.infer<typeof apiKeyOnlyAccessRequirementSchema>
+
+/**
  * The access a contract declares. Its route binds the matching authenticator,
  * and the OpenAPI spec publishes it as the operation's security and
  * `x-shots-entitlement`, so docs, REST, and MCP read one declaration.
@@ -74,6 +90,7 @@ export type MemberAccessRequirement = z.infer<typeof memberAccessRequirementSche
 export const contractAccessSchema = z.union([
   tenantAccessRequirementSchema.strict(),
   memberAccessRequirementSchema,
+  apiKeyOnlyAccessRequirementSchema,
 ])
 
 /** One of {@link contractAccessSchema}. */

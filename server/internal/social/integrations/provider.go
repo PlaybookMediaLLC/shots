@@ -85,11 +85,12 @@ type PollDetails struct {
 // PostDetails is one entry to publish: the post or a comment. Settings is the
 // provider's raw settings JSON; decode it into the provider's settings DTO.
 type PostDetails struct {
-	ID       string          `json:"id"`
-	Message  string          `json:"message"`
-	Settings json.RawMessage `json:"settings"`
-	Media    []MediaContent  `json:"media,omitempty"`
-	Poll     *PollDetails    `json:"poll,omitempty"`
+	ID        string          `json:"id"`
+	Message   string          `json:"message"`
+	PlainText bool            `json:"plainText,omitempty"`
+	Settings  json.RawMessage `json:"settings"`
+	Media     []MediaContent  `json:"media,omitempty"`
+	Poll      *PollDetails    `json:"poll,omitempty"`
 }
 
 // PostResponse: Status "pending" means the workflow must poll

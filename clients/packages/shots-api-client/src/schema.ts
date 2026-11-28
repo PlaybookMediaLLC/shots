@@ -1928,6 +1928,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify the calling workspace API key
+         * @description Verifies the calling workspace API key and returns redacted key metadata, granted scopes, and workspace identity. Useful for CLI setup and integration health checks.
+         */
+        get: operations["getCurrentKeyInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -3206,6 +3226,8 @@ export interface components {
                 publishedAt: string | null;
                 /** @default null */
                 deletedAt: string | null;
+                /** @default 0 */
+                xLinksStrippedCount: number;
                 /** @default [] */
                 deletions: {
                     attempts: number;
@@ -5584,6 +5606,8 @@ export interface components {
                 publishedAt: string | null;
                 /** @default null */
                 deletedAt: string | null;
+                /** @default 0 */
+                xLinksStrippedCount: number;
                 /** @default [] */
                 deletions: {
                     attempts: number;
@@ -5990,6 +6014,21 @@ export interface components {
                 sourceUrl?: string;
                 value: unknown;
             }[];
+        };
+        CurrentKeyInfoResponse: {
+            key: {
+                expiresAt: string | null;
+                id: string;
+                name: string | null;
+                prefix: string | null;
+                scopes: string[];
+                start: string | null;
+            };
+            workspace: {
+                id: string;
+                name: string;
+                slug: string;
+            };
         };
         PlaybookBootstrap: {
             capabilities: {
@@ -9372,6 +9411,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;
@@ -14548,6 +14589,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;
@@ -14868,6 +14911,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;
@@ -16278,6 +16323,53 @@ export interface operations {
             };
             /** @description No run with that ID exists in the workspace. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCurrentKeyInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted API key summary and workspace identity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentKeyInfoResponse"];
+                };
+            };
+            /** @description The API key is missing, invalid, disabled, or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The credential is not a workspace API key or lacks workspace access. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

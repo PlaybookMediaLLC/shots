@@ -370,6 +370,8 @@ type Tx struct {
 	WebhookDeliveryAttempt *WebhookDeliveryAttemptClient
 	// WebhookSubscription is the client for interacting with the WebhookSubscription builders.
 	WebhookSubscription *WebhookSubscriptionClient
+	// WorkspaceAddon is the client for interacting with the WorkspaceAddon builders.
+	WorkspaceAddon *WorkspaceAddonClient
 	// WorkspaceCreditGrant is the client for interacting with the WorkspaceCreditGrant builders.
 	WorkspaceCreditGrant *WorkspaceCreditGrantClient
 	// WorkspaceDeletion is the client for interacting with the WorkspaceDeletion builders.
@@ -380,6 +382,8 @@ type Tx struct {
 	WorkspaceGitHubInstallation *WorkspaceGitHubInstallationClient
 	// WorkspaceSettings is the client for interacting with the WorkspaceSettings builders.
 	WorkspaceSettings *WorkspaceSettingsClient
+	// XLinkPostUsage is the client for interacting with the XLinkPostUsage builders.
+	XLinkPostUsage *XLinkPostUsageClient
 
 	// lazily loaded.
 	client     *Client
@@ -690,11 +694,13 @@ func (tx *Tx) init() {
 	tx.WebhookDelivery = NewWebhookDeliveryClient(tx.config)
 	tx.WebhookDeliveryAttempt = NewWebhookDeliveryAttemptClient(tx.config)
 	tx.WebhookSubscription = NewWebhookSubscriptionClient(tx.config)
+	tx.WorkspaceAddon = NewWorkspaceAddonClient(tx.config)
 	tx.WorkspaceCreditGrant = NewWorkspaceCreditGrantClient(tx.config)
 	tx.WorkspaceDeletion = NewWorkspaceDeletionClient(tx.config)
 	tx.WorkspaceEntitlement = NewWorkspaceEntitlementClient(tx.config)
 	tx.WorkspaceGitHubInstallation = NewWorkspaceGitHubInstallationClient(tx.config)
 	tx.WorkspaceSettings = NewWorkspaceSettingsClient(tx.config)
+	tx.XLinkPostUsage = NewXLinkPostUsageClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

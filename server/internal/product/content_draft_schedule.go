@@ -267,6 +267,8 @@ type ContentDraftPost struct {
 	PublishedAt *time.Time `json:"publishedAt"`
 	// When it was deleted from its platform through Shots; it stays PUBLISHED.
 	DeletedAt *time.Time `json:"deletedAt"`
+	// Total links stripped when publishing to X without the x_links add-on.
+	XLinksStrippedCount int `json:"xLinksStrippedCount"`
 	// Each part of a requested delete, with its receipt.
 	Deletions []PostDeletionReceipt `json:"deletions"`
 }
@@ -339,7 +341,8 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		URL: postURL, Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
 		NaturalOffsetSeconds: post.NaturalOffsetSeconds, ScheduleMode: mode, ScheduleTimeZone: post.ScheduleTimeZone,
 		SlotAt: post.SlotAt, SocialSetID: post.SocialSetID, Automations: []PostAutomation{},
-		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt, Deletions: []PostDeletionReceipt{}}
+		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt,
+		XLinksStrippedCount: post.XLinksStrippedCount, Deletions: []PostDeletionReceipt{}}
 }
 
 // validateDraftTargets checks the shape of a schedule before any lookup.

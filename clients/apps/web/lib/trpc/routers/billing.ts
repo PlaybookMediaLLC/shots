@@ -2,25 +2,68 @@ import 'server-only'
 
 import { TRPCError } from '@trpc/server'
 
-import { monthlyUsagePeriod } from '@/lib/billing/display'
 import { backendSDK } from '@/lib/backend/sdk'
-import { includedAllowance, type WorkspaceQuota, workspacePlanSchema } from '@/lib/billing/plans'
-import { workspaceSubscriptionCycle } from '@/lib/billing/stripe'
+import { monthlyUsagePeriod } from '@/lib/billing/display'
+import {
+  includedAllowance,
+  WORKSPACE_ADDONS,
+  type WorkspaceQuota,
+  workspacePlanSchema,
+} from '@/lib/billing/plans'
+import {
+  workspaceRecentInvoices,
+  workspaceSubscriptionOverview,
+} from '@/lib/billing/stripe'
 import { consumeWorkspaceQuota, WorkspaceQuotaError } from '@/lib/tenant/entitlements'
 import { router } from '../init'
 import { organizationProcedure } from '../procedures'
 
-/** The workspace's plan, its usage against each monthly allowance, and its purchased credits. */
+function defaultXLinksAddon() {
+  return {
+    cancelsAt: null,
+    enabled: false,
+    limit: WORKSPACE_ADDONS.x_links.limit,
+    nextSlotAt: null,
+    priceMonthlyUsd: WORKSPACE_ADDONS.x_links.priceMonthlyUsd,
+    remaining: WORKSPACE_ADDONS.x_links.limit,
+    status: 'off' as const,
+    used: 0,
+    windowDays: WORKSPACE_ADDONS.x_links.windowDays,
+  }
+}
+
+/** The workspace's plan, add-ons, usage against each monthly allowance, and purchased credits. */
 export const billingRouter = router({
+  recentInvoices: organizationProcedure('billing:manage').query(async ({ ctx }) => {
+    if (!process.env.STRIPE_SECRET_KEY) return { invoices: [] }
+    try {
+      return { invoices: await workspaceRecentInvoices(ctx.access.organizationId) }
+    } catch (cause) {
+      console.error('Stripe invoice lookup failed', cause)
+      throw new TRPCError({
+        cause,
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Could not load recent invoices right now.',
+      })
+    }
+  }),
   subscription: organizationProcedure('workspace:read').query(async ({ ctx }) => {
     if (!process.env.STRIPE_SECRET_KEY) {
-      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Online billing is not configured. Contact your workspace administrator for subscription details.' })
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message:
+          'Online billing is not configured. Contact your workspace administrator for subscription details.',
+      })
     }
     try {
-      return { cycle: await workspaceSubscriptionCycle(ctx.access.organizationId) }
+      return await workspaceSubscriptionOverview(ctx.access.organizationId)
     } catch (cause) {
       console.error('Stripe subscription lookup failed', cause)
-      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'The billing provider could not be reached. Retry subscription details in a moment.', cause })
+      throw new TRPCError({
+        cause,
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'The billing provider could not be reached. Retry subscription details in a moment.',
+      })
     }
   }),
   summary: organizationProcedure('workspace:read').query(async ({ ctx }) => {
@@ -52,16 +95,24 @@ export const billingRouter = router({
             .then(({ entitlement }) => entitlement.graceUntil)
             .catch(() => null)
         : null
+    const xLinks = entitlements.addons?.xLinks ?? defaultXLinksAddon()
+    const paid = entitlements.features['workspace:paid'] === true
     return {
+      addons: { xLinks },
+      apiAccess: { included: paid },
       creditBalance,
-      usagePeriod: monthlyUsagePeriod(),
       credits: { ...credits, left: Math.max(credits.left - creditBalance, 0) },
       emails,
       graceUntil,
-      paid: entitlements.features['workspace:paid'] === true,
-      posts,
+      paid,
       plan,
+      posts,
       status: entitlements.status,
+      usagePeriod: monthlyUsagePeriod(),
     }
+  }),
+  xLinksAddon: organizationProcedure('workspace:read').query(async ({ ctx }) => {
+    const entitlements = await backendSDK(ctx.access).getEntitlements()
+    return entitlements.addons?.xLinks ?? defaultXLinksAddon()
   }),
 })

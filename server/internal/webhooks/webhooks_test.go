@@ -77,6 +77,17 @@ func TestHTTPClientRefusesPrivateDial(t *testing.T) {
 	}
 }
 
+func TestOperationalWebhookEventsAreKnown(t *testing.T) {
+	for _, event := range []string{PostCompleted, ConnectionNeedsReconnect, DraftPublished} {
+		if !KnownEvent(event) {
+			t.Errorf("KnownEvent(%q) = false, want true", event)
+		}
+	}
+	if KnownEvent(Test) {
+		t.Errorf("KnownEvent(%q) = true, want false (test events are not subscribable)", Test)
+	}
+}
+
 func TestSignatureAndSealing(t *testing.T) {
 	key := make([]byte, 32)
 	secret, err := NewSecret()
