@@ -104,10 +104,16 @@ function makeValidRecordedManifest(overrides: Record<string, unknown> = {}) {
   }
 }
 
-test('valid recorded manifest renders to markdown and round-trips cleanly', () => {
+test('valid recorded manifest renders to markdown with inline embedded video and round-trips cleanly', () => {
   const manifest = makeValidRecordedManifest()
   const markdown = renderPrEvidenceMarkdown(manifest)
+  const expectedUrl =
+    'https://github.com/user-attachments/assets/00000000-0000-4000-8000-000000000001'
   assert.match(markdown, /### Narrated verification/)
+  assert.ok(
+    markdown.includes(`\n\n${expectedUrl}\n\n`),
+    'expected bare videoUrl on its own standalone paragraph for GitHub inline video player'
+  )
   assert.match(markdown, /### Demonstrated behavior/)
   assert.match(markdown, /### Automated checks/)
   assert.match(markdown, /### Independent engineering review/)
@@ -130,6 +136,26 @@ test('valid recorded manifest renders to markdown and round-trips cleanly', () =
   })
   assert.equal(check.ok, true, check.errors.join('; '))
   assert.deepEqual(check.errors, [])
+
+  // Removing the standalone videoUrl paragraph (leaving only the markdown link and
+  // collapsed JSON manifest) must fail validation so PRs always embed the player.
+  const linkOnlyBody = markdown.replace(`\n\n${expectedUrl}\n\n`, '\n\n')
+  const linkOnlyCheck = validatePrEvidence({
+    prBody: linkOnlyBody,
+    headSha: VALID_SHA,
+    prNumber: 677,
+    baseRef: 'develop',
+    headRef: 'feat/demo',
+    headRepo: 'PlaybookMediaLLC/shots',
+    repository: 'PlaybookMediaLLC/shots',
+    isDraft: false,
+    changedFiles: ['clients/apps/web/components/platform-ui/card.tsx'],
+  })
+  assert.equal(linkOnlyCheck.ok, false)
+  assert.ok(
+    linkOnlyCheck.errors.some((e) => /standalone paragraph in the visible PR description/.test(e)),
+    `expected inline embed error, got: ${linkOnlyCheck.errors.join('; ')}`
+  )
 })
 
 test('stale or missing headSha fails closed in PR evidence validation', () => {

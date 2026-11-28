@@ -488,6 +488,118 @@ function cmdValidate(argv) {
   if (!result.ok) process.exit(1)
 }
 
+function cmdPublishPr(argv) {
+  const { positionals, values: flags } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      pr: { type: 'string' },
+      video: { type: 'string' },
+      'video-url': { type: 'string' },
+    },
+  })
+  const manifestArg = positionals[0]
+  const prNumber = parsePositiveInt(flags.pr, '--pr')
+  if (!manifestArg || !prNumber) {
+    console.error(
+      'Usage: cli.mjs publish-pr <manifest.json> --pr <number> [--video <evidence.mp4>] [--video-url <https://...>]'
+    )
+    process.exit(2)
+  }
+
+  const manifestPath = resolveInputPath(manifestArg)
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const rec = Array.isArray(manifest.recordings) ? manifest.recordings[0] : null
+  if (!rec || typeof rec !== 'object') {
+    throw new Error('manifest.recordings[0] is required to publish a video to a pull request.')
+  }
+
+  const existingBody = execFileSync(
+    'gh',
+    ['pr', 'view', String(prNumber), '--json', 'body', '--jq', '.body'],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }
+  )
+
+  let videoUrl = flags['video-url'] ? String(flags['video-url']).trim() : ''
+  let bodyBase = existingBody
+
+  if (!videoUrl) {
+    const mp4Arg = flags.video || rec.artifacts?.renderedMp4
+    if (!mp4Arg) {
+      throw new Error('Pass --video <evidence.mp4> or --video-url <https://...>.')
+    }
+    const mp4Path = resolveInputPath(String(mp4Arg))
+    if (!existsSync(mp4Path)) {
+      throw new Error(`Rendered MP4 not found: ${mp4Path}`)
+    }
+    const attach = spawnSync('gh', ['pr', 'edit', String(prNumber), '--attach', mp4Path], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    })
+    if (attach.status !== 0) {
+      const detail = (attach.stderr || attach.stdout || '').trim()
+      console.error(
+        `Failed to upload ${mp4Path} via "gh pr edit ${prNumber} --attach": ${detail}\n` +
+          'Note: GitHub user-attachments uploads require a user token with uploads.github.com access.\n' +
+          `Attach the MP4 in the PR #${prNumber} description (or run "gh pr edit ${prNumber} --attach ${mp4Path}" locally), ` +
+          `then run "node dev/pr-video-evidence/cli.mjs publish-pr ${manifestArg} --pr ${prNumber} --video-url <uploaded-url>".`
+      )
+      process.exit(1)
+    }
+    const afterAttachBody = execFileSync(
+      'gh',
+      ['pr', 'view', String(prNumber), '--json', 'body', '--jq', '.body'],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    )
+    const beforeMatches = new Set(
+      existingBody.match(/https:\/\/github\.com\/user-attachments\/assets\/[0-9a-f-]+/gi) ?? []
+    )
+    const afterMatches =
+      afterAttachBody.match(/https:\/\/github\.com\/user-attachments\/assets\/[0-9a-f-]+/gi) ?? []
+    videoUrl = afterMatches.find((u) => !beforeMatches.has(u)) || afterMatches.at(-1) || ''
+    if (!videoUrl) {
+      throw new Error('Uploaded video URL was not found in the updated PR body after --attach.')
+    }
+    // Remove the trailing raw URL appended by `gh pr edit --attach` so the
+    // canonical PR evidence block embeds it cleanly once at the top.
+    bodyBase = afterAttachBody
+      .replace(new RegExp(`\\n*${videoUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`), '')
+      .trimEnd()
+  }
+
+  rec.videoUrl = videoUrl
+  manifest.pullRequestNumber = prNumber
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+
+  const rendered = renderPrEvidenceMarkdown(manifest)
+  const updatedBody = upsertPrEvidenceBlock(bodyBase, rendered)
+  const prBodyOut = join(dirname(manifestPath), 'pr-body-published.md')
+  writeFileSync(prBodyOut, updatedBody + '\n', 'utf8')
+  writeFileSync(join(dirname(manifestPath), 'pr-evidence.md'), rendered + '\n', 'utf8')
+
+  const check = validatePrEvidence({
+    prBody: updatedBody,
+    headSha: String(manifest.commitSha || ''),
+    prNumber,
+    repository: String(manifest.repository || ''),
+    requireVideoUrl: true,
+  })
+  if (!check.ok) {
+    console.error('Refusing to update PR body because evidence validation failed:')
+    for (const err of check.errors) console.error(`  - ${err}`)
+    process.exit(1)
+  }
+
+  execFileSync('gh', ['pr', 'edit', String(prNumber), '--body-file', prBodyOut], {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  })
+  console.log(`Embedded video ${videoUrl} in PR #${prNumber} description.`)
+}
+
 async function main() {
   const [command, ...rest] = process.argv.slice(2)
   switch (command) {
@@ -503,12 +615,15 @@ async function main() {
     case 'render-markdown':
       cmdRenderMarkdown(rest)
       break
+    case 'publish-pr':
+      cmdPublishPr(rest)
+      break
     case 'validate':
       cmdValidate(rest)
       break
     default:
       console.error(
-        'Usage: dev/pr-video-evidence/cli.mjs <check-deps|setup-kokoro|record|render-markdown|validate> [options]'
+        'Usage: dev/pr-video-evidence/cli.mjs <check-deps|setup-kokoro|record|render-markdown|publish-pr|validate> [options]'
       )
       process.exit(2)
   }

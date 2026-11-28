@@ -343,12 +343,16 @@ review. Do not wait for the reviewer to request a recording.
    per-beat keyframes for correctness, completeness, readability, audio
    synchronization, and absence of credentials or sensitive data.
 7. Deliver the playable MP4 attachment/artifact, consolidated engineering
-   review report, and verification results in the review thread, and include
-   the PR evidence summary (`render-markdown`) with an accessible video link
-   in the pull request description.
+   review report, and verification results in the review thread, and **always
+   embed the playable video directly in the pull request description** on its
+   own standalone paragraph (via `node dev/pr-video-evidence/cli.mjs publish-pr
+   <manifest.json> --pr <number>` / `gh pr edit <pr> --attach <mp4>` and
+   `render-markdown`), so GitHub renders an inline `<video>` player. Never leave
+   a PR ready for review with an unembedded video or a text-only link.
 8. Mark the pull request ready for review only after all applicable
-   verification requirements pass. Keep incomplete PRs in draft. Never merge
-   without explicit human authorization.
+   verification requirements pass (including inline embedded video validation).
+   Keep incomplete PRs in draft. Never merge without explicit human
+   authorization.
 
 ### Video, narration, and evidence rules
 

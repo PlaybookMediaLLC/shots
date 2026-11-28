@@ -527,6 +527,38 @@ export function validateManifest(manifest, context = {}) {
 }
 
 /**
+ * Verify that `videoUrl` is embedded visibly in the PR description (outside the
+ * collapsed `<details>` manifest block) on its own standalone line (so GitHub
+ * renders an inline `<video>` player) or inside an explicit `<video src="...">`.
+ *
+ * @param {string} prBody
+ * @param {string} videoUrl
+ * @returns {boolean}
+ */
+export function hasEmbeddedVideoInPrBody(prBody, videoUrl) {
+  if (typeof prBody !== 'string' || typeof videoUrl !== 'string') return false
+  const target = videoUrl.trim()
+  if (!target) return false
+  const visibleBody = prBody.replace(/<details>[\s\S]*?<\/details>/gi, '')
+  const lines = visibleBody.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    if (trimmed === target) {
+      const prevBlank = i === 0 || lines[i - 1].trim() === ''
+      const nextBlank = i === lines.length - 1 || lines[i + 1].trim() === ''
+      if (prevBlank && nextBlank) return true
+    }
+    if (
+      /<video\b/i.test(trimmed) &&
+      (trimmed.includes(`src="${target}"`) || trimmed.includes(`src='${target}'`))
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
  * Full pull-request evidence validation used by GitHub Actions and local CLI.
  *
  * @param {{
@@ -594,6 +626,27 @@ export function validatePrEvidence(input) {
     changedFiles: input.changedFiles,
     requireVideoUrl: input.requireVideoUrl,
   })
+
+  if (
+    extracted.manifest &&
+    extracted.manifest.status === 'recorded' &&
+    input.requireVideoUrl !== false &&
+    Array.isArray(extracted.manifest.recordings)
+  ) {
+    for (let i = 0; i < extracted.manifest.recordings.length; i++) {
+      const rec = extracted.manifest.recordings[i]
+      if (
+        rec &&
+        typeof rec === 'object' &&
+        isAccessibleVideoUrl(rec.videoUrl) &&
+        !hasEmbeddedVideoInPrBody(input.prBody ?? '', String(rec.videoUrl))
+      ) {
+        result.errors.push(
+          `recordings[${i}].videoUrl must be embedded on its own standalone paragraph in the visible PR description so GitHub renders an inline video player.`
+        )
+      }
+    }
+  }
 
   if (bodySecrets.length > 0) {
     result.errors.push(
