@@ -111,6 +111,7 @@ effects (writes, audit records, emails, provider calls, quota use).
 | Test helpers and fixtures | `web/test/`, `web/test/e2e/framework/`, Go `*_test.go` beside the code |
 | End-to-end test hooks | `web/lib/e2e-hooks.ts`; one gate for every behavior the suite needs and production must not have |
 | CI pipeline | `.github/workflows/ci.yml` with `dev/e2e-plan.mjs` and `dev/ci-image.cjs` ([the CI pipeline](docs/ci.md)) |
+| PR video evidence | `dev/pr-video-evidence/`, `.agents/skills/pr-video-evidence/SKILL.md`, `.github/workflows/pr-video-evidence.yml` |
 | Dependencies | `clients/apps/web/package.json`, `clients/package.json`, `server/go.mod`; npm is the only JS package manager |
 
 Check the dependency files for a library that already does the job before you
@@ -218,6 +219,7 @@ authorization, tenant isolation or database constraints there.
 | A zod API contract | `npm run api:generate` in `clients/`, then commit the diff |
 | `docs/rfcs/` | `python3 dev/verify-rfcs.py` |
 | Journeys, tenancy, publishing | `make e2e`, `make tenant-isolation`, `./dev/social-gate` as they apply |
+| Every pull request | `npm run devx:video-evidence -- validate ...` and the [pr-video-evidence skill](.agents/skills/pr-video-evidence/SKILL.md) |
 
 CI runs all of these. Do not loosen a lint rule, `--max-warnings=0`, the
 format scope, a CI step or a boundary test's exemption list to pass a check.
@@ -227,7 +229,7 @@ format scope, a CI step or a boundary test's exemption list to pass a check.
 For implementation, bug fixes, and refactors, follow this sequence:
 
 Understand scope → implement → verify → independent review → fix confirmed
-blockers → verify again → report.
+blockers → verify again → narrated video evidence → report.
 
 Use the repository's existing feature-flow skill when available. The rules
 below also apply when that skill is not installed.
@@ -300,13 +302,90 @@ publication, or deployment.
 For documentation-only changes or a few lines without logic, the parent
 agent may apply the review perspectives itself and disclose that exception.
 
-If sub-agents are unavailable, apply the perspectives sequentially and
-disclose the fallback. Do not claim an independent review occurred.
+If sub-agents are unavailable for a substantive change, apply the perspectives
+sequentially only as preliminary self-checks, disclose the fallback (never
+claim an independent review occurred), and keep the pull request in draft until
+independent review completes.
 
 A directly requested review may run independently of implementation.
 
 These are agent execution instructions. Installing the agent definitions
 does not itself create a watcher, automatic trigger, or CI enforcement.
+
+## Mandatory narrated video evidence for pull requests
+
+Every coding agent, across every implementation thread, branch, and model,
+MUST automatically invoke the
+[pr-video-evidence skill](.agents/skills/pr-video-evidence/SKILL.md) before
+declaring implementation work complete or marking a pull request ready for
+review. Do not wait for the reviewer to request a recording.
+
+### Required sequence
+
+1. Inspect the original task, acceptance criteria, implementation, blast
+   radius, edge cases, and failure states.
+2. Start the actual Shots application from the current branch in an isolated
+   environment with seeded test data (`make up` / `make up-production`, or
+   `dev/native-stack up && dev/native-stack login` in cloud sessions).
+3. Execute all applicable automated checks (`npm run quality:check`,
+   `make -C server check`, contract/e2e/tenant-isolation checks as applicable).
+4. Complete the mandatory independent engineering review above (core
+   `reviewer` perspectives, `ponytail-review` when available, and applicable
+   domain specialists). Resolve all blocking findings (`P0`/`P1`, plus required
+   `P2` items), rerun verification, and obtain independent re-review. Follow
+   the exceptions and fallback rules in `Mandatory implementation review`
+   above; review-only subagents must not recursively initiate this workflow.
+5. After independent review and automated checks pass, generate a narrated,
+   visually annotated video demonstrating the actual running implementation
+   using `npm run devx:video-evidence` (in `clients/`) or
+   `make video-evidence` (`dev/pr-video-evidence/cli.mjs`).
+6. Inspect the rendered recording with `ffprobe`, `volumedetect`, and
+   per-beat keyframes for correctness, completeness, readability, audio
+   synchronization, and absence of credentials or sensitive data.
+7. Deliver the playable MP4 attachment/artifact, consolidated engineering
+   review report, and verification results in the review thread, and include
+   the PR evidence summary (`render-markdown`) with an accessible video link
+   in the pull request description.
+8. Mark the pull request ready for review only after all applicable
+   verification requirements pass. Keep incomplete PRs in draft. Never merge
+   without explicit human authorization.
+
+### Video, narration, and evidence rules
+
+- **Real application only:** record the actual running app via Playwright
+  (`1920 x 1080` @ `30 fps`, MP4 with H.264 `yuv420p` video and AAC audio,
+  typically 30–120s per clip, no music, promotional copy, or decorative
+  transitions). Never substitute mockups or simulated UIs.
+- **Visual annotations & narration:** include synchronized spoken narration
+  (Kokoro local TTS by default via `dev/pr-video-evidence/tts.py`, with
+  approved cloud TTS or `espeak-ng` fallback only when needed), visible
+  cursor movement, click indicators, element bounding boxes/highlights,
+  restrained zoom where needed, legible burned-in captions, real interactions,
+  relevant error states, and verified acceptance criteria. Describe only
+  observed, verified outcomes.
+- **Backend and non-UI changes:** demonstrate observable behavior via terminal
+  recordings, API requests/responses, database assertions, dashboards, or test
+  execution (`EvidenceRecorder.renderTerminalView`). For genuinely
+  non-demonstrable changes (e.g., prose-only docs), explicitly document why
+  video evidence is not applicable (`status: "not_applicable"`) and provide
+  equivalent verification artifacts. Never silently skip verification.
+- **Evidence integrity:** bind every recording to the repository, branch,
+  exact 40-character `commitSha`, PR number (once assigned), capture
+  timestamp, application routes/targets, test environment, acceptance
+  criteria, and assertion results. Preserve raw footage, transcript, captions,
+  manifest, and Playwright trace under `.local/pr-evidence/` (gitignored).
+  Never commit binary recordings to git and never expose credentials, tokens,
+  financial data, or customer data.
+- **Review feedback loop:** when a reviewer annotates video frames or submits
+  PR review comments, inspect every marked frame and comment, convert feedback
+  into acceptance criteria, implement corrections, rerun independent review
+  and automated checks, generate a fresh narrated video against the new
+  commit SHA, attach it to the same thread, update the PR evidence summary,
+  and explicitly state which comments are addressed and which remain
+  outstanding. Never reuse an earlier commit's recording for updated code.
+- **Failure handling:** if the recording or verification pipeline fails,
+  report the exact blocker and leave the pull request as a draft. Never
+  fabricate evidence or bypass quality gates.
 
 ## Handoff
 
@@ -318,6 +397,8 @@ For implementation work, end with a short report sized to the change:
 - **Affected:** shared code and the consumers your change reaches.
 - **Checks:** what ran and the result; any failure, and any check you could
   not run with the reason.
+- **Evidence:** playable narrated video attachment/link, exact commit SHA,
+  and consolidated independent review verdict.
 
 ## Branch and release flow
 
