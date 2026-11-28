@@ -47,9 +47,14 @@ func (q *recordingQuotaCounter) Increment(_ context.Context, _ string, amount in
 
 // recordingMonthlyMeter mirrors quota.MonthlyMeter's semantics in memory:
 // it records overruns and reports Reached once usage is over the limit.
-type recordingMonthlyMeter struct{ used map[string]int64 }
+type recordingMonthlyMeter struct {
+	mu   sync.Mutex
+	used map[string]int64
+}
 
 func (m *recordingMonthlyMeter) Meter(_ context.Context, key string, amount, limit int64) (quota.MonthlyUsage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.used == nil {
 		m.used = map[string]int64{}
 	}

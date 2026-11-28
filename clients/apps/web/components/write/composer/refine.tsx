@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
-import { caretPost, postRanges } from '@/components/drafts/thread'
+import { caretPost, leaveHeader, postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from '@/lib/write/document'
@@ -153,9 +153,18 @@ export function RefineProvider({
     if (!current?.plugins.aiChat) return
     if (where?.startsWith('post-')) {
       const [, end] = postRanges(current.children)[Number(where.slice(5)) - 1] ?? [0, 0]
-      if (end) current.tf.select(current.api.end([end - 1])!)
+      if (end) {
+        const point = current.api.end([end - 1])
+        if (point) current.tf.select(point)
+      }
     } else if (!current.selection) {
-      current.tf.select(current.api.end([])!)
+      const end = current.api.end([])
+      if (end) current.tf.select(end)
+    }
+    if (current.api.isCollapsed() && leaveHeader(current)) {
+      const block = current.selection?.anchor.path[0]
+      const end = block !== undefined ? current.api.end([block]) : undefined
+      if (end) current.tf.select(end)
     }
     current.tf.focus()
     current.getApi(AIChatPlugin).aiChat.show()

@@ -555,22 +555,34 @@ If any quality check fails, fix the issue and regenerate the recording.
   review thread (Capy attachment, Antigravity artifact, or equivalent) so the
   reviewer can watch and annotate frames directly — never provide only a local
   filesystem path or prose summary.
-- Include an authorized, accessible HTTPS link to the recording in the pull
-  request description (never expose private recordings on public third-party
-  file hosts, and never commit binary MP4s to git).
-- If the recording or attachment cannot be delivered, report the exact blocker
-  and leave the pull request in draft.
+- **Always embed the playable video directly in the pull request description**
+  on its own standalone paragraph (blank line before and after) using
+  `node dev/pr-video-evidence/cli.mjs publish-pr <manifest.json> --pr <number>`
+  (which uploads via `gh pr edit <pr> --attach <mp4>`, binds `videoUrl`, and
+  re-renders the PR evidence block) so GitHub renders an inline `<video>`
+  player. Never rely solely on a Markdown text link, never expose private
+  recordings on public third-party file hosts, and never commit binary MP4s to
+  git.
+- If the recording or inline PR attachment cannot be delivered (for example,
+  when `uploads.github.com` rejects a sandboxed token), report the exact
+  blocker and leave the pull request in draft.
 
 ## 16. Pull request evidence summary
 
-Generate the PR description block with
-`node dev/pr-video-evidence/cli.mjs render-markdown <manifest.json>` so both
-human reviewers and the `pr-video-evidence` GitHub Actions check can verify it:
+Generate and publish the PR description block with
+`node dev/pr-video-evidence/cli.mjs publish-pr <manifest.json> --pr <number>`
+(or `render-markdown <manifest.json>` when `--video-url` is already populated)
+so human reviewers see an inline playable video player and the
+`pr-video-evidence` GitHub Actions check verifies both freshness and inline
+embedding:
 
 ```markdown
 <!-- pr-video-evidence:start -->
 ### Narrated verification
-Recording: [Playable demonstration](https://...)
+
+https://github.com/user-attachments/assets/<uuid>
+
+Recording: [Playable demonstration](https://github.com/user-attachments/assets/<uuid>)
 Commit: `<exact 40-char commit SHA>`
 Environment: `native-stack`
 Routes / targets: `/home`, `/editor`
@@ -625,7 +637,7 @@ recording for updated code. Repeat until approved.
 Inspect and reuse Shots' verification and recording infrastructure:
 
 - `dev/pr-video-evidence/cli.mjs` — unified CLI (`check-deps`, `setup-kokoro`,
-  `record`, `render-markdown`, `validate`).
+  `record`, `render-markdown`, `publish-pr`, `validate`).
 - `dev/pr-video-evidence/playwright-helpers.mjs` — Playwright 1920×1080 capture,
   visual annotation overlay, synchronized beat runner, Shots dev sign-in, and
   terminal/backend scene renderer.
