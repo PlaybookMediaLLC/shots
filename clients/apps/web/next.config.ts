@@ -107,7 +107,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/api/:path*',
+        // Asset content routes set per-response Cache-Control (`private, max-age=0, must-revalidate`
+        // with ETag for authorized bytes/thumbnails; `private, no-store` for redirects and errors).
+        source: '/api/((?!v1/assets/[^/]+/content$).*)',
         headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
       },
       // Security and SEO headers for all pages
