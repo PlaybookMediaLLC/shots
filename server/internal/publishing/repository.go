@@ -804,6 +804,9 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	}); err != nil {
 		return err
 	}
+	if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "unknown_delivery", "", FailureUnknownDelivery); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -879,9 +882,15 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		return err
 	}
 	if inApp {
+		if err := EmitPostCompleted(ctx, tx, live.OrganizationID, live.ID, "sent_to_app", providerPostID, ""); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 	if err := EmitDraftPublished(ctx, tx, live, providerPostID); err != nil {
+		return err
+	}
+	if err := EmitPostCompleted(ctx, tx, live.OrganizationID, live.ID, "published", providerPostID, ""); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -952,6 +961,11 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 	if err != nil {
 		return err
 	}
+	if !retry {
+		if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "failed", "", failureCode); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -1009,6 +1023,13 @@ func (r *Repository) FailUnsent(ctx context.Context, post *ent.ScheduledPost, co
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": code, "sent": false},
 	}); err != nil {
+		return err
+	}
+	completedStatus := "failed"
+	if code == FailureMissedWindow {
+		completedStatus = "missed_window"
+	}
+	if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, completedStatus, "", code); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1087,6 +1108,11 @@ func (r *Repository) ReleaseStalled(ctx context.Context, postID, runID string) (
 	}
 	if err != nil {
 		return "", err
+	}
+	if open != nil {
+		if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "unknown_delivery", "", FailureUnknownDelivery); err != nil {
+			return "", err
+		}
 	}
 	return outcome, tx.Commit()
 }

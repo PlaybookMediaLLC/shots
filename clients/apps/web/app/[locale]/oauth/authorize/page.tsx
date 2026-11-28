@@ -42,7 +42,7 @@ function Refusal({ message }: { message: string }) {
     <AuthShell description={message} title="This connection can’t be approved">
       <p className="text-sm text-neutral-500">
         Start the connection again from your AI client. If it keeps failing, check the server URL in
-        Settings → AI agents.
+        Settings → Agents &amp; API keys.
       </p>
     </AuthShell>
   )

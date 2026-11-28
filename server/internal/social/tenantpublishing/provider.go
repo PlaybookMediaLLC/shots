@@ -48,6 +48,10 @@ type poster interface {
 	Post(context.Context, string, string, []integrations.PostDetails, *socialent.Integration) ([]integrations.PostResponse, error)
 }
 
+// ReconnectNotifier receives a channel's social organization ID, integration
+// ID, and cause whenever its credentials flip to needing reconnection.
+type ReconnectNotifier func(ctx context.Context, goOrganizationID, integrationID, reason string) error
+
 type Publisher struct {
 	bindings     BindingLookup
 	integrations IntegrationLookup
@@ -55,13 +59,30 @@ type Publisher struct {
 	resolve      func(string) poster
 	now          func() time.Time
 	// channels and refresh renew expiring credentials (RefreshSocialTokens).
-	channels *socialent.Client
-	refresh  *socialintegration.RefreshIntegrationService
+	channels          *socialent.Client
+	refresh           *socialintegration.RefreshIntegrationService
+	reconnectNotifier ReconnectNotifier
 
 	refreshMu       sync.Mutex
 	refreshCooldown map[string]refreshBackoff
 	xLinks          XLinkPolicy
 	xLinkRecorder   XLinkOutcomeRecorder
+}
+
+// WithReconnectNotifier attaches a callback invoked once whenever a social
+// account transitions to needing reconnection.
+func (p *Publisher) WithReconnectNotifier(notifier ReconnectNotifier) *Publisher {
+	p.reconnectNotifier = notifier
+	return p
+}
+
+func (p *Publisher) notifyReconnect(ctx context.Context, account *socialent.Integration, reason string) {
+	if p.reconnectNotifier == nil || account == nil {
+		return
+	}
+	if err := p.reconnectNotifier(ctx, account.OrganizationID, account.ID, reason); err != nil {
+		slog.WarnContext(ctx, "could not emit connection.needs_reconnect webhook", "integration_id", account.ID, "error", err)
+	}
 }
 
 func New(bindings BindingLookup, socialClient *socialent.Client, signer MediaSigner, lifecycle ...managedslack.Lifecycle) *Publisher {
@@ -183,7 +204,12 @@ func (p *Publisher) requireReconnect(ctx context.Context, account *socialent.Int
 	if p.refresh == nil || account == nil {
 		return
 	}
-	if err := p.refresh.RequireReconnect(ctx, account); err != nil && !errors.Is(err, socialintegration.ErrRefreshChanged) {
+	err := p.refresh.RequireReconnect(ctx, account)
+	if err == nil {
+		p.notifyReconnect(ctx, account, "credentials_rejected")
+		return
+	}
+	if !errors.Is(err, socialintegration.ErrRefreshChanged) {
 		slog.WarnContext(ctx, "could not flag a channel for reconnection", "integration_id", account.ID, "error", err)
 	}
 }

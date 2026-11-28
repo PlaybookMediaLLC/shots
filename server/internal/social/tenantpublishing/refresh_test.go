@@ -82,10 +82,19 @@ func TestRefreshSocialTokensRenewsDueChannelsAndFlagsRevokedOnes(t *testing.T) {
 			unbound := channel(unboundOrg, "unbound", 10*time.Minute)
 
 			fake := &fakeThreads{Provider: social.NewManager().GetSocialIntegration(provider), calls: map[string]int{}}
-			p := &Publisher{channels: db.Client, refresh: newRefresh(db.Client, integrations.NewManager([]integrations.Provider{fake})), now: time.Now}
+			var notified []string
+			p := (&Publisher{channels: db.Client, refresh: newRefresh(db.Client, integrations.NewManager([]integrations.Provider{fake})), now: time.Now}).
+				WithReconnectNotifier(func(_ context.Context, orgID, integrationID, reason string) error {
+					notified = append(notified, orgID+":"+integrationID+":"+reason)
+					return nil
+				})
 			renewed, err := p.RefreshSocialTokens(ctx)
 			if err != nil || renewed < 1 {
 				t.Fatalf("renewed=%d err=%v", renewed, err)
+			}
+			wantNotice := boundOrg + ":" + revoked + ":token_refresh_rejected"
+			if len(notified) != 1 || notified[0] != wantNotice {
+				t.Fatalf("reconnect notifier=%v want [%s]", notified, wantNotice)
 			}
 
 			rows := map[string]bool{}

@@ -225,11 +225,14 @@ test("tenant OpenAPI operations declare the implemented X-API-Key scheme", () =>
   for (const [path, operations] of Object.entries(spec.paths)) {
     for (const operation of Object.values(operations)) {
       if (path.startsWith("/api/v1/")) {
-        // Tenant operations take an API key with one scope, or a member
-        // session. Shell operations and a person's decisions (approving,
-        // scheduling) take only a session.
+        // Tenant operations take an API key with one scope or a member session.
+        // Key introspection (/api/v1/auth/me) accepts any valid workspace API key
+        // and refuses browser sessions. Shell operations and human decisions
+        // take only a session.
         const [first, ...rest] = operation.security ?? [];
-        if ("workspaceApiKey" in (first ?? {})) {
+        if (path === "/api/v1/auth/me") {
+          assert.deepEqual(operation.security, [{ workspaceApiKey: [] }], path);
+        } else if ("workspaceApiKey" in (first ?? {})) {
           assert.equal(first.workspaceApiKey.length, 1, path);
           assert.ok(apiKeyScopes.includes(first.workspaceApiKey[0] as never), path);
           assert.deepEqual(rest, [{ workspaceSession: [] }], path);

@@ -3524,6 +3524,41 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /**
+   * Atomically revokes every OAuth agent-issued key belonging to one connected
+   * agent client in the active workspace, leaving manual REST/CLI keys intact.
+   */
+  async revokeAgentClient(input: { clientId?: string; clientName?: string }) {
+    return this.request<{ revokedCount: number; revokedKeyIds: string[] }>(
+      'v1/agent-authorizations/revoke-client',
+      {
+        body: input,
+        method: 'POST',
+      }
+    )
+  }
+
+  /**
+   * Returns redacted metadata about the calling API key and its workspace.
+   */
+  async getCurrentAPIKeyInfo() {
+    return this.request<{
+      key: {
+        expiresAt: string | null
+        id: string
+        name: string | null
+        prefix: string | null
+        scopes: string[]
+        start: string | null
+      }
+      workspace: {
+        id: string
+        name: string
+        slug: string
+      }
+    }>('v1/api-keys/me')
+  }
+
   /** The review queue: posts waiting for a reviewer's decision, oldest first. */
   async listPendingApprovals(options: { cursor?: string; limit: number }) {
     const parameters = new URLSearchParams({ limit: String(options.limit) })
@@ -5216,12 +5251,8 @@ export class ScreenshotStudioBackendSDK {
     )
     if (response.headers.get('content-type')?.includes('application/json')) {
       const payload = (await response.json()) as { base64?: string }
-      const binary = atob(payload.base64 ?? '')
-      const bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i)
-      }
-      return bytes
+      const decoded = atob(payload.base64 ?? '')
+      return Uint8Array.from(decoded, (char) => char.charCodeAt(0))
     }
     return new Uint8Array(await response.arrayBuffer())
   }

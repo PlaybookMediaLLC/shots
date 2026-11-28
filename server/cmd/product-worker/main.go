@@ -88,7 +88,8 @@ func main() {
 	xLinkStore := product.NewConfiguration(db.Client)
 	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects).
 		WithXLinkPolicy(xLinkPolicyAdapter{store: xLinkStore}).
-		WithXLinkRecorder(repository)
+		WithXLinkRecorder(repository).
+		WithReconnectNotifier(repository.EmitConnectionNeedsReconnect)
 	activities := temporalpublishing.NewActivities(repository, provider)
 	scheduler := temporalpublishing.NewScheduler(temporalClient, temporalpublishing.SchedulerConfig{
 		ActivityTaskQueue: cfg.ActivityTaskQueue, ActivityTimeout: cfg.ActivityTimeout,

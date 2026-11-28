@@ -6,27 +6,42 @@
 export class ShotsClient {
   /**
    * @param {string} origin The Shots origin, such as https://shots.playbookmedia.io.
-   * @param {string} key A workspace API key with the asset:write and artifact:read scopes.
+   * @param {string} key A workspace API key.
    * @param {typeof fetch} [transport]
    */
   constructor(origin, key, transport = fetch) {
-    const url = new URL(origin)
+    let url
+    try {
+      url = new URL(typeof origin === 'string' ? origin.trim() : '')
+    } catch {
+      throw new Error('Set SHOTS_ORIGIN to an HTTPS Shots origin without credentials, a path or a query.')
+    }
     const local = url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
     if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || (url.protocol !== 'https:' && !local))
       throw new Error('Set SHOTS_ORIGIN to an HTTPS Shots origin without credentials, a path or a query.')
-    if (!key?.trim()) throw new Error('Set SHOTS_API_KEY to a workspace API key.')
+    if (!key?.trim()) throw new Error('Set SHOTS_API_KEY to a workspace API key, or run: shots setup --key YOUR_API_KEY')
     this.origin = url.origin
     this.key = key.trim()
     this.transport = transport
   }
 
-  /** @param {string} path @param {string} [method] @param {unknown} [body] */
-  async request(path, method = 'GET', body) {
+  /**
+   * @param {string} path
+   * @param {string} [method]
+   * @param {unknown} [body]
+   * @param {Record<string, string>} [extraHeaders]
+   */
+  async request(path, method = 'GET', body, extraHeaders = {}) {
     if (!path.startsWith('/api/v1/') || path.includes('://')) throw new Error('Invalid API path.')
     const response = await this.transport(this.origin + path, {
       method,
       redirect: 'error',
-      headers: { 'x-api-key': this.key, 'content-type': 'application/json', 'x-playbook-client': 'cli' },
+      headers: {
+        'x-api-key': this.key,
+        'content-type': 'application/json',
+        'x-playbook-client': 'cli',
+        ...extraHeaders,
+      },
       signal: AbortSignal.timeout(120_000),
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
@@ -35,7 +50,55 @@ export class ShotsClient {
       const message = result && typeof result === 'object' ? result.message ?? result.error : undefined
       throw new Error(typeof message === 'string' ? message : `Shots returned ${response.status}.`)
     }
+    if (!result || typeof result !== 'object') {
+      throw new Error('Shots returned an invalid JSON response.')
+    }
     return result
+  }
+
+  /** Verify the key and return workspace + scope summary. */
+  async whoami() {
+    const info = await this.request('/api/v1/auth/me')
+    if (
+      !info.workspace ||
+      typeof info.workspace.slug !== 'string' ||
+      !info.key ||
+      typeof info.key.id !== 'string'
+    ) {
+      throw new Error('Shots returned an unexpected authentication payload.')
+    }
+    return info
+  }
+
+  /** List visible shared social sets and their connected accounts. */
+  async listSocialSets() {
+    return this.request('/api/v1/social-sets')
+  }
+
+  /** List scheduled posts for the workspace. */
+  async listScheduledPosts() {
+    return this.request('/api/v1/scheduled-posts')
+  }
+
+  /**
+   * Create and schedule or publish a post (requires `post:publish`).
+   * @param {Record<string, unknown>} input
+   * @param {string} idempotencyKey
+   */
+  async createPost(input, idempotencyKey) {
+    return this.request('/api/v1/posts', 'POST', input, {
+      'idempotency-key': idempotencyKey,
+    })
+  }
+
+  /** List content drafts. */
+  async listDrafts() {
+    return this.request('/api/v1/content-drafts')
+  }
+
+  /** List releases. */
+  async listReleases() {
+    return this.request('/api/v1/releases')
   }
 
   /**
