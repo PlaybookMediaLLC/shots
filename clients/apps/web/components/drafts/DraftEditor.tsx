@@ -30,6 +30,7 @@ import {
 import {
   BlockPlaceholderKit,
   BlockSelectionKit,
+  createMarkdownKit,
   MediaKit,
   commentPlugin,
   discussionPlugin,
@@ -44,6 +45,7 @@ import { useKeys } from '@/components/write/shortcuts'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
 import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
+import { socialMentionMarkdownRules } from '@/lib/editor/services'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
 import { OverLimitPlugin } from './over-limit'
@@ -640,6 +642,7 @@ function DraftEditorSession({
       // the upstream demo users.
       overridePlugins: [
         ...hosted,
+        ...createMarkdownKit(socialMentionMarkdownRules()),
         // Extend the configured kit: configure() replaces its deferred renderer.
         UploadPlaceholderPlugin.extend(() => ({
           options: {

@@ -26,11 +26,25 @@ export type EditorProposal = z.infer<typeof EditorProposalSchema>;
 export type EditorProposalAction = z.infer<typeof EditorProposalActionSchema>;
 export type EditorToolName = z.infer<typeof EditorToolNameSchema>;
 
+type EditorAIPoint = {
+  offset: number;
+  path: number[];
+};
+
+export type EditorAIRange = {
+  anchor: EditorAIPoint;
+  focus: EditorAIPoint;
+};
+
 export type EditorAICommentEventDetail = {
   comment: string;
   /** The passage the comment is about; without it, the current selection. */
   content?: string;
   editorId: string;
+  /** Called by the host listener when the comment actually attaches to text. */
+  markAttached?: () => void;
+  /** The selection active when the review started, searched before the full document. */
+  selection?: EditorAIRange;
 };
 
 export type EditorAIQualityEventDetail = {
@@ -67,14 +81,39 @@ export const editorToolForAction = (
   action: EditorProposalAction
 ): EditorToolName => TOOL_BY_ACTION[action];
 
+/**
+ * Dispatches one AI review comment to the host editor listener and reports
+ * whether the host attached it as a comment thread.
+ */
 export const dispatchEditorAIComment = (
-  detail: EditorAICommentEventDetail
-): void => {
+  detail: Omit<EditorAICommentEventDetail, "markAttached">
+): boolean => {
+  let attached = false;
   window.dispatchEvent(
     new CustomEvent<EditorAICommentEventDetail>(EDITOR_AI_COMMENT_EVENT, {
-      detail,
+      detail: {
+        ...detail,
+        markAttached: () => {
+          attached = true;
+        },
+      },
     })
   );
+  return attached;
+};
+
+/** Notice shown after a review finishes, counting only attached comments. */
+export const reviewSummaryMessage = (
+  attached: number,
+  total: number
+): string => {
+  if (attached > 0) {
+    return `The review added ${attached} ${attached === 1 ? "comment" : "comments"}.`;
+  }
+  if (total === 0) {
+    return "The review found nothing to change.";
+  }
+  return "The review could not attach its comments to the text.";
 };
 
 export const dispatchEditorAIQuality = (

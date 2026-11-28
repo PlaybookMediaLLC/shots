@@ -8,9 +8,11 @@ import {
   type UIMessage,
 } from "ai";
 import { useChat as useBaseChat } from "@ai-sdk/react";
+import { RangeApi } from "platejs";
 import { useEditorPlugin } from "platejs/react";
 import {
   type ChangeEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -19,9 +21,11 @@ import {
 import { toast } from "sonner";
 import {
   dispatchEditorAIComment,
+  type EditorAIRange,
   EditorReviewCommentSchema,
   type EditorToolName,
   EditorToolNameSchema,
+  reviewSummaryMessage,
 } from "../lib/ai-editor";
 import { useEditorServices } from "../lib/editor-services";
 
@@ -66,10 +70,7 @@ type EditorChatData = {
 type EditorUIMessage = UIMessage<{}, EditorChatData>;
 
 type EditorChatHelpers = {
-  append: (
-    message: LegacyChatMessage,
-    options?: unknown
-  ) => Promise<void>;
+  append: (message: LegacyChatMessage, options?: unknown) => Promise<void>;
   clearError: () => void;
   data: unknown[];
   error: Error | undefined;
@@ -83,10 +84,7 @@ type EditorChatHelpers = {
   messages: EditorChatMessage[];
   regenerate: (options?: unknown) => Promise<void>;
   reload: (options?: unknown) => Promise<void>;
-  sendMessage: (
-    message: { text: string },
-    options?: unknown
-  ) => Promise<void>;
+  sendMessage: (message: { text: string }, options?: unknown) => Promise<void>;
   setMessages: (
     messages:
       | EditorChatMessage[]
@@ -126,6 +124,55 @@ const requestToolName = (
   return parsed.success ? parsed.data : null;
 };
 
+const isValidPoint = (
+  value: unknown
+): value is { offset: number; path: number[] } => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { offset?: unknown; path?: unknown };
+  return (
+    typeof candidate.offset === "number" &&
+    Number.isInteger(candidate.offset) &&
+    candidate.offset >= 0 &&
+    Array.isArray(candidate.path) &&
+    candidate.path.length > 0 &&
+    candidate.path.every(
+      (segment) =>
+        typeof segment === "number" && Number.isInteger(segment) && segment >= 0
+    )
+  );
+};
+
+const cloneExpandedRange = (range: unknown): EditorAIRange | null => {
+  if (!range || typeof range !== "object") return null;
+  const candidate = range as { anchor?: unknown; focus?: unknown };
+  if (!isValidPoint(candidate.anchor) || !isValidPoint(candidate.focus)) {
+    return null;
+  }
+  const cloned: EditorAIRange = {
+    anchor: {
+      offset: candidate.anchor.offset,
+      path: [...candidate.anchor.path],
+    },
+    focus: { offset: candidate.focus.offset, path: [...candidate.focus.path] },
+  };
+  return RangeApi.isCollapsed(cloned) ? null : cloned;
+};
+
+/** Captures the active selection for a review request, preferring block selection `ctx.selection`. */
+export const captureReviewSelection = (
+  editorSelection: unknown,
+  body: Record<string, unknown>
+): EditorAIRange | null => {
+  const ctx = body.ctx;
+  if (ctx && typeof ctx === "object") {
+    const fromCtx = cloneExpandedRange(
+      (ctx as Record<string, unknown>).selection
+    );
+    if (fromCtx) return fromCtx;
+  }
+  return cloneExpandedRange(editorSelection);
+};
+
 const unconfiguredFetch: typeof globalThis.fetch = () =>
   Promise.reject(new Error("AI assistance is not available in this editor."));
 
@@ -148,6 +195,20 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
   const chatFetch = ai?.chat?.fetch;
   const bodyRef = useRef(body);
   bodyRef.current = body;
+  const reviewCountsRef = useRef({ attached: 0, total: 0 });
+  const inFlightCountRef = useRef(0);
+  const reviewSelectionRef = useRef<ReturnType<
+    typeof editor.api.rangeRef
+  > | null>(null);
+  const clearReviewSelection = useCallback(() => {
+    reviewSelectionRef.current?.unref();
+    reviewSelectionRef.current = null;
+  }, []);
+  const resetReviewState = useCallback(() => {
+    reviewCountsRef.current = { attached: 0, total: 0 };
+    clearReviewSelection();
+  }, [clearReviewSelection]);
+  useEffect(() => () => clearReviewSelection(), [clearReviewSelection]);
   const transport = useMemo(
     () =>
       new DefaultChatTransport<EditorUIMessage>({
@@ -167,11 +228,23 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
             ...requestBody,
             ...bodyRef.current?.(),
           };
+          const toolName = requestToolName(suppliedBody);
+          inFlightCountRef.current += 1;
+          resetReviewState();
+          if (toolName === "comment") {
+            const captured = captureReviewSelection(
+              editor.selection,
+              suppliedBody
+            );
+            if (captured) {
+              reviewSelectionRef.current = editor.api.rangeRef(captured);
+            }
+          }
           return {
             api: requestApi,
             body: {
               ...suppliedBody,
-              ctx: { toolName: requestToolName(suppliedBody) },
+              ctx: { toolName },
               id,
               messageId,
               messages,
@@ -181,43 +254,100 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
           };
         },
       }),
-    [api, chatFetch, editor]
+    [api, chatFetch, editor, resetReviewState]
   );
   const chat = useBaseChat<EditorUIMessage>({
     id: "editor",
     onError: (error) => {
+      if (inFlightCountRef.current <= 1) resetReviewState();
       // The half-written answer goes, and the writer learns why.
       toast.error(failureMessage(error));
       editor.getApi(AIChatPlugin).aiChat.hide();
+    },
+    onFinish: () => {
+      inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
+      if (inFlightCountRef.current === 0) resetReviewState();
     },
     onData: (part) => {
       if (part.type === "data-comment") {
         const comment = EditorReviewCommentSchema.safeParse(part.data);
         if (comment.success) {
-          dispatchEditorAIComment({ ...comment.data, editorId: String(editor.id) });
+          reviewCountsRef.current.total += 1;
+          const liveSelection = reviewSelectionRef.current?.current;
+          if (
+            dispatchEditorAIComment({
+              ...comment.data,
+              editorId: String(editor.id),
+              selection:
+                liveSelection && !RangeApi.isCollapsed(liveSelection)
+                  ? liveSelection
+                  : undefined,
+            })
+          ) {
+            reviewCountsRef.current.attached += 1;
+          }
         }
       }
       if (part.type === "data-reviewed") {
-        const count = Number(part.data) || 0;
-        toast(
-          count
-            ? `The review added ${count} ${count === 1 ? "comment" : "comments"}.`
-            : "The review found nothing to change."
-        );
+        const { attached, total } = reviewCountsRef.current;
+        resetReviewState();
+        toast(reviewSummaryMessage(attached, total));
         editor.getApi(AIChatPlugin).aiChat.hide({ undo: false });
       }
       if (part.type === "data-toolName") {
         const toolName = EditorToolNameSchema.safeParse(part.data);
-        if (toolName.success) setOption("toolName", toolName.data);
+        if (toolName.success) {
+          if (toolName.data === "comment") {
+            reviewCountsRef.current = { attached: 0, total: 0 };
+          }
+          setOption("toolName", toolName.data);
+        }
       }
     },
     ...chatOptions,
     transport,
   });
 
+  const {
+    addToolApprovalResponse: chatAddToolApprovalResponse,
+    addToolOutput: chatAddToolOutput,
+    clearError: chatClearError,
+    error: chatError,
+    id: chatId,
+    messages: chatMessages,
+    regenerate: chatRegenerate,
+    resumeStream: chatResumeStream,
+    sendMessage: chatSendMessage,
+    setMessages: chatSetMessages,
+    status: chatStatus,
+    stop: chatStop,
+  } = chat;
+  const stop = useCallback(() => {
+    resetReviewState();
+    return chatStop();
+  }, [chatStop, resetReviewState]);
   useEffect(() => {
-    setOption("chat", chat);
-  }, [chat, setOption]);
+    setOption("chat", {
+      ...chat,
+      stop,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- useBaseChat returns a fresh wrapper object on every render; depend on its fields instead.
+  }, [
+    chatAddToolApprovalResponse,
+    chatAddToolOutput,
+    chatClearError,
+    chatError,
+    chatId,
+    chatMessages,
+    chatRegenerate,
+    chatResumeStream,
+    chatSendMessage,
+    chatSetMessages,
+    chatStatus,
+    chatStop,
+    setOption,
+    stop,
+  ]);
   const handleInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => setInput(event.target.value);
@@ -238,8 +368,9 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
       | ((currentMessages: EditorChatMessage[]) => EditorChatMessage[])
   ) => {
     if (typeof messages === "function") {
-      chat.setMessages((currentMessages) =>
-        messages(currentMessages as EditorChatMessage[]) as EditorUIMessage[]
+      chat.setMessages(
+        (currentMessages) =>
+          messages(currentMessages as EditorChatMessage[]) as EditorUIMessage[]
       );
       return;
     }
@@ -266,6 +397,7 @@ export const useChat = (opts: EditorChatOptions = {}): EditorChatHelpers => {
       chat.sendMessage(message, options as ChatRequestOptions),
     setMessages,
     status: chat.status as EditorChatStatus,
+    stop,
     setInput,
   };
 };

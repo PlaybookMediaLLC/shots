@@ -1,0 +1,4 @@
+interface:
+  display_name: 'PR Video Evidence'
+  short_description: 'Produce narrated, annotated video evidence and review manifest for every PR'
+  default_prompt: 'Use $pr-video-evidence to run independent review, verify tests, and record narrated video evidence for this pull request.'

@@ -35,6 +35,7 @@ import {
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -101,6 +102,7 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
+import { useInlineSuggestionsEnabled } from '@/lib/write/inline-suggestions'
 import { buildPublication, isStory } from '@/lib/write/publication'
 import { splitThread } from '@/lib/write/split-thread'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
@@ -485,6 +487,7 @@ export function WriteComposer({
   const active = allChannels(accounts, primary).includes(tab) ? tab : primary
   // The editor's AI menu lists Refine's reviewed rewrites beside its own streamed ones.
   const refineApi = React.useRef<RefineApi | null>(null)
+  const [inlineSuggestions, setInlineSuggestions] = useInlineSuggestionsEnabled()
   const services = React.useMemo(() => {
     if (!aiEnabled) return platformEditorServices(trpcClient)
     const presets = (Object.keys(REFINE_LABELS) as (keyof typeof REFINE_LABELS)[]).filter(
@@ -514,9 +517,15 @@ export function WriteComposer({
             }),
         })),
     ]
-    return platformEditorServices(trpcClient, { actions, channel: active, draftId: initial.id })
+    return platformEditorServices(trpcClient, {
+      actions,
+      channel: active,
+      comments: active === primary,
+      draftId: initial.id,
+      inlineSuggestions,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- channels is derived anew each render.
-  }, [trpcClient, aiEnabled, active, initial.id, channels.join()])
+  }, [trpcClient, aiEnabled, active, primary, initial.id, inlineSuggestions, channels.join()])
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = React.useMemo(
     () => ({
@@ -1884,6 +1893,14 @@ export function WriteComposer({
                     {compact ? 'Comfortable display' : 'Compact display'}
                     <DropdownMenuShortcut>{mod}⇧H</DropdownMenuShortcut>
                   </DropdownMenuItem>
+                  {aiEnabled && canEdit ? (
+                    <DropdownMenuCheckboxItem
+                      checked={inlineSuggestions}
+                      onCheckedChange={(checked) => setInlineSuggestions(checked === true)}
+                    >
+                      Inline AI suggestions
+                    </DropdownMenuCheckboxItem>
+                  ) : null}
                   {canEdit ? (
                     <>
                       <DropdownMenuSeparator />

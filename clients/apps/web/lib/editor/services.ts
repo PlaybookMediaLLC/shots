@@ -1,4 +1,6 @@
+import type { MdRules } from '@platejs/markdown'
 import type { EditorAIAction, EditorServices, EditorUploadFile } from '@shots/platejs-editor/lib'
+import { SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 import type { DraftChannel } from '@/lib/write/document'
 import { type SaveToWorkspaceInput, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { assetContentUrl } from './asset-url'
@@ -6,6 +8,25 @@ import { assetContentUrl } from './asset-url'
 export { assetContentUrl }
 
 type TrpcClient = SaveToWorkspaceInput['trpcClient']
+
+/**
+ * Markdown serializer rule for Shots `social_mention` nodes so AI prompts and
+ * Markdown export include `@label` (or `@handle`) instead of dropping mentions.
+ */
+export function socialMentionMarkdownRules(): MdRules {
+  const clean = (value: unknown) =>
+    String(value ?? '')
+      .trim()
+      .replace(/^@+/, '')
+  return {
+    [SOCIAL_MENTION]: {
+      serialize: (node) => {
+        const raw = clean(node.label) || clean(node.handle)
+        return { type: 'text', value: raw ? `@${raw}` : '' }
+      },
+    },
+  }
+}
 
 /**
  * Stores an editor upload as a workspace asset: signed upload to R2 through the
@@ -32,14 +53,22 @@ export function workspaceUploadFile(trpcClient: TrpcClient): EditorUploadFile {
  */
 export function platformEditorServices(
   trpcClient: TrpcClient,
-  ai?: { actions?: readonly EditorAIAction[]; channel: DraftChannel; draftId: string }
+  ai?: {
+    actions?: readonly EditorAIAction[]
+    channel: DraftChannel
+    comments?: boolean
+    draftId: string
+    inlineSuggestions?: boolean
+  }
 ): EditorServices {
   const query = ai && `?${new URLSearchParams({ channel: ai.channel, draftId: ai.draftId })}`
   return {
     ai: ai && {
       actions: ai.actions,
       chat: { api: `/api/ai/document${query}` },
-      copilot: { api: `/api/ai/document/copilot${query}` },
+      comments: ai.comments,
+      copilot:
+        ai.inlineSuggestions === false ? undefined : { api: `/api/ai/document/copilot${query}` },
     },
     uploadFile: workspaceUploadFile(trpcClient),
   }

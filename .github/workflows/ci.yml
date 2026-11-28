@@ -540,6 +540,10 @@ jobs:
         if: matrix.shard == 2
         working-directory: clients
         run: npm test -w @shots/collab-server
+      - name: Shots API client unit tests
+        if: matrix.shard == 2
+        working-directory: clients
+        run: npm test -w shots-api-client
       - name: Editor unit tests
         if: matrix.shard == 1
         working-directory: clients

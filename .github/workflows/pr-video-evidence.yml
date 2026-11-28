@@ -1,0 +1,123 @@
+name: PR video evidence
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  # Required checks on develop must also report on the merge queue's commit.
+  merge_group:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Overlapping runs on description edits would flap the check status.
+concurrency:
+  group: pr-video-evidence-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-video-evidence:
+    name: pr-video-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify merge queue entry
+        if: github.event_name == 'merge_group'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.payload.merge_group.base_ref === 'refs/heads/develop') {
+              core.info('Merge queue entry for develop (constituent PR passed pr-video-evidence).')
+            } else {
+              core.setFailed('Only develop merges through a merge queue.')
+            }
+
+      # Check out the trusted base commit so a pull request cannot modify its
+      # own evidence gate. During the initial rollout PR (before base contains
+      # dev/pr-video-evidence/cli.mjs), same-repository PRs fall back to head.
+      - name: Checkout verification tooling from trusted base
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: |
+            dev/pr-video-evidence
+
+      - name: Check whether verification tooling exists on base
+        if: github.event_name == 'pull_request'
+        id: tooling
+        run: |
+          if [ -f dev/pr-video-evidence/cli.mjs ]; then
+            echo "on_base=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on_base=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bootstrap verification tooling on introducing same-repo PR
+        if: >-
+          github.event_name == 'pull_request' &&
+          steps.tooling.outputs.on_base == 'false' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: |
+            dev/pr-video-evidence
+
+      - name: Setup Node.js
+        if: github.event_name == 'pull_request'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Collect pull request metadata and changed files
+        if: github.event_name == 'pull_request'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs')
+            const pr = context.payload.pull_request
+            const body = pr.body || ''
+            fs.writeFileSync('/tmp/pr-body.md', body, 'utf8')
+
+            const needsFileList =
+              pr.head.ref.startsWith('release-please--') ||
+              body.includes('not_applicable') ||
+              /\\u[0-9a-fA-F]{4}/.test(body)
+            let changedFiles = []
+            if (needsFileList) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100,
+              })
+              changedFiles = files.map((f) => f.filename)
+            }
+            fs.writeFileSync('/tmp/pr-changed-files.txt', changedFiles.join('\n') + '\n', 'utf8')
+
+            core.setOutput('head_sha', pr.head.sha)
+            core.setOutput('base_ref', pr.base.ref)
+            core.setOutput('head_ref', pr.head.ref)
+            core.setOutput('head_repo', pr.head.repo?.full_name || '')
+            core.setOutput('number', String(pr.number))
+            core.setOutput('draft', String(Boolean(pr.draft)))
+
+      # Pass all untrusted PR metadata strictly through env vars, never via
+      # ${{ ... }} shell interpolation inside `run:`.
+      - name: Validate narrated video evidence
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_BASE_REF: ${{ steps.pr.outputs.base_ref }}
+          PR_HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PR_HEAD_REPO: ${{ steps.pr.outputs.head_repo }}
+          PR_REPO: ${{ github.repository }}
+          PR_IS_DRAFT: ${{ steps.pr.outputs.draft }}
+        run: |
+          set -euo pipefail
+          node dev/pr-video-evidence/cli.mjs validate \
+            --pr-body-file /tmp/pr-body.md \
+            --changed-files /tmp/pr-changed-files.txt

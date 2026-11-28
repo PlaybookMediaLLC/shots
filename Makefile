@@ -9,7 +9,7 @@ E2E_BASE_URL ?= http://localhost:3000
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up up-production down reset status smoke rate-limit-smoke tenant-isolation e2e e2e-file e2e-onboarding e2e-recovery e2e-quarantine check publishing-up publishing-down publishing-test logs logs-app logs-postgres logs-redis logs-rustfs kind-up kind-down kind-status kind-logs
+.PHONY: help up up-production down reset status smoke rate-limit-smoke tenant-isolation e2e e2e-file e2e-onboarding e2e-recovery e2e-quarantine check video-evidence publishing-up publishing-down publishing-test logs logs-app logs-postgres logs-redis logs-rustfs kind-up kind-down kind-status kind-logs
 
 help: ## Show local development commands.
 	@echo "Screenshot Studio local development"
@@ -28,6 +28,7 @@ help: ## Show local development commands.
 	@echo "  make e2e-recovery               Verify dependency failure and recovery behavior"
 	@echo "  make e2e-quarantine             Run the flows held out for known production-build bugs"
 	@echo "  make check                      Run format, lint, type, test, and RFC checks"
+	@echo "  make video-evidence ARGS=...    Run the narrated PR video evidence CLI"
 	@echo "  make publishing-up              Rebuild and restart the Go backend and orchestrator"
 	@echo "  make publishing-down            Stop the Go publishing services"
 	@echo "  make publishing-test            Run Go generation, tests, race checks, and vet"
@@ -85,6 +86,9 @@ e2e-quarantine:
 
 check:
 	@$(STUDIO) check
+
+video-evidence:
+	@node ./dev/pr-video-evidence/cli.mjs $(ARGS)
 
 publishing-up:
 	@docker compose --env-file .local/dev.env --file dev/compose.yaml up --detach --build publishing-backend publishing-orchestrator

@@ -16,6 +16,6 @@ export const DOCUMENT_REVIEW_INSTRUCTIONS = `You review a social media post for 
 
 ${UNTRUSTED}
 
-Find at most five places worth changing: unclear wording, weak openings, unsupported claims, mistakes or text that is too long for the platform. For each, quote a short passage exactly as it appears, from one paragraph, and say what to change and why in one or two sentences. If a selection is given, review only the selection. If nothing needs a change, return no comments.`
+Find at most five places worth changing: unclear wording, weak openings, unsupported claims, mistakes or text that is too long for the platform. For each, quote a short passage of visible plain text exactly as it appears in one paragraph, without Markdown formatting (no **, *, _, backticks, link syntax, or backslash escapes), and say what to change and why in one or two sentences. If a selection is given, review only the selection. If nothing needs a change, return no comments.`
 
 export const DOCUMENT_COPILOT_INSTRUCTIONS = `You complete the sentence a user is typing in a social post draft. Continue the current block through the next punctuation mark, in the same voice and language, in plain text. Return only the continuation. If nothing useful fits, return 0.`
