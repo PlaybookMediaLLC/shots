@@ -35,6 +35,8 @@ type SocialSet struct {
 	PostingSlots []schema.QueueSlot `json:"posting_slots,omitempty"`
 	// NaturalPostingTimes holds the value of the "natural_posting_times" field.
 	NaturalPostingTimes bool `json:"natural_posting_times,omitempty"`
+	// NaturalPostingWindowMinutes holds the value of the "natural_posting_window_minutes" field.
+	NaturalPostingWindowMinutes int `json:"natural_posting_window_minutes,omitempty"`
 	// DefaultPlatforms holds the value of the "default_platforms" field.
 	DefaultPlatforms []string `json:"default_platforms,omitempty"`
 	// PrimaryPlatform holds the value of the "primary_platform" field.
@@ -69,7 +71,7 @@ func (*SocialSet) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case socialset.FieldNaturalPostingTimes, socialset.FieldPublicProfile:
 			values[i] = new(sql.NullBool)
-		case socialset.FieldVersion:
+		case socialset.FieldNaturalPostingWindowMinutes, socialset.FieldVersion:
 			values[i] = new(sql.NullInt64)
 		case socialset.FieldID, socialset.FieldOrganizationID, socialset.FieldName, socialset.FieldColor, socialset.FieldVisibility, socialset.FieldOwnerUserID, socialset.FieldTimeZone, socialset.FieldPrimaryPlatform, socialset.FieldPublicSlug, socialset.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
@@ -146,6 +148,12 @@ func (_m *SocialSet) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field natural_posting_times", values[i])
 			} else if value.Valid {
 				_m.NaturalPostingTimes = value.Bool
+			}
+		case socialset.FieldNaturalPostingWindowMinutes:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field natural_posting_window_minutes", values[i])
+			} else if value.Valid {
+				_m.NaturalPostingWindowMinutes = int(value.Int64)
 			}
 		case socialset.FieldDefaultPlatforms:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -283,6 +291,9 @@ func (_m *SocialSet) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("natural_posting_times=")
 	builder.WriteString(fmt.Sprintf("%v", _m.NaturalPostingTimes))
+	builder.WriteString(", ")
+	builder.WriteString("natural_posting_window_minutes=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NaturalPostingWindowMinutes))
 	builder.WriteString(", ")
 	builder.WriteString("default_platforms=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DefaultPlatforms))

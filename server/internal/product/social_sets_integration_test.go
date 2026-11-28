@@ -282,7 +282,7 @@ func TestSocialSetsPlatform(t *testing.T) {
 		}
 		queued = result.Posts[0]
 		offset := *queued.NaturalOffsetSeconds
-		if offset < -240 || offset > 240 || *queued.ScheduleMode != "queue" || queued.SlotAt.UTC().Hour() != 7 ||
+		if offset < -600 || offset > 600 || *queued.ScheduleMode != "queue" || queued.SlotAt.UTC().Hour() != 7 ||
 			!queued.ScheduledFor.Equal(queued.SlotAt.Add(time.Duration(offset)*time.Second)) {
 			t.Fatalf("placement=%+v", queued)
 		}

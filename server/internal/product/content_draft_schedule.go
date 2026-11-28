@@ -176,16 +176,24 @@ func recentDuplicates(ctx context.Context, tx *ent.Tx, organizationID string, at
 	return duplicates, nil
 }
 
-// naturalOffsetLimit bounds a natural posting time's offset: four minutes.
+// naturalOffsetLimit bounds the legacy default natural posting time offset: four minutes.
 const naturalOffsetLimit = 240
 
-// naturalOffset is a natural posting time's offset in seconds, within four
-// minutes either side. It is derived from the draft, its version and the base
-// instant, and stored with each post, so the same scheduling intent always
-// lands on the same instant across reloads, retries and recoveries.
-func naturalOffset(draftID string, version int, base time.Time) int {
+// defaultNaturalPostingWindowMinutes is the default randomization window for
+// new profiles: up to 10 minutes either side.
+const defaultNaturalPostingWindowMinutes = 10
+
+// naturalOffset is a natural posting time's offset in seconds, bounded by limit
+// (defaulting to naturalOffsetLimit when omitted). It is derived from the draft,
+// its version and the base instant, and stored with each post, so the same
+// scheduling intent always lands on the same instant across reloads and retries.
+func naturalOffset(draftID string, version int, base time.Time, limitSeconds ...int) int {
+	limit := naturalOffsetLimit
+	if len(limitSeconds) > 0 && limitSeconds[0] > 0 {
+		limit = limitSeconds[0]
+	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("natural-time:%s:%d:%d", draftID, version, base.Unix())))
-	return int(binary.BigEndian.Uint32(sum[:4])%(2*naturalOffsetLimit+1)) - naturalOffsetLimit
+	return int(binary.BigEndian.Uint32(sum[:4])%uint32(2*limit+1)) - limit
 }
 
 // AccountStanding is a display projection of verified connection capabilities.
@@ -259,6 +267,8 @@ type ContentDraftPost struct {
 	PublishedAt *time.Time `json:"publishedAt"`
 	// When it was deleted from its platform through Shots; it stays PUBLISHED.
 	DeletedAt *time.Time `json:"deletedAt"`
+	// Total links stripped when publishing to X without the x_links add-on.
+	XLinksStrippedCount int `json:"xLinksStrippedCount"`
 	// Each part of a requested delete, with its receipt.
 	Deletions []PostDeletionReceipt `json:"deletions"`
 }
@@ -331,7 +341,8 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		URL: postURL, Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
 		NaturalOffsetSeconds: post.NaturalOffsetSeconds, ScheduleMode: mode, ScheduleTimeZone: post.ScheduleTimeZone,
 		SlotAt: post.SlotAt, SocialSetID: post.SocialSetID, Automations: []PostAutomation{},
-		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt, Deletions: []PostDeletionReceipt{}}
+		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt, DeletedAt: post.DeletedAt,
+		XLinksStrippedCount: post.XLinksStrippedCount, Deletions: []PostDeletionReceipt{}}
 }
 
 // validateDraftTargets checks the shape of a schedule before any lookup.
@@ -743,6 +754,7 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID,
 		return nil, err
 	}
 	cancelled := make([]string, 0, len(live))
+	groupSamplePost := map[string]string{}
 	for _, post := range live {
 		if post.Status == scheduledpost.StatusPROCESSING || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
 			return nil, conflict("A post from this draft is publishing or may already be live. Check the channel before changing its schedule or review.")
@@ -763,7 +775,22 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID,
 			map[string]any{"contentDraftId": draftID, "reason": reason}); err != nil {
 			return nil, err
 		}
+		if post.PublishGroupID != nil && *post.PublishGroupID != "" {
+			if _, ok := groupSamplePost[*post.PublishGroupID]; !ok {
+				groupSamplePost[*post.PublishGroupID] = post.ID
+			}
+		}
 		cancelled = append(cancelled, post.ID)
+	}
+	groupIDs := make([]string, 0, len(groupSamplePost))
+	for groupID := range groupSamplePost {
+		groupIDs = append(groupIDs, groupID)
+	}
+	slices.Sort(groupIDs)
+	for _, groupID := range groupIDs {
+		if err := publishing.EmitPublishGroupSummary(ctx, tx, actor.OrganizationID, groupSamplePost[groupID]); err != nil {
+			return nil, err
+		}
 	}
 	return cancelled, nil
 }
@@ -993,6 +1020,7 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	}
 	result := &ScheduleContentDraftResult{Cancelled: cancelled, Created: true}
 	intent := scheduleIntent(input)
+	publishGroupID := cuid.New()
 	channelIDs := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		create := tx.ScheduledPost.Create()
@@ -1018,6 +1046,7 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			SetContentDraftID(draft.ID).SetChannelConnectionID(target.ChannelConnectionID).
 			SetSocialSetID(set.ID).SetScheduleMode(placement.mode).SetSlotAt(placement.base).
 			SetNaturalOffsetSeconds(placement.offset).SetScheduleTimeZone(placement.zone).SetScheduleIntent(intent).
+			SetPublishGroupID(publishGroupID).
 			SetScheduledFor(placement.at).SetStatus(scheduledpost.StatusSCHEDULED).
 			SetCaption(strings.TrimSpace(target.Caption)).
 			SetNillableScheduledByUserID(schedulerID(actor)).
@@ -1153,8 +1182,12 @@ func placeDraftSchedule(ctx context.Context, tx *ent.Tx, set *ent.SocialSet, dra
 	if input.NaturalPostingTime != nil {
 		natural = *input.NaturalPostingTime
 	}
+	limitSeconds := defaultNaturalPostingWindowMinutes * 60
+	if set != nil && set.NaturalPostingWindowMinutes >= 1 && set.NaturalPostingWindowMinutes <= 15 {
+		limitSeconds = set.NaturalPostingWindowMinutes * 60
+	}
 	if natural {
-		placement.offset = naturalOffset(draft.ID, input.Version, placement.base)
+		placement.offset = naturalOffset(draft.ID, input.Version, placement.base, limitSeconds)
 	}
 	placement.at = placement.base.Add(time.Duration(placement.offset) * time.Second)
 	if !placement.at.After(now.Add(30 * time.Second)) {
@@ -1166,7 +1199,7 @@ func placeDraftSchedule(ctx context.Context, tx *ent.Tx, set *ent.SocialSet, dra
 			return placement, invalid("Pick a time at least 30 seconds in the future.")
 		}
 		placement.offset = int(now.Add(31*time.Second).Sub(placement.base).Seconds()) + 1
-		if placement.offset > naturalOffsetLimit {
+		if placement.offset > limitSeconds {
 			return placement, invalid("Pick a later natural posting time.")
 		}
 		placement.at = placement.base.Add(time.Duration(placement.offset) * time.Second)

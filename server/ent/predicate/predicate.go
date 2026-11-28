@@ -507,8 +507,14 @@ type SurfaceCapture func(*sql.Selector)
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
 
+// UserAutomationEmailLog is the predicate function for userautomationemaillog builders.
+type UserAutomationEmailLog func(*sql.Selector)
+
 // UserPreference is the predicate function for userpreference builders.
 type UserPreference func(*sql.Selector)
+
+// VideoTranscodeJob is the predicate function for videotranscodejob builders.
+type VideoTranscodeJob func(*sql.Selector)
 
 // VoiceAudioRun is the predicate function for voiceaudiorun builders.
 type VoiceAudioRun func(*sql.Selector)
@@ -537,6 +543,9 @@ type WebhookDeliveryAttempt func(*sql.Selector)
 // WebhookSubscription is the predicate function for webhooksubscription builders.
 type WebhookSubscription func(*sql.Selector)
 
+// WorkspaceAddon is the predicate function for workspaceaddon builders.
+type WorkspaceAddon func(*sql.Selector)
+
 // WorkspaceCreditGrant is the predicate function for workspacecreditgrant builders.
 type WorkspaceCreditGrant func(*sql.Selector)
 
@@ -551,3 +560,6 @@ type WorkspaceGitHubInstallation func(*sql.Selector)
 
 // WorkspaceSettings is the predicate function for workspacesettings builders.
 type WorkspaceSettings func(*sql.Selector)
+
+// XLinkPostUsage is the predicate function for xlinkpostusage builders.
+type XLinkPostUsage func(*sql.Selector)

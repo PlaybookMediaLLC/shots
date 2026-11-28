@@ -8,20 +8,57 @@ import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { POST_COLUMN } from '@/components/drafts/layout'
 import { postRanges } from '@/components/drafts/thread'
+import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { Button } from '@/components/ui/button'
 import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handoff'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import type { DraftChannel } from '@/lib/write/document'
+import { filenameCaptionIfEligible } from '@/lib/write/filename-caption'
 import { attachmentsIn, insertAttachments, removeAttachment } from '@/lib/write/media-operations'
 import { DESTINATION_MEDIA, mediaProblems } from '@/lib/write/media-rules'
 import { MediaThumb } from './media-thumb'
 
 const RECENT_SHOWN = 6
 
+/**
+ * If the "Use file name as caption" preference is on and the draft currently
+ * has no text, inserts the first eligible video's filename stem verbatim.
+ */
+export function maybeFillFilenameCaption(
+  editor: PlateEditor,
+  candidates: readonly { fileName?: string | null; mimeType?: string | null }[],
+  enabled: boolean
+): void {
+  if (!enabled || candidates.length === 0) return
+  const currentCaption = editor.api.string([])
+  for (const candidate of candidates) {
+    const derived = filenameCaptionIfEligible({
+      currentCaption,
+      enabled,
+      fileName: candidate.fileName,
+      mimeType: candidate.mimeType,
+    })
+    if (derived) {
+      if (!editor.selection) editor.tf.select(editor.api.start([]))
+      editor.tf.insertText(derived)
+      return
+    }
+  }
+}
+
 /** Uploads files into the draft, as a drop or a picker does: the media plugin takes a FileList. */
-export async function uploadFiles(editor: PlateEditor, files: File[]) {
+export async function uploadFiles(
+  editor: PlateEditor,
+  files: File[],
+  options?: { useFilenameAsCaption?: boolean }
+) {
+  maybeFillFilenameCaption(
+    editor,
+    files.map((file) => ({ fileName: file.name, mimeType: file.type })),
+    Boolean(options?.useFilenameAsCaption)
+  )
   const { PlaceholderPlugin } = await import('@shots/platejs-editor/@platejs/media/react')
   if (!editor.selection) editor.tf.select(editor.api.end([]))
   const list = new DataTransfer()
@@ -159,6 +196,7 @@ function AddMedia({
 }) {
   const trpc = useTRPC()
   const client = useTRPCClient()
+  const useFilenameAsCaption = usePreferences().preferences?.useFilenameAsCaption ?? false
   const [attaching, setAttaching] = React.useState<string | null>(null)
   const recent = useQuery(
     trpc.asset.list.queryOptions({ limit: 24, sort: 'newest', type: 'all' }, { staleTime: 30_000 })
@@ -172,13 +210,18 @@ function AddMedia({
     )
     .slice(0, RECENT_SHOWN)
 
-  const upload = (files: File[]) => uploadFiles(editor, files)
+  const upload = (files: File[]) => uploadFiles(editor, files, { useFilenameAsCaption })
 
-  async function attach(asset: { id: string; mediaType: string }) {
+  async function attach(asset: { fileName?: string | null; id: string; mediaType: string }) {
     setAttaching(asset.id)
     try {
       // The asset may have been deleted since the list loaded; the server has the final word.
       await client.asset.signDownload.query({ assetId: asset.id })
+      maybeFillFilenameCaption(
+        editor,
+        [{ fileName: asset.fileName, mimeType: asset.mediaType }],
+        useFilenameAsCaption
+      )
       insertAttachments(editor, [draftAssetNode(asset)])
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'This asset is no longer available.')

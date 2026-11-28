@@ -1,6 +1,8 @@
 import 'server-only'
 
 import {
+  type ApiKeyOnlyAccessRequirement,
+  apiKeyOnlyAccessRequirementSchema,
   type MemberAccessRequirement,
   memberAccessRequirementSchema,
   type OrganizationAccessOptions,
@@ -26,6 +28,7 @@ import {
   type SessionAccess,
   type TenantContext,
 } from '@/lib/auth/access'
+import { requireOrganizationApiKey } from '@/lib/auth/api-keys'
 import type { Permission } from '@/lib/auth/permissions'
 import { requireTenantAccess } from '@/lib/tenant/access'
 import {
@@ -156,5 +159,22 @@ export function paidSessionAccess(
       Boolean(options.sensitive),
       (context) => requireWorkspaceFeature(context, 'workspace:paid')
     )
+  }
+}
+
+/**
+ * Any valid, enabled organization API key (no specific scope required), on an
+ * operational workspace with `workspace:use` and any optional feature/quota.
+ * Browser sessions without `X-API-Key` are refused with 403.
+ */
+export function apiKeyOnlyAccess(
+  requirement: ApiKeyOnlyAccessRequirement
+): Authenticate<TenantContext> {
+  const { feature, quota } = apiKeyOnlyAccessRequirementSchema.parse(requirement)
+  return async ({ request }) => {
+    const access = await requireOrganizationApiKey(request.headers)
+    await requireWorkspaceFeatures(access, feature ? ['workspace:use', feature] : ['workspace:use'])
+    if (quota) await consumeWorkspaceQuota(access, quota)
+    return access
   }
 }

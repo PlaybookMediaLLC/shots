@@ -17,9 +17,9 @@ import (
 )
 
 type Mailer struct {
-	APIKey, From, BaseURL, SigningSecret, PostalAddress string
-	HTTP                                                *http.Client
-	Endpoint                                            string
+	APIKey, From, BaseURL, SigningSecret, AutomationSigningSecret, PostalAddress string
+	HTTP                                                                         *http.Client
+	Endpoint                                                                     string
 }
 type Message struct{ OrganizationID, Product, Title, Benefit, Body, CTA, RecipientID, Email string }
 

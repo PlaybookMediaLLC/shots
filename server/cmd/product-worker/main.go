@@ -85,7 +85,11 @@ func main() {
 	}
 	tenantObjects := media.NewTenantObjects(objectStore)
 	// The social Ent projection and canonical scheduled_post share the worker DB pool.
-	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects)
+	xLinkStore := product.NewConfiguration(db.Client)
+	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects).
+		WithXLinkPolicy(xLinkPolicyAdapter{store: xLinkStore}).
+		WithXLinkRecorder(repository).
+		WithReconnectNotifier(repository.EmitConnectionNeedsReconnect)
 	activities := temporalpublishing.NewActivities(repository, provider)
 	scheduler := temporalpublishing.NewScheduler(temporalClient, temporalpublishing.SchedulerConfig{
 		ActivityTaskQueue: cfg.ActivityTaskQueue, ActivityTimeout: cfg.ActivityTimeout,
@@ -351,7 +355,7 @@ func main() {
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),
 			Webhooks:   webhooks.NewDispatcher(db.SQL, cfg.WebhookEncryptionKey),
-			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, PostalAddress: cfg.CompanyPostalAddress},
+			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, AutomationSigningSecret: config.EmailUnsubscribeSecret(), PostalAddress: cfg.CompanyPostalAddress},
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
 			BackgroundActivityContext:          ctx,

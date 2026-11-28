@@ -107,6 +107,7 @@ func (ContentBatchItem) Fields() []ent.Field {
 		field.JSON("timing", BatchTiming{}).StorageKey("timing"),
 		field.JSON("grid", &BatchGrid{}).StorageKey("grid").Optional(),
 		field.String("draft_id").StorageKey("draftId").Optional().Nillable(),
+		field.Bool("process_videos_on_server").StorageKey("processVideosOnServer").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

@@ -41,6 +41,8 @@ const SETTINGS_COVERAGE = new Map<string, string>([
   ['brand', '/docs/features/settings-brand'],
   ['product', '/docs/features/settings-brand'],
   ['surfaces', '/docs/features/settings-brand'],
+  ['queue-schedule', '/docs/features/settings-publishing'],
+  ['publishing-preferences', '/docs/features/settings-publishing'],
   ['sharing', '/docs/features/settings-brand'],
   ['social-sets', '/docs/features/settings-publishing'],
   ['channels', '/docs/features/settings-publishing'],

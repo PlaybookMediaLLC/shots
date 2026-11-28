@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { permissionsForApiKeyScopes } from '@/lib/auth/api-key-scopes'
+import { z } from 'zod'
+import { permissionsForApiKeyScopes, scopesFromPermissions } from '@/lib/auth/api-key-scopes'
 import { auth } from '@/lib/auth/server'
 import { backendSDK, serviceBackend, withDates } from '@/lib/backend/sdk'
 import {
@@ -12,17 +13,45 @@ import { organizationProcedure } from '../procedures'
 
 const dayInSeconds = 24 * 60 * 60
 
-/** An agent connected through OAuth keeps its client's name in the key metadata (RFC 026). */
-function agentClientOf(metadata: unknown): string | null {
+const agentKeyMetadataSchema = z.object({
+  clientId: z.string().trim().nullish(),
+  clientName: z.string().trim().nullish(),
+  grantId: z.string().trim().nullish(),
+  source: z.literal('agent'),
+})
+
+const revokeAgentClientInputSchema = z
+  .object({
+    clientId: z.string().trim().max(200).optional(),
+    clientName: z.string().trim().max(200).optional(),
+  })
+  .refine((value) => Boolean(value.clientId || value.clientName), {
+    message: 'Specify the connected agent to revoke.',
+  })
+
+/** Structured OAuth session identity stored on agent-issued workspace keys (RFC 026). */
+export type AgentSessionInfo = {
+  clientId: string
+  clientName: string
+  grantId: string | null
+}
+
+/** An agent connected through OAuth keeps its client's identity in key metadata (RFC 026). */
+function agentSessionOf(metadata: unknown): AgentSessionInfo | null {
   try {
-    const parsed: unknown = typeof metadata === 'string' ? JSON.parse(metadata) : metadata
-    if (parsed && typeof parsed === 'object' && 'source' in parsed && parsed.source === 'agent') {
-      return 'clientName' in parsed && typeof parsed.clientName === 'string' ? parsed.clientName : 'AI agent'
+    const raw: unknown = typeof metadata === 'string' ? JSON.parse(metadata) : metadata
+    const parsed = agentKeyMetadataSchema.safeParse(raw)
+    if (!parsed.success) return null
+    const clientName = parsed.data.clientName || 'AI agent'
+    return {
+      clientId: parsed.data.clientId || '',
+      clientName,
+      grantId: parsed.data.grantId || null,
     }
   } catch {
     // Metadata Better Auth wrote for other keys is not ours to read.
+    return null
   }
-  return null
 }
 
 export const apiKeyRouter = router({
@@ -30,7 +59,18 @@ export const apiKeyRouter = router({
     const { rows } = await serviceBackend().authStore({
       model: 'apikey',
       op: 'findMany',
-      select: ['createdAt', 'enabled', 'expiresAt', 'id', 'lastRequest', 'metadata', 'name', 'prefix', 'start'],
+      select: [
+        'createdAt',
+        'enabled',
+        'expiresAt',
+        'id',
+        'lastRequest',
+        'metadata',
+        'name',
+        'permissions',
+        'prefix',
+        'start',
+      ],
       sortBy: { direction: 'desc', field: 'createdAt' },
       where: [{ field: 'referenceId', value: ctx.access.organizationId }],
     })
@@ -44,10 +84,19 @@ export const apiKeyRouter = router({
         lastRequest: string | null
         metadata: unknown
         name: string | null
+        permissions: unknown
         prefix: string | null
         start: string | null
       }[]
-    ).map(({ metadata, ...key }) => ({ ...key, agentClient: agentClientOf(metadata) }))
+    ).map(({ metadata, permissions, ...key }) => {
+      const agentSession = agentSessionOf(metadata)
+      return {
+        ...key,
+        agentClient: agentSession?.clientName ?? null,
+        agentSession,
+        scopes: scopesFromPermissions(permissions),
+      }
+    })
     return { keys }
   }),
   create: organizationProcedure('brand:manage')
@@ -90,4 +139,7 @@ export const apiKeyRouter = router({
       }
       return { success: true as const }
     }),
+  revokeAgentClient: organizationProcedure('brand:manage')
+    .input(revokeAgentClientInputSchema)
+    .mutation(async ({ ctx, input }) => backendSDK(ctx.access).revokeAgentClient(input)),
 })

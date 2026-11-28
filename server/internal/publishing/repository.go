@@ -405,6 +405,9 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 		if err := reopenCancelledDraft(ctx, tx, post); err != nil {
 			return nil, err
 		}
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -804,6 +807,12 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	}); err != nil {
 		return err
 	}
+	if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "unknown_delivery", "", FailureUnknownDelivery); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -878,10 +887,19 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 	}); err != nil {
 		return err
 	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+		return err
+	}
 	if inApp {
+		if err := EmitPostCompleted(ctx, tx, live.OrganizationID, live.ID, "sent_to_app", providerPostID, ""); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 	if err := EmitDraftPublished(ctx, tx, live, providerPostID); err != nil {
+		return err
+	}
+	if err := EmitPostCompleted(ctx, tx, live.OrganizationID, live.ID, "published", providerPostID, ""); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -952,6 +970,14 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 	if err != nil {
 		return err
 	}
+	if !retry {
+		if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "failed", "", failureCode); err != nil {
+			return err
+		}
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -979,6 +1005,9 @@ func (r *Repository) CancelIneligible(ctx context.Context, post *ent.ScheduledPo
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"reason": reason},
 	}); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1009,6 +1038,16 @@ func (r *Repository) FailUnsent(ctx context.Context, post *ent.ScheduledPost, co
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": code, "sent": false},
 	}); err != nil {
+		return err
+	}
+	completedStatus := "failed"
+	if code == FailureMissedWindow {
+		completedStatus = "missed_window"
+	}
+	if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, completedStatus, "", code); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1081,12 +1120,21 @@ func (r *Repository) ReleaseStalled(ctx context.Context, postID, runID string) (
 	}
 	// Only a post that may be live needs a person; a requeue is audit only.
 	if open != nil {
-		err = recordPostActivity(ctx, tx, action, audit)
+		if err := recordPostActivity(ctx, tx, action, audit); err != nil {
+			return "", err
+		}
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return "", err
+		}
 	} else {
-		err = AppendAudit(ctx, tx, audit)
+		if err := AppendAudit(ctx, tx, audit); err != nil {
+			return "", err
+		}
 	}
-	if err != nil {
-		return "", err
+	if open != nil {
+		if err := EmitPostCompleted(ctx, tx, post.OrganizationID, post.ID, "unknown_delivery", "", FailureUnknownDelivery); err != nil {
+			return "", err
+		}
 	}
 	return outcome, tx.Commit()
 }
@@ -1210,4 +1258,29 @@ func (r *Repository) RecordAutomation(ctx context.Context, postID, key, status, 
 	}
 	changed, err := update.Save(ctx)
 	return changed > 0, err
+}
+
+// RecordXLinkOutcome records stripped-link counts on the scheduled post and
+// its open publication attempt, plus whether an X link add-on slot was used.
+func (r *Repository) RecordXLinkOutcome(ctx context.Context, scheduledPostID string, linksStripped int, quotaConsumed bool) error {
+	if scheduledPostID == "" || (linksStripped <= 0 && !quotaConsumed) {
+		return nil
+	}
+	if linksStripped > 0 {
+		if err := r.client.ScheduledPost.Update().
+			Where(scheduledpost.ID(scheduledPostID)).
+			AddXLinksStrippedCount(linksStripped).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+	attemptUpdate := r.client.PublicationAttempt.Update().
+		Where(publicationattempt.ScheduledPostID(scheduledPostID), publicationattempt.CompletedAtIsNil())
+	if linksStripped > 0 {
+		attemptUpdate.AddLinksStrippedCount(linksStripped)
+	}
+	if quotaConsumed {
+		attemptUpdate.SetXLinkQuotaConsumed(true)
+	}
+	return attemptUpdate.Exec(ctx)
 }

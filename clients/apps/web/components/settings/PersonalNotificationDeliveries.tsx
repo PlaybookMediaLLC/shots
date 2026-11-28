@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
@@ -101,9 +102,7 @@ export function PersonalNotificationDeliveries({
                   {delivery.decisionCode === 'REQUIRED_FAILURE_ALERT'
                     ? 'Required failure alert · '
                     : ''}
-                  <time dateTime={delivery.createdAt}>
-                    {new Date(delivery.createdAt).toLocaleString()}
-                  </time>
+                  <LocalTime options={WHEN_STYLE} value={delivery.createdAt} />
                 </p>
                 <p className="break-all text-xs text-muted-foreground">Reference: {delivery.id}</p>
                 {['BLOCKED', 'UNCERTAIN', 'DEAD'].includes(delivery.status) ? (

@@ -181,6 +181,7 @@ import type {
   Engagement,
   ExperimentState,
   PublicProfile,
+  RevokeAllSessionsResult,
   SocialAccountHealth,
   SocialSet,
   SocialSetInput,
@@ -188,11 +189,13 @@ import type {
   SocialSetRemoval,
   SocialSetUpdate,
   StyleGuide,
+  UpdateWorkspacePublishingSettingsInput,
   UserPreferences,
   UserPreferencesUpdate,
   Webhook,
   WebhookDelivery,
   WebhookWithSecret,
+  WeeklyGoalProgress,
   WritingContext,
   WritingSample,
 } from './settings-platform.js'
@@ -710,6 +713,12 @@ export type WorkspaceSettings = {
   aiProviderKeyHint?: string | null
   /** Missing on older backends; treat as disabled during an additive rollout. */
   releaseReadinessEnabled?: boolean
+  /** Optional weekly post target (1..1000); null when cleared. */
+  weeklyPostingGoal?: number | null
+  /** When true, videos are normalized server-side for new posts; when false, originals pass through. */
+  processVideosOnServer?: boolean
+  /** Read-only server capability flag indicating whether the video worker is configured. */
+  videoProcessingAvailable?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -729,7 +738,12 @@ export type BackendBootstrapSnapshot = {
   organizations: ListedWorkspace[]
   role: string
   settings: Pick<WorkspaceSettings, 'locale' | 'timeZone' | 'defaultPublishTime'> | null
-  entitlements: { features: Record<string, boolean>; plan: string; status: string }
+  entitlements: {
+    addons?: BackendWorkspaceAddonsSummary
+    features: Record<string, boolean>
+    plan: string
+    status: string
+  }
   capabilities: {
     /** Whether AI agent runs are allowed in this workspace (the kill switch). */
     aiAgent: boolean
@@ -1385,6 +1399,8 @@ export type BackendContentDraftPost = {
   /** Why it did not publish (a provider status or a code such as `MEDIA_UNAVAILABLE`), and when its provider confirmed it. */
   failureCode?: string | null
   publishedAt?: string | null
+  /** Total links stripped when publishing to X without the x_links add-on. */
+  xLinksStrippedCount?: number
 }
 
 /** One channel of a draft schedule and the caption serialized for it. */
@@ -1798,7 +1814,25 @@ export type BackendCreativeApproval = {
   variantId: string
 }
 
+export type BackendXLinksAddonSummary = {
+  cancelsAt: string | null
+  enabled: boolean
+  limit: number | null
+  nextSlotAt: string | null
+  priceMonthlyUsd: number
+  remaining: number | null
+  status: 'active' | 'canceling' | 'off' | 'past_due' | 'paused'
+  used: number
+  windowDays: number
+}
+
+export type BackendWorkspaceAddonsSummary = {
+  xLinks: BackendXLinksAddonSummary
+}
+
 export type BackendEntitlementSummary = {
+  /** Paid workspace add-ons (starting with Links in X posts). An older backend omits it. */
+  addons?: BackendWorkspaceAddonsSummary
   /** Each monthly quota the plan includes; 0 while the plan does not stand. An older backend omits it. */
   allowances?: Record<string, number>
   /** What is left of the workspace's purchased credit packs. */
@@ -2025,8 +2059,25 @@ export type BackendEntitlementSync = {
   organizationId: string
   plan: 'business' | 'enterprise' | 'free' | 'pro'
   provider: string
-  status: 'active' | 'cancelled' | 'past_due' | 'suspended' | 'trialing'
+  status: 'active' | 'cancelled' | 'past_due' | 'paused' | 'suspended' | 'trialing'
   validUntil?: Date | null
+}
+
+/** A billing provider event for a workspace add-on (such as x_links). */
+export type BackendAddonSync = {
+  addonKey: 'x_links'
+  cancelAtPeriodEnd: boolean
+  currentPeriodEnd?: Date | null
+  currentPeriodStart?: Date | null
+  eventId: string
+  eventType: string
+  expectedVersion: number
+  externalSubscriptionId?: string | null
+  graceUntil?: Date | null
+  organizationId: string
+  provider: string
+  quotaLimit?: number | null
+  status: 'active' | 'canceled' | 'past_due' | 'paused'
 }
 
 export type BackendWorkspaceEntitlement = {
@@ -3482,6 +3533,41 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /**
+   * Atomically revokes every OAuth agent-issued key belonging to one connected
+   * agent client in the active workspace, leaving manual REST/CLI keys intact.
+   */
+  async revokeAgentClient(input: { clientId?: string; clientName?: string }) {
+    return this.request<{ revokedCount: number; revokedKeyIds: string[] }>(
+      'v1/agent-authorizations/revoke-client',
+      {
+        body: input,
+        method: 'POST',
+      }
+    )
+  }
+
+  /**
+   * Returns redacted metadata about the calling API key and its workspace.
+   */
+  async getCurrentAPIKeyInfo() {
+    return this.request<{
+      key: {
+        expiresAt: string | null
+        id: string
+        name: string | null
+        prefix: string | null
+        scopes: string[]
+        start: string | null
+      }
+      workspace: {
+        id: string
+        name: string
+        slug: string
+      }
+    }>('v1/api-keys/me')
+  }
+
   /** The review queue: posts waiting for a reviewer's decision, oldest first. */
   async listPendingApprovals(options: { cursor?: string; limit: number }) {
     const parameters = new URLSearchParams({ limit: String(options.limit) })
@@ -4371,6 +4457,22 @@ export class ScreenshotStudioBackendSDK {
     return this.request<AccountDeletionStatus>('v1/me/account-deletion', { method: 'DELETE' })
   }
 
+  /** Revokes all browser sessions and OAuth tokens for the signed-in person. */
+  async revokeAllSessions() {
+    return this.request<RevokeAllSessionsResult>('v1/me/sessions/revoke-all', {
+      body: {},
+      method: 'POST',
+    })
+  }
+
+  /** Unsubscribes a user from automation emails using a signed HMAC token. */
+  async unsubscribeAutomationEmails(token: string) {
+    return this.request<{ unsubscribed: true }>('v1/internal/email/unsubscribe', {
+      body: { token },
+      method: 'POST',
+    })
+  }
+
   async listExperiments() {
     return this.request<{ items: ExperimentState[] }>('v1/experiments')
   }
@@ -4407,7 +4509,11 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     input: Pick<
       SocialSetUpdate,
-      'baseVersion' | 'timeZone' | 'postingSlots' | 'naturalPostingTimes'
+      | 'baseVersion'
+      | 'timeZone'
+      | 'postingSlots'
+      | 'naturalPostingTimes'
+      | 'naturalPostingWindowMinutes'
     >
   ) {
     return this.request<SocialSet>(`v1/social-sets/${encodeURIComponent(id)}/queue`, {
@@ -5174,7 +5280,8 @@ export class ScreenshotStudioBackendSDK {
     )
     if (response.headers.get('content-type')?.includes('application/json')) {
       const payload = (await response.json()) as { base64?: string }
-      return Buffer.from(payload.base64 ?? '', 'base64')
+      const decoded = atob(payload.base64 ?? '')
+      return Uint8Array.from(decoded, (char) => char.charCodeAt(0))
     }
     return new Uint8Array(await response.arrayBuffer())
   }
@@ -5870,6 +5977,14 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Facade-only: applies a billing add-on event once, at the version it expects. */
+  async syncWorkspaceAddon(input: BackendAddonSync) {
+    return this.request<{ replayed: boolean; version: number }>('v1/internal/billing/addons', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
   /** Facade-only: adds a paid AI credit pack once per provider reference. */
   async grantWorkspaceCredits(input: BackendCreditGrant) {
     return this.request<{ balance: number; replayed: boolean }>(
@@ -6264,6 +6379,20 @@ export class ScreenshotStudioBackendSDK {
       body: input,
       method: 'PUT',
     })
+  }
+
+  /** Updates workspace-level publishing preferences (weekly goal and server video processing). */
+  async updateWorkspacePublishingSettings(input: UpdateWorkspacePublishingSettingsInput) {
+    return this.request<WorkspaceMutation>('v1/workspace/publishing-settings', {
+      body: input,
+      method: 'PUT',
+    })
+  }
+
+  /** Current-week publishing progress against the workspace weekly posting goal. */
+  async getWeeklyGoalProgress(weekStart?: 'monday' | 'sunday') {
+    const query = weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : ''
+    return this.request<WeeklyGoalProgress>(`v1/workspace/weekly-goal-progress${query}`)
   }
 
   /** Server-only: decrypts the workspace's BYOK OpenRouter API key for assistant turns. */

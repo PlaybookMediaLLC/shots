@@ -36,6 +36,13 @@ func (f *platformControlsFake) SyncWorkspaceEntitlement(_ context.Context, input
 	return &product.EntitlementSyncResult{Version: input.ExpectedVersion + 1}, nil
 }
 
+func (f *platformControlsFake) SyncWorkspaceAddon(_ context.Context, input product.AddonSyncInput) (*product.AddonSyncResult, error) {
+	if input.ExpectedVersion == 99 {
+		return nil, product.EntitlementConflictError{Current: 4}
+	}
+	return &product.AddonSyncResult{Version: input.ExpectedVersion + 1}, nil
+}
+
 func (f *platformControlsFake) GrantWorkspaceCredits(_ context.Context, input product.CreditGrantInput) (*product.CreditGrantResult, error) {
 	if input.Credits <= 0 {
 		return nil, product.ErrInvalidInput
@@ -67,6 +74,20 @@ func TestOutboxReplayAndBillingSyncAreServiceOnly(t *testing.T) {
 	}
 	if response := post("/v1/internal/billing/entitlements", "secret", billing); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"version":3`) {
 		t.Fatalf("billing sync %d %s", response.Code, response.Body.String())
+	}
+	addon := `{"addonKey":"x_links","eventId":"e2","eventType":"t","expectedVersion":1,"organizationId":"org-1","provider":"stripe","status":"active"}`
+	if code := post("/v1/internal/billing/addons", "wrong", addon).Code; code != http.StatusUnauthorized {
+		t.Fatalf("unsigned addon sync status %d", code)
+	}
+	if code := post("/v1/internal/billing/addons", "secret", `{invalid`).Code; code != http.StatusBadRequest {
+		t.Fatalf("invalid json addon sync status %d", code)
+	}
+	if response := post("/v1/internal/billing/addons", "secret", addon); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"version":2`) {
+		t.Fatalf("addon sync %d %s", response.Code, response.Body.String())
+	}
+	addonConflict := `{"addonKey":"x_links","eventId":"e3","eventType":"t","expectedVersion":99,"organizationId":"org-1","provider":"stripe","status":"active"}`
+	if response := post("/v1/internal/billing/addons", "secret", addonConflict); response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"currentVersion":4`) {
+		t.Fatalf("addon conflict %d %s", response.Code, response.Body.String())
 	}
 	grant := `{"credits":500,"organizationId":"org-1","provider":"stripe","reference":"cs_1"}`
 	if code := post("/v1/internal/billing/credit-grants", "wrong", grant).Code; code != http.StatusUnauthorized {

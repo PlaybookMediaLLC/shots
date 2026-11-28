@@ -180,7 +180,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/supportaccessgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userautomationemaillog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/videotranscodejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
@@ -190,11 +192,13 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdeliveryattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceaddon"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacecreditgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacegithubinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/xlinkpostusage"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -422,7 +426,9 @@ func checkColumn(t, c string) error {
 			supportaccessgrant.Table:              supportaccessgrant.ValidColumn,
 			surfacecapture.Table:                  surfacecapture.ValidColumn,
 			user.Table:                            user.ValidColumn,
+			userautomationemaillog.Table:          userautomationemaillog.ValidColumn,
 			userpreference.Table:                  userpreference.ValidColumn,
+			videotranscodejob.Table:               videotranscodejob.ValidColumn,
 			voiceaudiorun.Table:                   voiceaudiorun.ValidColumn,
 			voicecommand.Table:                    voicecommand.ValidColumn,
 			voicemembersettings.Table:             voicemembersettings.ValidColumn,
@@ -432,11 +438,13 @@ func checkColumn(t, c string) error {
 			webhookdelivery.Table:                 webhookdelivery.ValidColumn,
 			webhookdeliveryattempt.Table:          webhookdeliveryattempt.ValidColumn,
 			webhooksubscription.Table:             webhooksubscription.ValidColumn,
+			workspaceaddon.Table:                  workspaceaddon.ValidColumn,
 			workspacecreditgrant.Table:            workspacecreditgrant.ValidColumn,
 			workspacedeletion.Table:               workspacedeletion.ValidColumn,
 			workspaceentitlement.Table:            workspaceentitlement.ValidColumn,
 			workspacegithubinstallation.Table:     workspacegithubinstallation.ValidColumn,
 			workspacesettings.Table:               workspacesettings.ValidColumn,
+			xlinkpostusage.Table:                  xlinkpostusage.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

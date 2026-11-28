@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // UserPreference is one person's preferences (RFC 024), keyed by the person
@@ -32,10 +33,42 @@ func (UserPreference) Fields() []ent.Field {
 		field.Bool("show_scrollbars").StorageKey("showScrollbars").Default(true),
 		field.Bool("developer_mode").StorageKey("developerMode").Default(false),
 		field.Bool("email_notifications").StorageKey("emailNotifications").Default(true),
+		field.Bool("automation_emails").StorageKey("automationEmails").Default(true),
+		field.Bool("post_failure_alerts").StorageKey("postFailureAlerts").Default(true),
+		field.Bool("post_summary_emails").StorageKey("postSummaryEmails").Default(false),
+		field.Bool("use_filename_as_caption").StorageKey("useFilenameAsCaption").Default(false),
 		field.JSON("dismissed_tips", []string{}).StorageKey("dismissedTips").Default([]string{}),
 		field.JSON("experiments", map[string]bool{}).StorageKey("experiments").Default(map[string]bool{}),
 		field.Int("version").StorageKey("version").Default(1),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
+	}
+}
+
+// UserAutomationEmailLog records sent lifecycle reminder emails so each user
+// receives at most one reminder per workspace, kind, and cooldown window.
+type UserAutomationEmailLog struct{ ent.Schema }
+
+func (UserAutomationEmailLog) Annotations() []schema.Annotation {
+	return []schema.Annotation{entsql.Annotation{Table: "user_automation_email_log"}}
+}
+
+func (UserAutomationEmailLog) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("id").StorageKey("id").Immutable(),
+		field.String("user_id").StorageKey("userId").Immutable(),
+		field.String("organization_id").StorageKey("organizationId").Immutable(),
+		field.String("kind").StorageKey("kind").Immutable(),
+		field.String("window_key").StorageKey("windowKey").Immutable(),
+		field.String("provider_receipt").StorageKey("providerReceipt").Default(""),
+		field.String("status").StorageKey("status").Default("SENT"),
+		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
+	}
+}
+
+func (UserAutomationEmailLog) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("user_id", "organization_id", "kind", "window_key").Unique(),
+		index.Fields("user_id", "kind", "created_at"),
 	}
 }
 

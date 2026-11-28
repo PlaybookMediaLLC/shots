@@ -60,6 +60,8 @@ type ContentDraft struct {
 	PrimaryPlatform *string `json:"primary_platform,omitempty"`
 	// NaturalPostingTime holds the value of the "natural_posting_time" field.
 	NaturalPostingTime bool `json:"natural_posting_time,omitempty"`
+	// ProcessVideosOnServer holds the value of the "process_videos_on_server" field.
+	ProcessVideosOnServer *bool `json:"process_videos_on_server,omitempty"`
 	// Engagement holds the value of the "engagement" field.
 	Engagement schema.Engagement `json:"engagement,omitempty"`
 	// PlannedFor holds the value of the "planned_for" field.
@@ -114,7 +116,7 @@ func (*ContentDraft) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case contentdraft.FieldBody, contentdraft.FieldAssetIds, contentdraft.FieldChannelConnectionIds, contentdraft.FieldDiscussions, contentdraft.FieldChannelText, contentdraft.FieldGuestComments, contentdraft.FieldEngagement, contentdraft.FieldTarget, contentdraft.FieldPlatformVersions, contentdraft.FieldArticle, contentdraft.FieldTagIds, contentdraft.FieldCollabState:
 			values[i] = new([]byte)
-		case contentdraft.FieldNaturalPostingTime, contentdraft.FieldSuppressSlackOnPublish:
+		case contentdraft.FieldNaturalPostingTime, contentdraft.FieldProcessVideosOnServer, contentdraft.FieldSuppressSlackOnPublish:
 			values[i] = new(sql.NullBool)
 		case contentdraft.FieldApprovedVersion, contentdraft.FieldCalendarVersion, contentdraft.FieldVersion, contentdraft.FieldCollabGeneration:
 			values[i] = new(sql.NullInt64)
@@ -280,6 +282,13 @@ func (_m *ContentDraft) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field natural_posting_time", values[i])
 			} else if value.Valid {
 				_m.NaturalPostingTime = value.Bool
+			}
+		case contentdraft.FieldProcessVideosOnServer:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field process_videos_on_server", values[i])
+			} else if value.Valid {
+				_m.ProcessVideosOnServer = new(bool)
+				*_m.ProcessVideosOnServer = value.Bool
 			}
 		case contentdraft.FieldEngagement:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -540,6 +549,11 @@ func (_m *ContentDraft) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("natural_posting_time=")
 	builder.WriteString(fmt.Sprintf("%v", _m.NaturalPostingTime))
+	builder.WriteString(", ")
+	if v := _m.ProcessVideosOnServer; v != nil {
+		builder.WriteString("process_videos_on_server=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("engagement=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Engagement))

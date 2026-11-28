@@ -48,6 +48,10 @@ type poster interface {
 	Post(context.Context, string, string, []integrations.PostDetails, *socialent.Integration) ([]integrations.PostResponse, error)
 }
 
+// ReconnectNotifier receives a channel's social organization ID, integration
+// ID, and cause whenever its credentials flip to needing reconnection.
+type ReconnectNotifier func(ctx context.Context, goOrganizationID, integrationID, reason string) error
+
 type Publisher struct {
 	bindings     BindingLookup
 	integrations IntegrationLookup
@@ -55,11 +59,30 @@ type Publisher struct {
 	resolve      func(string) poster
 	now          func() time.Time
 	// channels and refresh renew expiring credentials (RefreshSocialTokens).
-	channels *socialent.Client
-	refresh  *socialintegration.RefreshIntegrationService
+	channels          *socialent.Client
+	refresh           *socialintegration.RefreshIntegrationService
+	reconnectNotifier ReconnectNotifier
 
 	refreshMu       sync.Mutex
 	refreshCooldown map[string]refreshBackoff
+	xLinks          XLinkPolicy
+	xLinkRecorder   XLinkOutcomeRecorder
+}
+
+// WithReconnectNotifier attaches a callback invoked once whenever a social
+// account transitions to needing reconnection.
+func (p *Publisher) WithReconnectNotifier(notifier ReconnectNotifier) *Publisher {
+	p.reconnectNotifier = notifier
+	return p
+}
+
+func (p *Publisher) notifyReconnect(ctx context.Context, account *socialent.Integration, reason string) {
+	if p.reconnectNotifier == nil || account == nil {
+		return
+	}
+	if err := p.reconnectNotifier(ctx, account.OrganizationID, account.ID, reason); err != nil {
+		slog.WarnContext(ctx, "could not emit connection.needs_reconnect webhook", "integration_id", account.ID, "error", err)
+	}
 }
 
 func New(bindings BindingLookup, socialClient *socialent.Client, signer MediaSigner, lifecycle ...managedslack.Lifecycle) *Publisher {
@@ -181,7 +204,12 @@ func (p *Publisher) requireReconnect(ctx context.Context, account *socialent.Int
 	if p.refresh == nil || account == nil {
 		return
 	}
-	if err := p.refresh.RequireReconnect(ctx, account); err != nil && !errors.Is(err, socialintegration.ErrRefreshChanged) {
+	err := p.refresh.RequireReconnect(ctx, account)
+	if err == nil {
+		p.notifyReconnect(ctx, account, "credentials_rejected")
+		return
+	}
+	if !errors.Is(err, socialintegration.ErrRefreshChanged) {
 		slog.WarnContext(ctx, "could not flag a channel for reconnection", "integration_id", account.ID, "error", err)
 	}
 }
@@ -349,13 +377,50 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		// Images are now in the article body; do not append them a second time.
 		media = nil
 	}
+	isArticle := (input.Options != nil && input.Options.ArticleHTML != "") || isXArticleSettings(settings)
+	var preparedX preparedXText
+	var preparedReplies []preparedXText
+	refundAllPrepared := func() {
+		if preparedX.refund != nil {
+			preparedX.refund()
+		}
+		for _, pr := range preparedReplies {
+			if pr.refund != nil {
+				pr.refund()
+			}
+		}
+	}
+	if !isArticle {
+		partKey := "root"
+		if input.ReplyTo != "" {
+			partKey = "resume"
+		}
+		preparedX, err = p.prepareXText(ctx, input.Platform, input.OrganizationID, input.PostID, partKey, input.PostID+":"+partKey, message, len(media) > 0)
+		if err != nil {
+			return socialapi.Receipt{}, err
+		}
+		message = preparedX.text
+		if isXPlatform(input.Platform) && len(input.Replies) > 0 {
+			preparedReplies = make([]preparedXText, len(input.Replies))
+			for idx, reply := range input.Replies {
+				rPartKey := fmt.Sprintf("reply:%d", idx+1)
+				pr, replyErr := p.prepareXText(ctx, input.Platform, input.OrganizationID, input.PostID, rPartKey, input.PostID+":"+rPartKey, reply.Caption, len(reply.Assets) > 0)
+				if replyErr != nil {
+					refundAllPrepared()
+					return socialapi.Receipt{}, replyErr
+				}
+				preparedReplies[idx] = pr
+			}
+		}
+	}
 	details := []integrations.PostDetails{{
-		ID: input.PostID, Message: message, Settings: settings, Media: media, Poll: pollFor(input.Poll, input.Options),
+		ID: input.PostID, Message: message, PlainText: preparedX.plainText, Settings: settings, Media: media, Poll: pollFor(input.Poll, input.Options),
 	}}
 	var response []integrations.PostResponse
 	if input.ReplyTo != "" {
 		commenter, ok := provider.(integrations.Commenter)
 		if !ok {
+			refundAllPrepared()
 			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, "this provider cannot continue a thread")
 		}
 		response, err = commenter.Comment(ctx, account.InternalID, input.ReplyTo, "", account.Token, details, account)
@@ -373,11 +438,13 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 			if appErr := verifier.VerifyAppCredentials(ctx); appErr != nil {
 				if errors.Is(appErr, integrations.ErrAppCredentialsRefused) {
 					slog.ErrorContext(ctx, "provider refused the app credentials; every post to it fails until they are fixed", "platform", input.Platform, "error", appErr)
+					refundAllPrepared()
 					return socialapi.Receipt{}, appAccessRefused(err)
 				}
 				// The check itself failed, so the cause is unknown. The refusal
 				// proves nothing was created, so the post retries durably.
 				slog.WarnContext(ctx, "could not check the provider's app credentials", "platform", input.Platform, "error", appErr)
+				refundAllPrepared()
 				unchecked := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherUnavailable,
 					"The platform refused the request and Shots could not yet tell whether its app credentials or the account's token are at fault. Nothing was sent; it retries.")
 				unchecked.ProviderMessage = unchecked.Error() + " The platform said: " + temporalx.FailureMessage(err)
@@ -390,12 +457,27 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		if kind == temporalx.TypeDisconnect || kind == temporalx.TypeRefreshToken && account.RefreshToken == nil {
 			p.requireReconnect(ctx, account)
 		}
-		return socialapi.Receipt{}, publicationOutcome(err)
+		mapped := publicationOutcome(err)
+		refundXLinkOnDefiniteFailure(mapped, preparedX.refund)
+		// Replies were never attempted when root failed; always release reply reservations.
+		for _, pr := range preparedReplies {
+			if pr.refund != nil {
+				pr.refund()
+			}
+		}
+		return socialapi.Receipt{}, mapped
 	}
 	if len(response) != 1 || response[0].PostID == "" ||
 		response[0].Status != "posted" && response[0].Status != "success" && response[0].Status != "completed" {
+		// Root delivery is unknown (do not refund root), but replies were never sent.
+		for _, pr := range preparedReplies {
+			if pr.refund != nil {
+				pr.refund()
+			}
+		}
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "provider returned no confirmed post receipt")
 	}
+	p.recordXOutcome(ctx, input.PostID, preparedX)
 	if input.Platform == "tiktok" && tiktokOptions.SendToApp {
 		// TikTok gives an app draft no post id until the person posts it in the
 		// app; its publish id rides in the inbox address instead.
@@ -434,7 +516,7 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	if input.Platform == "tiktok" {
 		publication.Visibility = tiktokOptions.Privacy
 	}
-	progress := p.postReplies(ctx, provider, account, input, response[0].PostID)
+	progress := p.postReplies(ctx, provider, account, input, response[0].PostID, preparedReplies)
 	progress.Publication = publication
 	if response[0].QuoteState != "" {
 		progress.Quotes = append(progress.Quotes, postoptions.QuoteReceipt{PostID: response[0].PostID, State: response[0].QuoteState})
@@ -523,14 +605,33 @@ func (p *Publisher) AutoAct(ctx context.Context, input socialapi.AutoActionInput
 			}
 		}
 	}
+	var plugErr error
 	if input.Plug {
 		result.Plugged = !ok
 		if ok {
-			done, err := auto.AutoPlugPost(ctx, account, input.RemotePostID,
-				map[string]string{"likesAmount": fmt.Sprint(input.PlugAtLikes), "post": input.PlugText})
-			result.Plugged = err == nil && done
-			if temporalx.FailureType(err) == temporalx.TypeUnknownDelivery {
-				return result, err
+			shouldPlug := true
+			if reader, hasReader := provider.(engagementReader); hasReader && input.PlugAtLikes > 0 {
+				if likes, _, engErr := reader.PostEngagement(ctx, account, input.RemotePostID); engErr == nil && likes < input.PlugAtLikes {
+					shouldPlug = false
+				}
+			}
+			if shouldPlug {
+				var preparedPlug preparedXText
+				preparedPlug, plugErr = p.prepareXText(ctx, input.Platform, input.OrganizationID, "", "plug", "auto:"+input.RemotePostID+":plug", input.PlugText, false)
+				if plugErr == nil {
+					done, err := auto.AutoPlugPost(ctx, account, input.RemotePostID,
+						map[string]string{"likesAmount": fmt.Sprint(input.PlugAtLikes), "post": preparedPlug.text})
+					if err != nil {
+						refundXLinkOnDefiniteFailure(err, preparedPlug.refund)
+					} else if !done && preparedPlug.refund != nil {
+						// Threshold was not met, so no reply was posted; release slot.
+						preparedPlug.refund()
+					}
+					result.Plugged = err == nil && done
+					if temporalx.FailureType(err) == temporalx.TypeUnknownDelivery {
+						return result, err
+					}
+				}
 			}
 		}
 	}
@@ -539,16 +640,24 @@ func (p *Publisher) AutoAct(ctx context.Context, input socialapi.AutoActionInput
 		if err != nil {
 			return result, err
 		}
+		preparedQuote, quoteErr := p.prepareXText(ctx, input.Platform, input.OrganizationID, "", "quote", "auto:"+input.RemotePostID+":quote", strings.TrimSpace(input.QuoteText), false)
+		if quoteErr != nil {
+			return result, quoteErr
+		}
 		posted, err := provider.Post(ctx, account.InternalID, account.Token, []integrations.PostDetails{{
-			ID: input.RemotePostID + "-quote", Message: strings.TrimSpace(input.QuoteText), Settings: settings,
+			ID: input.RemotePostID + "-quote", Message: preparedQuote.text, PlainText: preparedQuote.plainText, Settings: settings,
 		}}, account)
 		if err != nil {
+			refundXLinkOnDefiniteFailure(err, preparedQuote.refund)
 			return result, err
 		}
 		if firstPostID(posted) == "" {
 			return result, temporalx.UnknownDelivery(input.Platform, "The provider returned no quote receipt. Reconcile before resending.")
 		}
 		result.Quoted = true
+	}
+	if plugErr != nil {
+		return result, plugErr
 	}
 	return result, nil
 }
@@ -559,13 +668,21 @@ func (p *Publisher) AutoAct(ctx context.Context, input socialapi.AutoActionInput
 // again). The progress it returns is kept on the post, and the composer
 // offers to post the rest.
 func (p *Publisher) postReplies(ctx context.Context, provider poster, account *socialent.Integration,
-	input socialapi.PublishInput, postID string) postoptions.ThreadProgress {
+	input socialapi.PublishInput, postID string, preparedReplies []preparedXText) postoptions.ThreadProgress {
 	progress := postoptions.ThreadProgress{Total: len(input.Replies)}
+	refundRemaining := func(from int) {
+		for i := from; i < len(preparedReplies); i++ {
+			if preparedReplies[i].refund != nil {
+				preparedReplies[i].refund()
+			}
+		}
+	}
 	if len(input.Replies) == 0 {
 		return progress
 	}
 	commenter, ok := provider.(integrations.Commenter)
 	if !ok {
+		refundRemaining(0)
 		slog.WarnContext(ctx, "provider cannot post thread replies", "platform", input.Platform, "post", input.PostID)
 		return progress
 	}
@@ -591,15 +708,30 @@ func (p *Publisher) postReplies(ctx context.Context, provider poster, account *s
 				}
 			}
 		}
+		var preparedReply preparedXText
+		if index < len(preparedReplies) {
+			preparedReply = preparedReplies[index]
+			if err != nil && preparedReply.refund != nil {
+				// Failed before sending reply to provider; release this reply's slot.
+				preparedReply.refund()
+			}
+		} else if err == nil {
+			partKey := fmt.Sprintf("reply:%d", index+1)
+			preparedReply, err = p.prepareXText(ctx, input.Platform, input.OrganizationID, input.PostID, partKey, input.PostID+":"+partKey, reply.Caption, len(media) > 0)
+		}
 		if err == nil {
 			var response []integrations.PostResponse
 			response, err = commenter.Comment(ctx, account.InternalID, postID, last, account.Token, []integrations.PostDetails{{
-				ID: fmt.Sprintf("%s-reply-%d", input.PostID, index+1), Message: reply.Caption, Settings: replySettings, Media: media, Poll: pollFor(reply.Poll, reply.Options),
+				ID: fmt.Sprintf("%s-reply-%d", input.PostID, index+1), Message: preparedReply.text, PlainText: preparedReply.plainText, Settings: replySettings, Media: media, Poll: pollFor(reply.Poll, reply.Options),
 			}}, account)
+			if err != nil {
+				refundXLinkOnDefiniteFailure(err, preparedReply.refund)
+			}
 			if err == nil && (len(response) == 0 || response[0].PostID == "") {
 				err = errors.New("provider returned no reply receipt")
 			}
 			if err == nil {
+				p.recordXOutcome(ctx, input.PostID, preparedReply)
 				last = response[0].PostID
 				if response[0].QuoteState != "" {
 					progress.Quotes = append(progress.Quotes, postoptions.QuoteReceipt{PostID: last, State: response[0].QuoteState})
@@ -609,6 +741,7 @@ func (p *Publisher) postReplies(ctx context.Context, provider poster, account *s
 				continue
 			}
 		}
+		refundRemaining(index + 1)
 		slog.ErrorContext(ctx, "thread reply was not posted", "post", input.PostID, "reply", index+1, "error", err)
 		return progress
 	}

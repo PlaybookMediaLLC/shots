@@ -9,6 +9,7 @@ import { TrayArrowUpIcon as ArchiveRestore } from '@phosphor-icons/react/dist/ss
 import { ChecksIcon as CheckCheck } from '@phosphor-icons/react/dist/ssr/Checks'
 import { EnvelopeIcon as Mail } from '@phosphor-icons/react/dist/ssr/Envelope'
 import { EnvelopeOpenIcon as MailOpen } from '@phosphor-icons/react/dist/ssr/EnvelopeOpen'
+import { LocalTime } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import {
   NotificationRequestError,
@@ -224,17 +225,15 @@ export function NotificationFeed({
                       </>
                     ) : null}
                     {item.workspaceName} ·{' '}
-                    <time
-                      dateTime={item.createdAt}
-                      title={new Date(item.createdAt).toLocaleString()}
-                    >
-                      {new Date(item.createdAt).toLocaleString(undefined, {
+                    <LocalTime
+                      options={{
                         month: 'short',
                         day: 'numeric',
                         hour: 'numeric',
                         minute: '2-digit',
-                      })}
-                    </time>
+                      }}
+                      value={item.createdAt}
+                    />
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1">
                     {item.href ? (

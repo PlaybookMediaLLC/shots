@@ -135,6 +135,7 @@ export function entitlementFor(access: ContractAccess): ShotsEntitlement {
 function securityFor(contract: RouteContract, docs: ContractDocs): OpenApiObject[] {
   const { access } = contract
   if (!access) return [{ [docs.security ?? 'workspaceSession']: [] }]
+  if ('apiKeyOnly' in access) return [{ workspaceApiKey: [] }]
   const session = { workspaceSession: [] }
   return 'apiKeyScope' in access ? [{ workspaceApiKey: [access.apiKeyScope] }, session] : [session]
 }

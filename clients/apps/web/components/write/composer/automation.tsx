@@ -5,6 +5,7 @@ import { useWriteRouter } from '@/components/write/write-context'
 import * as React from 'react'
 import type { EngagementRule } from 'screenshot-studio-backend-sdk'
 import { toast } from 'sonner'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -400,9 +401,14 @@ function RetweetDialog({
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground" data-testid="retweet-projection">
-                  {at
-                    ? `If published ${publishAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone })}: reposts ${at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone })}`
-                    : 'Set a time between one minute and 30 days after publishing.'}
+                  {at ? (
+                    <>
+                      If published <LocalTime options={WHEN_STYLE} value={publishAt} zone={timeZone} />:
+                      reposts <LocalTime options={WHEN_STYLE} value={at} zone={timeZone} />
+                    </>
+                  ) : (
+                    'Set a time between one minute and 30 days after publishing.'
+                  )}
                 </p>
               </li>
             )

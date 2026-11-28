@@ -38,6 +38,14 @@ type UserPreference struct {
 	DeveloperMode bool `json:"developer_mode,omitempty"`
 	// EmailNotifications holds the value of the "email_notifications" field.
 	EmailNotifications bool `json:"email_notifications,omitempty"`
+	// AutomationEmails holds the value of the "automation_emails" field.
+	AutomationEmails bool `json:"automation_emails,omitempty"`
+	// PostFailureAlerts holds the value of the "post_failure_alerts" field.
+	PostFailureAlerts bool `json:"post_failure_alerts,omitempty"`
+	// PostSummaryEmails holds the value of the "post_summary_emails" field.
+	PostSummaryEmails bool `json:"post_summary_emails,omitempty"`
+	// UseFilenameAsCaption holds the value of the "use_filename_as_caption" field.
+	UseFilenameAsCaption bool `json:"use_filename_as_caption,omitempty"`
 	// DismissedTips holds the value of the "dismissed_tips" field.
 	DismissedTips []string `json:"dismissed_tips,omitempty"`
 	// Experiments holds the value of the "experiments" field.
@@ -56,7 +64,7 @@ func (*UserPreference) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case userpreference.FieldDismissedTips, userpreference.FieldExperiments:
 			values[i] = new([]byte)
-		case userpreference.FieldShowScrollbars, userpreference.FieldDeveloperMode, userpreference.FieldEmailNotifications:
+		case userpreference.FieldShowScrollbars, userpreference.FieldDeveloperMode, userpreference.FieldEmailNotifications, userpreference.FieldAutomationEmails, userpreference.FieldPostFailureAlerts, userpreference.FieldPostSummaryEmails, userpreference.FieldUseFilenameAsCaption:
 			values[i] = new(sql.NullBool)
 		case userpreference.FieldVersion:
 			values[i] = new(sql.NullInt64)
@@ -145,6 +153,30 @@ func (_m *UserPreference) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field email_notifications", values[i])
 			} else if value.Valid {
 				_m.EmailNotifications = value.Bool
+			}
+		case userpreference.FieldAutomationEmails:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field automation_emails", values[i])
+			} else if value.Valid {
+				_m.AutomationEmails = value.Bool
+			}
+		case userpreference.FieldPostFailureAlerts:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field post_failure_alerts", values[i])
+			} else if value.Valid {
+				_m.PostFailureAlerts = value.Bool
+			}
+		case userpreference.FieldPostSummaryEmails:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field post_summary_emails", values[i])
+			} else if value.Valid {
+				_m.PostSummaryEmails = value.Bool
+			}
+		case userpreference.FieldUseFilenameAsCaption:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field use_filename_as_caption", values[i])
+			} else if value.Valid {
+				_m.UseFilenameAsCaption = value.Bool
 			}
 		case userpreference.FieldDismissedTips:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -241,6 +273,18 @@ func (_m *UserPreference) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("email_notifications=")
 	builder.WriteString(fmt.Sprintf("%v", _m.EmailNotifications))
+	builder.WriteString(", ")
+	builder.WriteString("automation_emails=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AutomationEmails))
+	builder.WriteString(", ")
+	builder.WriteString("post_failure_alerts=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PostFailureAlerts))
+	builder.WriteString(", ")
+	builder.WriteString("post_summary_emails=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PostSummaryEmails))
+	builder.WriteString(", ")
+	builder.WriteString("use_filename_as_caption=")
+	builder.WriteString(fmt.Sprintf("%v", _m.UseFilenameAsCaption))
 	builder.WriteString(", ")
 	builder.WriteString("dismissed_tips=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DismissedTips))

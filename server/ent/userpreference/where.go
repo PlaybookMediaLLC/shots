@@ -89,6 +89,26 @@ func EmailNotifications(v bool) predicate.UserPreference {
 	return predicate.UserPreference(sql.FieldEQ(FieldEmailNotifications, v))
 }
 
+// AutomationEmails applies equality check predicate on the "automation_emails" field. It's identical to AutomationEmailsEQ.
+func AutomationEmails(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldAutomationEmails, v))
+}
+
+// PostFailureAlerts applies equality check predicate on the "post_failure_alerts" field. It's identical to PostFailureAlertsEQ.
+func PostFailureAlerts(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldPostFailureAlerts, v))
+}
+
+// PostSummaryEmails applies equality check predicate on the "post_summary_emails" field. It's identical to PostSummaryEmailsEQ.
+func PostSummaryEmails(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldPostSummaryEmails, v))
+}
+
+// UseFilenameAsCaption applies equality check predicate on the "use_filename_as_caption" field. It's identical to UseFilenameAsCaptionEQ.
+func UseFilenameAsCaption(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldUseFilenameAsCaption, v))
+}
+
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.UserPreference {
 	return predicate.UserPreference(sql.FieldEQ(FieldVersion, v))
@@ -367,6 +387,46 @@ func EmailNotificationsEQ(v bool) predicate.UserPreference {
 // EmailNotificationsNEQ applies the NEQ predicate on the "email_notifications" field.
 func EmailNotificationsNEQ(v bool) predicate.UserPreference {
 	return predicate.UserPreference(sql.FieldNEQ(FieldEmailNotifications, v))
+}
+
+// AutomationEmailsEQ applies the EQ predicate on the "automation_emails" field.
+func AutomationEmailsEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldAutomationEmails, v))
+}
+
+// AutomationEmailsNEQ applies the NEQ predicate on the "automation_emails" field.
+func AutomationEmailsNEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNEQ(FieldAutomationEmails, v))
+}
+
+// PostFailureAlertsEQ applies the EQ predicate on the "post_failure_alerts" field.
+func PostFailureAlertsEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldPostFailureAlerts, v))
+}
+
+// PostFailureAlertsNEQ applies the NEQ predicate on the "post_failure_alerts" field.
+func PostFailureAlertsNEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNEQ(FieldPostFailureAlerts, v))
+}
+
+// PostSummaryEmailsEQ applies the EQ predicate on the "post_summary_emails" field.
+func PostSummaryEmailsEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldPostSummaryEmails, v))
+}
+
+// PostSummaryEmailsNEQ applies the NEQ predicate on the "post_summary_emails" field.
+func PostSummaryEmailsNEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNEQ(FieldPostSummaryEmails, v))
+}
+
+// UseFilenameAsCaptionEQ applies the EQ predicate on the "use_filename_as_caption" field.
+func UseFilenameAsCaptionEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldUseFilenameAsCaption, v))
+}
+
+// UseFilenameAsCaptionNEQ applies the NEQ predicate on the "use_filename_as_caption" field.
+func UseFilenameAsCaptionNEQ(v bool) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNEQ(FieldUseFilenameAsCaption, v))
 }
 
 // VersionEQ applies the EQ predicate on the "version" field.

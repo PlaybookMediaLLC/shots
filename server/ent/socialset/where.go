@@ -94,6 +94,11 @@ func NaturalPostingTimes(v bool) predicate.SocialSet {
 	return predicate.SocialSet(sql.FieldEQ(FieldNaturalPostingTimes, v))
 }
 
+// NaturalPostingWindowMinutes applies equality check predicate on the "natural_posting_window_minutes" field. It's identical to NaturalPostingWindowMinutesEQ.
+func NaturalPostingWindowMinutes(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldEQ(FieldNaturalPostingWindowMinutes, v))
+}
+
 // PrimaryPlatform applies equality check predicate on the "primary_platform" field. It's identical to PrimaryPlatformEQ.
 func PrimaryPlatform(v string) predicate.SocialSet {
 	return predicate.SocialSet(sql.FieldEQ(FieldPrimaryPlatform, v))
@@ -497,6 +502,46 @@ func NaturalPostingTimesEQ(v bool) predicate.SocialSet {
 // NaturalPostingTimesNEQ applies the NEQ predicate on the "natural_posting_times" field.
 func NaturalPostingTimesNEQ(v bool) predicate.SocialSet {
 	return predicate.SocialSet(sql.FieldNEQ(FieldNaturalPostingTimes, v))
+}
+
+// NaturalPostingWindowMinutesEQ applies the EQ predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesEQ(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldEQ(FieldNaturalPostingWindowMinutes, v))
+}
+
+// NaturalPostingWindowMinutesNEQ applies the NEQ predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesNEQ(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldNEQ(FieldNaturalPostingWindowMinutes, v))
+}
+
+// NaturalPostingWindowMinutesIn applies the In predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesIn(vs ...int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldIn(FieldNaturalPostingWindowMinutes, vs...))
+}
+
+// NaturalPostingWindowMinutesNotIn applies the NotIn predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesNotIn(vs ...int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldNotIn(FieldNaturalPostingWindowMinutes, vs...))
+}
+
+// NaturalPostingWindowMinutesGT applies the GT predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesGT(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldGT(FieldNaturalPostingWindowMinutes, v))
+}
+
+// NaturalPostingWindowMinutesGTE applies the GTE predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesGTE(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldGTE(FieldNaturalPostingWindowMinutes, v))
+}
+
+// NaturalPostingWindowMinutesLT applies the LT predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesLT(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldLT(FieldNaturalPostingWindowMinutes, v))
+}
+
+// NaturalPostingWindowMinutesLTE applies the LTE predicate on the "natural_posting_window_minutes" field.
+func NaturalPostingWindowMinutesLTE(v int) predicate.SocialSet {
+	return predicate.SocialSet(sql.FieldLTE(FieldNaturalPostingWindowMinutes, v))
 }
 
 // PrimaryPlatformEQ applies the EQ predicate on the "primary_platform" field.

@@ -57,6 +57,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTRPC } from '@/lib/trpc/react'
 import { useShortcuts } from '@/components/write/shortcuts'
 import { calendarPostSchema } from '@/lib/api/contracts/content-draft-platform'
 import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
@@ -250,6 +252,8 @@ export function PlanWorkspace({
   advancedScheduling?: boolean
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const when = useWhen()
   const twelveHour = useTwelveHour()
   const [prefs, setPrefs] = React.useState<PlanPreferences>(() =>
@@ -323,7 +327,10 @@ export function PlanWorkspace({
     prefs.visible,
     sets.map((s) => s.id)
   )
-  const reload = () => setRefresh((n) => n + 1)
+  const reload = () => {
+    setRefresh((n) => n + 1)
+    void queryClient.invalidateQueries({ queryKey: trpc.workspace.weeklyGoalProgress.queryKey() })
+  }
 
   React.useEffect(() => {
     try {
@@ -720,7 +727,9 @@ export function PlanWorkspace({
                 }}
               >
                 Available · {time}
-                {focused.naturalPostingTimes ? ' ±4 min' : ''}
+                {focused.naturalPostingTimes
+                  ? ` ±${focused.naturalPostingWindowMinutes ?? 10} min`
+                  : ''}
               </Button>
             </div>
           )
@@ -896,6 +905,10 @@ export function PlanWorkspace({
                   : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
               </span>
             </h1>
+            <WeeklyGoalBadge
+              enabled={hydrated}
+              weekStart={prefs.weekStart === 0 ? 'sunday' : 'monday'}
+            />
             {focused ? (
               <Button
                 onClick={() => openBrandSettings('scheduling', focused.id)}
@@ -2308,5 +2321,35 @@ function PlanDetail({
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function WeeklyGoalBadge({
+  enabled,
+  weekStart,
+}: {
+  enabled: boolean
+  weekStart: 'monday' | 'sunday'
+}) {
+  const trpc = useTRPC()
+  const progress = useQuery({
+    ...trpc.workspace.weeklyGoalProgress.queryOptions({ weekStart }),
+    enabled,
+    staleTime: 60_000,
+  })
+  const data = progress.data
+  if (!data || data.goal === null) return null
+  const met = data.totalCount >= data.goal
+  return (
+    <Link
+      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
+      data-testid="plan-weekly-goal"
+      href="/settings/publishing-preferences"
+      title={`${data.publishedCount} published, ${data.scheduledCount} scheduled this week`}
+    >
+      <Pill tone={met ? 'green' : undefined}>
+        Goal {data.totalCount}/{data.goal}
+      </Pill>
+    </Link>
   )
 }

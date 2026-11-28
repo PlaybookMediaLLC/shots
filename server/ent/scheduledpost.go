@@ -77,6 +77,8 @@ type ScheduledPost struct {
 	ScheduleTimeZone *string `json:"schedule_time_zone,omitempty"`
 	// ScheduleIntent holds the value of the "schedule_intent" field.
 	ScheduleIntent *string `json:"schedule_intent,omitempty"`
+	// PublishGroupID holds the value of the "publish_group_id" field.
+	PublishGroupID *string `json:"publish_group_id,omitempty"`
 	// FailureCode holds the value of the "failure_code" field.
 	FailureCode *string `json:"failure_code,omitempty"`
 	// ScheduledByUserID holds the value of the "scheduled_by_user_id" field.
@@ -85,6 +87,8 @@ type ScheduledPost struct {
 	ApprovedByUserID *string `json:"approved_by_user_id,omitempty"`
 	// ApprovedVersion holds the value of the "approved_version" field.
 	ApprovedVersion *int `json:"approved_version,omitempty"`
+	// XLinksStrippedCount holds the value of the "x_links_stripped_count" field.
+	XLinksStrippedCount int `json:"x_links_stripped_count,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -133,9 +137,9 @@ func (*ScheduledPost) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case scheduledpost.FieldAssetIds, scheduledpost.FieldReplies, scheduledpost.FieldThreadProgress, scheduledpost.FieldMetrics, scheduledpost.FieldAutoActions, scheduledpost.FieldPoll, scheduledpost.FieldPublishOptions:
 			values[i] = new([]byte)
-		case scheduledpost.FieldNaturalOffsetSeconds, scheduledpost.FieldApprovedVersion:
+		case scheduledpost.FieldNaturalOffsetSeconds, scheduledpost.FieldApprovedVersion, scheduledpost.FieldXLinksStrippedCount:
 			values[i] = new(sql.NullInt64)
-		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldFailureCode, scheduledpost.FieldScheduledByUserID, scheduledpost.FieldApprovedByUserID:
+		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldPublishGroupID, scheduledpost.FieldFailureCode, scheduledpost.FieldScheduledByUserID, scheduledpost.FieldApprovedByUserID:
 			values[i] = new(sql.NullString)
 		case scheduledpost.FieldPublishedAt, scheduledpost.FieldDeletedAt, scheduledpost.FieldMetricsAt, scheduledpost.FieldScheduledFor, scheduledpost.FieldSlotAt, scheduledpost.FieldCreatedAt, scheduledpost.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -357,6 +361,13 @@ func (_m *ScheduledPost) assignValues(columns []string, values []any) error {
 				_m.ScheduleIntent = new(string)
 				*_m.ScheduleIntent = value.String
 			}
+		case scheduledpost.FieldPublishGroupID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field publish_group_id", values[i])
+			} else if value.Valid {
+				_m.PublishGroupID = new(string)
+				*_m.PublishGroupID = value.String
+			}
 		case scheduledpost.FieldFailureCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field failure_code", values[i])
@@ -384,6 +395,12 @@ func (_m *ScheduledPost) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ApprovedVersion = new(int)
 				*_m.ApprovedVersion = int(value.Int64)
+			}
+		case scheduledpost.FieldXLinksStrippedCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field x_links_stripped_count", values[i])
+			} else if value.Valid {
+				_m.XLinksStrippedCount = int(value.Int64)
 			}
 		case scheduledpost.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -557,6 +574,11 @@ func (_m *ScheduledPost) String() string {
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
+	if v := _m.PublishGroupID; v != nil {
+		builder.WriteString("publish_group_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	if v := _m.FailureCode; v != nil {
 		builder.WriteString("failure_code=")
 		builder.WriteString(*v)
@@ -576,6 +598,9 @@ func (_m *ScheduledPost) String() string {
 		builder.WriteString("approved_version=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("x_links_stripped_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.XLinksStrippedCount))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

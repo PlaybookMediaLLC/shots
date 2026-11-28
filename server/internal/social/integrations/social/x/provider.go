@@ -9,7 +9,6 @@ import (
 	"math"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -104,15 +103,10 @@ func (p *Provider) InlineImages(settings json.RawMessage) bool {
 	return str(decodeSettings(settings).PostType) == "article"
 }
 
-var hasTag = regexp.MustCompile(`(?i)</?[a-z][\s\S]*>`)
-
 // toTweetText flattens the editor HTML back to the plain text X expects - same
 // output the old 'normal' editor produced.
 func toTweetText(message string) string {
-	return helpers.StripHTMLValidation("normal", message, helpers.StripOptions{
-		ReplaceBold: true,
-		Plain:       !hasTag.MatchString(message),
-	})
+	return helpers.FlattenXTweetText(message)
 }
 
 func (p *Provider) CheckValidity(_ context.Context, posts [][]integrations.ValidityMedia, settings json.RawMessage, _ []integrations.AdditionalSetting) (string, error) {

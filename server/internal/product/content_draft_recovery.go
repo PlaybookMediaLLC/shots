@@ -311,6 +311,13 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 		if err := publishing.EmitDraftPublished(ctx, tx, updated, optionalText(updated.RemotePostID)); err != nil {
 			return nil, err
 		}
+		if err := publishing.EmitPostCompleted(ctx, tx, updated.OrganizationID, updated.ID, "published", optionalText(updated.RemotePostID), ""); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := publishing.EmitPostCompleted(ctx, tx, updated.OrganizationID, updated.ID, "failed", "", publishing.FailureNotLive); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

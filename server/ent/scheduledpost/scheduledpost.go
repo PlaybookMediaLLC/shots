@@ -71,6 +71,8 @@ const (
 	FieldScheduleTimeZone = "scheduleTimeZone"
 	// FieldScheduleIntent holds the string denoting the schedule_intent field in the database.
 	FieldScheduleIntent = "scheduleIntent"
+	// FieldPublishGroupID holds the string denoting the publish_group_id field in the database.
+	FieldPublishGroupID = "publishGroupId"
 	// FieldFailureCode holds the string denoting the failure_code field in the database.
 	FieldFailureCode = "failureCode"
 	// FieldScheduledByUserID holds the string denoting the scheduled_by_user_id field in the database.
@@ -79,6 +81,8 @@ const (
 	FieldApprovedByUserID = "approvedByUserId"
 	// FieldApprovedVersion holds the string denoting the approved_version field in the database.
 	FieldApprovedVersion = "approvedVersion"
+	// FieldXLinksStrippedCount holds the string denoting the x_links_stripped_count field in the database.
+	FieldXLinksStrippedCount = "xLinksStrippedCount"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -136,10 +140,12 @@ var Columns = []string{
 	FieldNaturalOffsetSeconds,
 	FieldScheduleTimeZone,
 	FieldScheduleIntent,
+	FieldPublishGroupID,
 	FieldFailureCode,
 	FieldScheduledByUserID,
 	FieldApprovedByUserID,
 	FieldApprovedVersion,
+	FieldXLinksStrippedCount,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -157,6 +163,8 @@ func ValidColumn(column string) bool {
 var (
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
+	// DefaultXLinksStrippedCount holds the default value on creation for the "x_links_stripped_count" field.
+	DefaultXLinksStrippedCount int
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -333,6 +341,11 @@ func ByScheduleIntent(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldScheduleIntent, opts...).ToFunc()
 }
 
+// ByPublishGroupID orders the results by the publish_group_id field.
+func ByPublishGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPublishGroupID, opts...).ToFunc()
+}
+
 // ByFailureCode orders the results by the failure_code field.
 func ByFailureCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureCode, opts...).ToFunc()
@@ -351,6 +364,11 @@ func ByApprovedByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByApprovedVersion orders the results by the approved_version field.
 func ByApprovedVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldApprovedVersion, opts...).ToFunc()
+}
+
+// ByXLinksStrippedCount orders the results by the x_links_stripped_count field.
+func ByXLinksStrippedCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldXLinksStrippedCount, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

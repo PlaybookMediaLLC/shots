@@ -56,6 +56,8 @@ const (
 	FieldPrimaryPlatform = "primaryPlatform"
 	// FieldNaturalPostingTime holds the string denoting the natural_posting_time field in the database.
 	FieldNaturalPostingTime = "naturalPostingTime"
+	// FieldProcessVideosOnServer holds the string denoting the process_videos_on_server field in the database.
+	FieldProcessVideosOnServer = "processVideosOnServer"
 	// FieldEngagement holds the string denoting the engagement field in the database.
 	FieldEngagement = "engagement"
 	// FieldPlannedFor holds the string denoting the planned_for field in the database.
@@ -127,6 +129,7 @@ var Columns = []string{
 	FieldSocialSetID,
 	FieldPrimaryPlatform,
 	FieldNaturalPostingTime,
+	FieldProcessVideosOnServer,
 	FieldEngagement,
 	FieldPlannedFor,
 	FieldKind,
@@ -356,6 +359,11 @@ func ByPrimaryPlatform(opts ...sql.OrderTermOption) OrderOption {
 // ByNaturalPostingTime orders the results by the natural_posting_time field.
 func ByNaturalPostingTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNaturalPostingTime, opts...).ToFunc()
+}
+
+// ByProcessVideosOnServer orders the results by the process_videos_on_server field.
+func ByProcessVideosOnServer(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessVideosOnServer, opts...).ToFunc()
 }
 
 // ByPlannedFor orders the results by the planned_for field.

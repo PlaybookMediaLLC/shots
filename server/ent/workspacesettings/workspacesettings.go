@@ -33,6 +33,10 @@ const (
 	FieldAiProviderKeyHint = "aiProviderKeyHint"
 	// FieldReleaseReadinessEnabled holds the string denoting the release_readiness_enabled field in the database.
 	FieldReleaseReadinessEnabled = "releaseReadinessEnabled"
+	// FieldWeeklyPostingGoal holds the string denoting the weekly_posting_goal field in the database.
+	FieldWeeklyPostingGoal = "weeklyPostingGoal"
+	// FieldProcessVideosOnServer holds the string denoting the process_videos_on_server field in the database.
+	FieldProcessVideosOnServer = "processVideosOnServer"
 	// FieldDisabledExperiments holds the string denoting the disabled_experiments field in the database.
 	FieldDisabledExperiments = "disabledExperiments"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -56,6 +60,8 @@ var Columns = []string{
 	FieldAiProviderKeyEncrypted,
 	FieldAiProviderKeyHint,
 	FieldReleaseReadinessEnabled,
+	FieldWeeklyPostingGoal,
+	FieldProcessVideosOnServer,
 	FieldDisabledExperiments,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -82,6 +88,8 @@ var (
 	DefaultAiAgentEnabled bool
 	// DefaultReleaseReadinessEnabled holds the default value on creation for the "release_readiness_enabled" field.
 	DefaultReleaseReadinessEnabled bool
+	// DefaultProcessVideosOnServer holds the default value on creation for the "process_videos_on_server" field.
+	DefaultProcessVideosOnServer bool
 	// DefaultDisabledExperiments holds the default value on creation for the "disabled_experiments" field.
 	DefaultDisabledExperiments []string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -143,6 +151,16 @@ func ByAiProviderKeyHint(opts ...sql.OrderTermOption) OrderOption {
 // ByReleaseReadinessEnabled orders the results by the release_readiness_enabled field.
 func ByReleaseReadinessEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReleaseReadinessEnabled, opts...).ToFunc()
+}
+
+// ByWeeklyPostingGoal orders the results by the weekly_posting_goal field.
+func ByWeeklyPostingGoal(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyPostingGoal, opts...).ToFunc()
+}
+
+// ByProcessVideosOnServer orders the results by the process_videos_on_server field.
+func ByProcessVideosOnServer(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessVideosOnServer, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

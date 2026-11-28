@@ -22,6 +22,8 @@ import (
 func (s *Server) registerAgentAccess(mux *http.ServeMux) {
 	mux.Handle("POST /v1/agent-authorizations/preview", s.authenticateProduct(http.HandlerFunc(s.previewAgentAuthorization)))
 	mux.Handle("POST /v1/agent-authorizations", s.authenticateProduct(http.HandlerFunc(s.approveAgentAuthorization)))
+	mux.Handle("POST /v1/agent-authorizations/revoke-client", s.authenticateProduct(http.HandlerFunc(s.revokeAgentClient)))
+	mux.Handle("GET /v1/api-keys/me", s.authenticateProduct(http.HandlerFunc(s.currentAPIKeyInfo)))
 }
 
 func (s *Server) previewAgentAuthorization(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +54,30 @@ func (s *Server) approveAgentAuthorization(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusCreated, code)
 }
 
+func (s *Server) revokeAgentClient(w http.ResponseWriter, r *http.Request) {
+	var input product.RevokeAgentClientInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid agent revocation request")
+		return
+	}
+	result, err := s.configuration.RevokeAgentClient(r.Context(), workspaceActor(r), input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) currentAPIKeyInfo(w http.ResponseWriter, r *http.Request) {
+	info, err := s.configuration.GetCurrentAPIKeyInfo(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, info)
+}
+
 // AgentClientRegistry registers and authenticates the MCP authorization
 // server's OAuth clients.
 type AgentClientRegistry interface {
@@ -75,6 +101,8 @@ func NewAgentOAuth(clients AgentClientRegistry, codes AgentCodeExchanger) http.H
 	mux.HandleFunc("OPTIONS /oauth/token", oauthPreflight)
 	mux.HandleFunc("POST /oauth/register", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
 		var request agentclients.Registration
 		if err := decodeOAuthBody(r, &request); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_client_metadata", "error_description": "The registration request is malformed."})
@@ -93,6 +121,8 @@ func NewAgentOAuth(clients AgentClientRegistry, codes AgentCodeExchanger) http.H
 	})
 	mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
 		var body struct {
 			GrantType    string `json:"grant_type"`
 			Code         string `json:"code"`

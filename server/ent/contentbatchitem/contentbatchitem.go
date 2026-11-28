@@ -37,6 +37,8 @@ const (
 	FieldGrid = "grid"
 	// FieldDraftID holds the string denoting the draft_id field in the database.
 	FieldDraftID = "draftId"
+	// FieldProcessVideosOnServer holds the string denoting the process_videos_on_server field in the database.
+	FieldProcessVideosOnServer = "processVideosOnServer"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -60,6 +62,7 @@ var Columns = []string{
 	FieldTiming,
 	FieldGrid,
 	FieldDraftID,
+	FieldProcessVideosOnServer,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -133,6 +136,11 @@ func ByCaption(opts ...sql.OrderTermOption) OrderOption {
 // ByDraftID orders the results by the draft_id field.
 func ByDraftID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDraftID, opts...).ToFunc()
+}
+
+// ByProcessVideosOnServer orders the results by the process_videos_on_server field.
+func ByProcessVideosOnServer(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessVideosOnServer, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

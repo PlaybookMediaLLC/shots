@@ -18,6 +18,7 @@ import type {
   WorkspaceAiSettingsUpdateInput,
   WorkspaceCreateInput,
   WorkspaceInviteInput,
+  WorkspacePublishingSettingsUpdateInput,
   WorkspaceUpdateInput,
 } from './schemas'
 
@@ -92,6 +93,28 @@ export async function updateWorkspaceAiSettings(
     ...(input.aiProviderApiKey !== undefined ? { aiProviderApiKey: input.aiProviderApiKey } : {}),
   })
   return { organization: result.organization, settings: fromBackendSettings(result.settings) }
+}
+
+export async function updateWorkspacePublishingSettings(
+  access: OrganizationAccess,
+  input: WorkspacePublishingSettingsUpdateInput
+) {
+  const result = await backendSDK(access).updateWorkspacePublishingSettings({
+    ...(input.weeklyPostingGoal !== undefined
+      ? { weeklyPostingGoal: input.weeklyPostingGoal }
+      : {}),
+    ...(input.processVideosOnServer !== undefined
+      ? { processVideosOnServer: input.processVideosOnServer }
+      : {}),
+  })
+  return { organization: result.organization, settings: fromBackendSettings(result.settings) }
+}
+
+export async function getWeeklyGoalProgress(
+  access: OrganizationAccess,
+  weekStart?: 'monday' | 'sunday'
+) {
+  return backendSDK(access).getWeeklyGoalProgress(weekStart)
 }
 
 /**

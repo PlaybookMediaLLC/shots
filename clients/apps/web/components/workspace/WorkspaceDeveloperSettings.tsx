@@ -40,6 +40,7 @@ type NewSource = {
 
 type WorkspaceDeveloperSettingsProps = { canManage: boolean }
 type ApiKey = {
+  agentClient?: string | null
   createdAt: Date | string
   enabled: boolean | null
   expiresAt: Date | string | null
@@ -151,14 +152,14 @@ export function WorkspaceDeveloperSettings({ canManage }: WorkspaceDeveloperSett
     <div className="flex flex-col gap-10">
       {newKey ? <NewKeyNotice apiKey={newKey} onDismiss={() => setNewKey(null)} /> : null}
       <Section
-        description="Keys are shown once. Revoke a key when it is no longer needed."
+        description="Keys are shown once. Revoke a key when it is no longer needed. OAuth-connected AI agents live in Agents & API keys."
         title="Organization API keys"
       >
         <Group>
           <ApiKeyList
             canManage={canManage}
             isRevoking={pendingId}
-            keys={keys}
+            keys={keys.filter((key) => !key.agentClient)}
             onRevoke={revokeKey}
           />
           {canManage ? (

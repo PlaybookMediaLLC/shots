@@ -54,6 +54,8 @@ func (ContentDraft) Fields() []ent.Field {
 		field.String("social_set_id").StorageKey("socialSetId").Optional().Nillable(),
 		field.String("primary_platform").StorageKey("primaryPlatform").Optional().Nillable(),
 		field.Bool("natural_posting_time").StorageKey("naturalPostingTime").Default(false),
+		// Snapshot of workspace video processing preference at draft creation; nil falls back to workspace default.
+		field.Bool("process_videos_on_server").StorageKey("processVideosOnServer").Optional().Nillable(),
 		field.JSON("engagement", Engagement{}).StorageKey("engagement").Default(Engagement{}),
 		// A calendar placement without scheduling: nothing publishes from it.
 		field.Time("planned_for").StorageKey("plannedFor").Optional().Nillable(),

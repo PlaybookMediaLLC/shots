@@ -31,6 +31,14 @@ const IntegrationCatalog = dynamic(() =>
 const NewTeamSettings = dynamic(() =>
   import('@/components/settings/NewTeamSettings').then((m) => m.NewTeamSettings)
 )
+const PublishingPreferencesSettings = dynamic(() =>
+  import('@/components/settings/PublishingPreferencesSettings').then(
+    (m) => m.PublishingPreferencesSettings
+  )
+)
+const QueueScheduleSettings = dynamic(() =>
+  import('@/components/settings/QueueScheduleSettings').then((m) => m.QueueScheduleSettings)
+)
 const SocialSetList = dynamic(() =>
   import('@/components/settings/social-sets/SocialSetList').then((m) => m.SocialSetList)
 )
@@ -54,8 +62,8 @@ const VoiceSettings = dynamic(() =>
 const ChannelConnections = dynamic(() =>
   import('./ChannelConnections').then((m) => m.ChannelConnections)
 )
-const WorkspaceAgentSettings = dynamic(() =>
-  import('./WorkspaceAgentSettings').then((m) => m.WorkspaceAgentSettings)
+const AgentsAndApiKeysPage = dynamic(() =>
+  import('@/components/settings/agents/AgentsAndApiKeysPage').then((m) => m.AgentsAndApiKeysPage)
 )
 const WorkspaceAuditSettings = dynamic(() =>
   import('./WorkspaceAuditSettings').then((m) => m.WorkspaceAuditSettings)
@@ -180,6 +188,19 @@ const SETTINGS_CONTENT = {
     </>
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
+  'queue-schedule': ({ can, organization }) => (
+    <QueueScheduleSettings
+      canManage={can('workspace:update') && can('connection:manage')}
+      weeklyPostingGoal={organization.workspaceSettings?.weeklyPostingGoal ?? null}
+    />
+  ),
+  'publishing-preferences': ({ can, organization }) => (
+    <PublishingPreferencesSettings
+      canManage={can('workspace:update')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
   'social-sets': ({ can, draftsEnabled, role, socialSet }) =>
     socialSet ? (
@@ -211,8 +232,14 @@ const SETTINGS_CONTENT = {
       <WorkspaceIntegrations canManage={can('workspace:update')} />
     </>
   ),
-  agents: ({ can, mcpUrl }) => (
-    <WorkspaceAgentSettings canManage={can('brand:manage')} mcpUrl={mcpUrl} />
+  agents: ({ can, mcpUrl, organization }) => (
+    <AgentsAndApiKeysPage
+      canManageKeys={can('brand:manage')}
+      canManageWebhooks={can('workspace:update')}
+      key={organization.id}
+      mcpUrl={mcpUrl}
+      organizationId={organization.id}
+    />
   ),
   sso: ({ can, organization, role }) => (
     <WorkspaceIdentitySettings

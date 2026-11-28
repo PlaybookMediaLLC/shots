@@ -156,6 +156,16 @@ export function DraftPosts({
                     ) : null}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{post.caption}</p>
+                  {post.xLinksStrippedCount > 0 ? (
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      {post.xLinksStrippedCount === 1
+                        ? '1 link was removed on X.'
+                        : `${post.xLinksStrippedCount} links were removed on X.`}{' '}
+                      <Link className="underline underline-offset-4" href="/settings/billing#x-links">
+                        Turn on Links in X posts
+                      </Link>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Pill tone={POST_STATE_TONE[state]}>{state}</Pill>

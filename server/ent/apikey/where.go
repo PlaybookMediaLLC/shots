@@ -104,6 +104,11 @@ func ExpiresAt(v time.Time) predicate.Apikey {
 	return predicate.Apikey(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// LastRequest applies equality check predicate on the "last_request" field. It's identical to LastRequestEQ.
+func LastRequest(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldEQ(FieldLastRequest, v))
+}
+
 // Permissions applies equality check predicate on the "permissions" field. It's identical to PermissionsEQ.
 func Permissions(v string) predicate.Apikey {
 	return predicate.Apikey(sql.FieldEQ(FieldPermissions, v))
@@ -612,6 +617,56 @@ func ExpiresAtIsNil() predicate.Apikey {
 // ExpiresAtNotNil applies the NotNil predicate on the "expires_at" field.
 func ExpiresAtNotNil() predicate.Apikey {
 	return predicate.Apikey(sql.FieldNotNull(FieldExpiresAt))
+}
+
+// LastRequestEQ applies the EQ predicate on the "last_request" field.
+func LastRequestEQ(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldEQ(FieldLastRequest, v))
+}
+
+// LastRequestNEQ applies the NEQ predicate on the "last_request" field.
+func LastRequestNEQ(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldNEQ(FieldLastRequest, v))
+}
+
+// LastRequestIn applies the In predicate on the "last_request" field.
+func LastRequestIn(vs ...time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldIn(FieldLastRequest, vs...))
+}
+
+// LastRequestNotIn applies the NotIn predicate on the "last_request" field.
+func LastRequestNotIn(vs ...time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldNotIn(FieldLastRequest, vs...))
+}
+
+// LastRequestGT applies the GT predicate on the "last_request" field.
+func LastRequestGT(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldGT(FieldLastRequest, v))
+}
+
+// LastRequestGTE applies the GTE predicate on the "last_request" field.
+func LastRequestGTE(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldGTE(FieldLastRequest, v))
+}
+
+// LastRequestLT applies the LT predicate on the "last_request" field.
+func LastRequestLT(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldLT(FieldLastRequest, v))
+}
+
+// LastRequestLTE applies the LTE predicate on the "last_request" field.
+func LastRequestLTE(v time.Time) predicate.Apikey {
+	return predicate.Apikey(sql.FieldLTE(FieldLastRequest, v))
+}
+
+// LastRequestIsNil applies the IsNil predicate on the "last_request" field.
+func LastRequestIsNil() predicate.Apikey {
+	return predicate.Apikey(sql.FieldIsNull(FieldLastRequest))
+}
+
+// LastRequestNotNil applies the NotNil predicate on the "last_request" field.
+func LastRequestNotNil() predicate.Apikey {
+	return predicate.Apikey(sql.FieldNotNull(FieldLastRequest))
 }
 
 // PermissionsEQ applies the EQ predicate on the "permissions" field.

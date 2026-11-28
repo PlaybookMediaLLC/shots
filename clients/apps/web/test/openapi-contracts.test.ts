@@ -9,6 +9,7 @@ import * as ai from '@/lib/api/contracts/ai'
 import * as approvals from '@/lib/api/contracts/approvals'
 import * as assets from '@/lib/api/contracts/assets'
 import * as audit from '@/lib/api/contracts/audit'
+import * as authKey from '@/lib/api/contracts/auth-key'
 import * as billing from '@/lib/api/contracts/billing'
 import * as blueskyConnections from '@/lib/api/contracts/bluesky-connections'
 import * as campaigns from '@/lib/api/contracts/campaigns'
@@ -78,6 +79,7 @@ const contracts = new Map<string, RouteContract>(
     approvals,
     assets,
     audit,
+    authKey,
     whitelabel,
     permissionGroups,
     billing,
@@ -219,8 +221,12 @@ test('a contract that declares access binds it, and the spec publishes it', () =
   const paths = openApiSpec.paths as Record<string, Record<string, Record<string, unknown>>>
   for (const [name, contract] of contracts) {
     if (!contract.access) continue
-    const tenant = 'apiKeyScope' in contract.access
-    const auth = tenant ? 'tenantAccess' : 'memberAccess'
+    const auth =
+      'apiKeyOnly' in contract.access
+        ? 'apiKeyOnlyAccess'
+        : 'apiKeyScope' in contract.access
+          ? 'tenantAccess'
+          : 'memberAccess'
     const source = readFileSync(join(ROOT, routeFileFor(contract)), 'utf8')
     assert.match(
       source,
@@ -241,12 +247,33 @@ test('a contract that declares access binds it, and the spec publishes it', () =
     )
     assert.deepEqual(
       operation.security,
-      'apiKeyScope' in contract.access
-        ? [{ workspaceApiKey: [contract.access.apiKeyScope] }, { workspaceSession: [] }]
-        : [{ workspaceSession: [] }],
+      'apiKeyOnly' in contract.access
+        ? [{ workspaceApiKey: [] }]
+        : 'apiKeyScope' in contract.access
+          ? [{ workspaceApiKey: [contract.access.apiKeyScope] }, { workspaceSession: [] }]
+          : [{ workspaceSession: [] }],
       name
     )
   }
+})
+
+test('outbound webhook events match Go webhooks.EventTypes and currentApiKeyInfoSchema parses Go payloads', () => {
+  const goEvents = readFileSync(join(ROOT, '../../../server/internal/webhooks/events.go'), 'utf8')
+  for (const event of outboundWebhooks.webhookEventSchema.options) {
+    assert.ok(goEvents.includes(`"${event}"`), `Go webhooks/events.go missing ${event}`)
+  }
+  const parsed = authKey.currentApiKeyInfoSchema.parse({
+    key: {
+      expiresAt: null,
+      id: 'key_1',
+      name: 'CLI key',
+      prefix: 'ss_',
+      scopes: ['artifact:read', 'post:publish'],
+      start: 'ss_abc',
+    },
+    workspace: { id: 'org_1', name: 'Acme', slug: 'acme' },
+  })
+  assert.equal(parsed.workspace.slug, 'acme')
 })
 
 test('every tenant /api/v1 operation and editor utility publishes its plan gate', () => {

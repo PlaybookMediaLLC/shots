@@ -43,6 +43,8 @@ type ContentBatchItem struct {
 	Grid *schema.BatchGrid `json:"grid,omitempty"`
 	// DraftID holds the value of the "draft_id" field.
 	DraftID *string `json:"draft_id,omitempty"`
+	// ProcessVideosOnServer holds the value of the "process_videos_on_server" field.
+	ProcessVideosOnServer *bool `json:"process_videos_on_server,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -57,6 +59,8 @@ func (*ContentBatchItem) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case contentbatchitem.FieldMedia, contentbatchitem.FieldChannelConnectionIds, contentbatchitem.FieldTiming, contentbatchitem.FieldGrid:
 			values[i] = new([]byte)
+		case contentbatchitem.FieldProcessVideosOnServer:
+			values[i] = new(sql.NullBool)
 		case contentbatchitem.FieldPosition:
 			values[i] = new(sql.NullInt64)
 		case contentbatchitem.FieldID, contentbatchitem.FieldBatchID, contentbatchitem.FieldOrganizationID, contentbatchitem.FieldImportKey, contentbatchitem.FieldFingerprint, contentbatchitem.FieldSourceKey, contentbatchitem.FieldCaption, contentbatchitem.FieldDraftID:
@@ -165,6 +169,13 @@ func (_m *ContentBatchItem) assignValues(columns []string, values []any) error {
 				_m.DraftID = new(string)
 				*_m.DraftID = value.String
 			}
+		case contentbatchitem.FieldProcessVideosOnServer:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field process_videos_on_server", values[i])
+			} else if value.Valid {
+				_m.ProcessVideosOnServer = new(bool)
+				*_m.ProcessVideosOnServer = value.Bool
+			}
 		case contentbatchitem.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -249,6 +260,11 @@ func (_m *ContentBatchItem) String() string {
 	if v := _m.DraftID; v != nil {
 		builder.WriteString("draft_id=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessVideosOnServer; v != nil {
+		builder.WriteString("process_videos_on_server=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")

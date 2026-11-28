@@ -117,6 +117,8 @@ import { wallTime } from '@/lib/write/zoned-time'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
 import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye'
+import { usePreferences } from '@/components/settings/PreferencesProvider'
+import { filenameCaptionIfEligible } from '@/lib/write/filename-caption'
 import { uploadByteLimit } from '@/lib/write/media-limits'
 import { clock } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
@@ -554,6 +556,7 @@ export function BatchWorkspace({
   start?: BatchStart
 }) {
   const trpc = useTRPCClient()
+  const useFilenameAsCaption = usePreferences().preferences?.useFilenameAsCaption ?? false
   const [batch, setBatch] = React.useState(initial)
   const items = React.useMemo(() => batch.items ?? [], [batch.items])
   const zone = batch.timeZone || 'UTC'
@@ -807,6 +810,18 @@ export function BatchWorkspace({
               destinationsOf(sharedAccounts).map((account) => account.channel),
               post.files
             )
+            const baseCaption = expandSpintax(sharedCaption)
+            const autoCaption = post.files.reduce<string | null>(
+              (found, file) =>
+                found ??
+                filenameCaptionIfEligible({
+                  currentCaption: baseCaption,
+                  enabled: useFilenameAsCaption,
+                  fileName: file.name,
+                  mimeType: file.type,
+                }),
+              null
+            )
             return {
               files: post.files,
               line: index + 1,
@@ -814,7 +829,7 @@ export function BatchWorkspace({
               problems: [...post.problems, ...checked.problems],
               input: {
                 importKey: importKey(),
-                caption: expandSpintax(sharedCaption),
+                caption: baseCaption.trim() ? baseCaption : (autoCaption ?? ''),
                 media: post.files.map((file, at) => ({
                   bytes: file.size,
                   fileName: post.storedNames[at]!,
@@ -884,6 +899,20 @@ export function BatchWorkspace({
           destinationsOf(chosenAccounts).map((account) => account.channel),
           rowFiles
         )
+        const baseCaption = row.caption || expandSpintax(sharedCaption)
+        const autoCaption = rowFiles.reduce<string | null>(
+          (found, file) =>
+            found ??
+            (file
+              ? filenameCaptionIfEligible({
+                  currentCaption: baseCaption,
+                  enabled: useFilenameAsCaption,
+                  fileName: file.name,
+                  mimeType: file.type,
+                })
+              : null),
+          null
+        )
         return {
           files: rowFiles,
           line: row.line,
@@ -897,7 +926,7 @@ export function BatchWorkspace({
           ],
           input: {
             importKey: importKey(),
-            caption: row.caption || expandSpintax(sharedCaption),
+            caption: baseCaption.trim() ? baseCaption : (autoCaption ?? ''),
             media: matched.media,
             channelConnectionIds: chosenAccounts,
             ...(row.assets.length === 1 && !csv.trim() ? { sourceKey: row.assets[0] } : {}),

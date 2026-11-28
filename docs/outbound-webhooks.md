@@ -14,9 +14,11 @@ person writing the receiver.
 | `draft.scheduled`      | A draft is scheduled, rescheduled or moved on the calendar.                                      |
 | `draft.planned`        | A draft's planned date is set or changed.                                                        |
 | `draft.status_changed` | A draft's status changes: scheduled, archived (also when its social set is deleted) or restored. |
-| `draft.tags_changed`   | A draft's tags change (an experiment).                                                           |
-| `draft.deleted`        | A draft is deleted.                                                                              |
-| `webhook.test`         | An admin presses **Send test**. It is never sent on its own.                                     |
+| `draft.tags_changed`         | A draft's tags change (an experiment).                                                                                         |
+| `draft.deleted`              | A draft is deleted.                                                                                                            |
+| `post.completed`             | A scheduled post reaches a terminal outcome (`published`, `sent_to_app`, `failed`, `unknown_delivery`, or `missed_window`), with its live URL or failure code. |
+| `connection.needs_reconnect` | A shared social account stops renewing its credentials and requires reconnection.                                              |
+| `webhook.test`               | An admin presses **Send test**. It is never sent on its own.                                                                   |
 
 Events are written in the same database transaction as the change they
 describe, so an event exists only if the change was saved. Nothing is emitted

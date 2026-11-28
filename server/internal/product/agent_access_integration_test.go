@@ -183,3 +183,138 @@ func TestAgentKeysLeaveWithTheMemberWhoConsented(t *testing.T) {
 		t.Fatalf("revocation audits=%d", n)
 	}
 }
+
+// Bulk-revoking a connected OAuth agent removes every session for that client
+// in the caller's workspace, leaves manual REST/CLI keys and other clients
+// untouched, records one audit event, and VerifyAPIKey stamps lastRequest.
+func TestRevokeAgentClientAndLastRequestAndKeyInfo(t *testing.T) {
+	w := newTestWorkspace(t)
+	t.Cleanup(func() { _, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM apikey WHERE "referenceId"=$1`, w.org) })
+	w.repo.WithAgentClients(fakeAgentClients{
+		"pcd_claude": {ClientID: "pcd_claude", Name: "Claude Code", Dynamic: true, Public: true, RedirectURIs: []string{"http://127.0.0.1:4123/cb"}},
+		"pcd_codex":  {ClientID: "pcd_codex", Name: "Codex", Dynamic: true, Public: true, RedirectURIs: []string{"http://127.0.0.1:4124/cb"}},
+	})
+	s256 := "S256"
+	connect := func(clientID, redirectURI string, scopes []string) string {
+		t.Helper()
+		req := AgentAuthorizationRequest{
+			ClientID: clientID, RedirectURI: redirectURI,
+			CodeChallenge: pkce("v-" + clientID), CodeChallengeMethod: &s256, Scopes: scopes,
+		}
+		code, err := w.repo.ApproveAgentAccess(w.ctx, w.owner, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tok, err := w.repo.ExchangeAgentCode(w.ctx, clientID, code.Code, "v-"+clientID, redirectURI)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tok.AccessToken
+	}
+
+	// Two Claude Code sessions, one pending unexchanged Claude Code authorization,
+	// one Codex session, one name-only legacy Claude Code agent key, and one manual REST API key.
+	claude1 := connect("pcd_claude", "http://127.0.0.1:4123/cb", []string{"artifact:read", "draft:write"})
+	claude2 := connect("pcd_claude", "http://127.0.0.1:4123/cb", []string{"artifact:read", "post:publish"})
+	pendingCode, err := w.repo.ApproveAgentAccess(w.ctx, w.owner, AgentAuthorizationRequest{
+		ClientID: "pcd_claude", RedirectURI: "http://127.0.0.1:4123/cb",
+		CodeChallenge: pkce("v-pending"), CodeChallengeMethod: &s256, Scopes: []string{"artifact:read"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexKey := connect("pcd_codex", "http://127.0.0.1:4124/cb", []string{"artifact:read"})
+	w.exec(t, `INSERT INTO apikey (id,name,"referenceId",key,enabled,"createdAt","updatedAt") VALUES ($1,'Claude Code manual key',$2,$3,true,now(),now())`,
+		"key_manual_"+w.id, w.org, "hashed-manual-"+w.id)
+	w.exec(t, `INSERT INTO apikey (id,name,"referenceId",key,enabled,metadata,"createdAt","updatedAt") VALUES ($1,'Claude Code (AI agent)',$2,$3,true,$4,now(),now())`,
+		"key_legacy_name_"+w.id, w.org, "hashed-legacy-"+w.id, `{"source":"agent","clientName":"Claude Code"}`)
+
+	// Second workspace holding the same clientId must stay completely untouched.
+	other := newTestWorkspace(t)
+	t.Cleanup(func() {
+		_, _ = other.db.SQL.ExecContext(other.ctx, `DELETE FROM apikey WHERE "referenceId"=$1`, other.org)
+	})
+	other.repo.WithAgentClients(fakeAgentClients{
+		"pcd_claude": {ClientID: "pcd_claude", Name: "Claude Code", Dynamic: true, Public: true, RedirectURIs: []string{"http://127.0.0.1:4123/cb"}},
+	})
+	otherCode, err := other.repo.ApproveAgentAccess(other.ctx, other.owner, AgentAuthorizationRequest{
+		ClientID: "pcd_claude", RedirectURI: "http://127.0.0.1:4123/cb",
+		CodeChallenge: pkce("v-other"), CodeChallengeMethod: &s256, Scopes: []string{"artifact:read"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherClaude, err := other.repo.ExchangeAgentCode(other.ctx, "pcd_claude", otherCode.Code, "v-other", "http://127.0.0.1:4123/cb")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// VerifyAPIKey stamps lastRequest on first verification and debounces immediate repeats.
+	verified, err := w.repo.VerifyAPIKey(w.ctx, claude1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := w.db.Client.Apikey.Query().Where(apikey.ID(verified.ID)).OnlyX(w.ctx)
+	if row.LastRequest == nil {
+		t.Fatal("VerifyAPIKey did not stamp lastRequest on first call")
+	}
+	firstTouch := *row.LastRequest
+	if _, err := w.repo.VerifyAPIKey(w.ctx, claude1); err != nil {
+		t.Fatal(err)
+	}
+	rowAfter := w.db.Client.Apikey.Query().Where(apikey.ID(verified.ID)).OnlyX(w.ctx)
+	if rowAfter.LastRequest == nil || !rowAfter.LastRequest.Equal(firstTouch) {
+		t.Fatalf("VerifyAPIKey overwrote lastRequest inside 5-minute debounce: %v -> %v", firstTouch, rowAfter.LastRequest)
+	}
+	info, err := w.repo.GetCurrentAPIKeyInfo(w.ctx, verified.Actor("req-1"))
+	if err != nil || info.Key.ID != verified.ID || info.Workspace.ID != w.org || !slices.Equal(info.Key.Scopes, []string{"artifact:read", "draft:write"}) {
+		t.Fatalf("GetCurrentAPIKeyInfo=%+v err=%v", info, err)
+	}
+	if _, err := w.repo.GetCurrentAPIKeyInfo(w.ctx, w.owner); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("session caller should be refused by GetCurrentAPIKeyInfo: %v", err)
+	}
+	// Non-admin and API-key callers cannot revoke agent clients.
+	w.addMember(t, "creator", "creator")
+	if _, err := w.repo.RevokeAgentClient(w.ctx, w.actor("creator"), RevokeAgentClientInput{ClientID: "pcd_claude"}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("creator should be refused by RevokeAgentClient: %v", err)
+	}
+	if _, err := w.repo.RevokeAgentClient(w.ctx, verified.Actor("req-2"), RevokeAgentClientInput{ClientID: "pcd_claude"}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("api_key caller should be refused by RevokeAgentClient: %v", err)
+	}
+
+	// Revoke all pcd_claude sessions and pending consent codes atomically.
+	res, err := w.repo.RevokeAgentClient(w.ctx, w.owner, RevokeAgentClientInput{ClientID: "pcd_claude", ClientName: "Claude Code"})
+	if err != nil || res.RevokedCount != 2 || len(res.RevokedKeyIDs) != 2 {
+		t.Fatalf("RevokeAgentClient=%+v err=%v", res, err)
+	}
+	if _, err := w.repo.VerifyAPIKey(w.ctx, claude1); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("claude1 still valid after bulk revoke: %v", err)
+	}
+	if _, err := w.repo.VerifyAPIKey(w.ctx, claude2); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("claude2 still valid after bulk revoke: %v", err)
+	}
+	if _, err := w.repo.ExchangeAgentCode(w.ctx, "pcd_claude", pendingCode.Code, "v-pending", "http://127.0.0.1:4123/cb"); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("pending authorization code survived RevokeAgentClient: %v", err)
+	}
+	// Repeating revoke writes no extra audit record and returns 0.
+	repeat, err := w.repo.RevokeAgentClient(w.ctx, w.owner, RevokeAgentClientInput{ClientID: "pcd_claude"})
+	if err != nil || repeat.RevokedCount != 0 {
+		t.Fatalf("repeat revoke=%+v err=%v", repeat, err)
+	}
+	// Codex session, legacy name-only group, manual key, and other workspace's pcd_claude stay intact.
+	if _, err := w.repo.VerifyAPIKey(w.ctx, codexKey); err != nil {
+		t.Fatalf("codex key was unexpectedly revoked: %v", err)
+	}
+	if _, err := other.repo.VerifyAPIKey(other.ctx, otherClaude.AccessToken); err != nil {
+		t.Fatalf("other workspace's pcd_claude key was revoked: %v", err)
+	}
+	if exists := w.db.Client.Apikey.Query().Where(apikey.ID("key_manual_" + w.id)).ExistX(w.ctx); !exists {
+		t.Fatal("manual REST key was unexpectedly deleted by RevokeAgentClient")
+	}
+	if exists := w.db.Client.Apikey.Query().Where(apikey.ID("key_legacy_name_" + w.id)).ExistX(w.ctx); !exists {
+		t.Fatal("separate name-only agent group was over-revoked by clientId revoke")
+	}
+	if n := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.agent_access_revoked")).CountX(w.ctx); n != 1 {
+		t.Fatalf("expected 1 product.agent_access_revoked audit record, got %d", n)
+	}
+}

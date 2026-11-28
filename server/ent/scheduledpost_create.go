@@ -352,6 +352,20 @@ func (_c *ScheduledPostCreate) SetNillableScheduleIntent(v *string) *ScheduledPo
 	return _c
 }
 
+// SetPublishGroupID sets the "publish_group_id" field.
+func (_c *ScheduledPostCreate) SetPublishGroupID(v string) *ScheduledPostCreate {
+	_c.mutation.SetPublishGroupID(v)
+	return _c
+}
+
+// SetNillablePublishGroupID sets the "publish_group_id" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillablePublishGroupID(v *string) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetPublishGroupID(*v)
+	}
+	return _c
+}
+
 // SetFailureCode sets the "failure_code" field.
 func (_c *ScheduledPostCreate) SetFailureCode(v string) *ScheduledPostCreate {
 	_c.mutation.SetFailureCode(v)
@@ -404,6 +418,20 @@ func (_c *ScheduledPostCreate) SetApprovedVersion(v int) *ScheduledPostCreate {
 func (_c *ScheduledPostCreate) SetNillableApprovedVersion(v *int) *ScheduledPostCreate {
 	if v != nil {
 		_c.SetApprovedVersion(*v)
+	}
+	return _c
+}
+
+// SetXLinksStrippedCount sets the "x_links_stripped_count" field.
+func (_c *ScheduledPostCreate) SetXLinksStrippedCount(v int) *ScheduledPostCreate {
+	_c.mutation.SetXLinksStrippedCount(v)
+	return _c
+}
+
+// SetNillableXLinksStrippedCount sets the "x_links_stripped_count" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillableXLinksStrippedCount(v *int) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetXLinksStrippedCount(*v)
 	}
 	return _c
 }
@@ -501,6 +529,10 @@ func (_c *ScheduledPostCreate) defaults() {
 		v := scheduledpost.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.XLinksStrippedCount(); !ok {
+		v := scheduledpost.DefaultXLinksStrippedCount
+		_c.mutation.SetXLinksStrippedCount(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := scheduledpost.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -545,6 +577,9 @@ func (_c *ScheduledPostCreate) check() error {
 		if err := scheduledpost.ScheduleModeValidator(v); err != nil {
 			return &ValidationError{Name: "schedule_mode", err: fmt.Errorf(`ent: validator failed for field "ScheduledPost.schedule_mode": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.XLinksStrippedCount(); !ok {
+		return &ValidationError{Name: "x_links_stripped_count", err: errors.New(`ent: missing required field "ScheduledPost.x_links_stripped_count"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "ScheduledPost.created_at"`)}
@@ -698,6 +733,10 @@ func (_c *ScheduledPostCreate) createSpec() (*ScheduledPost, *sqlgraph.CreateSpe
 		_spec.SetField(scheduledpost.FieldScheduleIntent, field.TypeString, value)
 		_node.ScheduleIntent = &value
 	}
+	if value, ok := _c.mutation.PublishGroupID(); ok {
+		_spec.SetField(scheduledpost.FieldPublishGroupID, field.TypeString, value)
+		_node.PublishGroupID = &value
+	}
 	if value, ok := _c.mutation.FailureCode(); ok {
 		_spec.SetField(scheduledpost.FieldFailureCode, field.TypeString, value)
 		_node.FailureCode = &value
@@ -713,6 +752,10 @@ func (_c *ScheduledPostCreate) createSpec() (*ScheduledPost, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.ApprovedVersion(); ok {
 		_spec.SetField(scheduledpost.FieldApprovedVersion, field.TypeInt, value)
 		_node.ApprovedVersion = &value
+	}
+	if value, ok := _c.mutation.XLinksStrippedCount(); ok {
+		_spec.SetField(scheduledpost.FieldXLinksStrippedCount, field.TypeInt, value)
+		_node.XLinksStrippedCount = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldCreatedAt, field.TypeTime, value)

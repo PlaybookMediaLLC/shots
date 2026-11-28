@@ -1,11 +1,12 @@
 {
   "name": "shots-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Turn code into Shots Code Studio projects and images from the terminal",
+  "description": "Connect to Shots from the terminal: setup, accounts, posts, drafts, releases, and Code Studio",
   "type": "module",
   "bin": {
-    "shots": "bin/shots.js"
+    "shots": "bin/shots.js",
+    "shots-cli": "bin/shots.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

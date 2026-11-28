@@ -315,6 +315,8 @@ export const contentDraftPostSchema = z.object({
   publishedAt: timestampSchema.nullable().default(null),
   /** When Shots deleted it from its platform; it stays published in Shots' record. */
   deletedAt: timestampSchema.nullable().default(null),
+  /** Total links stripped when publishing to X without the x_links add-on. */
+  xLinksStrippedCount: z.number().int().nonnegative().default(0),
   /** Each part of a requested delete, with its receipt. */
   deletions: z.array(postDeletionReceiptSchema).default([]),
 })
@@ -345,7 +347,7 @@ export const contentDraftScheduleSchema = scheduleTimingSchema.extend({
    * text and media to an account again within a day.
    */
   confirmDuplicate: z.boolean().optional(),
-  /** Overrides the draft's natural posting time for this schedule (±4 minutes). */
+  /** Overrides the draft's randomized posting time for this schedule (±1–15 minutes per profile). */
   naturalPostingTime: z.boolean().optional(),
   scheduledFor: z.coerce
     .date()

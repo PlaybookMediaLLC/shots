@@ -148,6 +148,41 @@ func (_u *PublicationAttemptUpdate) ClearRemoteURL() *PublicationAttemptUpdate {
 	return _u
 }
 
+// SetLinksStrippedCount sets the "links_stripped_count" field.
+func (_u *PublicationAttemptUpdate) SetLinksStrippedCount(v int) *PublicationAttemptUpdate {
+	_u.mutation.ResetLinksStrippedCount()
+	_u.mutation.SetLinksStrippedCount(v)
+	return _u
+}
+
+// SetNillableLinksStrippedCount sets the "links_stripped_count" field if the given value is not nil.
+func (_u *PublicationAttemptUpdate) SetNillableLinksStrippedCount(v *int) *PublicationAttemptUpdate {
+	if v != nil {
+		_u.SetLinksStrippedCount(*v)
+	}
+	return _u
+}
+
+// AddLinksStrippedCount adds value to the "links_stripped_count" field.
+func (_u *PublicationAttemptUpdate) AddLinksStrippedCount(v int) *PublicationAttemptUpdate {
+	_u.mutation.AddLinksStrippedCount(v)
+	return _u
+}
+
+// SetXLinkQuotaConsumed sets the "x_link_quota_consumed" field.
+func (_u *PublicationAttemptUpdate) SetXLinkQuotaConsumed(v bool) *PublicationAttemptUpdate {
+	_u.mutation.SetXLinkQuotaConsumed(v)
+	return _u
+}
+
+// SetNillableXLinkQuotaConsumed sets the "x_link_quota_consumed" field if the given value is not nil.
+func (_u *PublicationAttemptUpdate) SetNillableXLinkQuotaConsumed(v *bool) *PublicationAttemptUpdate {
+	if v != nil {
+		_u.SetXLinkQuotaConsumed(*v)
+	}
+	return _u
+}
+
 // Mutation returns the PublicationAttemptMutation object of the builder.
 func (_u *PublicationAttemptUpdate) Mutation() *PublicationAttemptMutation {
 	return _u.mutation
@@ -240,6 +275,15 @@ func (_u *PublicationAttemptUpdate) sqlSave(ctx context.Context) (_node int, err
 	}
 	if _u.mutation.RemoteURLCleared() {
 		_spec.ClearField(publicationattempt.FieldRemoteURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinksStrippedCount(); ok {
+		_spec.SetField(publicationattempt.FieldLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLinksStrippedCount(); ok {
+		_spec.AddField(publicationattempt.FieldLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.XLinkQuotaConsumed(); ok {
+		_spec.SetField(publicationattempt.FieldXLinkQuotaConsumed, field.TypeBool, value)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -381,6 +425,41 @@ func (_u *PublicationAttemptUpdateOne) ClearRemoteURL() *PublicationAttemptUpdat
 	return _u
 }
 
+// SetLinksStrippedCount sets the "links_stripped_count" field.
+func (_u *PublicationAttemptUpdateOne) SetLinksStrippedCount(v int) *PublicationAttemptUpdateOne {
+	_u.mutation.ResetLinksStrippedCount()
+	_u.mutation.SetLinksStrippedCount(v)
+	return _u
+}
+
+// SetNillableLinksStrippedCount sets the "links_stripped_count" field if the given value is not nil.
+func (_u *PublicationAttemptUpdateOne) SetNillableLinksStrippedCount(v *int) *PublicationAttemptUpdateOne {
+	if v != nil {
+		_u.SetLinksStrippedCount(*v)
+	}
+	return _u
+}
+
+// AddLinksStrippedCount adds value to the "links_stripped_count" field.
+func (_u *PublicationAttemptUpdateOne) AddLinksStrippedCount(v int) *PublicationAttemptUpdateOne {
+	_u.mutation.AddLinksStrippedCount(v)
+	return _u
+}
+
+// SetXLinkQuotaConsumed sets the "x_link_quota_consumed" field.
+func (_u *PublicationAttemptUpdateOne) SetXLinkQuotaConsumed(v bool) *PublicationAttemptUpdateOne {
+	_u.mutation.SetXLinkQuotaConsumed(v)
+	return _u
+}
+
+// SetNillableXLinkQuotaConsumed sets the "x_link_quota_consumed" field if the given value is not nil.
+func (_u *PublicationAttemptUpdateOne) SetNillableXLinkQuotaConsumed(v *bool) *PublicationAttemptUpdateOne {
+	if v != nil {
+		_u.SetXLinkQuotaConsumed(*v)
+	}
+	return _u
+}
+
 // Mutation returns the PublicationAttemptMutation object of the builder.
 func (_u *PublicationAttemptUpdateOne) Mutation() *PublicationAttemptMutation {
 	return _u.mutation
@@ -503,6 +582,15 @@ func (_u *PublicationAttemptUpdateOne) sqlSave(ctx context.Context) (_node *Publ
 	}
 	if _u.mutation.RemoteURLCleared() {
 		_spec.ClearField(publicationattempt.FieldRemoteURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.LinksStrippedCount(); ok {
+		_spec.SetField(publicationattempt.FieldLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLinksStrippedCount(); ok {
+		_spec.AddField(publicationattempt.FieldLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.XLinkQuotaConsumed(); ok {
+		_spec.SetField(publicationattempt.FieldXLinkQuotaConsumed, field.TypeBool, value)
 	}
 	_node = &PublicationAttempt{config: _u.config}
 	_spec.Assign = _node.assignValues

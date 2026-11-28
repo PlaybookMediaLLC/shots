@@ -160,6 +160,11 @@ func ScheduleIntent(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldScheduleIntent, v))
 }
 
+// PublishGroupID applies equality check predicate on the "publish_group_id" field. It's identical to PublishGroupIDEQ.
+func PublishGroupID(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldPublishGroupID, v))
+}
+
 // FailureCode applies equality check predicate on the "failure_code" field. It's identical to FailureCodeEQ.
 func FailureCode(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldFailureCode, v))
@@ -178,6 +183,11 @@ func ApprovedByUserID(v string) predicate.ScheduledPost {
 // ApprovedVersion applies equality check predicate on the "approved_version" field. It's identical to ApprovedVersionEQ.
 func ApprovedVersion(v int) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedVersion, v))
+}
+
+// XLinksStrippedCount applies equality check predicate on the "x_links_stripped_count" field. It's identical to XLinksStrippedCountEQ.
+func XLinksStrippedCount(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldXLinksStrippedCount, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -1535,6 +1545,81 @@ func ScheduleIntentContainsFold(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldContainsFold(FieldScheduleIntent, v))
 }
 
+// PublishGroupIDEQ applies the EQ predicate on the "publish_group_id" field.
+func PublishGroupIDEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDNEQ applies the NEQ predicate on the "publish_group_id" field.
+func PublishGroupIDNEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDIn applies the In predicate on the "publish_group_id" field.
+func PublishGroupIDIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldPublishGroupID, vs...))
+}
+
+// PublishGroupIDNotIn applies the NotIn predicate on the "publish_group_id" field.
+func PublishGroupIDNotIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldPublishGroupID, vs...))
+}
+
+// PublishGroupIDGT applies the GT predicate on the "publish_group_id" field.
+func PublishGroupIDGT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDGTE applies the GTE predicate on the "publish_group_id" field.
+func PublishGroupIDGTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDLT applies the LT predicate on the "publish_group_id" field.
+func PublishGroupIDLT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDLTE applies the LTE predicate on the "publish_group_id" field.
+func PublishGroupIDLTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDContains applies the Contains predicate on the "publish_group_id" field.
+func PublishGroupIDContains(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContains(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDHasPrefix applies the HasPrefix predicate on the "publish_group_id" field.
+func PublishGroupIDHasPrefix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasPrefix(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDHasSuffix applies the HasSuffix predicate on the "publish_group_id" field.
+func PublishGroupIDHasSuffix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasSuffix(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDIsNil applies the IsNil predicate on the "publish_group_id" field.
+func PublishGroupIDIsNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIsNull(FieldPublishGroupID))
+}
+
+// PublishGroupIDNotNil applies the NotNil predicate on the "publish_group_id" field.
+func PublishGroupIDNotNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotNull(FieldPublishGroupID))
+}
+
+// PublishGroupIDEqualFold applies the EqualFold predicate on the "publish_group_id" field.
+func PublishGroupIDEqualFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEqualFold(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDContainsFold applies the ContainsFold predicate on the "publish_group_id" field.
+func PublishGroupIDContainsFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContainsFold(FieldPublishGroupID, v))
+}
+
 // FailureCodeEQ applies the EQ predicate on the "failure_code" field.
 func FailureCodeEQ(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldFailureCode, v))
@@ -1808,6 +1893,46 @@ func ApprovedVersionIsNil() predicate.ScheduledPost {
 // ApprovedVersionNotNil applies the NotNil predicate on the "approved_version" field.
 func ApprovedVersionNotNil() predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldNotNull(FieldApprovedVersion))
+}
+
+// XLinksStrippedCountEQ applies the EQ predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountNEQ applies the NEQ predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountNEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountIn applies the In predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldXLinksStrippedCount, vs...))
+}
+
+// XLinksStrippedCountNotIn applies the NotIn predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountNotIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldXLinksStrippedCount, vs...))
+}
+
+// XLinksStrippedCountGT applies the GT predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountGT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountGTE applies the GTE predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountGTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountLT applies the LT predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountLT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldXLinksStrippedCount, v))
+}
+
+// XLinksStrippedCountLTE applies the LTE predicate on the "x_links_stripped_count" field.
+func XLinksStrippedCountLTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldXLinksStrippedCount, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

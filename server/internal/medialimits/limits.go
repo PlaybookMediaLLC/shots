@@ -11,6 +11,19 @@ import (
 //go:embed limits.json
 var document []byte
 
+// VideoProfile defines server-side normalized video derivative parameters.
+// Originals are never overwritten; passthrough mode skips transcoding entirely.
+type VideoProfile struct {
+	MaxBytes      int    `json:"maxBytes"`
+	MaxEdge       int    `json:"maxEdge"`
+	MaxFPS        int    `json:"maxFps"`
+	VideoCodec    string `json:"videoCodec"`
+	AudioCodec    string `json:"audioCodec"`
+	PixelFormat   string `json:"pixelFormat"`
+	CRF           int    `json:"crf"`
+	AudioBitrateK int    `json:"audioBitrateK"`
+}
+
 // ImageProfile defines persisted static-image derivatives; MaxEdge is the
 // application's conservative processing size, not an account entitlement.
 type ImageProfile struct {
@@ -82,6 +95,7 @@ type Destination struct {
 var Limits struct {
 	Destinations   map[string]Destination  `json:"destinations"`
 	ImageProfiles  map[string]ImageProfile `json:"imageProfiles"`
+	VideoProfiles  map[string]VideoProfile `json:"videoProfiles"`
 	FreeImageBytes int                     `json:"freeImageBytes"`
 	PaidImageBytes int                     `json:"paidImageBytes"`
 	VideoBytes     int                     `json:"videoBytes"`
