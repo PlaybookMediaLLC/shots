@@ -19,6 +19,8 @@ export const webhookEventSchema = z.enum([
   'draft.status_changed',
   'draft.tags_changed',
   'draft.deleted',
+  'post.completed',
+  'connection.needs_reconnect',
 ])
 
 /** An outbound webhook, without its secret. */
@@ -56,7 +58,7 @@ export const listWebhooksContract = defineContract({
 export const createWebhookContract = defineContract({
   body: z
     .object({
-      events: z.array(webhookEventSchema).min(1).max(8),
+      events: z.array(webhookEventSchema).min(1).max(webhookEventSchema.options.length),
       name: z.string().trim().min(1).max(80),
       url: z.url({ protocol: /^https$/ }).max(2_048),
     })
@@ -74,7 +76,7 @@ export const updateWebhookContract = defineContract({
   body: z
     .object({
       enabled: z.boolean().optional(),
-      events: z.array(webhookEventSchema).min(1).max(8).optional(),
+      events: z.array(webhookEventSchema).min(1).max(webhookEventSchema.options.length).optional(),
       name: z.string().trim().min(1).max(80).optional(),
       url: z
         .url({ protocol: /^https$/ })

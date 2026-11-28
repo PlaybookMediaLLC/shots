@@ -264,6 +264,29 @@ func (f *fakeConfiguration) ApproveAgentAccess(_ context.Context, actor product.
 	}
 	return &product.AgentAuthorizationCode{Code: "shc_code", RedirectURI: request.RedirectURI}, nil
 }
+func (f *fakeConfiguration) RevokeAgentClient(_ context.Context, actor product.Actor, input product.RevokeAgentClientInput) (*product.RevokeAgentClientResult, error) {
+	f.actor = actor
+	if f.authorizationError != nil {
+		return nil, f.authorizationError
+	}
+	if input.ClientID == "" && input.ClientName == "" {
+		return nil, product.ErrInvalidInput
+	}
+	return &product.RevokeAgentClientResult{RevokedCount: 2, RevokedKeyIDs: []string{"k1", "k2"}}, nil
+}
+func (f *fakeConfiguration) GetCurrentAPIKeyInfo(_ context.Context, actor product.Actor) (*product.CurrentAPIKeyInfo, error) {
+	f.actor = actor
+	if actor.Kind != "api_key" || actor.KeyID == "" {
+		return nil, publishing.ErrForbidden
+	}
+	name := "CLI key"
+	prefix := "ss_"
+	start := "ss_123"
+	return &product.CurrentAPIKeyInfo{
+		Key:       product.APIKeySummary{ID: actor.KeyID, Name: &name, Prefix: &prefix, Start: &start, Scopes: []string{"artifact:read"}},
+		Workspace: product.APIKeyWorkspaceBrief{ID: actor.OrganizationID, Name: "Acme", Slug: "acme"},
+	}, nil
+}
 func (f *fakeConfiguration) GetCampaign(context.Context, product.Actor, string) (*product.CampaignDetail, error) {
 	return &product.CampaignDetail{CampaignItem: product.CampaignItem{ID: "campaign-1", Name: "Launch"}}, nil
 }
@@ -955,4 +978,46 @@ func (f *fakeConfiguration) ListFounderHubSettings(context.Context, product.Acto
 }
 func (f *fakeConfiguration) UpdateFounderHubSettings(context.Context, product.Actor, product.FounderHubSettingsUpdate) (*product.FounderHubSettings, error) {
 	return nil, nil
+}
+
+func TestAgentRevokeClientAndCurrentAPIKeyInfo(t *testing.T) {
+	config := &fakeConfiguration{}
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", config)
+
+	revokeResp := configurationRequest(handler, http.MethodPost, "/v1/agent-authorizations/revoke-client", `{"clientId":"pcd_claude"}`)
+	if revokeResp.Code != http.StatusOK || !strings.Contains(revokeResp.Body.String(), `"revokedCount":2`) {
+		t.Fatalf("revoke-client expected 200 with revokedCount=2 got %d body=%s", revokeResp.Code, revokeResp.Body.String())
+	}
+
+	invalidResp := configurationRequest(handler, http.MethodPost, "/v1/agent-authorizations/revoke-client", `{}`)
+	if invalidResp.Code != http.StatusBadRequest {
+		t.Fatalf("empty revoke-client expected 400 got %d body=%s", invalidResp.Code, invalidResp.Body.String())
+	}
+	unknownFieldResp := configurationRequest(handler, http.MethodPost, "/v1/agent-authorizations/revoke-client", `{"clientId":"pcd_claude","bogus":true}`)
+	if unknownFieldResp.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field revoke-client expected 400 got %d body=%s", unknownFieldResp.Code, unknownFieldResp.Body.String())
+	}
+
+	config.authorizationError = publishing.ErrForbidden
+	deniedResp := configurationRequest(handler, http.MethodPost, "/v1/agent-authorizations/revoke-client", `{"clientId":"pcd_claude"}`)
+	if deniedResp.Code != http.StatusForbidden {
+		t.Fatalf("unauthorized revoke-client expected 403 got %d body=%s", deniedResp.Code, deniedResp.Body.String())
+	}
+	config.authorizationError = nil
+
+	sessionMeResp := configurationRequest(handler, http.MethodGet, "/v1/api-keys/me", "")
+	if sessionMeResp.Code != http.StatusForbidden {
+		t.Fatalf("session caller on GET /v1/api-keys/me expected 403 got %d body=%s", sessionMeResp.Code, sessionMeResp.Body.String())
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/v1/api-keys/me", nil)
+	meReq.Header.Set("Authorization", "Bearer secret")
+	meReq.Header.Set("X-Organization-ID", "org-1")
+	meReq.Header.Set("X-Principal-Kind", "api_key")
+	meReq.Header.Set("X-API-Key-ID", "key-42")
+	meResp := httptest.NewRecorder()
+	handler.ServeHTTP(meResp, meReq)
+	if meResp.Code != http.StatusOK || meResp.Header().Get("Cache-Control") != "no-store" || !strings.Contains(meResp.Body.String(), `"id":"key-42"`) || !strings.Contains(meResp.Body.String(), `"slug":"acme"`) {
+		t.Fatalf("GET /v1/api-keys/me status=%d cc=%q body=%s", meResp.Code, meResp.Header().Get("Cache-Control"), meResp.Body.String())
+	}
 }

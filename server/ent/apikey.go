@@ -33,6 +33,8 @@ type Apikey struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// LastRequest holds the value of the "last_request" field.
+	LastRequest *time.Time `json:"last_request,omitempty"`
 	// Permissions holds the value of the "permissions" field.
 	Permissions *string `json:"permissions,omitempty"`
 	// Metadata holds the value of the "metadata" field.
@@ -53,7 +55,7 @@ func (*Apikey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case apikey.FieldID, apikey.FieldConfigID, apikey.FieldName, apikey.FieldStart, apikey.FieldReferenceID, apikey.FieldPrefix, apikey.FieldKey, apikey.FieldPermissions, apikey.FieldMetadata:
 			values[i] = new(sql.NullString)
-		case apikey.FieldExpiresAt, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
+		case apikey.FieldExpiresAt, apikey.FieldLastRequest, apikey.FieldCreatedAt, apikey.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -128,6 +130,13 @@ func (_m *Apikey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ExpiresAt = new(time.Time)
 				*_m.ExpiresAt = value.Time
+			}
+		case apikey.FieldLastRequest:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_request", values[i])
+			} else if value.Valid {
+				_m.LastRequest = new(time.Time)
+				*_m.LastRequest = value.Time
 			}
 		case apikey.FieldPermissions:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -221,6 +230,11 @@ func (_m *Apikey) String() string {
 	builder.WriteString(", ")
 	if v := _m.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.LastRequest; v != nil {
+		builder.WriteString("last_request=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

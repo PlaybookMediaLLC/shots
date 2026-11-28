@@ -21,20 +21,26 @@ const SchemaVersion = 1
 // Event types a subscription can receive. The names are Screenshot Studio's
 // own, stable wire identifiers.
 const (
-	DraftCreated       = "draft.created"
-	DraftUpdated       = "draft.updated"
-	DraftScheduled     = "draft.scheduled"
-	DraftPlanned       = "draft.planned"
-	DraftStatusChanged = "draft.status_changed"
-	DraftTagsChanged   = "draft.tags_changed"
-	DraftPublished     = "draft.published"
-	DraftDeleted       = "draft.deleted"
+	DraftCreated             = "draft.created"
+	DraftUpdated             = "draft.updated"
+	DraftScheduled           = "draft.scheduled"
+	DraftPlanned             = "draft.planned"
+	DraftStatusChanged       = "draft.status_changed"
+	DraftTagsChanged         = "draft.tags_changed"
+	DraftPublished           = "draft.published"
+	DraftDeleted             = "draft.deleted"
+	PostCompleted            = "post.completed"
+	ConnectionNeedsReconnect = "connection.needs_reconnect"
 	// Test is sent only when an admin asks for a test delivery.
 	Test = "webhook.test"
 )
 
 // EventTypes are the events a subscription can choose, in display order.
-var EventTypes = []string{DraftCreated, DraftUpdated, DraftPublished, DraftScheduled, DraftPlanned, DraftStatusChanged, DraftTagsChanged, DraftDeleted}
+var EventTypes = []string{
+	DraftCreated, DraftUpdated, DraftPublished, DraftScheduled, DraftPlanned,
+	DraftStatusChanged, DraftTagsChanged, DraftDeleted,
+	PostCompleted, ConnectionNeedsReconnect,
+}
 
 // KnownEvent reports whether kind is an event a subscription can choose.
 func KnownEvent(kind string) bool {

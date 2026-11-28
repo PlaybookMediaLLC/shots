@@ -54,3 +54,129 @@ test('the client refuses unsafe origins and keeps the key on its origin', async 
     /No scope/
   )
 })
+
+test('parseCommand supports setup, whoami, accounts, drafts, releases, and posts create', async () => {
+  const { parseCommand } = await import('../lib/args.js')
+  assert.deepEqual(parseCommand(['setup', '--key', 'ss_test', '--origin', 'https://shots.example']), {
+    command: 'setup',
+    options: { key: 'ss_test', origin: 'https://shots.example', json: false },
+  })
+  assert.deepEqual(parseCommand(['whoami', '--json']), {
+    command: 'whoami',
+    options: { json: true },
+  })
+  assert.deepEqual(parseCommand(['accounts', 'list']), {
+    command: 'accounts:list',
+    options: { json: false },
+  })
+  assert.deepEqual(
+    parseCommand(['posts', 'create', '--account', 'cc_1', '--text', 'hello', '--now', '--idempotency-key', 'k1234567890123456']),
+    {
+      command: 'posts:create',
+      options: {
+        accounts: ['cc_1'],
+        texts: ['hello'],
+        publishNow: true,
+        queue: false,
+        idempotencyKey: 'k1234567890123456',
+        json: false,
+      },
+    }
+  )
+  assert.deepEqual(
+    parseCommand(['posts', 'create', '--account', 'cc_1', '--text', '--leading-dashes', '--text', '-h', '--at', '2026-12-01T10:00:00Z']),
+    {
+      command: 'posts:create',
+      options: {
+        accounts: ['cc_1'],
+        texts: ['--leading-dashes', '-h'],
+        publishNow: false,
+        scheduledFor: '2026-12-01T10:00:00Z',
+        queue: false,
+        json: false,
+      },
+    }
+  )
+  assert.throws(() => parseCommand(['setup']), /--key/)
+  assert.throws(() => parseCommand(['setup', '--key', '   ']), /non-empty/)
+  assert.throws(() => parseCommand(['setup', '--key', 'ss_1', '--origin', '   ']), /non-empty/)
+  assert.throws(() => parseCommand(['setup', '--key', 'ss_1', '--bogus']), /Unknown option --bogus/)
+  assert.throws(() => parseCommand(['whoami', '--bogus']), /Unknown option --bogus/)
+  assert.throws(() => parseCommand(['posts', 'list', '--limit', '5']), /Unknown option --limit/)
+  assert.throws(() => parseCommand(['posts', 'create', '--account', '  ', '--text', 'hi', '--now']), /non-empty/)
+  assert.throws(() => parseCommand(['posts', 'create', '--account', 'cc_1', '--text', 'hi']), /exactly one/)
+  assert.throws(() => parseCommand(['posts', 'create', '--account', 'cc_1', '--text', 'hi', '--now', '--queue']), /exactly one/)
+})
+
+test('config persists atomically with owner-only permissions, recovers from corrupt JSON, and env vars override', async () => {
+  const { mkdtemp, rm, stat, writeFile } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { defaultConfigPath, loadConfig, resolveCredentials, saveConfig } = await import('../lib/config.js')
+  const dir = await mkdtemp(join(tmpdir(), 'shots-cli-test-'))
+  try {
+    assert.equal(defaultConfigPath({ XDG_CONFIG_HOME: dir }), join(dir, 'shots', 'config.json'))
+    const configPath = join(dir, 'shots', 'config.json')
+    await saveConfig({ apiKey: 'ss_saved_key', origin: 'https://shots.example' }, configPath)
+    const info = await stat(configPath)
+    assert.equal(info.mode & 0o777, 0o600)
+    assert.deepEqual(await loadConfig(configPath), {
+      apiKey: 'ss_saved_key',
+      origin: 'https://shots.example',
+    })
+    assert.deepEqual(await resolveCredentials({ configPath, env: {} }), {
+      apiKey: 'ss_saved_key',
+      origin: 'https://shots.example',
+    })
+    assert.deepEqual(
+      await resolveCredentials({
+        configPath,
+        env: { SHOTS_API_KEY: 'ss_env_override', SHOTS_ORIGIN: 'https://override.example' },
+      }),
+      {
+        apiKey: 'ss_env_override',
+        origin: 'https://override.example',
+      }
+    )
+    await writeFile(configPath, '{corrupt json', 'utf8')
+    assert.deepEqual(await loadConfig(configPath), {})
+  } finally {
+    await rm(dir, { force: true, recursive: true })
+  }
+})
+
+test('ShotsClient validates JSON/whoami responses, forwards headers, and supports list endpoints', async () => {
+  const calls = []
+  const transport = async (url, init) => {
+    calls.push({ url, init })
+    if (url.endsWith('/api/v1/auth/me')) {
+      return Response.json({
+        key: { id: 'k1', name: 'CLI', prefix: 'ss_', start: 'ss_123', scopes: ['artifact:read'], expiresAt: null },
+        workspace: { id: 'org1', name: 'Acme', slug: 'acme' },
+      })
+    }
+    if (url.endsWith('/api/v1/social-sets')) return Response.json({ items: [] })
+    if (url.endsWith('/api/v1/scheduled-posts')) return Response.json({ items: [] })
+    if (url.endsWith('/api/v1/content-drafts')) return Response.json({ items: [] })
+    if (url.endsWith('/api/v1/releases')) return Response.json({ items: [] })
+    return Response.json({ status: 'scheduled' }, { status: 201 })
+  }
+  const client = new ShotsClient('http://localhost:3000', 'ss_secret', transport)
+  const me = await client.whoami()
+  assert.equal(me.workspace.slug, 'acme')
+  await client.createPost({ channelConnectionIds: ['cc_1'], posts: [{ text: 'hi' }], publishNow: true }, 'idem_1234567890123456')
+  assert.equal(calls[1].init.headers['idempotency-key'], 'idem_1234567890123456')
+  await client.listSocialSets()
+  await client.listScheduledPosts()
+  await client.listDrafts()
+  await client.listReleases()
+  await assert.rejects(() => client.request('/not-v1'), /Invalid API path/)
+
+  const htmlClient = new ShotsClient('https://example.com', 'ss_secret', async () => new Response('<html>login</html>', { status: 200 }))
+  await assert.rejects(() => htmlClient.whoami(), /invalid JSON/)
+
+  const badShapeClient = new ShotsClient('https://example.com', 'ss_secret', async () => Response.json({ ok: true }))
+  await assert.rejects(() => badShapeClient.whoami(), /unexpected authentication payload/)
+
+  assert.throws(() => new ShotsClient('   ', 'ss_secret'), /SHOTS_ORIGIN/)
+})

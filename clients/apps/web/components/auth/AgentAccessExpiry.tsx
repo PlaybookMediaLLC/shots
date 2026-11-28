@@ -24,7 +24,7 @@ export function AgentAccessExpiry() {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="never">Never (revoke it in Settings → AI agents)</SelectItem>
+          <SelectItem value="never">Never (revoke it in Settings → Agents &amp; API keys)</SelectItem>
           <SelectItem value="30">In 30 days</SelectItem>
           <SelectItem value="90">In 90 days</SelectItem>
           <SelectItem value="365">In a year</SelectItem>

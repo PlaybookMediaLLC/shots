@@ -114,6 +114,7 @@ import {
   createScheduledPostContract,
   listScheduledPostsContract,
 } from '@/lib/api/contracts/scheduled-posts'
+import { getCurrentKeyInfoContract } from '@/lib/api/contracts/auth-key'
 import {
   activateOrganizationContract,
   getBootstrapContract,
@@ -260,6 +261,7 @@ export const documentedContracts = [
   cancelOnboardingRunContract,
   rerunOnboardingRunContract,
   listOnboardingEnrichmentContract,
+  getCurrentKeyInfoContract,
   getCurrentUserContract,
   getBootstrapContract,
   listOrganizationsContract,

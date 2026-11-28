@@ -332,6 +332,20 @@ func TestDirectPublisherFailsExpiredCredentialWithoutUnknownDelivery(t *testing.
 	}
 }
 
+func TestDirectPublisherReconnectNotifier(t *testing.T) {
+	p, _, _, _ := directFixture()
+	var events []string
+	p.WithReconnectNotifier(func(_ context.Context, orgID, integrationID, reason string) error {
+		events = append(events, orgID+":"+integrationID+":"+reason)
+		return errors.New("webhook sink down")
+	})
+	p.notifyReconnect(context.Background(), nil, "credentials_rejected")
+	p.notifyReconnect(context.Background(), &socialent.Integration{ID: "destination", OrganizationID: "social-org"}, "credentials_rejected")
+	if len(events) != 1 || events[0] != "social-org:destination:credentials_rejected" {
+		t.Fatalf("events=%v", events)
+	}
+}
+
 func TestDirectPublisherRejectsWrongWorkspaceBinding(t *testing.T) {
 	p, signer, poster, input := directFixture()
 	input.SecretReference = "OTHER_WORKSPACE_KEY"

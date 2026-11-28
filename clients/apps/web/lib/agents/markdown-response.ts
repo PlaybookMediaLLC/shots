@@ -1,3 +1,4 @@
+import { buildAgentBriefMarkdown } from '@/lib/agents/agent-briefs'
 import {
   BASE_URL,
   findAgentPage,
@@ -20,8 +21,18 @@ function markdownResponse(body: string, status: number, canonical: string): Resp
   })
 }
 
+const agentBriefPathPattern = /^\/docs\/agents\/([a-z0-9-]+)\.md$/i
+
 export function agentMarkdownResponse(path: string): Response {
   const pathname = normalizeAgentPath(path)
+  const briefMatch = agentBriefPathPattern.exec(pathname)
+  if (briefMatch) {
+    const markdown = buildAgentBriefMarkdown(briefMatch[1]!)
+    if (markdown) {
+      return markdownResponse(markdown, 200, `${BASE_URL}/docs/agents`)
+    }
+    return markdownResponse(renderNotFoundMarkdown(pathname), 404, `${BASE_URL}/docs/agents`)
+  }
   const canonical = `${BASE_URL}${pathname === '/' ? '/' : pathname}`
   const page = findAgentPage(pathname)
 

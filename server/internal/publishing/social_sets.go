@@ -170,6 +170,160 @@ func EmitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 		webhooks.Resource{ID: draft.ID, Type: "draft"}, data))
 }
 
+// EmitPostCompleted writes a post.completed webhook event in the transaction
+// that settles a scheduled post into a terminal state (published, sent_to_app,
+// failed, unknown_delivery, or missed_window). It carries one per-account
+// outcome with its live URL or failure code and never leaks post copy or
+// private social sets.
+func EmitPostCompleted(ctx context.Context, tx *ent.Tx, organizationID, postID, status, providerPostID, failureCode string) error {
+	if organizationID == "" || postID == "" {
+		return nil
+	}
+	subscribed, err := tx.WebhookSubscription.Query().Where(webhooksubscription.OrganizationID(organizationID),
+		webhooksubscription.Enabled(true)).Exist(ctx)
+	if err != nil || !subscribed {
+		return err
+	}
+	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(postID), scheduledpost.OrganizationID(organizationID)).
+		Select(scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldContentDraftID,
+			scheduledpost.FieldVariantID, scheduledpost.FieldSocialSetID, scheduledpost.FieldChannelConnectionID,
+			scheduledpost.FieldThreadProgress).
+		WithChannelConnection(func(q *ent.ChannelConnectionQuery) {
+			q.Select(channelconnection.FieldID, channelconnection.FieldPlatform, channelconnection.FieldDisplayName,
+				channelconnection.FieldHandle, channelconnection.FieldSocialSetID)
+		}).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	connection := live.Edges.ChannelConnection
+	platform := ""
+	var displayName, handle *string
+	var referencedSets []string
+	var primarySetID *string
+	if connection != nil {
+		platform = connection.Platform
+		displayName = connection.DisplayName
+		handle = connection.Handle
+		if connection.SocialSetID != nil {
+			primarySetID = connection.SocialSetID
+			referencedSets = append(referencedSets, *connection.SocialSetID)
+		}
+	}
+	if live.SocialSetID != nil {
+		primarySetID = live.SocialSetID
+		if !slices.Contains(referencedSets, *live.SocialSetID) {
+			referencedSets = append(referencedSets, *live.SocialSetID)
+		}
+	} else if live.ContentDraftID != nil {
+		draft, draftErr := tx.ContentDraft.Query().
+			Where(contentdraft.ID(*live.ContentDraftID), contentdraft.OrganizationID(live.OrganizationID)).
+			Select(contentdraft.FieldSocialSetID).Only(ctx)
+		if draftErr != nil && !ent.IsNotFound(draftErr) {
+			return draftErr
+		}
+		if draft != nil && draft.SocialSetID != nil {
+			if primarySetID == nil {
+				primarySetID = draft.SocialSetID
+			}
+			if !slices.Contains(referencedSets, *draft.SocialSetID) {
+				referencedSets = append(referencedSets, *draft.SocialSetID)
+			}
+		}
+	}
+	if len(referencedSets) > 0 {
+		workspaceCount, setErr := tx.SocialSet.Query().Where(
+			socialset.IDIn(referencedSets...),
+			socialset.OrganizationID(live.OrganizationID),
+			socialset.VisibilityEQ(socialset.VisibilityWORKSPACE),
+		).Count(ctx)
+		if setErr != nil {
+			return setErr
+		}
+		if workspaceCount != len(referencedSets) {
+			return nil
+		}
+	}
+	var liveURL *string
+	if status == "published" && providerPostID != "" {
+		liveURL = postoptions.PostURL(platform, &providerPostID, live.ThreadProgress)
+	}
+	data := map[string]any{
+		"post": map[string]any{
+			"id":                  live.ID,
+			"contentDraftId":      live.ContentDraftID,
+			"variantId":           live.VariantID,
+			"channelConnectionId": live.ChannelConnectionID,
+			"platform":            platform,
+			"displayName":         displayName,
+			"handle":              handle,
+			"status":              status,
+			"remotePostId":        nonEmpty(providerPostID),
+			"url":                 liveURL,
+			"failureCode":         nonEmpty(failureCode),
+			"completedAt":         time.Now().UTC(),
+		},
+	}
+	return webhooks.Emit(ctx, tx, webhooks.NewEnvelope(live.OrganizationID, webhooks.PostCompleted, primarySetID,
+		webhooks.Resource{ID: live.ID, Type: "scheduled_post"}, data))
+}
+
+// EmitConnectionNeedsReconnect writes a connection.needs_reconnect webhook
+// event when a workspace's social channel stops renewing its credentials.
+// Private social sets and workspaces without enabled webhooks emit nothing.
+func (r *Repository) EmitConnectionNeedsReconnect(ctx context.Context, goOrganizationID, socialIntegrationID, reason string) error {
+	if goOrganizationID == "" || socialIntegrationID == "" {
+		return nil
+	}
+	var orgID string
+	if err := r.client.PlatformQuery(ctx,
+		`SELECT b."organizationId" FROM social_tenant_binding b WHERE b."goOrganizationId"=$1 AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=b."organizationId" AND d.status<>'CANCELLED') AND EXISTS (SELECT 1 FROM webhook_subscription s WHERE s."organizationId"=b."organizationId" AND s.enabled=true) LIMIT 1`,
+		[]any{goOrganizationID}, func(row entsql.ColumnScanner) error { return row.Scan(&orgID) }); err != nil || orgID == "" {
+		return err
+	}
+	tx, err := r.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	conn, err := tx.ChannelConnection.Query().Where(
+		channelconnection.OrganizationID(orgID),
+		channelconnection.Provider("social"),
+		channelconnection.ExternalAccountID(socialIntegrationID),
+		channelconnection.StatusEQ(channelconnection.StatusACTIVE),
+	).Select(
+		channelconnection.FieldID,
+		channelconnection.FieldPlatform,
+		channelconnection.FieldDisplayName,
+		channelconnection.FieldHandle,
+		channelconnection.FieldSocialSetID,
+	).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	data := map[string]any{
+		"connection": map[string]any{
+			"id":            conn.ID,
+			"platform":      conn.Platform,
+			"displayName":   conn.DisplayName,
+			"handle":        conn.Handle,
+			"socialSetId":   conn.SocialSetID,
+			"reason":        nonEmpty(reason),
+			"reconnectPath": "/settings/channels",
+		},
+	}
+	if err := webhooks.Emit(ctx, tx, webhooks.NewEnvelope(orgID, webhooks.ConnectionNeedsReconnect, conn.SocialSetID,
+		webhooks.Resource{ID: conn.ID, Type: "channel_connection"}, data)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // PostConnectionActive reports whether the account a post went out on is
 // still active; a removed or revoked account takes no further action.
 func (r *Repository) PostConnectionActive(ctx context.Context, postID string) (bool, error) {

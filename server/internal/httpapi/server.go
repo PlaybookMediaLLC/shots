@@ -293,6 +293,8 @@ type ConfigurationStore interface {
 	ListPendingApprovals(context.Context, product.Actor, int, string) (*product.ApprovalPage, error)
 	DescribeAgentClient(context.Context, product.Actor, product.AgentAuthorizationRequest) (*product.AgentConsent, error)
 	ApproveAgentAccess(context.Context, product.Actor, product.AgentAuthorizationRequest) (*product.AgentAuthorizationCode, error)
+	RevokeAgentClient(context.Context, product.Actor, product.RevokeAgentClientInput) (*product.RevokeAgentClientResult, error)
+	GetCurrentAPIKeyInfo(context.Context, product.Actor) (*product.CurrentAPIKeyInfo, error)
 	GetCampaign(context.Context, product.Actor, string) (*product.CampaignDetail, error)
 	CreateCampaign(context.Context, product.Actor, product.CreateCampaignInput) (*product.CampaignDetail, error)
 	TransitionCampaign(context.Context, product.Actor, string, string) (*product.CampaignTransition, error)

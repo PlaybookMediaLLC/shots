@@ -29,6 +29,7 @@ func (Apikey) Fields() []ent.Field {
 		field.String("key").StorageKey("key").Sensitive(),
 		field.Bool("enabled").StorageKey("enabled").Optional().Nillable(),
 		field.Time("expires_at").StorageKey("expiresAt").Optional().Nillable(),
+		field.Time("last_request").StorageKey("lastRequest").Optional().Nillable(),
 		field.String("permissions").StorageKey("permissions").Optional().Nillable(),
 		// Better Auth's JSON metadata; agent keys record the OAuth client here.
 		field.String("metadata").StorageKey("metadata").Optional().Nillable(),
