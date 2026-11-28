@@ -27,8 +27,92 @@ func renderEmail(e *Envelope) {
 	if summary == "" {
 		summary = e.Subject
 	}
+	if e.HTML == "" {
+		e.HTML = "<p>" + html.EscapeString(summary) + "</p>"
+	}
 	e.Text = summary + "\n\nWorkspace: " + e.Workspace + "\n\nOpen activity: " + e.Href + "\nNotification preferences: " + prefs
-	e.HTML = "<p>" + html.EscapeString(summary) + "</p><p>Workspace: " + html.EscapeString(e.Workspace) + "</p><p><a href=\"" + html.EscapeString(e.Href) + "\">Open activity</a></p><p><a href=\"" + html.EscapeString(prefs) + "\">Notification preferences</a></p>"
+	e.HTML = e.HTML + "<p>Workspace: " + html.EscapeString(e.Workspace) + "</p><p><a href=\"" + html.EscapeString(e.Href) + "\">Open in Shots</a></p><p><a href=\"" + html.EscapeString(prefs) + "\">Notification preferences</a></p>"
+}
+
+func renderPostSummary(e *Envelope, payload map[string]any) {
+	rawOutcomes, _ := payload["outcomes"].([]any)
+	publishedCount := intFromAny(payload["publishedCount"])
+	sentToAppCount := intFromAny(payload["sentToAppCount"])
+	failedCount := intFromAny(payload["failedCount"])
+	unknownCount := intFromAny(payload["unknownCount"])
+
+	parts := []string{}
+	if publishedCount > 0 {
+		parts = append(parts, strconv.Itoa(publishedCount)+" published")
+	}
+	if sentToAppCount > 0 {
+		parts = append(parts, strconv.Itoa(sentToAppCount)+" sent to app")
+	}
+	if failedCount > 0 {
+		parts = append(parts, strconv.Itoa(failedCount)+" failed")
+	}
+	if unknownCount > 0 {
+		parts = append(parts, strconv.Itoa(unknownCount)+" needs review")
+	}
+	if len(parts) > 0 {
+		e.Subject = "Post summary: " + strings.Join(parts, ", ")
+	} else {
+		e.Subject = "Post publish summary"
+	}
+
+	var textLines []string
+	var htmlItems []string
+	textLines = append(textLines, e.Subject)
+	for _, raw := range rawOutcomes {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		platform := textValue(item, "platform")
+		handle := textValue(item, "handle")
+		status := textValue(item, "status")
+		remoteURL := textValue(item, "remoteUrl")
+		failureCode := textValue(item, "failureCode")
+
+		label := platform
+		if handle != "" {
+			label = platform + " (" + handle + ")"
+		}
+		statusLabel := strings.ToLower(strings.ReplaceAll(status, "_", " "))
+		line := "- " + label + ": " + statusLabel
+		htmlLine := "<li><strong>" + html.EscapeString(label) + "</strong>: " + html.EscapeString(statusLabel)
+		if remoteURL != "" && (strings.HasPrefix(remoteURL, "https://") || strings.HasPrefix(remoteURL, "http://")) {
+			line += " (" + remoteURL + ")"
+			htmlLine += " — <a href=\"" + html.EscapeString(remoteURL) + "\">View post</a>"
+		}
+		if failureCode != "" {
+			cleanCode := strings.ToLower(strings.ReplaceAll(failureCode, "_", " "))
+			line += " — " + cleanCode
+			htmlLine += " (" + html.EscapeString(cleanCode) + ")"
+		}
+		htmlLine += "</li>"
+		textLines = append(textLines, line)
+		htmlItems = append(htmlItems, htmlLine)
+	}
+	e.Text = strings.Join(textLines, "\n")
+	if len(htmlItems) > 0 {
+		e.HTML = "<p><strong>" + html.EscapeString(e.Subject) + "</strong></p><ul>" + strings.Join(htmlItems, "") + "</ul>"
+	} else {
+		e.HTML = "<p>" + html.EscapeString(e.Subject) + "</p>"
+	}
+}
+
+func intFromAny(value any) int {
+	switch v := value.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case int64:
+		return int(v)
+	default:
+		return 0
+	}
 }
 func retryAfter(value string) time.Duration {
 	if n, err := strconv.Atoi(value); err == nil && n > 0 {

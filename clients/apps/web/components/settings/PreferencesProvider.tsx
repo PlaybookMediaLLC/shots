@@ -56,6 +56,7 @@ function applyPreferenceUpdate(previous: Preferences, update: PreferencesUpdate)
   return {
     ...previous,
     ...(update.accentColor === undefined ? {} : { accentColor: update.accentColor }),
+    ...(update.automationEmails === undefined ? {} : { automationEmails: update.automationEmails }),
     ...(update.theme ? { theme: update.theme } : {}),
     ...(update.navigation ? { navigation: update.navigation } : {}),
     ...(update.weekStart ? { weekStart: update.weekStart } : {}),
@@ -66,6 +67,15 @@ function applyPreferenceUpdate(previous: Preferences, update: PreferencesUpdate)
     ...(update.emailNotifications === undefined
       ? {}
       : { emailNotifications: update.emailNotifications }),
+    ...(update.postFailureAlerts === undefined
+      ? {}
+      : { postFailureAlerts: update.postFailureAlerts }),
+    ...(update.postSummaryEmails === undefined
+      ? {}
+      : { postSummaryEmails: update.postSummaryEmails }),
+    ...(update.useFilenameAsCaption === undefined
+      ? {}
+      : { useFilenameAsCaption: update.useFilenameAsCaption }),
     ...(update.experiments
       ? { experiments: { ...previous.experiments, ...update.experiments } }
       : {}),

@@ -2,7 +2,9 @@ import { z } from 'zod'
 import type {
   AccountDeletionStatus,
   ExperimentState,
+  RevokeAllSessionsResult,
   UserPreferences,
+  WeeklyGoalProgress,
 } from 'screenshot-studio-backend-sdk'
 import { defineContract, mirrors } from '@/lib/api/contract'
 
@@ -38,17 +40,21 @@ export const textDirectionSchema = z.enum(['ltr', 'rtl'])
 export const userPreferencesSchema = mirrors<UserPreferences>()(
   z.object({
     accentColor: accentColorSchema,
+    automationEmails: z.boolean(),
     developerMode: z.boolean(),
     dismissedTips: z.array(z.string()),
     emailNotifications: z.boolean(),
     experiments: z.record(z.string(), z.boolean()),
     navigation: navigationLayoutSchema,
+    postFailureAlerts: z.boolean(),
+    postSummaryEmails: z.boolean(),
     showScrollbars: z.boolean(),
     textDirection: textDirectionSchema,
     theme: themeSchema,
     timeFormat: timeFormatSchema,
     timeZone: z.string().nullable(),
     updatedAt: isoInstantSchema.nullable(),
+    useFilenameAsCaption: z.boolean(),
     version: z.number().int(),
     weekStart: weekStartSchema,
   })
@@ -64,12 +70,15 @@ export const helpTipIdSchema = z
 export const userPreferencesUpdateSchema = z
   .object({
     accentColor: accentColorSchema.optional(),
+    automationEmails: z.boolean().optional(),
     baseVersion: z.number().int().min(1).optional(),
     developerMode: z.boolean().optional(),
     dismissTip: helpTipIdSchema.optional(),
     emailNotifications: z.boolean().optional(),
     experiments: z.record(z.string().max(64), z.boolean()).optional(),
     navigation: navigationLayoutSchema.optional(),
+    postFailureAlerts: z.boolean().optional(),
+    postSummaryEmails: z.boolean().optional(),
     resetTips: z.boolean().optional(),
     showScrollbars: z.boolean().optional(),
     textDirection: textDirectionSchema.optional(),
@@ -77,6 +86,7 @@ export const userPreferencesUpdateSchema = z
     timeFormat: timeFormatSchema.optional(),
     /** An IANA zone such as `Europe/Paris`, or an empty string to follow the browser. */
     timeZone: z.string().max(64).optional(),
+    useFilenameAsCaption: z.boolean().optional(),
     weekStart: weekStartSchema.optional(),
   })
   .strict()
@@ -194,4 +204,79 @@ export const cancelAccountDeletionContract = defineContract({
   output: accountDeletionStatusSchema,
   path: '/api/v1/me/account-deletion',
   summary: 'Cancel your account deletion request',
+})
+
+/** Result of revoking every active browser session and OAuth grant. */
+export const revokeAllSessionsResultSchema = mirrors<RevokeAllSessionsResult>()(
+  z.object({
+    revokedOAuthTokens: z.number().int().nonnegative(),
+    revokedSessions: z.number().int().nonnegative(),
+  })
+)
+
+/** `POST /api/v1/me/sessions/revoke-all` */
+export const revokeAllSessionsContract = defineContract({
+  method: 'POST',
+  name: 'me.sessions-revoke-all',
+  output: revokeAllSessionsResultSchema,
+  path: '/api/v1/me/sessions/revoke-all',
+  summary: 'Sign out of all active browser sessions and connected OAuth tokens',
+})
+
+/** Current-week publishing progress against the workspace weekly posting goal. */
+export const weeklyGoalProgressSchema = mirrors<WeeklyGoalProgress>()(
+  z.object({
+    goal: z.number().int().min(1).max(1000).nullable(),
+    publishedCount: z.number().int().nonnegative(),
+    scheduledCount: z.number().int().nonnegative(),
+    timeZone: z.string(),
+    totalCount: z.number().int().nonnegative(),
+    weekEnd: isoInstantSchema,
+    weekStart: isoInstantSchema,
+  })
+)
+
+/** Optional week-start preference override for weekly goal progress queries. */
+export const weeklyGoalProgressQuerySchema = z.object({
+  weekStart: weekStartSchema.optional(),
+})
+
+/** `GET /api/v1/workspace/weekly-goal-progress` */
+export const getWeeklyGoalProgressContract = defineContract({
+  method: 'GET',
+  name: 'workspace.weekly-goal-progress',
+  output: weeklyGoalProgressSchema,
+  path: '/api/v1/workspace/weekly-goal-progress',
+  query: weeklyGoalProgressQuerySchema,
+  summary: 'Read current-week publishing progress against the workspace weekly posting goal',
+})
+
+/** Signed one-click automation email unsubscribe token query. */
+export const emailUnsubscribeQuerySchema = z.object({
+  token: z.string().min(16).max(512),
+})
+
+/** Response confirming automation emails have been unsubscribed. */
+export const emailUnsubscribeResultSchema = z.object({
+  unsubscribed: z.literal(true),
+})
+
+/** `POST /api/v1/email/unsubscribe` */
+export const unsubscribeAutomationEmailsContract = defineContract({
+  method: 'POST',
+  name: 'email.unsubscribe',
+  output: emailUnsubscribeResultSchema,
+  path: '/api/v1/email/unsubscribe',
+  query: emailUnsubscribeQuerySchema,
+  summary: 'Unsubscribe from automation emails with a signed one-click token',
+})
+
+/** `GET /api/v1/email/unsubscribe` */
+export const unsubscribeAutomationEmailsGetContract = defineContract({
+  method: 'GET',
+  name: 'email.unsubscribe-get',
+  output: z.undefined(),
+  path: '/api/v1/email/unsubscribe',
+  query: emailUnsubscribeQuerySchema,
+  summary: 'Render confirmation page to unsubscribe from automation emails',
 })

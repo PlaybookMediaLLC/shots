@@ -175,6 +175,62 @@ func (_u *UserPreferenceUpdate) SetNillableEmailNotifications(v *bool) *UserPref
 	return _u
 }
 
+// SetAutomationEmails sets the "automation_emails" field.
+func (_u *UserPreferenceUpdate) SetAutomationEmails(v bool) *UserPreferenceUpdate {
+	_u.mutation.SetAutomationEmails(v)
+	return _u
+}
+
+// SetNillableAutomationEmails sets the "automation_emails" field if the given value is not nil.
+func (_u *UserPreferenceUpdate) SetNillableAutomationEmails(v *bool) *UserPreferenceUpdate {
+	if v != nil {
+		_u.SetAutomationEmails(*v)
+	}
+	return _u
+}
+
+// SetPostFailureAlerts sets the "post_failure_alerts" field.
+func (_u *UserPreferenceUpdate) SetPostFailureAlerts(v bool) *UserPreferenceUpdate {
+	_u.mutation.SetPostFailureAlerts(v)
+	return _u
+}
+
+// SetNillablePostFailureAlerts sets the "post_failure_alerts" field if the given value is not nil.
+func (_u *UserPreferenceUpdate) SetNillablePostFailureAlerts(v *bool) *UserPreferenceUpdate {
+	if v != nil {
+		_u.SetPostFailureAlerts(*v)
+	}
+	return _u
+}
+
+// SetPostSummaryEmails sets the "post_summary_emails" field.
+func (_u *UserPreferenceUpdate) SetPostSummaryEmails(v bool) *UserPreferenceUpdate {
+	_u.mutation.SetPostSummaryEmails(v)
+	return _u
+}
+
+// SetNillablePostSummaryEmails sets the "post_summary_emails" field if the given value is not nil.
+func (_u *UserPreferenceUpdate) SetNillablePostSummaryEmails(v *bool) *UserPreferenceUpdate {
+	if v != nil {
+		_u.SetPostSummaryEmails(*v)
+	}
+	return _u
+}
+
+// SetUseFilenameAsCaption sets the "use_filename_as_caption" field.
+func (_u *UserPreferenceUpdate) SetUseFilenameAsCaption(v bool) *UserPreferenceUpdate {
+	_u.mutation.SetUseFilenameAsCaption(v)
+	return _u
+}
+
+// SetNillableUseFilenameAsCaption sets the "use_filename_as_caption" field if the given value is not nil.
+func (_u *UserPreferenceUpdate) SetNillableUseFilenameAsCaption(v *bool) *UserPreferenceUpdate {
+	if v != nil {
+		_u.SetUseFilenameAsCaption(*v)
+	}
+	return _u
+}
+
 // SetDismissedTips sets the "dismissed_tips" field.
 func (_u *UserPreferenceUpdate) SetDismissedTips(v []string) *UserPreferenceUpdate {
 	_u.mutation.SetDismissedTips(v)
@@ -335,6 +391,18 @@ func (_u *UserPreferenceUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if value, ok := _u.mutation.EmailNotifications(); ok {
 		_spec.SetField(userpreference.FieldEmailNotifications, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AutomationEmails(); ok {
+		_spec.SetField(userpreference.FieldAutomationEmails, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PostFailureAlerts(); ok {
+		_spec.SetField(userpreference.FieldPostFailureAlerts, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PostSummaryEmails(); ok {
+		_spec.SetField(userpreference.FieldPostSummaryEmails, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.UseFilenameAsCaption(); ok {
+		_spec.SetField(userpreference.FieldUseFilenameAsCaption, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DismissedTips(); ok {
 		_spec.SetField(userpreference.FieldDismissedTips, field.TypeJSON, value)
@@ -518,6 +586,62 @@ func (_u *UserPreferenceUpdateOne) SetEmailNotifications(v bool) *UserPreference
 func (_u *UserPreferenceUpdateOne) SetNillableEmailNotifications(v *bool) *UserPreferenceUpdateOne {
 	if v != nil {
 		_u.SetEmailNotifications(*v)
+	}
+	return _u
+}
+
+// SetAutomationEmails sets the "automation_emails" field.
+func (_u *UserPreferenceUpdateOne) SetAutomationEmails(v bool) *UserPreferenceUpdateOne {
+	_u.mutation.SetAutomationEmails(v)
+	return _u
+}
+
+// SetNillableAutomationEmails sets the "automation_emails" field if the given value is not nil.
+func (_u *UserPreferenceUpdateOne) SetNillableAutomationEmails(v *bool) *UserPreferenceUpdateOne {
+	if v != nil {
+		_u.SetAutomationEmails(*v)
+	}
+	return _u
+}
+
+// SetPostFailureAlerts sets the "post_failure_alerts" field.
+func (_u *UserPreferenceUpdateOne) SetPostFailureAlerts(v bool) *UserPreferenceUpdateOne {
+	_u.mutation.SetPostFailureAlerts(v)
+	return _u
+}
+
+// SetNillablePostFailureAlerts sets the "post_failure_alerts" field if the given value is not nil.
+func (_u *UserPreferenceUpdateOne) SetNillablePostFailureAlerts(v *bool) *UserPreferenceUpdateOne {
+	if v != nil {
+		_u.SetPostFailureAlerts(*v)
+	}
+	return _u
+}
+
+// SetPostSummaryEmails sets the "post_summary_emails" field.
+func (_u *UserPreferenceUpdateOne) SetPostSummaryEmails(v bool) *UserPreferenceUpdateOne {
+	_u.mutation.SetPostSummaryEmails(v)
+	return _u
+}
+
+// SetNillablePostSummaryEmails sets the "post_summary_emails" field if the given value is not nil.
+func (_u *UserPreferenceUpdateOne) SetNillablePostSummaryEmails(v *bool) *UserPreferenceUpdateOne {
+	if v != nil {
+		_u.SetPostSummaryEmails(*v)
+	}
+	return _u
+}
+
+// SetUseFilenameAsCaption sets the "use_filename_as_caption" field.
+func (_u *UserPreferenceUpdateOne) SetUseFilenameAsCaption(v bool) *UserPreferenceUpdateOne {
+	_u.mutation.SetUseFilenameAsCaption(v)
+	return _u
+}
+
+// SetNillableUseFilenameAsCaption sets the "use_filename_as_caption" field if the given value is not nil.
+func (_u *UserPreferenceUpdateOne) SetNillableUseFilenameAsCaption(v *bool) *UserPreferenceUpdateOne {
+	if v != nil {
+		_u.SetUseFilenameAsCaption(*v)
 	}
 	return _u
 }
@@ -712,6 +836,18 @@ func (_u *UserPreferenceUpdateOne) sqlSave(ctx context.Context) (_node *UserPref
 	}
 	if value, ok := _u.mutation.EmailNotifications(); ok {
 		_spec.SetField(userpreference.FieldEmailNotifications, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AutomationEmails(); ok {
+		_spec.SetField(userpreference.FieldAutomationEmails, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PostFailureAlerts(); ok {
+		_spec.SetField(userpreference.FieldPostFailureAlerts, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PostSummaryEmails(); ok {
+		_spec.SetField(userpreference.FieldPostSummaryEmails, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.UseFilenameAsCaption(); ok {
+		_spec.SetField(userpreference.FieldUseFilenameAsCaption, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DismissedTips(); ok {
 		_spec.SetField(userpreference.FieldDismissedTips, field.TypeJSON, value)

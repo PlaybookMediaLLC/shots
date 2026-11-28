@@ -59,7 +59,16 @@ export function useSaveSocialSet(id: string): (change: SocialSetChange) => Promi
     (change: SocialSetChange) => {
       const run = queue.current.then(async (): Promise<SaveResult> => {
         if (!scope.ready) return { error: 'Your workspace is still loading.', ok: false }
-        const current = queryClient.getQueryData<SocialSetRecord>(socialSetKey(scope, id))
+        const fromItem = queryClient.getQueryData<SocialSetRecord>(socialSetKey(scope, id))
+        const fromList = queryClient
+          .getQueryData<z.output<typeof socialSetListSchema>>(scope.key)
+          ?.items.find((item) => item.id === id)
+        const current =
+          fromItem && fromList
+            ? fromItem.version >= fromList.version
+              ? fromItem
+              : fromList
+            : (fromItem ?? fromList)
         if (!current) return { error: 'This profile is still loading.', ok: false }
         try {
           const saved = await scope.request(
@@ -71,6 +80,14 @@ export function useSaveSocialSet(id: string): (change: SocialSetChange) => Promi
             }
           )
           queryClient.setQueryData(socialSetKey(scope, id), saved)
+          queryClient.setQueryData<z.output<typeof socialSetListSchema>>(scope.key, (existing) =>
+            existing
+              ? {
+                  ...existing,
+                  items: existing.items.map((item) => (item.id === saved.id ? saved : item)),
+                }
+              : existing
+          )
           await queryClient.invalidateQueries({ exact: true, queryKey: scope.key })
           scope.assertCurrent()
           return { ok: true }
@@ -80,7 +97,10 @@ export function useSaveSocialSet(id: string): (change: SocialSetChange) => Promi
             error.status === 409 &&
             error.code !== 'workspace_changed'
           ) {
-            await queryClient.invalidateQueries({ queryKey: socialSetKey(scope, id) })
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: socialSetKey(scope, id) }),
+              queryClient.invalidateQueries({ exact: true, queryKey: scope.key }),
+            ])
             toast.info('Someone else changed this profile. Showing the latest version.')
           }
           return { error: settingsErrorMessage(error), ok: false }

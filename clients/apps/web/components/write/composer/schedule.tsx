@@ -973,13 +973,15 @@ export function ScheduleDialog({
                     </div>
                     <Label className="flex items-center justify-between gap-4 text-sm font-normal">
                       <span className="grid gap-0.5">
-                        Natural posting time
+                        Randomize posting time
                         <span className="text-xs text-muted-foreground">
-                          Moves it up to 4 minutes off the round minute.
+                          Moves it up to {set?.naturalPostingWindowMinutes ?? 10} minute
+                          {(set?.naturalPostingWindowMinutes ?? 10) === 1 ? '' : 's'} off the round
+                          minute.
                         </span>
                       </span>
                       <Switch
-                        aria-label="Natural posting time"
+                        aria-label="Randomize posting time"
                         checked={natural}
                         onCheckedChange={(checked) => setNatural(checked === true)}
                       />
@@ -1013,7 +1015,9 @@ export function ScheduleDialog({
                 {chosen ? (
                   <p className="text-caption text-muted-foreground">
                     {zone} · {offsetLabel(chosen, zone)}
-                    {natural ? ' · ± up to 4 minutes' : ''}
+                    {natural
+                      ? ` · ± up to ${set?.naturalPostingWindowMinutes ?? 10} minute${(set?.naturalPostingWindowMinutes ?? 10) === 1 ? '' : 's'}`
+                      : ''}
                   </p>
                 ) : null}
                 {chosen && localZone && localZone !== zone ? (
@@ -1637,12 +1641,15 @@ function TimeChips({
             type="button"
             variant="outline"
           >
-            {at.toLocaleString(undefined, {
-              hour: 'numeric',
-              minute: '2-digit',
-              timeZone: zone,
-              weekday: 'short',
-            })}
+            <LocalTime
+              options={{
+                hour: 'numeric',
+                minute: '2-digit',
+                weekday: 'short',
+              }}
+              value={at}
+              zone={zone}
+            />
           </Button>
         ))}
       </div>

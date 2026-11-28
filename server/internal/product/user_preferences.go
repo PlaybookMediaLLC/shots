@@ -22,38 +22,46 @@ const maxDismissedTips = 100
 // UserPreferences is a person's preferences as the API returns them.
 type UserPreferences struct {
 	AccentColor        string          `json:"accentColor"`
+	AutomationEmails   bool            `json:"automationEmails"`
 	DeveloperMode      bool            `json:"developerMode"`
 	DismissedTips      []string        `json:"dismissedTips"`
 	EmailNotifications bool            `json:"emailNotifications"`
 	Experiments        map[string]bool `json:"experiments"`
 	Navigation         string          `json:"navigation"`
+	PostFailureAlerts  bool            `json:"postFailureAlerts"`
+	PostSummaryEmails  bool            `json:"postSummaryEmails"`
 	ShowScrollbars     bool            `json:"showScrollbars"`
 	TextDirection      string          `json:"textDirection"`
 	Theme              string          `json:"theme"`
 	// TimeFormat is the clock times read on: auto (the browser locale's), 12h or 24h.
 	TimeFormat string `json:"timeFormat"`
 	// TimeZone is the display time zone; nil follows the browser.
-	TimeZone  *string    `json:"timeZone"`
-	UpdatedAt *time.Time `json:"updatedAt"`
-	Version   int        `json:"version"`
-	WeekStart string     `json:"weekStart"`
+	TimeZone             *string    `json:"timeZone"`
+	UpdatedAt            *time.Time `json:"updatedAt"`
+	UseFilenameAsCaption bool       `json:"useFilenameAsCaption"`
+	Version              int        `json:"version"`
+	WeekStart            string     `json:"weekStart"`
 }
 
 // UserPreferencesUpdate changes the fields it sets. BaseVersion, when set,
 // refuses the save if the preferences changed since that version.
 type UserPreferencesUpdate struct {
 	AccentColor        *string `json:"accentColor"`
+	AutomationEmails   *bool   `json:"automationEmails"`
 	BaseVersion        *int    `json:"baseVersion"`
 	DeveloperMode      *bool   `json:"developerMode"`
 	EmailNotifications *bool   `json:"emailNotifications"`
 	Navigation         *string `json:"navigation"`
+	PostFailureAlerts  *bool   `json:"postFailureAlerts"`
+	PostSummaryEmails  *bool   `json:"postSummaryEmails"`
 	ShowScrollbars     *bool   `json:"showScrollbars"`
 	TextDirection      *string `json:"textDirection"`
 	Theme              *string `json:"theme"`
 	TimeFormat         *string `json:"timeFormat"`
 	// TimeZone sets the display time zone; an empty string follows the browser.
-	TimeZone  *string `json:"timeZone"`
-	WeekStart *string `json:"weekStart"`
+	TimeZone             *string `json:"timeZone"`
+	UseFilenameAsCaption *bool   `json:"useFilenameAsCaption"`
+	WeekStart            *string `json:"weekStart"`
 	// DismissTip hides one help tip; ResetTips shows every tip again.
 	DismissTip *string `json:"dismissTip"`
 	ResetTips  bool    `json:"resetTips"`
@@ -71,8 +79,9 @@ func (e *UserPreferencesConflictError) Error() string {
 func (e *UserPreferencesConflictError) Unwrap() error { return publishing.ErrConflict }
 
 func defaultUserPreferences() UserPreferences {
-	return UserPreferences{DismissedTips: []string{}, EmailNotifications: true, Experiments: map[string]bool{},
-		Navigation: "expanded", ShowScrollbars: true, TextDirection: "ltr", Theme: "dark", TimeFormat: "auto", WeekStart: "monday"}
+	return UserPreferences{AutomationEmails: true, DismissedTips: []string{}, EmailNotifications: true, Experiments: map[string]bool{},
+		Navigation: "expanded", PostFailureAlerts: true, PostSummaryEmails: false, ShowScrollbars: true, TextDirection: "ltr",
+		Theme: "dark", TimeFormat: "auto", UseFilenameAsCaption: false, WeekStart: "monday"}
 }
 
 func userPreferencesRecord(row *ent.UserPreference) UserPreferences {
@@ -80,11 +89,12 @@ func userPreferencesRecord(row *ent.UserPreference) UserPreferences {
 		return defaultUserPreferences()
 	}
 	updated := row.UpdatedAt
-	return UserPreferences{AccentColor: row.AccentColor, DeveloperMode: row.DeveloperMode, DismissedTips: nonNilStrings(row.DismissedTips),
-		EmailNotifications: row.EmailNotifications, Experiments: nonNilFlags(row.Experiments),
-		Navigation: string(row.Navigation), ShowScrollbars: row.ShowScrollbars, TextDirection: string(row.TextDirection),
-		Theme: string(row.Theme), TimeFormat: string(row.TimeFormat), TimeZone: row.TimeZone, UpdatedAt: &updated, Version: row.Version,
-		WeekStart: string(row.WeekStart)}
+	return UserPreferences{AccentColor: row.AccentColor, AutomationEmails: row.AutomationEmails, DeveloperMode: row.DeveloperMode,
+		DismissedTips: nonNilStrings(row.DismissedTips), EmailNotifications: row.EmailNotifications, Experiments: nonNilFlags(row.Experiments),
+		Navigation: string(row.Navigation), PostFailureAlerts: row.PostFailureAlerts, PostSummaryEmails: row.PostSummaryEmails,
+		ShowScrollbars: row.ShowScrollbars, TextDirection: string(row.TextDirection), Theme: string(row.Theme),
+		TimeFormat: string(row.TimeFormat), TimeZone: row.TimeZone, UpdatedAt: &updated, UseFilenameAsCaption: row.UseFilenameAsCaption,
+		Version: row.Version, WeekStart: string(row.WeekStart)}
 }
 
 func nonNilFlags(flags map[string]bool) map[string]bool {
@@ -197,6 +207,18 @@ func (c *Configuration) applyPreferenceUpdate(ctx context.Context, actor Actor, 
 	if input.EmailNotifications != nil {
 		current.EmailNotifications = *input.EmailNotifications
 	}
+	if input.AutomationEmails != nil {
+		current.AutomationEmails = *input.AutomationEmails
+	}
+	if input.PostFailureAlerts != nil {
+		current.PostFailureAlerts = *input.PostFailureAlerts
+	}
+	if input.PostSummaryEmails != nil {
+		current.PostSummaryEmails = *input.PostSummaryEmails
+	}
+	if input.UseFilenameAsCaption != nil {
+		current.UseFilenameAsCaption = *input.UseFilenameAsCaption
+	}
 	if input.ResetTips {
 		current.DismissedTips = []string{}
 	}
@@ -254,7 +276,9 @@ func (c *Configuration) UpdateUserPreferences(ctx context.Context, actor Actor, 
 				SetWeekStart(userpreference.WeekStart(current.WeekStart)).SetTimeFormat(userpreference.TimeFormat(current.TimeFormat)).
 				SetTextDirection(userpreference.TextDirection(current.TextDirection)).
 				SetShowScrollbars(current.ShowScrollbars).SetDeveloperMode(current.DeveloperMode).
-				SetEmailNotifications(current.EmailNotifications).SetDismissedTips(current.DismissedTips).
+				SetEmailNotifications(current.EmailNotifications).SetAutomationEmails(current.AutomationEmails).
+				SetPostFailureAlerts(current.PostFailureAlerts).SetPostSummaryEmails(current.PostSummaryEmails).
+				SetUseFilenameAsCaption(current.UseFilenameAsCaption).SetDismissedTips(current.DismissedTips).
 				SetExperiments(current.Experiments).Save(ctx)
 			if ent.IsConstraintError(err) {
 				continue
@@ -271,7 +295,9 @@ func (c *Configuration) UpdateUserPreferences(ctx context.Context, actor Actor, 
 			SetWeekStart(userpreference.WeekStart(current.WeekStart)).SetTimeFormat(userpreference.TimeFormat(current.TimeFormat)).
 			SetTextDirection(userpreference.TextDirection(current.TextDirection)).
 			SetShowScrollbars(current.ShowScrollbars).SetDeveloperMode(current.DeveloperMode).
-			SetEmailNotifications(current.EmailNotifications).SetDismissedTips(current.DismissedTips).
+			SetEmailNotifications(current.EmailNotifications).SetAutomationEmails(current.AutomationEmails).
+			SetPostFailureAlerts(current.PostFailureAlerts).SetPostSummaryEmails(current.PostSummaryEmails).
+			SetUseFilenameAsCaption(current.UseFilenameAsCaption).SetDismissedTips(current.DismissedTips).
 			SetExperiments(current.Experiments).AddVersion(1)
 		if current.TimeZone == nil {
 			update.ClearTimeZone()

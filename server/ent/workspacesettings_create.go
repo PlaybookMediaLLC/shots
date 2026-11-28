@@ -152,6 +152,34 @@ func (_c *WorkspaceSettingsCreate) SetNillableReleaseReadinessEnabled(v *bool) *
 	return _c
 }
 
+// SetWeeklyPostingGoal sets the "weekly_posting_goal" field.
+func (_c *WorkspaceSettingsCreate) SetWeeklyPostingGoal(v int) *WorkspaceSettingsCreate {
+	_c.mutation.SetWeeklyPostingGoal(v)
+	return _c
+}
+
+// SetNillableWeeklyPostingGoal sets the "weekly_posting_goal" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableWeeklyPostingGoal(v *int) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetWeeklyPostingGoal(*v)
+	}
+	return _c
+}
+
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_c *WorkspaceSettingsCreate) SetProcessVideosOnServer(v bool) *WorkspaceSettingsCreate {
+	_c.mutation.SetProcessVideosOnServer(v)
+	return _c
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_c *WorkspaceSettingsCreate) SetNillableProcessVideosOnServer(v *bool) *WorkspaceSettingsCreate {
+	if v != nil {
+		_c.SetProcessVideosOnServer(*v)
+	}
+	return _c
+}
+
 // SetDisabledExperiments sets the "disabled_experiments" field.
 func (_c *WorkspaceSettingsCreate) SetDisabledExperiments(v []string) *WorkspaceSettingsCreate {
 	_c.mutation.SetDisabledExperiments(v)
@@ -247,6 +275,10 @@ func (_c *WorkspaceSettingsCreate) defaults() {
 		v := workspacesettings.DefaultReleaseReadinessEnabled
 		_c.mutation.SetReleaseReadinessEnabled(v)
 	}
+	if _, ok := _c.mutation.ProcessVideosOnServer(); !ok {
+		v := workspacesettings.DefaultProcessVideosOnServer
+		_c.mutation.SetProcessVideosOnServer(v)
+	}
 	if _, ok := _c.mutation.DisabledExperiments(); !ok {
 		v := workspacesettings.DefaultDisabledExperiments
 		_c.mutation.SetDisabledExperiments(v)
@@ -277,6 +309,9 @@ func (_c *WorkspaceSettingsCreate) check() error {
 	}
 	if _, ok := _c.mutation.ReleaseReadinessEnabled(); !ok {
 		return &ValidationError{Name: "release_readiness_enabled", err: errors.New(`ent: missing required field "WorkspaceSettings.release_readiness_enabled"`)}
+	}
+	if _, ok := _c.mutation.ProcessVideosOnServer(); !ok {
+		return &ValidationError{Name: "process_videos_on_server", err: errors.New(`ent: missing required field "WorkspaceSettings.process_videos_on_server"`)}
 	}
 	if _, ok := _c.mutation.DisabledExperiments(); !ok {
 		return &ValidationError{Name: "disabled_experiments", err: errors.New(`ent: missing required field "WorkspaceSettings.disabled_experiments"`)}
@@ -361,6 +396,14 @@ func (_c *WorkspaceSettingsCreate) createSpec() (*WorkspaceSettings, *sqlgraph.C
 	if value, ok := _c.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
 		_node.ReleaseReadinessEnabled = value
+	}
+	if value, ok := _c.mutation.WeeklyPostingGoal(); ok {
+		_spec.SetField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt, value)
+		_node.WeeklyPostingGoal = &value
+	}
+	if value, ok := _c.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(workspacesettings.FieldProcessVideosOnServer, field.TypeBool, value)
+		_node.ProcessVideosOnServer = value
 	}
 	if value, ok := _c.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)

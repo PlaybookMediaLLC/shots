@@ -226,6 +226,8 @@ type ConfigurationStore interface {
 	GetWorkspace(context.Context, string) (*product.Workspace, error)
 	UpdateWorkspace(context.Context, product.Actor, product.UpdateWorkspaceInput) (*product.Workspace, error)
 	UpdateWorkspaceAISettings(context.Context, product.Actor, product.UpdateWorkspaceAISettingsInput) (*product.Workspace, error)
+	UpdateWorkspacePublishingSettings(context.Context, product.Actor, product.UpdateWorkspacePublishingSettingsInput) (*product.Workspace, error)
+	GetWeeklyGoalProgress(context.Context, product.Actor, string) (*product.WeeklyGoalProgress, error)
 	GetWorkspaceAIProviderKey(context.Context, product.Actor) (*string, error)
 	ListMembers(context.Context, string) ([]product.WorkspaceMember, error)
 	ListInvitations(context.Context, string) ([]product.WorkspaceInvitation, error)

@@ -330,6 +330,26 @@ func (_u *ContentDraftUpdate) SetNillableNaturalPostingTime(v *bool) *ContentDra
 	return _u
 }
 
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *ContentDraftUpdate) SetProcessVideosOnServer(v bool) *ContentDraftUpdate {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *ContentDraftUpdate) SetNillableProcessVideosOnServer(v *bool) *ContentDraftUpdate {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
+// ClearProcessVideosOnServer clears the value of the "process_videos_on_server" field.
+func (_u *ContentDraftUpdate) ClearProcessVideosOnServer() *ContentDraftUpdate {
+	_u.mutation.ClearProcessVideosOnServer()
+	return _u
+}
+
 // SetEngagement sets the "engagement" field.
 func (_u *ContentDraftUpdate) SetEngagement(v schema.Engagement) *ContentDraftUpdate {
 	_u.mutation.SetEngagement(v)
@@ -737,6 +757,12 @@ func (_u *ContentDraftUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.NaturalPostingTime(); ok {
 		_spec.SetField(contentdraft.FieldNaturalPostingTime, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentdraft.FieldProcessVideosOnServer, field.TypeBool, value)
+	}
+	if _u.mutation.ProcessVideosOnServerCleared() {
+		_spec.ClearField(contentdraft.FieldProcessVideosOnServer, field.TypeBool)
 	}
 	if value, ok := _u.mutation.Engagement(); ok {
 		_spec.SetField(contentdraft.FieldEngagement, field.TypeJSON, value)
@@ -1146,6 +1172,26 @@ func (_u *ContentDraftUpdateOne) SetNillableNaturalPostingTime(v *bool) *Content
 	if v != nil {
 		_u.SetNaturalPostingTime(*v)
 	}
+	return _u
+}
+
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *ContentDraftUpdateOne) SetProcessVideosOnServer(v bool) *ContentDraftUpdateOne {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *ContentDraftUpdateOne) SetNillableProcessVideosOnServer(v *bool) *ContentDraftUpdateOne {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
+// ClearProcessVideosOnServer clears the value of the "process_videos_on_server" field.
+func (_u *ContentDraftUpdateOne) ClearProcessVideosOnServer() *ContentDraftUpdateOne {
+	_u.mutation.ClearProcessVideosOnServer()
 	return _u
 }
 
@@ -1586,6 +1632,12 @@ func (_u *ContentDraftUpdateOne) sqlSave(ctx context.Context) (_node *ContentDra
 	}
 	if value, ok := _u.mutation.NaturalPostingTime(); ok {
 		_spec.SetField(contentdraft.FieldNaturalPostingTime, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentdraft.FieldProcessVideosOnServer, field.TypeBool, value)
+	}
+	if _u.mutation.ProcessVideosOnServerCleared() {
+		_spec.ClearField(contentdraft.FieldProcessVideosOnServer, field.TypeBool)
 	}
 	if value, ok := _u.mutation.Engagement(); ok {
 		_spec.SetField(contentdraft.FieldEngagement, field.TypeJSON, value)

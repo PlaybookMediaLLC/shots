@@ -203,7 +203,7 @@ func (s *Service) fanout(ctx context.Context) (bool, error) {
 					if e2 != nil {
 						return false, e2
 					}
-					emailByUser, e2 := emailWantedBatch(ctx, tx, eligibleUsers)
+					emailByUser, e2 := userEmailPrefsBatch(ctx, tx, eligibleUsers)
 					if e2 != nil {
 						return false, e2
 					}
@@ -248,13 +248,13 @@ func (s *Service) fanout(ctx context.Context) (bool, error) {
 						if !hasPref {
 							pref = defaultPreferences()
 						}
-						wantsEmail, hasEmail := emailByUser[user]
+						emailPrefs, hasEmail := emailByUser[user]
 						if !hasEmail {
-							wantsEmail = true
+							emailPrefs = defaultUserEmailPrefs()
 						}
 						personal := slackByUser[user]
 						for _, channel := range []string{"in_app", "email", "slack_dm"} {
-							permitted, decision := personalDecision(pol, pref, def, channel, wantsEmail, socialSetOf(row), e.sourceSocialSetID)
+							permitted, decision := personalDecisionWithEmailPrefs(pol, pref, def, channel, emailPrefs, socialSetOf(row), e.sourceSocialSetID)
 							status, failureCode, connectionID := "PENDING", "", ""
 							if !permitted {
 								status, failureCode = "SKIPPED", decision
@@ -673,9 +673,11 @@ func (s *Service) prepare(ctx context.Context, d Delivery) (Envelope, Outcome, e
 		if pref.Generation != d.preferenceGeneration && !def.MandatoryFailure {
 			return skip("PREFERENCES_CHANGED")
 		}
-		if wants, e := emailWanted(ctx, s.DB, d.Destination); e != nil {
+		emailPrefs, e := userEmailPrefs(ctx, s.DB, d.Destination)
+		if e != nil {
 			return env, Outcome{}, e
-		} else if d.Channel == "email" && !wants && !test {
+		}
+		if d.Channel == "email" && !emailPrefs.EmailNotifications && !test {
 			return skip("EMAIL_TURNED_OFF")
 		}
 		allowed, row, e := s.resource(ctx, d.OrganizationID, d.Destination, resourceType, resourceID)
@@ -691,7 +693,7 @@ func (s *Service) prepare(ctx context.Context, d Delivery) (Envelope, Outcome, e
 			return skip("ACCESS_REMOVED")
 		}
 		if !test {
-			allowed, reason := personalDecision(pol, pref, def, d.Channel, true, socialSetOf(row), sourceID)
+			allowed, reason := personalDecisionWithEmailPrefs(pol, pref, def, d.Channel, emailPrefs, socialSetOf(row), sourceID)
 			if !allowed {
 				return skip(reason)
 			}
@@ -771,6 +773,13 @@ func (s *Service) prepare(ctx context.Context, d Delivery) (Envelope, Outcome, e
 		if err = s.renderReview(ctx, &env, d.OrganizationID, resourceID, payload); err != nil {
 			return env, Outcome{}, err
 		}
+	}
+	if d.Channel == "email" && d.Kind == "post.publish_summary" {
+		var payload map[string]any
+		if err = json.Unmarshal(raw, &payload); err != nil {
+			return env, Outcome{}, err
+		}
+		renderPostSummary(&env, payload)
 	}
 	if d.Channel == "email" {
 		env.From, env.Transport, env.Endpoint = emailFrom(), emailTransport(), s.emailEndpoint()

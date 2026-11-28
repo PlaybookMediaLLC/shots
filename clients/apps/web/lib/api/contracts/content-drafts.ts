@@ -347,7 +347,7 @@ export const contentDraftScheduleSchema = scheduleTimingSchema.extend({
    * text and media to an account again within a day.
    */
   confirmDuplicate: z.boolean().optional(),
-  /** Overrides the draft's natural posting time for this schedule (±4 minutes). */
+  /** Overrides the draft's randomized posting time for this schedule (±1–15 minutes per profile). */
   naturalPostingTime: z.boolean().optional(),
   scheduledFor: z.coerce
     .date()

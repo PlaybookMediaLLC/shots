@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Group, Pill, PlanRequired, Row, Section } from '@/components/platform-ui'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { Button } from '@/components/ui/button'
@@ -229,8 +230,20 @@ function Deliveries({ webhook }: { webhook: Webhook }) {
                   </TableCell>
                   <TableCell className="py-1.5 align-top">{delivery.attempts}</TableCell>
                   <TableCell className="py-1.5 align-top">{delivery.responseStatus ?? '—'}</TableCell>
-                  <TableCell className="py-1.5 align-top whitespace-normal">{delivery.lastAttemptAt ? new Date(delivery.lastAttemptAt).toLocaleString() : '—'}</TableCell>
-                  <TableCell className="py-1.5 align-top whitespace-normal">{delivery.nextAttemptAt ? new Date(delivery.nextAttemptAt).toLocaleString() : '—'}</TableCell>
+                  <TableCell className="py-1.5 align-top whitespace-normal">
+                    {delivery.lastAttemptAt ? (
+                      <LocalTime options={WHEN_STYLE} value={delivery.lastAttemptAt} />
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell className="py-1.5 align-top whitespace-normal">
+                    {delivery.nextAttemptAt ? (
+                      <LocalTime options={WHEN_STYLE} value={delivery.nextAttemptAt} />
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
                   <TableCell className="py-1.5 text-right align-top">
                     {delivery.status === 'DEAD' ? (
                       <Button
@@ -279,11 +292,24 @@ function WebhookRow({ onSecret, webhook }: { onSecret: (secret: string) => void;
           <code className="break-all text-xs">{webhook.url}</code>
           <span>{webhook.events.map((event) => EVENT_LABELS[webhookEventSchema.catch('draft.created').parse(event)]?.label ?? event).join(', ')}</span>
           <span>
-            Last success: {webhook.lastSuccessAt ? new Date(webhook.lastSuccessAt).toLocaleString() : 'never'} · Last failure:{' '}
-            {webhook.lastFailureAt ? new Date(webhook.lastFailureAt).toLocaleString() : 'never'}
+            Last success:{' '}
+            {webhook.lastSuccessAt ? (
+              <LocalTime options={WHEN_STYLE} value={webhook.lastSuccessAt} />
+            ) : (
+              'never'
+            )}{' '}
+            · Last failure:{' '}
+            {webhook.lastFailureAt ? (
+              <LocalTime options={WHEN_STYLE} value={webhook.lastFailureAt} />
+            ) : (
+              'never'
+            )}
           </span>
           {webhook.previousSecretExpiresAt ? (
-            <span>The previous secret also signs until {new Date(webhook.previousSecretExpiresAt).toLocaleString()}.</span>
+            <span>
+              The previous secret also signs until{' '}
+              <LocalTime options={WHEN_STYLE} value={webhook.previousSecretExpiresAt} />.
+            </span>
           ) : null}
         </span>
       }

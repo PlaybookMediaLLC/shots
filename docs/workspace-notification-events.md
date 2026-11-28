@@ -37,13 +37,17 @@ and its code is stored on the delivery as `decision_code`:
 2. In-app and email only: the workspace's policy for this event leaves the
    channel out, `WORKSPACE_EVENT_DISABLED`.
 3. Email only: the person's email switch is off, `EMAIL_TURNED_OFF`.
-4. Slack DM only: the person's Slack switch is off, `SLACK_TURNED_OFF`.
-5. A required failure alert (`post.publish_failed`,
+4. Email only: for `post.publish_failed` / `post.publish_recovery_required`, if
+   `user_preference.postFailureAlerts` is false, skipped (`POST_FAILURE_ALERTS_OFF`);
+   for `post.publish_summary`, if `user_preference.postSummaryEmails` is false
+   (default), skipped (`POST_SUMMARY_EMAILS_OFF`). In-app alerts are unaffected.
+5. Slack DM only: the person's Slack switch is off, `SLACK_TURNED_OFF`.
+6. A required failure alert (`post.publish_failed`,
    `post.publish_recovery_required`) is sent, `REQUIRED_FAILURE_ALERT`. It
-   overrides only the person's own choices in step 6, never steps 1 to 4.
-6. The person turned this kind off, for every set or for the post's social set:
+   overrides only the person's own choices in step 7, never steps 1 to 5.
+7. The person turned this kind off, for every set or for the post's social set:
    `CATEGORY_DISABLED`.
-7. Otherwise it is sent: `SELECTED`.
+8. Otherwise it is sent: `SELECTED`.
 
 A channel that cannot deliver never sends, even a required alert. An expired
 Slack connection leaves the delivery `BLOCKED` (`SLACK_RECONNECT_REQUIRED`);
@@ -92,8 +96,9 @@ such as a scheduled publish, and a required failure alert still reach them.
 | `post.sent_to_app`                | `publishing.Repository.Complete`                                            | publishers      | coarse; in-app, email, Slack     | Post sent to the app to finish  | draft calendar or campaign            |
 | `post.auto_repost_published`      | `publishing.Repository.RecordAutoAction`                                    | publishers      | coarse; in-app, email, Slack     | Auto-retweet published          | draft calendar or campaign            |
 | `post.auto_plug_published`        | `publishing.Repository.RecordAutoAction`                                    | publishers      | coarse; in-app, email, Slack     | Auto-plug published             | draft calendar or campaign            |
-| `post.publish_failed`             | `publishing.Repository.Fail` (final failure only), `FailUnsent`             | operators       | restricted; in-app, email        | Publishing needs attention      | draft calendar or campaign            |
-| `post.publish_recovery_required`  | `publishing.Repository.MarkUnknown`                                         | operators       | restricted; in-app, email        | Publishing result needs review  | draft calendar or campaign            |
+| `post.publish_failed` *           | `publishing.Repository.Fail` (final failure only), `FailUnsent`             | operators       | restricted; in-app, email        | Publishing needs attention      | draft calendar or campaign            |
+| `post.publish_recovery_required` * | `publishing.Repository.MarkUnknown`                                        | operators       | restricted; in-app, email        | Publishing result needs review  | draft calendar or campaign            |
+| `post.publish_summary` *          | `publishing.emitPublishGroupSummary` (once all platforms in group settle)   | publishers      | restricted; email (opt-in)       | Post publishing summary         | draft calendar or campaign            |
 | `integration.connected`           | `SaveIntegration / FinishOAuth / Slack callback / provider health recovery` | admins          | coarse; in-app, email, Slack     | Integration connected           | integration or source settings        |
 | `integration.disconnected`        | `DeleteIntegration / Slack Disconnect`                                      | admins          | restricted; in-app, email        | Integration disconnected        | integration or source settings        |
 | `integration.reconnect_required`  | `Slack / social provider committed health transition`                       | admins          | restricted; in-app, email        | Integration needs reconnection  | integration or source settings        |

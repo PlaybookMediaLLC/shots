@@ -778,11 +778,11 @@ test(
     ).rejects.toThrow()
     await app.open(`/settings/publishing-brands/${sets[0].id}/scheduling`)
     await expect(
-      page.getByRole('switch', { name: 'Natural posting times for new drafts', exact: true })
+      page.getByRole('switch', { name: 'Randomize posting time for new drafts', exact: true })
     ).toBeChecked()
     await app.reload()
     await expect(
-      page.getByRole('switch', { name: 'Natural posting times for new drafts', exact: true })
+      page.getByRole('switch', { name: 'Randomize posting time for new drafts', exact: true })
     ).toBeChecked()
     const input = {
       requestId: crypto.randomUUID(),

@@ -109,6 +109,20 @@ func (_c *SocialSetCreate) SetNillableNaturalPostingTimes(v *bool) *SocialSetCre
 	return _c
 }
 
+// SetNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field.
+func (_c *SocialSetCreate) SetNaturalPostingWindowMinutes(v int) *SocialSetCreate {
+	_c.mutation.SetNaturalPostingWindowMinutes(v)
+	return _c
+}
+
+// SetNillableNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field if the given value is not nil.
+func (_c *SocialSetCreate) SetNillableNaturalPostingWindowMinutes(v *int) *SocialSetCreate {
+	if v != nil {
+		_c.SetNaturalPostingWindowMinutes(*v)
+	}
+	return _c
+}
+
 // SetDefaultPlatforms sets the "default_platforms" field.
 func (_c *SocialSetCreate) SetDefaultPlatforms(v []string) *SocialSetCreate {
 	_c.mutation.SetDefaultPlatforms(v)
@@ -308,6 +322,10 @@ func (_c *SocialSetCreate) defaults() {
 		v := socialset.DefaultNaturalPostingTimes
 		_c.mutation.SetNaturalPostingTimes(v)
 	}
+	if _, ok := _c.mutation.NaturalPostingWindowMinutes(); !ok {
+		v := socialset.DefaultNaturalPostingWindowMinutes
+		_c.mutation.SetNaturalPostingWindowMinutes(v)
+	}
 	if _, ok := _c.mutation.DefaultPlatforms(); !ok {
 		v := socialset.DefaultDefaultPlatforms
 		_c.mutation.SetDefaultPlatforms(v)
@@ -365,6 +383,14 @@ func (_c *SocialSetCreate) check() error {
 	}
 	if _, ok := _c.mutation.NaturalPostingTimes(); !ok {
 		return &ValidationError{Name: "natural_posting_times", err: errors.New(`ent: missing required field "SocialSet.natural_posting_times"`)}
+	}
+	if _, ok := _c.mutation.NaturalPostingWindowMinutes(); !ok {
+		return &ValidationError{Name: "natural_posting_window_minutes", err: errors.New(`ent: missing required field "SocialSet.natural_posting_window_minutes"`)}
+	}
+	if v, ok := _c.mutation.NaturalPostingWindowMinutes(); ok {
+		if err := socialset.NaturalPostingWindowMinutesValidator(v); err != nil {
+			return &ValidationError{Name: "natural_posting_window_minutes", err: fmt.Errorf(`ent: validator failed for field "SocialSet.natural_posting_window_minutes": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.DefaultPlatforms(); !ok {
 		return &ValidationError{Name: "default_platforms", err: errors.New(`ent: missing required field "SocialSet.default_platforms"`)}
@@ -456,6 +482,10 @@ func (_c *SocialSetCreate) createSpec() (*SocialSet, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.NaturalPostingTimes(); ok {
 		_spec.SetField(socialset.FieldNaturalPostingTimes, field.TypeBool, value)
 		_node.NaturalPostingTimes = value
+	}
+	if value, ok := _c.mutation.NaturalPostingWindowMinutes(); ok {
+		_spec.SetField(socialset.FieldNaturalPostingWindowMinutes, field.TypeInt, value)
+		_node.NaturalPostingWindowMinutes = value
 	}
 	if value, ok := _c.mutation.DefaultPlatforms(); ok {
 		_spec.SetField(socialset.FieldDefaultPlatforms, field.TypeJSON, value)

@@ -230,6 +230,20 @@ func (_c *ContentDraftCreate) SetNillableNaturalPostingTime(v *bool) *ContentDra
 	return _c
 }
 
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_c *ContentDraftCreate) SetProcessVideosOnServer(v bool) *ContentDraftCreate {
+	_c.mutation.SetProcessVideosOnServer(v)
+	return _c
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableProcessVideosOnServer(v *bool) *ContentDraftCreate {
+	if v != nil {
+		_c.SetProcessVideosOnServer(*v)
+	}
+	return _c
+}
+
 // SetEngagement sets the "engagement" field.
 func (_c *ContentDraftCreate) SetEngagement(v schema.Engagement) *ContentDraftCreate {
 	_c.mutation.SetEngagement(v)
@@ -822,6 +836,10 @@ func (_c *ContentDraftCreate) createSpec() (*ContentDraft, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.NaturalPostingTime(); ok {
 		_spec.SetField(contentdraft.FieldNaturalPostingTime, field.TypeBool, value)
 		_node.NaturalPostingTime = value
+	}
+	if value, ok := _c.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentdraft.FieldProcessVideosOnServer, field.TypeBool, value)
+		_node.ProcessVideosOnServer = &value
 	}
 	if value, ok := _c.mutation.Engagement(); ok {
 		_spec.SetField(contentdraft.FieldEngagement, field.TypeJSON, value)

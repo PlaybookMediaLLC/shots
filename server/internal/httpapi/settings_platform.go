@@ -21,6 +21,8 @@ type SettingsPlatformStore interface {
 	GetAccountDeletion(context.Context, product.Actor) (*product.AccountDeletionStatus, error)
 	RequestAccountDeletion(context.Context, product.Actor, string) (*product.AccountDeletionStatus, error)
 	CancelAccountDeletion(context.Context, product.Actor) (*product.AccountDeletionStatus, error)
+	RevokeAllSessions(context.Context, product.Actor) (*product.RevokeAllSessionsResult, error)
+	UnsubscribeAutomationEmails(context.Context, string) error
 	ListSocialSets(context.Context, product.Actor) (*product.SocialSetList, error)
 	GetChannelCapacity(context.Context, product.Actor) (*product.ChannelCapacity, error)
 	GetSocialSet(context.Context, product.Actor, string) (*product.SocialSetRecord, error)
@@ -57,6 +59,8 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	mux.Handle("GET /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.getAccountDeletion)))
 	mux.Handle("POST /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.requestAccountDeletion)))
 	mux.Handle("DELETE /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.cancelAccountDeletion)))
+	mux.Handle("POST /v1/me/sessions/revoke-all", s.authenticateSession(http.HandlerFunc(s.revokeAllSessions)))
+	mux.Handle("POST /v1/internal/email/unsubscribe", s.authenticateService(http.HandlerFunc(s.unsubscribeAutomationEmails)))
 	mux.Handle("GET /v1/experiments", product(s.listExperiments))
 	mux.Handle("PUT /v1/experiments/{id}/workspace", product(s.setWorkspaceExperiment))
 	mux.Handle("GET /v1/social-sets", product(s.listSocialSets))
@@ -129,6 +133,26 @@ func (s *Server) requestAccountDeletion(w http.ResponseWriter, r *http.Request) 
 func (s *Server) cancelAccountDeletion(w http.ResponseWriter, r *http.Request) {
 	status, err := s.configuration.CancelAccountDeletion(r.Context(), workspaceActor(r))
 	respond(w, http.StatusOK, status, err)
+}
+
+func (s *Server) revokeAllSessions(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.RevokeAllSessions(r.Context(), workspaceActor(r))
+	respond(w, http.StatusOK, result, err)
+}
+
+func (s *Server) unsubscribeAutomationEmails(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Token string `json:"token"`
+	}
+	if err := decodeJSON(r, &input); err != nil || input.Token == "" {
+		writeError(w, http.StatusBadRequest, "invalid unsubscribe token")
+		return
+	}
+	if err := s.configuration.UnsubscribeAutomationEmails(r.Context(), input.Token); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"unsubscribed": true})
 }
 
 func (s *Server) listExperiments(w http.ResponseWriter, r *http.Request) {

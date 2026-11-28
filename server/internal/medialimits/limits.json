@@ -53,6 +53,78 @@
       "formats": ["image/jpeg", "image/png"]
     }
   },
+  "videoProfiles": {
+    "standard": {
+      "maxBytes": 300000000,
+      "maxEdge": 1920,
+      "maxFps": 30,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 22,
+      "audioBitrateK": 160
+    },
+    "instagram": {
+      "maxBytes": 300000000,
+      "maxEdge": 1920,
+      "maxFps": 30,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 22,
+      "audioBitrateK": 128
+    },
+    "x": {
+      "maxBytes": 512000000,
+      "maxEdge": 1920,
+      "maxFps": 60,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 21,
+      "audioBitrateK": 160
+    },
+    "tiktok": {
+      "maxBytes": 512000000,
+      "maxEdge": 1920,
+      "maxFps": 60,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 21,
+      "audioBitrateK": 160
+    },
+    "youtube": {
+      "maxBytes": 512000000,
+      "maxEdge": 1920,
+      "maxFps": 60,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 20,
+      "audioBitrateK": 192
+    },
+    "linkedin": {
+      "maxBytes": 500000000,
+      "maxEdge": 1920,
+      "maxFps": 30,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 22,
+      "audioBitrateK": 160
+    },
+    "mastodon": {
+      "maxBytes": 100000000,
+      "maxEdge": 1920,
+      "maxFps": 30,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "crf": 23,
+      "audioBitrateK": 128
+    }
+  },
   "destinations": {
     "x": {
       "maxMedia": 4,

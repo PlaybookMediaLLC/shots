@@ -188,16 +188,24 @@ export function brandDaySlots(
   })
 }
 
-/** How far natural posting times move a post either side of its slot: the backend's `naturalOffsetLimit`. */
-const NATURAL_OFFSET_MS = 240_000
+/** Default natural posting window (±10 minutes), matching the backend default. */
+export const DEFAULT_NATURAL_WINDOW_MINUTES = 10
 
 /**
- * When a post in a slot can go out with natural posting times on. The backend
+ * When a post in a slot can go out with randomized posting time on. The backend
  * picks the exact offset when the post is scheduled, so a free slot has a window.
  */
-export function naturalWindow(at: Date): { from: Date; to: Date } {
+export function naturalWindow(
+  at: Date,
+  windowMinutes = DEFAULT_NATURAL_WINDOW_MINUTES
+): { from: Date; to: Date } {
+  const safeMinutes = Number.isFinite(windowMinutes)
+    ? windowMinutes
+    : DEFAULT_NATURAL_WINDOW_MINUTES
+  const clamped = Math.max(1, Math.min(15, Math.round(safeMinutes)))
+  const offsetMs = clamped * 60_000
   return {
-    from: new Date(at.getTime() - NATURAL_OFFSET_MS),
-    to: new Date(at.getTime() + NATURAL_OFFSET_MS),
+    from: new Date(at.getTime() - offsetMs),
+    to: new Date(at.getTime() + offsetMs),
   }
 }

@@ -66,6 +66,7 @@ func (SocialSet) Fields() []ent.Field {
 		field.String("time_zone").StorageKey("timeZone").Default("UTC"),
 		field.JSON("posting_slots", []QueueSlot{}).StorageKey("postingSlots").Default([]QueueSlot{}),
 		field.Bool("natural_posting_times").StorageKey("naturalPostingTimes").Default(false),
+		field.Int("natural_posting_window_minutes").StorageKey("naturalPostingWindowMinutes").Default(10).Min(1).Max(15),
 		// Platforms a new draft starts with, in order.
 		field.JSON("default_platforms", []string{}).StorageKey("defaultPlatforms").Default([]string{}),
 		field.String("primary_platform").StorageKey("primaryPlatform").Optional().Nillable(),

@@ -33,8 +33,9 @@ import { useWrite } from '../write-context'
 import { PastCaptions } from './past-captions'
 import { GoogleDriveImport } from './google-drive'
 import { SenjaImport } from './senja-import'
+import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
-import { uploadFiles } from './media-strip'
+import { maybeFillFilenameCaption, uploadFiles } from './media-strip'
 import { type Command, ComposerCommandsContext, type ComposerTool, commandsFor, rememberCommand } from './commands'
 import { DescribeImages } from './describe-images'
 import { insertAttachments } from '@/lib/write/media-operations'
@@ -95,6 +96,7 @@ export function ComposerToolbar({
   tool: ComposerTool | null
 }) {
   const editor = useEditorRef()
+  const useFilenameAsCaption = usePreferences().preferences?.useFilenameAsCaption ?? false
   const keys = useKeys()
   const coarse = useCoarsePointer()
   const refine = useRefine()
@@ -282,7 +284,9 @@ export function ComposerToolbar({
         <GoogleDriveImport
           config={composer?.drive ?? null}
           onClose={close}
-          onFiles={(picked) => void uploadFiles(editor as PlateEditor, picked)}
+          onFiles={(picked) =>
+            void uploadFiles(editor as PlateEditor, picked, { useFilenameAsCaption })
+          }
         />
       ) : null}
       {tool === 'senja' ? (
@@ -319,7 +323,16 @@ export function ComposerToolbar({
         <LibraryAssetPicker
           channel={channel}
           onClose={close}
-          onInsert={(nodes) => insertAttachments(editor as PlateEditor, nodes)}
+          onInsert={(nodes, picked) => {
+            if (picked?.length) {
+              maybeFillFilenameCaption(
+                editor as PlateEditor,
+                picked.map((item) => ({ fileName: item.fileName, mimeType: item.mediaType })),
+                useFilenameAsCaption
+              )
+            }
+            insertAttachments(editor as PlateEditor, nodes)
+          }}
         />
       ) : null}
       {tool === 'captions' ? (

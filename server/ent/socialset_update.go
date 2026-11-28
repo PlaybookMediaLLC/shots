@@ -132,6 +132,27 @@ func (_u *SocialSetUpdate) SetNillableNaturalPostingTimes(v *bool) *SocialSetUpd
 	return _u
 }
 
+// SetNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field.
+func (_u *SocialSetUpdate) SetNaturalPostingWindowMinutes(v int) *SocialSetUpdate {
+	_u.mutation.ResetNaturalPostingWindowMinutes()
+	_u.mutation.SetNaturalPostingWindowMinutes(v)
+	return _u
+}
+
+// SetNillableNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field if the given value is not nil.
+func (_u *SocialSetUpdate) SetNillableNaturalPostingWindowMinutes(v *int) *SocialSetUpdate {
+	if v != nil {
+		_u.SetNaturalPostingWindowMinutes(*v)
+	}
+	return _u
+}
+
+// AddNaturalPostingWindowMinutes adds value to the "natural_posting_window_minutes" field.
+func (_u *SocialSetUpdate) AddNaturalPostingWindowMinutes(v int) *SocialSetUpdate {
+	_u.mutation.AddNaturalPostingWindowMinutes(v)
+	return _u
+}
+
 // SetDefaultPlatforms sets the "default_platforms" field.
 func (_u *SocialSetUpdate) SetDefaultPlatforms(v []string) *SocialSetUpdate {
 	_u.mutation.SetDefaultPlatforms(v)
@@ -321,6 +342,11 @@ func (_u *SocialSetUpdate) check() error {
 			return &ValidationError{Name: "visibility", err: fmt.Errorf(`ent: validator failed for field "SocialSet.visibility": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.NaturalPostingWindowMinutes(); ok {
+		if err := socialset.NaturalPostingWindowMinutesValidator(v); err != nil {
+			return &ValidationError{Name: "natural_posting_window_minutes", err: fmt.Errorf(`ent: validator failed for field "SocialSet.natural_posting_window_minutes": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -364,6 +390,12 @@ func (_u *SocialSetUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.NaturalPostingTimes(); ok {
 		_spec.SetField(socialset.FieldNaturalPostingTimes, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.NaturalPostingWindowMinutes(); ok {
+		_spec.SetField(socialset.FieldNaturalPostingWindowMinutes, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedNaturalPostingWindowMinutes(); ok {
+		_spec.AddField(socialset.FieldNaturalPostingWindowMinutes, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.DefaultPlatforms(); ok {
 		_spec.SetField(socialset.FieldDefaultPlatforms, field.TypeJSON, value)
@@ -528,6 +560,27 @@ func (_u *SocialSetUpdateOne) SetNillableNaturalPostingTimes(v *bool) *SocialSet
 	if v != nil {
 		_u.SetNaturalPostingTimes(*v)
 	}
+	return _u
+}
+
+// SetNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field.
+func (_u *SocialSetUpdateOne) SetNaturalPostingWindowMinutes(v int) *SocialSetUpdateOne {
+	_u.mutation.ResetNaturalPostingWindowMinutes()
+	_u.mutation.SetNaturalPostingWindowMinutes(v)
+	return _u
+}
+
+// SetNillableNaturalPostingWindowMinutes sets the "natural_posting_window_minutes" field if the given value is not nil.
+func (_u *SocialSetUpdateOne) SetNillableNaturalPostingWindowMinutes(v *int) *SocialSetUpdateOne {
+	if v != nil {
+		_u.SetNaturalPostingWindowMinutes(*v)
+	}
+	return _u
+}
+
+// AddNaturalPostingWindowMinutes adds value to the "natural_posting_window_minutes" field.
+func (_u *SocialSetUpdateOne) AddNaturalPostingWindowMinutes(v int) *SocialSetUpdateOne {
+	_u.mutation.AddNaturalPostingWindowMinutes(v)
 	return _u
 }
 
@@ -733,6 +786,11 @@ func (_u *SocialSetUpdateOne) check() error {
 			return &ValidationError{Name: "visibility", err: fmt.Errorf(`ent: validator failed for field "SocialSet.visibility": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.NaturalPostingWindowMinutes(); ok {
+		if err := socialset.NaturalPostingWindowMinutesValidator(v); err != nil {
+			return &ValidationError{Name: "natural_posting_window_minutes", err: fmt.Errorf(`ent: validator failed for field "SocialSet.natural_posting_window_minutes": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -793,6 +851,12 @@ func (_u *SocialSetUpdateOne) sqlSave(ctx context.Context) (_node *SocialSet, er
 	}
 	if value, ok := _u.mutation.NaturalPostingTimes(); ok {
 		_spec.SetField(socialset.FieldNaturalPostingTimes, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.NaturalPostingWindowMinutes(); ok {
+		_spec.SetField(socialset.FieldNaturalPostingWindowMinutes, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedNaturalPostingWindowMinutes(); ok {
+		_spec.AddField(socialset.FieldNaturalPostingWindowMinutes, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.DefaultPlatforms(); ok {
 		_spec.SetField(socialset.FieldDefaultPlatforms, field.TypeJSON, value)

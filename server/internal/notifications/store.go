@@ -236,31 +236,37 @@ func preferencesBatch(ctx context.Context, db queryer, org string, users []strin
 // emailWanted reads the person's email master switch (RFC 024); off, no
 // notification email reaches them in any workspace.
 func emailWanted(ctx context.Context, db queryer, user string) (bool, error) {
-	var on bool
-	err := db.QueryRowContext(ctx, `SELECT "emailNotifications" FROM user_preference WHERE "userId"=$1`, user).Scan(&on)
-	if errors.Is(err, sql.ErrNoRows) {
-		return true, nil
-	}
-	return on, err
+	prefs, err := userEmailPrefs(ctx, db, user)
+	return prefs.EmailNotifications, err
 }
 
-func emailWantedBatch(ctx context.Context, db queryer, users []string) (map[string]bool, error) {
-	out := make(map[string]bool, len(users))
+func userEmailPrefs(ctx context.Context, db queryer, user string) (UserEmailPreferences, error) {
+	prefs := defaultUserEmailPrefs()
+	err := db.QueryRowContext(ctx, `SELECT "emailNotifications","postFailureAlerts","postSummaryEmails" FROM user_preference WHERE "userId"=$1`, user).
+		Scan(&prefs.EmailNotifications, &prefs.PostFailureAlerts, &prefs.PostSummaryEmails)
+	if errors.Is(err, sql.ErrNoRows) {
+		return defaultUserEmailPrefs(), nil
+	}
+	return prefs, err
+}
+
+func userEmailPrefsBatch(ctx context.Context, db queryer, users []string) (map[string]UserEmailPreferences, error) {
+	out := make(map[string]UserEmailPreferences, len(users))
 	if len(users) == 0 {
 		return out, nil
 	}
-	rows, err := db.QueryContext(ctx, `SELECT "userId","emailNotifications" FROM user_preference WHERE "userId"=ANY($1)`, users)
+	rows, err := db.QueryContext(ctx, `SELECT "userId","emailNotifications","postFailureAlerts","postSummaryEmails" FROM user_preference WHERE "userId"=ANY($1)`, users)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var userID string
-		var on bool
-		if err = rows.Scan(&userID, &on); err != nil {
+		prefs := defaultUserEmailPrefs()
+		if err = rows.Scan(&userID, &prefs.EmailNotifications, &prefs.PostFailureAlerts, &prefs.PostSummaryEmails); err != nil {
 			return nil, err
 		}
-		out[userID] = on
+		out[userID] = prefs
 	}
 	return out, rows.Err()
 }
@@ -330,9 +336,13 @@ func (s *Service) Settings(ctx context.Context, p Principal) (*Settings, error) 
 	if err != nil {
 		return nil, err
 	}
+	emailPrefs, err := userEmailPrefs(ctx, s.DB, p.UserID)
+	if err != nil {
+		return nil, err
+	}
 	_, keyErr := encryptionKey("PLATFORM_NOTIFICATION_ENCRYPTION_KEY")
 	available := emailConfigured() && keyErr == nil
-	return &Settings{PersonalSlack: personal, Catalogue: activity.Catalogue, Policy: pol, Preferences: pref, CanManage: s.Authorize(ctx, p, true) == nil, EmailAvailable: available, SlackAvailable: s.slackConfigured(), Connections: connections, Effective: effectiveSettings(pol, pref, available, connections, personal)}, nil
+	return &Settings{PersonalSlack: personal, Catalogue: activity.Catalogue, Policy: pol, Preferences: pref, CanManage: s.Authorize(ctx, p, true) == nil, EmailAvailable: available, SlackAvailable: s.slackConfigured(), Connections: connections, Effective: effectiveSettings(pol, pref, available, emailPrefs, connections, personal)}, nil
 }
 func validEvents(events map[string]Channels, personal bool) bool {
 	if len(events) > len(activity.Catalogue) {

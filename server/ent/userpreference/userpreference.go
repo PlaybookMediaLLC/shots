@@ -34,6 +34,14 @@ const (
 	FieldDeveloperMode = "developerMode"
 	// FieldEmailNotifications holds the string denoting the email_notifications field in the database.
 	FieldEmailNotifications = "emailNotifications"
+	// FieldAutomationEmails holds the string denoting the automation_emails field in the database.
+	FieldAutomationEmails = "automationEmails"
+	// FieldPostFailureAlerts holds the string denoting the post_failure_alerts field in the database.
+	FieldPostFailureAlerts = "postFailureAlerts"
+	// FieldPostSummaryEmails holds the string denoting the post_summary_emails field in the database.
+	FieldPostSummaryEmails = "postSummaryEmails"
+	// FieldUseFilenameAsCaption holds the string denoting the use_filename_as_caption field in the database.
+	FieldUseFilenameAsCaption = "useFilenameAsCaption"
 	// FieldDismissedTips holds the string denoting the dismissed_tips field in the database.
 	FieldDismissedTips = "dismissedTips"
 	// FieldExperiments holds the string denoting the experiments field in the database.
@@ -59,6 +67,10 @@ var Columns = []string{
 	FieldShowScrollbars,
 	FieldDeveloperMode,
 	FieldEmailNotifications,
+	FieldAutomationEmails,
+	FieldPostFailureAlerts,
+	FieldPostSummaryEmails,
+	FieldUseFilenameAsCaption,
 	FieldDismissedTips,
 	FieldExperiments,
 	FieldVersion,
@@ -84,6 +96,14 @@ var (
 	DefaultDeveloperMode bool
 	// DefaultEmailNotifications holds the default value on creation for the "email_notifications" field.
 	DefaultEmailNotifications bool
+	// DefaultAutomationEmails holds the default value on creation for the "automation_emails" field.
+	DefaultAutomationEmails bool
+	// DefaultPostFailureAlerts holds the default value on creation for the "post_failure_alerts" field.
+	DefaultPostFailureAlerts bool
+	// DefaultPostSummaryEmails holds the default value on creation for the "post_summary_emails" field.
+	DefaultPostSummaryEmails bool
+	// DefaultUseFilenameAsCaption holds the default value on creation for the "use_filename_as_caption" field.
+	DefaultUseFilenameAsCaption bool
 	// DefaultDismissedTips holds the default value on creation for the "dismissed_tips" field.
 	DefaultDismissedTips []string
 	// DefaultExperiments holds the default value on creation for the "experiments" field.
@@ -285,6 +305,26 @@ func ByDeveloperMode(opts ...sql.OrderTermOption) OrderOption {
 // ByEmailNotifications orders the results by the email_notifications field.
 func ByEmailNotifications(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEmailNotifications, opts...).ToFunc()
+}
+
+// ByAutomationEmails orders the results by the automation_emails field.
+func ByAutomationEmails(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAutomationEmails, opts...).ToFunc()
+}
+
+// ByPostFailureAlerts orders the results by the post_failure_alerts field.
+func ByPostFailureAlerts(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPostFailureAlerts, opts...).ToFunc()
+}
+
+// ByPostSummaryEmails orders the results by the post_summary_emails field.
+func ByPostSummaryEmails(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPostSummaryEmails, opts...).ToFunc()
+}
+
+// ByUseFilenameAsCaption orders the results by the use_filename_as_caption field.
+func ByUseFilenameAsCaption(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUseFilenameAsCaption, opts...).ToFunc()
 }
 
 // ByVersion orders the results by the version field.

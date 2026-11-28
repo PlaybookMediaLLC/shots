@@ -137,6 +137,10 @@ func (WorkspaceSettings) Fields() []ent.Field {
 		field.String("ai_provider_key_hint").StorageKey("aiProviderKeyHint").Optional().Nillable(),
 		// Manual release qualification is enabled explicitly for a workspace.
 		field.Bool("release_readiness_enabled").StorageKey("releaseReadinessEnabled").Default(false),
+		// Optional weekly post target (1..1000) for workspace publishing goals.
+		field.Int("weekly_posting_goal").StorageKey("weeklyPostingGoal").Optional().Nillable(),
+		// When true, new posts normalize/transcode videos server-side; when false, originals pass through untouched.
+		field.Bool("process_videos_on_server").StorageKey("processVideosOnServer").Default(true),
 		// Experiments an owner or admin turned off for everyone (RFC 024).
 		field.JSON("disabled_experiments", []string{}).StorageKey("disabledExperiments").Default([]string{}),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),

@@ -507,8 +507,14 @@ type SurfaceCapture func(*sql.Selector)
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
 
+// UserAutomationEmailLog is the predicate function for userautomationemaillog builders.
+type UserAutomationEmailLog func(*sql.Selector)
+
 // UserPreference is the predicate function for userpreference builders.
 type UserPreference func(*sql.Selector)
+
+// VideoTranscodeJob is the predicate function for videotranscodejob builders.
+type VideoTranscodeJob func(*sql.Selector)
 
 // VoiceAudioRun is the predicate function for voiceaudiorun builders.
 type VoiceAudioRun func(*sql.Selector)

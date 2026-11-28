@@ -346,8 +346,12 @@ type Tx struct {
 	SurfaceCapture *SurfaceCaptureClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserAutomationEmailLog is the client for interacting with the UserAutomationEmailLog builders.
+	UserAutomationEmailLog *UserAutomationEmailLogClient
 	// UserPreference is the client for interacting with the UserPreference builders.
 	UserPreference *UserPreferenceClient
+	// VideoTranscodeJob is the client for interacting with the VideoTranscodeJob builders.
+	VideoTranscodeJob *VideoTranscodeJobClient
 	// VoiceAudioRun is the client for interacting with the VoiceAudioRun builders.
 	VoiceAudioRun *VoiceAudioRunClient
 	// VoiceCommand is the client for interacting with the VoiceCommand builders.
@@ -678,7 +682,9 @@ func (tx *Tx) init() {
 	tx.SupportAccessGrant = NewSupportAccessGrantClient(tx.config)
 	tx.SurfaceCapture = NewSurfaceCaptureClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.UserAutomationEmailLog = NewUserAutomationEmailLogClient(tx.config)
 	tx.UserPreference = NewUserPreferenceClient(tx.config)
+	tx.VideoTranscodeJob = NewVideoTranscodeJobClient(tx.config)
 	tx.VoiceAudioRun = NewVoiceAudioRunClient(tx.config)
 	tx.VoiceCommand = NewVoiceCommandClient(tx.config)
 	tx.VoiceMemberSettings = NewVoiceMemberSettingsClient(tx.config)

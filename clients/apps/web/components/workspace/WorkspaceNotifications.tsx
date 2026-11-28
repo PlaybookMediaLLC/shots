@@ -333,8 +333,8 @@ function SettingsForm({
 
       <div hidden={panel !== 'personal'} className="space-y-8">
         <Section
-          title="Email"
-          description="Your switch for activity email in every workspace. It saves with your preferences below."
+          title="Email preferences"
+          description="Control automation reminders, post failure alerts, and combined post summaries across every workspace."
         >
           <EmailSwitch checked={email ?? savedEmail} disabled={!personal || !!busy} onCheckedChange={setEmail} />
         </Section>

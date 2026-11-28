@@ -13,12 +13,14 @@ export const socialSetQueueUpdateSchema = socialSetUpdateSchema
     postingSlots: true,
     timeZone: true,
     naturalPostingTimes: true,
+    naturalPostingWindowMinutes: true,
   })
   .refine(
     (value) =>
       value.postingSlots !== undefined ||
       value.timeZone !== undefined ||
-      value.naturalPostingTimes !== undefined,
+      value.naturalPostingTimes !== undefined ||
+      value.naturalPostingWindowMinutes !== undefined,
     'Choose a queue setting to change.'
   )
 

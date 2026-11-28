@@ -77,6 +77,8 @@ type ScheduledPost struct {
 	ScheduleTimeZone *string `json:"schedule_time_zone,omitempty"`
 	// ScheduleIntent holds the value of the "schedule_intent" field.
 	ScheduleIntent *string `json:"schedule_intent,omitempty"`
+	// PublishGroupID holds the value of the "publish_group_id" field.
+	PublishGroupID *string `json:"publish_group_id,omitempty"`
 	// FailureCode holds the value of the "failure_code" field.
 	FailureCode *string `json:"failure_code,omitempty"`
 	// ScheduledByUserID holds the value of the "scheduled_by_user_id" field.
@@ -137,7 +139,7 @@ func (*ScheduledPost) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case scheduledpost.FieldNaturalOffsetSeconds, scheduledpost.FieldApprovedVersion, scheduledpost.FieldXLinksStrippedCount:
 			values[i] = new(sql.NullInt64)
-		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldFailureCode, scheduledpost.FieldScheduledByUserID, scheduledpost.FieldApprovedByUserID:
+		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldPublishGroupID, scheduledpost.FieldFailureCode, scheduledpost.FieldScheduledByUserID, scheduledpost.FieldApprovedByUserID:
 			values[i] = new(sql.NullString)
 		case scheduledpost.FieldPublishedAt, scheduledpost.FieldDeletedAt, scheduledpost.FieldMetricsAt, scheduledpost.FieldScheduledFor, scheduledpost.FieldSlotAt, scheduledpost.FieldCreatedAt, scheduledpost.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -359,6 +361,13 @@ func (_m *ScheduledPost) assignValues(columns []string, values []any) error {
 				_m.ScheduleIntent = new(string)
 				*_m.ScheduleIntent = value.String
 			}
+		case scheduledpost.FieldPublishGroupID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field publish_group_id", values[i])
+			} else if value.Valid {
+				_m.PublishGroupID = new(string)
+				*_m.PublishGroupID = value.String
+			}
 		case scheduledpost.FieldFailureCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field failure_code", values[i])
@@ -562,6 +571,11 @@ func (_m *ScheduledPost) String() string {
 	builder.WriteString(", ")
 	if v := _m.ScheduleIntent; v != nil {
 		builder.WriteString("schedule_intent=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PublishGroupID; v != nil {
+		builder.WriteString("publish_group_id=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

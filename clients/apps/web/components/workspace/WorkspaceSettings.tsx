@@ -30,7 +30,10 @@ export type WorkspaceSettingsProps = {
       defaultPublishTime: string
       description: string | null
       locale: string
+      processVideosOnServer?: boolean
       timeZone: string
+      videoProcessingAvailable?: boolean
+      weeklyPostingGoal?: number | null
     } | null
   }
   role: string

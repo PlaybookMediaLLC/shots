@@ -406,6 +406,10 @@ func TestScheduleReconciliationPreservesPauseSkipsNoOpsAndDeletesRetired(t *test
 			if len(got.Spec.Intervals) != 1 || got.Spec.Intervals[0] != want {
 				t.Fatalf("asset-cleanup spec=%+v", got.Spec)
 			}
+		case "platform-maintenance-automation-reminders":
+			if got.Spec.TimeZoneName != "UTC" || len(got.Spec.CronExpressions) != 1 || got.Spec.CronExpressions[0] != "0 14 * * *" || got.Policy.CatchupWindow != 24*time.Hour {
+				t.Fatalf("automation-reminders spec=%+v policy=%+v", got.Spec, got.Policy)
+			}
 		case "platform-maintenance-voice-cleanup":
 			want := client.ScheduleIntervalSpec{Every: time.Hour, Offset: 45 * time.Minute}
 			if len(got.Spec.Intervals) != 1 || got.Spec.Intervals[0] != want {

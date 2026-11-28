@@ -104,6 +104,11 @@ func DraftID(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldDraftID, v))
 }
 
+// ProcessVideosOnServer applies equality check predicate on the "process_videos_on_server" field. It's identical to ProcessVideosOnServerEQ.
+func ProcessVideosOnServer(v bool) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldCreatedAt, v))
@@ -627,6 +632,26 @@ func DraftIDEqualFold(v string) predicate.ContentBatchItem {
 // DraftIDContainsFold applies the ContainsFold predicate on the "draft_id" field.
 func DraftIDContainsFold(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldContainsFold(FieldDraftID, v))
+}
+
+// ProcessVideosOnServerEQ applies the EQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerEQ(v bool) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
+// ProcessVideosOnServerNEQ applies the NEQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerNEQ(v bool) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNEQ(FieldProcessVideosOnServer, v))
+}
+
+// ProcessVideosOnServerIsNil applies the IsNil predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerIsNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldIsNull(FieldProcessVideosOnServer))
+}
+
+// ProcessVideosOnServerNotNil applies the NotNil predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerNotNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNotNull(FieldProcessVideosOnServer))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

@@ -2013,6 +2013,18 @@ func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
 }
 
+// The UserAutomationEmailLogFunc type is an adapter to allow the use of ordinary
+// function as UserAutomationEmailLog mutator.
+type UserAutomationEmailLogFunc func(context.Context, *ent.UserAutomationEmailLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserAutomationEmailLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserAutomationEmailLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserAutomationEmailLogMutation", m)
+}
+
 // The UserPreferenceFunc type is an adapter to allow the use of ordinary
 // function as UserPreference mutator.
 type UserPreferenceFunc func(context.Context, *ent.UserPreferenceMutation) (ent.Value, error)
@@ -2023,6 +2035,18 @@ func (f UserPreferenceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserPreferenceMutation", m)
+}
+
+// The VideoTranscodeJobFunc type is an adapter to allow the use of ordinary
+// function as VideoTranscodeJob mutator.
+type VideoTranscodeJobFunc func(context.Context, *ent.VideoTranscodeJobMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VideoTranscodeJobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VideoTranscodeJobMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VideoTranscodeJobMutation", m)
 }
 
 // The VoiceAudioRunFunc type is an adapter to allow the use of ordinary

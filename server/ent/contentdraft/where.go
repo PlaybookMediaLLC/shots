@@ -124,6 +124,11 @@ func NaturalPostingTime(v bool) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldNaturalPostingTime, v))
 }
 
+// ProcessVideosOnServer applies equality check predicate on the "process_videos_on_server" field. It's identical to ProcessVideosOnServerEQ.
+func ProcessVideosOnServer(v bool) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
 // PlannedFor applies equality check predicate on the "planned_for" field. It's identical to PlannedForEQ.
 func PlannedFor(v time.Time) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldPlannedFor, v))
@@ -952,6 +957,26 @@ func NaturalPostingTimeEQ(v bool) predicate.ContentDraft {
 // NaturalPostingTimeNEQ applies the NEQ predicate on the "natural_posting_time" field.
 func NaturalPostingTimeNEQ(v bool) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldNEQ(FieldNaturalPostingTime, v))
+}
+
+// ProcessVideosOnServerEQ applies the EQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerEQ(v bool) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
+// ProcessVideosOnServerNEQ applies the NEQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerNEQ(v bool) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNEQ(FieldProcessVideosOnServer, v))
+}
+
+// ProcessVideosOnServerIsNil applies the IsNil predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerIsNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIsNull(FieldProcessVideosOnServer))
+}
+
+// ProcessVideosOnServerNotNil applies the NotNil predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerNotNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotNull(FieldProcessVideosOnServer))
 }
 
 // PlannedForEQ applies the EQ predicate on the "planned_for" field.

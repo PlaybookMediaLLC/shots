@@ -182,7 +182,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/supportaccessgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userautomationemaillog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/videotranscodejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
@@ -540,8 +542,12 @@ type Client struct {
 	SurfaceCapture *SurfaceCaptureClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserAutomationEmailLog is the client for interacting with the UserAutomationEmailLog builders.
+	UserAutomationEmailLog *UserAutomationEmailLogClient
 	// UserPreference is the client for interacting with the UserPreference builders.
 	UserPreference *UserPreferenceClient
+	// VideoTranscodeJob is the client for interacting with the VideoTranscodeJob builders.
+	VideoTranscodeJob *VideoTranscodeJobClient
 	// VoiceAudioRun is the client for interacting with the VoiceAudioRun builders.
 	VoiceAudioRun *VoiceAudioRunClient
 	// VoiceCommand is the client for interacting with the VoiceCommand builders.
@@ -752,7 +758,9 @@ func (c *Client) init() {
 	c.SupportAccessGrant = NewSupportAccessGrantClient(c.config)
 	c.SurfaceCapture = NewSurfaceCaptureClient(c.config)
 	c.User = NewUserClient(c.config)
+	c.UserAutomationEmailLog = NewUserAutomationEmailLogClient(c.config)
 	c.UserPreference = NewUserPreferenceClient(c.config)
+	c.VideoTranscodeJob = NewVideoTranscodeJobClient(c.config)
 	c.VoiceAudioRun = NewVoiceAudioRunClient(c.config)
 	c.VoiceCommand = NewVoiceCommandClient(c.config)
 	c.VoiceMemberSettings = NewVoiceMemberSettingsClient(c.config)
@@ -1028,7 +1036,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		SupportAccessGrant:              NewSupportAccessGrantClient(cfg),
 		SurfaceCapture:                  NewSurfaceCaptureClient(cfg),
 		User:                            NewUserClient(cfg),
+		UserAutomationEmailLog:          NewUserAutomationEmailLogClient(cfg),
 		UserPreference:                  NewUserPreferenceClient(cfg),
+		VideoTranscodeJob:               NewVideoTranscodeJobClient(cfg),
 		VoiceAudioRun:                   NewVoiceAudioRunClient(cfg),
 		VoiceCommand:                    NewVoiceCommandClient(cfg),
 		VoiceMemberSettings:             NewVoiceMemberSettingsClient(cfg),
@@ -1231,7 +1241,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		SupportAccessGrant:              NewSupportAccessGrantClient(cfg),
 		SurfaceCapture:                  NewSurfaceCaptureClient(cfg),
 		User:                            NewUserClient(cfg),
+		UserAutomationEmailLog:          NewUserAutomationEmailLogClient(cfg),
 		UserPreference:                  NewUserPreferenceClient(cfg),
+		VideoTranscodeJob:               NewVideoTranscodeJobClient(cfg),
 		VoiceAudioRun:                   NewVoiceAudioRunClient(cfg),
 		VoiceCommand:                    NewVoiceCommandClient(cfg),
 		VoiceMemberSettings:             NewVoiceMemberSettingsClient(cfg),
@@ -1328,8 +1340,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.SocialSet, c.SocialSetWritingSample, c.SocialTenantBinding, c.SourceApp,
 		c.SourceChange, c.StorePublishingCredential, c.StoreReview,
 		c.StoreReviewComment, c.SupportAccessGrant, c.SurfaceCapture, c.User,
-		c.UserPreference, c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings,
-		c.VoiceNote, c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.UserAutomationEmailLog, c.UserPreference, c.VideoTranscodeJob,
+		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
+		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
 		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceAddon,
 		c.WorkspaceCreditGrant, c.WorkspaceDeletion, c.WorkspaceEntitlement,
 		c.WorkspaceGitHubInstallation, c.WorkspaceSettings, c.XLinkPostUsage,
@@ -1393,8 +1406,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.SocialSet, c.SocialSetWritingSample, c.SocialTenantBinding, c.SourceApp,
 		c.SourceChange, c.StorePublishingCredential, c.StoreReview,
 		c.StoreReviewComment, c.SupportAccessGrant, c.SurfaceCapture, c.User,
-		c.UserPreference, c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings,
-		c.VoiceNote, c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.UserAutomationEmailLog, c.UserPreference, c.VideoTranscodeJob,
+		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
+		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
 		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceAddon,
 		c.WorkspaceCreditGrant, c.WorkspaceDeletion, c.WorkspaceEntitlement,
 		c.WorkspaceGitHubInstallation, c.WorkspaceSettings, c.XLinkPostUsage,
@@ -1740,8 +1754,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SurfaceCapture.mutate(ctx, m)
 	case *UserMutation:
 		return c.User.mutate(ctx, m)
+	case *UserAutomationEmailLogMutation:
+		return c.UserAutomationEmailLog.mutate(ctx, m)
 	case *UserPreferenceMutation:
 		return c.UserPreference.mutate(ctx, m)
+	case *VideoTranscodeJobMutation:
+		return c.VideoTranscodeJob.mutate(ctx, m)
 	case *VoiceAudioRunMutation:
 		return c.VoiceAudioRun.mutate(ctx, m)
 	case *VoiceCommandMutation:
@@ -24118,6 +24136,139 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 	}
 }
 
+// UserAutomationEmailLogClient is a client for the UserAutomationEmailLog schema.
+type UserAutomationEmailLogClient struct {
+	config
+}
+
+// NewUserAutomationEmailLogClient returns a client for the UserAutomationEmailLog from the given config.
+func NewUserAutomationEmailLogClient(c config) *UserAutomationEmailLogClient {
+	return &UserAutomationEmailLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `userautomationemaillog.Hooks(f(g(h())))`.
+func (c *UserAutomationEmailLogClient) Use(hooks ...Hook) {
+	c.hooks.UserAutomationEmailLog = append(c.hooks.UserAutomationEmailLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `userautomationemaillog.Intercept(f(g(h())))`.
+func (c *UserAutomationEmailLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserAutomationEmailLog = append(c.inters.UserAutomationEmailLog, interceptors...)
+}
+
+// Create returns a builder for creating a UserAutomationEmailLog entity.
+func (c *UserAutomationEmailLogClient) Create() *UserAutomationEmailLogCreate {
+	mutation := newUserAutomationEmailLogMutation(c.config, OpCreate)
+	return &UserAutomationEmailLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserAutomationEmailLog entities.
+func (c *UserAutomationEmailLogClient) CreateBulk(builders ...*UserAutomationEmailLogCreate) *UserAutomationEmailLogCreateBulk {
+	return &UserAutomationEmailLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserAutomationEmailLogClient) MapCreateBulk(slice any, setFunc func(*UserAutomationEmailLogCreate, int)) *UserAutomationEmailLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserAutomationEmailLogCreateBulk{err: fmt.Errorf("calling to UserAutomationEmailLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserAutomationEmailLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserAutomationEmailLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserAutomationEmailLog.
+func (c *UserAutomationEmailLogClient) Update() *UserAutomationEmailLogUpdate {
+	mutation := newUserAutomationEmailLogMutation(c.config, OpUpdate)
+	return &UserAutomationEmailLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserAutomationEmailLogClient) UpdateOne(_m *UserAutomationEmailLog) *UserAutomationEmailLogUpdateOne {
+	mutation := newUserAutomationEmailLogMutation(c.config, OpUpdateOne, withUserAutomationEmailLog(_m))
+	return &UserAutomationEmailLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UserAutomationEmailLogClient) UpdateOneID(id string) *UserAutomationEmailLogUpdateOne {
+	mutation := newUserAutomationEmailLogMutation(c.config, OpUpdateOne, withUserAutomationEmailLogID(id))
+	return &UserAutomationEmailLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserAutomationEmailLog.
+func (c *UserAutomationEmailLogClient) Delete() *UserAutomationEmailLogDelete {
+	mutation := newUserAutomationEmailLogMutation(c.config, OpDelete)
+	return &UserAutomationEmailLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UserAutomationEmailLogClient) DeleteOne(_m *UserAutomationEmailLog) *UserAutomationEmailLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UserAutomationEmailLogClient) DeleteOneID(id string) *UserAutomationEmailLogDeleteOne {
+	builder := c.Delete().Where(userautomationemaillog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UserAutomationEmailLogDeleteOne{builder}
+}
+
+// Query returns a query builder for UserAutomationEmailLog.
+func (c *UserAutomationEmailLogClient) Query() *UserAutomationEmailLogQuery {
+	return &UserAutomationEmailLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserAutomationEmailLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UserAutomationEmailLog entity by its id.
+func (c *UserAutomationEmailLogClient) Get(ctx context.Context, id string) (*UserAutomationEmailLog, error) {
+	return c.Query().Where(userautomationemaillog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UserAutomationEmailLogClient) GetX(ctx context.Context, id string) *UserAutomationEmailLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *UserAutomationEmailLogClient) Hooks() []Hook {
+	return c.hooks.UserAutomationEmailLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserAutomationEmailLogClient) Interceptors() []Interceptor {
+	return c.inters.UserAutomationEmailLog
+}
+
+func (c *UserAutomationEmailLogClient) mutate(ctx context.Context, m *UserAutomationEmailLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserAutomationEmailLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserAutomationEmailLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserAutomationEmailLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserAutomationEmailLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserAutomationEmailLog mutation op: %q", m.Op())
+	}
+}
+
 // UserPreferenceClient is a client for the UserPreference schema.
 type UserPreferenceClient struct {
 	config
@@ -24248,6 +24399,139 @@ func (c *UserPreferenceClient) mutate(ctx context.Context, m *UserPreferenceMuta
 		return (&UserPreferenceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown UserPreference mutation op: %q", m.Op())
+	}
+}
+
+// VideoTranscodeJobClient is a client for the VideoTranscodeJob schema.
+type VideoTranscodeJobClient struct {
+	config
+}
+
+// NewVideoTranscodeJobClient returns a client for the VideoTranscodeJob from the given config.
+func NewVideoTranscodeJobClient(c config) *VideoTranscodeJobClient {
+	return &VideoTranscodeJobClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `videotranscodejob.Hooks(f(g(h())))`.
+func (c *VideoTranscodeJobClient) Use(hooks ...Hook) {
+	c.hooks.VideoTranscodeJob = append(c.hooks.VideoTranscodeJob, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `videotranscodejob.Intercept(f(g(h())))`.
+func (c *VideoTranscodeJobClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VideoTranscodeJob = append(c.inters.VideoTranscodeJob, interceptors...)
+}
+
+// Create returns a builder for creating a VideoTranscodeJob entity.
+func (c *VideoTranscodeJobClient) Create() *VideoTranscodeJobCreate {
+	mutation := newVideoTranscodeJobMutation(c.config, OpCreate)
+	return &VideoTranscodeJobCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VideoTranscodeJob entities.
+func (c *VideoTranscodeJobClient) CreateBulk(builders ...*VideoTranscodeJobCreate) *VideoTranscodeJobCreateBulk {
+	return &VideoTranscodeJobCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VideoTranscodeJobClient) MapCreateBulk(slice any, setFunc func(*VideoTranscodeJobCreate, int)) *VideoTranscodeJobCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VideoTranscodeJobCreateBulk{err: fmt.Errorf("calling to VideoTranscodeJobClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VideoTranscodeJobCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VideoTranscodeJobCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VideoTranscodeJob.
+func (c *VideoTranscodeJobClient) Update() *VideoTranscodeJobUpdate {
+	mutation := newVideoTranscodeJobMutation(c.config, OpUpdate)
+	return &VideoTranscodeJobUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VideoTranscodeJobClient) UpdateOne(_m *VideoTranscodeJob) *VideoTranscodeJobUpdateOne {
+	mutation := newVideoTranscodeJobMutation(c.config, OpUpdateOne, withVideoTranscodeJob(_m))
+	return &VideoTranscodeJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VideoTranscodeJobClient) UpdateOneID(id string) *VideoTranscodeJobUpdateOne {
+	mutation := newVideoTranscodeJobMutation(c.config, OpUpdateOne, withVideoTranscodeJobID(id))
+	return &VideoTranscodeJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VideoTranscodeJob.
+func (c *VideoTranscodeJobClient) Delete() *VideoTranscodeJobDelete {
+	mutation := newVideoTranscodeJobMutation(c.config, OpDelete)
+	return &VideoTranscodeJobDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VideoTranscodeJobClient) DeleteOne(_m *VideoTranscodeJob) *VideoTranscodeJobDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VideoTranscodeJobClient) DeleteOneID(id string) *VideoTranscodeJobDeleteOne {
+	builder := c.Delete().Where(videotranscodejob.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VideoTranscodeJobDeleteOne{builder}
+}
+
+// Query returns a query builder for VideoTranscodeJob.
+func (c *VideoTranscodeJobClient) Query() *VideoTranscodeJobQuery {
+	return &VideoTranscodeJobQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVideoTranscodeJob},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VideoTranscodeJob entity by its id.
+func (c *VideoTranscodeJobClient) Get(ctx context.Context, id string) (*VideoTranscodeJob, error) {
+	return c.Query().Where(videotranscodejob.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VideoTranscodeJobClient) GetX(ctx context.Context, id string) *VideoTranscodeJob {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VideoTranscodeJobClient) Hooks() []Hook {
+	return c.hooks.VideoTranscodeJob
+}
+
+// Interceptors returns the client interceptors.
+func (c *VideoTranscodeJobClient) Interceptors() []Interceptor {
+	return c.inters.VideoTranscodeJob
+}
+
+func (c *VideoTranscodeJobClient) mutate(ctx context.Context, m *VideoTranscodeJobMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VideoTranscodeJobCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VideoTranscodeJobUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VideoTranscodeJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VideoTranscodeJobDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VideoTranscodeJob mutation op: %q", m.Op())
 	}
 }
 
@@ -26428,9 +26712,10 @@ type (
 		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
 		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
 		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,
-		SurfaceCapture, User, UserPreference, VoiceAudioRun, VoiceCommand,
-		VoiceMemberSettings, VoiceNote, VoiceSettings, VoiceTranscriptRevision,
-		WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription, WorkspaceAddon,
+		SurfaceCapture, User, UserAutomationEmailLog, UserPreference,
+		VideoTranscodeJob, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
+		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
+		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceAddon,
 		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
 		WorkspaceGitHubInstallation, WorkspaceSettings, XLinkPostUsage []ent.Hook
 	}
@@ -26481,9 +26766,10 @@ type (
 		ScreenshotCache, Session, ShareLink, SocialOAuthStart, SocialSet,
 		SocialSetWritingSample, SocialTenantBinding, SourceApp, SourceChange,
 		StorePublishingCredential, StoreReview, StoreReviewComment, SupportAccessGrant,
-		SurfaceCapture, User, UserPreference, VoiceAudioRun, VoiceCommand,
-		VoiceMemberSettings, VoiceNote, VoiceSettings, VoiceTranscriptRevision,
-		WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription, WorkspaceAddon,
+		SurfaceCapture, User, UserAutomationEmailLog, UserPreference,
+		VideoTranscodeJob, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
+		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
+		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceAddon,
 		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
 		WorkspaceGitHubInstallation, WorkspaceSettings,
 		XLinkPostUsage []ent.Interceptor

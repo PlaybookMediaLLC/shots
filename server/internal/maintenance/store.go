@@ -98,6 +98,7 @@ func (s *Store) run(ctx context.Context, job string, wait bool) (int, error) {
 		"notifications":          s.Notifications,
 		"notifications-maintain": s.NotificationsMaintain,
 		"account-deletions":      s.AccountDeletions,
+		"automation-reminders":   s.AutomationReminders,
 		"webhooks":               s.DeliverWebhooks,
 		"asset-cleanup":          s.AssetCleanup,
 		"voice-cleanup":          s.VoiceCleanup,

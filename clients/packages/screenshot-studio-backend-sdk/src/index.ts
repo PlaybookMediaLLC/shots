@@ -181,6 +181,7 @@ import type {
   Engagement,
   ExperimentState,
   PublicProfile,
+  RevokeAllSessionsResult,
   SocialAccountHealth,
   SocialSet,
   SocialSetInput,
@@ -188,11 +189,13 @@ import type {
   SocialSetRemoval,
   SocialSetUpdate,
   StyleGuide,
+  UpdateWorkspacePublishingSettingsInput,
   UserPreferences,
   UserPreferencesUpdate,
   Webhook,
   WebhookDelivery,
   WebhookWithSecret,
+  WeeklyGoalProgress,
   WritingContext,
   WritingSample,
 } from './settings-platform.js'
@@ -710,6 +713,12 @@ export type WorkspaceSettings = {
   aiProviderKeyHint?: string | null
   /** Missing on older backends; treat as disabled during an additive rollout. */
   releaseReadinessEnabled?: boolean
+  /** Optional weekly post target (1..1000); null when cleared. */
+  weeklyPostingGoal?: number | null
+  /** When true, videos are normalized server-side for new posts; when false, originals pass through. */
+  processVideosOnServer?: boolean
+  /** Read-only server capability flag indicating whether the video worker is configured. */
+  videoProcessingAvailable?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -4448,6 +4457,22 @@ export class ScreenshotStudioBackendSDK {
     return this.request<AccountDeletionStatus>('v1/me/account-deletion', { method: 'DELETE' })
   }
 
+  /** Revokes all browser sessions and OAuth tokens for the signed-in person. */
+  async revokeAllSessions() {
+    return this.request<RevokeAllSessionsResult>('v1/me/sessions/revoke-all', {
+      body: {},
+      method: 'POST',
+    })
+  }
+
+  /** Unsubscribes a user from automation emails using a signed HMAC token. */
+  async unsubscribeAutomationEmails(token: string) {
+    return this.request<{ unsubscribed: true }>('v1/internal/email/unsubscribe', {
+      body: { token },
+      method: 'POST',
+    })
+  }
+
   async listExperiments() {
     return this.request<{ items: ExperimentState[] }>('v1/experiments')
   }
@@ -4484,7 +4509,11 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     input: Pick<
       SocialSetUpdate,
-      'baseVersion' | 'timeZone' | 'postingSlots' | 'naturalPostingTimes'
+      | 'baseVersion'
+      | 'timeZone'
+      | 'postingSlots'
+      | 'naturalPostingTimes'
+      | 'naturalPostingWindowMinutes'
     >
   ) {
     return this.request<SocialSet>(`v1/social-sets/${encodeURIComponent(id)}/queue`, {
@@ -6350,6 +6379,20 @@ export class ScreenshotStudioBackendSDK {
       body: input,
       method: 'PUT',
     })
+  }
+
+  /** Updates workspace-level publishing preferences (weekly goal and server video processing). */
+  async updateWorkspacePublishingSettings(input: UpdateWorkspacePublishingSettingsInput) {
+    return this.request<WorkspaceMutation>('v1/workspace/publishing-settings', {
+      body: input,
+      method: 'PUT',
+    })
+  }
+
+  /** Current-week publishing progress against the workspace weekly posting goal. */
+  async getWeeklyGoalProgress(weekStart?: 'monday' | 'sunday') {
+    const query = weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : ''
+    return this.request<WeeklyGoalProgress>(`v1/workspace/weekly-goal-progress${query}`)
   }
 
   /** Server-only: decrypts the workspace's BYOK OpenRouter API key for assistant turns. */

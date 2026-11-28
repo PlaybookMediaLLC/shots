@@ -160,6 +160,62 @@ func (_c *UserPreferenceCreate) SetNillableEmailNotifications(v *bool) *UserPref
 	return _c
 }
 
+// SetAutomationEmails sets the "automation_emails" field.
+func (_c *UserPreferenceCreate) SetAutomationEmails(v bool) *UserPreferenceCreate {
+	_c.mutation.SetAutomationEmails(v)
+	return _c
+}
+
+// SetNillableAutomationEmails sets the "automation_emails" field if the given value is not nil.
+func (_c *UserPreferenceCreate) SetNillableAutomationEmails(v *bool) *UserPreferenceCreate {
+	if v != nil {
+		_c.SetAutomationEmails(*v)
+	}
+	return _c
+}
+
+// SetPostFailureAlerts sets the "post_failure_alerts" field.
+func (_c *UserPreferenceCreate) SetPostFailureAlerts(v bool) *UserPreferenceCreate {
+	_c.mutation.SetPostFailureAlerts(v)
+	return _c
+}
+
+// SetNillablePostFailureAlerts sets the "post_failure_alerts" field if the given value is not nil.
+func (_c *UserPreferenceCreate) SetNillablePostFailureAlerts(v *bool) *UserPreferenceCreate {
+	if v != nil {
+		_c.SetPostFailureAlerts(*v)
+	}
+	return _c
+}
+
+// SetPostSummaryEmails sets the "post_summary_emails" field.
+func (_c *UserPreferenceCreate) SetPostSummaryEmails(v bool) *UserPreferenceCreate {
+	_c.mutation.SetPostSummaryEmails(v)
+	return _c
+}
+
+// SetNillablePostSummaryEmails sets the "post_summary_emails" field if the given value is not nil.
+func (_c *UserPreferenceCreate) SetNillablePostSummaryEmails(v *bool) *UserPreferenceCreate {
+	if v != nil {
+		_c.SetPostSummaryEmails(*v)
+	}
+	return _c
+}
+
+// SetUseFilenameAsCaption sets the "use_filename_as_caption" field.
+func (_c *UserPreferenceCreate) SetUseFilenameAsCaption(v bool) *UserPreferenceCreate {
+	_c.mutation.SetUseFilenameAsCaption(v)
+	return _c
+}
+
+// SetNillableUseFilenameAsCaption sets the "use_filename_as_caption" field if the given value is not nil.
+func (_c *UserPreferenceCreate) SetNillableUseFilenameAsCaption(v *bool) *UserPreferenceCreate {
+	if v != nil {
+		_c.SetUseFilenameAsCaption(*v)
+	}
+	return _c
+}
+
 // SetDismissedTips sets the "dismissed_tips" field.
 func (_c *UserPreferenceCreate) SetDismissedTips(v []string) *UserPreferenceCreate {
 	_c.mutation.SetDismissedTips(v)
@@ -277,6 +333,22 @@ func (_c *UserPreferenceCreate) defaults() {
 		v := userpreference.DefaultEmailNotifications
 		_c.mutation.SetEmailNotifications(v)
 	}
+	if _, ok := _c.mutation.AutomationEmails(); !ok {
+		v := userpreference.DefaultAutomationEmails
+		_c.mutation.SetAutomationEmails(v)
+	}
+	if _, ok := _c.mutation.PostFailureAlerts(); !ok {
+		v := userpreference.DefaultPostFailureAlerts
+		_c.mutation.SetPostFailureAlerts(v)
+	}
+	if _, ok := _c.mutation.PostSummaryEmails(); !ok {
+		v := userpreference.DefaultPostSummaryEmails
+		_c.mutation.SetPostSummaryEmails(v)
+	}
+	if _, ok := _c.mutation.UseFilenameAsCaption(); !ok {
+		v := userpreference.DefaultUseFilenameAsCaption
+		_c.mutation.SetUseFilenameAsCaption(v)
+	}
 	if _, ok := _c.mutation.DismissedTips(); !ok {
 		v := userpreference.DefaultDismissedTips
 		_c.mutation.SetDismissedTips(v)
@@ -348,6 +420,18 @@ func (_c *UserPreferenceCreate) check() error {
 	}
 	if _, ok := _c.mutation.EmailNotifications(); !ok {
 		return &ValidationError{Name: "email_notifications", err: errors.New(`ent: missing required field "UserPreference.email_notifications"`)}
+	}
+	if _, ok := _c.mutation.AutomationEmails(); !ok {
+		return &ValidationError{Name: "automation_emails", err: errors.New(`ent: missing required field "UserPreference.automation_emails"`)}
+	}
+	if _, ok := _c.mutation.PostFailureAlerts(); !ok {
+		return &ValidationError{Name: "post_failure_alerts", err: errors.New(`ent: missing required field "UserPreference.post_failure_alerts"`)}
+	}
+	if _, ok := _c.mutation.PostSummaryEmails(); !ok {
+		return &ValidationError{Name: "post_summary_emails", err: errors.New(`ent: missing required field "UserPreference.post_summary_emails"`)}
+	}
+	if _, ok := _c.mutation.UseFilenameAsCaption(); !ok {
+		return &ValidationError{Name: "use_filename_as_caption", err: errors.New(`ent: missing required field "UserPreference.use_filename_as_caption"`)}
 	}
 	if _, ok := _c.mutation.DismissedTips(); !ok {
 		return &ValidationError{Name: "dismissed_tips", err: errors.New(`ent: missing required field "UserPreference.dismissed_tips"`)}
@@ -435,6 +519,22 @@ func (_c *UserPreferenceCreate) createSpec() (*UserPreference, *sqlgraph.CreateS
 	if value, ok := _c.mutation.EmailNotifications(); ok {
 		_spec.SetField(userpreference.FieldEmailNotifications, field.TypeBool, value)
 		_node.EmailNotifications = value
+	}
+	if value, ok := _c.mutation.AutomationEmails(); ok {
+		_spec.SetField(userpreference.FieldAutomationEmails, field.TypeBool, value)
+		_node.AutomationEmails = value
+	}
+	if value, ok := _c.mutation.PostFailureAlerts(); ok {
+		_spec.SetField(userpreference.FieldPostFailureAlerts, field.TypeBool, value)
+		_node.PostFailureAlerts = value
+	}
+	if value, ok := _c.mutation.PostSummaryEmails(); ok {
+		_spec.SetField(userpreference.FieldPostSummaryEmails, field.TypeBool, value)
+		_node.PostSummaryEmails = value
+	}
+	if value, ok := _c.mutation.UseFilenameAsCaption(); ok {
+		_spec.SetField(userpreference.FieldUseFilenameAsCaption, field.TypeBool, value)
+		_node.UseFilenameAsCaption = value
 	}
 	if value, ok := _c.mutation.DismissedTips(); ok {
 		_spec.SetField(userpreference.FieldDismissedTips, field.TypeJSON, value)

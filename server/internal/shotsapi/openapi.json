@@ -4492,6 +4492,11 @@
                           "naturalPostingTimes": {
                             "type": "boolean"
                           },
+                          "naturalPostingWindowMinutes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 15
+                          },
                           "needsAttention": {
                             "type": "boolean"
                           },
@@ -4672,6 +4677,7 @@
                           "isOwner",
                           "name",
                           "naturalPostingTimes",
+                          "naturalPostingWindowMinutes",
                           "needsAttention",
                           "ownerUserId",
                           "postingSlots",
@@ -5048,6 +5054,11 @@
                   },
                   "naturalPostingTimes": {
                     "type": "boolean"
+                  },
+                  "naturalPostingWindowMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 15
                   }
                 },
                 "required": [
@@ -5351,6 +5362,11 @@
                     "naturalPostingTimes": {
                       "type": "boolean"
                     },
+                    "naturalPostingWindowMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
                     "needsAttention": {
                       "type": "boolean"
                     },
@@ -5531,6 +5547,7 @@
                     "isOwner",
                     "name",
                     "naturalPostingTimes",
+                    "naturalPostingWindowMinutes",
                     "needsAttention",
                     "ownerUserId",
                     "postingSlots",
@@ -6098,6 +6115,11 @@
                     "naturalPostingTimes": {
                       "type": "boolean"
                     },
+                    "naturalPostingWindowMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
                     "needsAttention": {
                       "type": "boolean"
                     },
@@ -6278,6 +6300,7 @@
                     "isOwner",
                     "name",
                     "naturalPostingTimes",
+                    "naturalPostingWindowMinutes",
                     "needsAttention",
                     "ownerUserId",
                     "postingSlots",

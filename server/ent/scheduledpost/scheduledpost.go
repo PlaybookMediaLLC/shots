@@ -71,6 +71,8 @@ const (
 	FieldScheduleTimeZone = "scheduleTimeZone"
 	// FieldScheduleIntent holds the string denoting the schedule_intent field in the database.
 	FieldScheduleIntent = "scheduleIntent"
+	// FieldPublishGroupID holds the string denoting the publish_group_id field in the database.
+	FieldPublishGroupID = "publishGroupId"
 	// FieldFailureCode holds the string denoting the failure_code field in the database.
 	FieldFailureCode = "failureCode"
 	// FieldScheduledByUserID holds the string denoting the scheduled_by_user_id field in the database.
@@ -138,6 +140,7 @@ var Columns = []string{
 	FieldNaturalOffsetSeconds,
 	FieldScheduleTimeZone,
 	FieldScheduleIntent,
+	FieldPublishGroupID,
 	FieldFailureCode,
 	FieldScheduledByUserID,
 	FieldApprovedByUserID,
@@ -336,6 +339,11 @@ func ByScheduleTimeZone(opts ...sql.OrderTermOption) OrderOption {
 // ByScheduleIntent orders the results by the schedule_intent field.
 func ByScheduleIntent(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldScheduleIntent, opts...).ToFunc()
+}
+
+// ByPublishGroupID orders the results by the publish_group_id field.
+func ByPublishGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPublishGroupID, opts...).ToFunc()
 }
 
 // ByFailureCode orders the results by the failure_code field.
