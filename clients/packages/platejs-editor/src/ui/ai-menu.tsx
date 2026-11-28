@@ -2,7 +2,6 @@
 
 import {
   AIChatPlugin,
-  AIPlugin,
   useEditorChat,
 } from "@platejs/ai/react";
 import { BlockSelectionPlugin, useIsSelecting } from "@platejs/selection/react";
@@ -44,7 +43,7 @@ import {
 } from "../lib/editor-services";
 import { cn } from "../lib/utils";
 
-import { keepOwnAI } from "../plugins/ai-ownership";
+import { keepOwnAI, selectLastEditableEnd } from "../plugins/ai-ownership";
 import { AIChatEditor } from "./ai-chat-editor";
 import { Button } from "./button";
 import {
@@ -63,6 +62,16 @@ import {
   useMenuStore,
 } from "./menu";
 import { TextareaAutosize } from "./textarea";
+
+function hideAIMenu(editor: PlateEditor) {
+  editor.getApi(AIChatPlugin).aiChat.hide({ focus: false, undo: true });
+  if (editor.getOption(BlockSelectionPlugin, "isSelectingSome")) {
+    editor.getApi(BlockSelectionPlugin).blockSelection.focus();
+  } else {
+    if (!editor.selection) selectLastEditableEnd(editor);
+    editor.tf.focus();
+  }
+}
 
 const ignoreAiMenuPromise = <T,>(result: Promise<T> | T) => {
   Promise.resolve(result).catch(() => {
@@ -153,6 +162,13 @@ export function AIMenu() {
       if (!nextOpen) {
         store.hideAll();
         setInput("");
+        return;
+      }
+      if (
+        !editor.getOption(BlockSelectionPlugin, "isSelectingSome") &&
+        !editor.selection
+      ) {
+        selectLastEditableEnd(editor);
       }
     },
     onOpenCursor: () => {
@@ -191,7 +207,7 @@ export function AIMenu() {
     if (isLoading) {
       api.aiChat.stop();
     } else {
-      api.aiChat.hide();
+      hideAIMenu(editor);
     }
   });
 
@@ -363,8 +379,7 @@ Start writing a new paragraph AFTER <Document> ONLY ONE SENTENCE`
     value: "discard",
     onSelect: ({ editor }) => {
       emitQuality(editor, "discarded");
-      editor.getTransforms(AIPlugin).ai.undo();
-      editor.getApi(AIChatPlugin).aiChat.hide();
+      hideAIMenu(editor);
     },
   },
   explain: {
@@ -947,7 +962,7 @@ function AIMenuCombobox({
   input: string;
   setInput: (input: string) => void;
 }) {
-  const { api } = useEditorPlugin(AIChatPlugin);
+  const { api, editor } = useEditorPlugin(AIChatPlugin);
   const [, setValue] = useComboboxValueState();
 
   useEffect(() => {
@@ -964,7 +979,7 @@ function AIMenuCombobox({
         onKeyDown={(e) => {
           if (isHotkey("backspace")(e) && input?.length === 0) {
             e.preventDefault();
-            api.aiChat.hide();
+            hideAIMenu(editor);
           }
           if (isHotkey("enter")(e) && !e.shiftKey) {
             e.preventDefault();

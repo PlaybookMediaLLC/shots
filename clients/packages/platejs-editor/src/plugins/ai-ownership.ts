@@ -54,12 +54,41 @@ export const recordAISuggestions = (editor: PlateEditor, apply: () => void) => {
   }
 };
 
+const selectEditableEnd = (editor: PlateEditor, index: number): boolean => {
+  const candidate = editor.children[index];
+  if (
+    !candidate ||
+    editor.api.isVoid(candidate) ||
+    candidate.type === editor.getType(KEYS.aiChat)
+  ) {
+    return false;
+  }
+  const end = editor.api.end([index]);
+  if (!end) return false;
+  editor.tf.select(end);
+  return true;
+};
+
+/** Places the caret at the end of the last non-void, non-anchor block, if any. */
+export const selectLastEditableEnd = (editor: PlateEditor): boolean => {
+  for (let index = editor.children.length - 1; index >= 0; index -= 1) {
+    if (selectEditableEnd(editor, index)) return true;
+  }
+  const end = editor.api.end([]);
+  if (end) {
+    editor.tf.select(end);
+    return true;
+  }
+  return false;
+};
+
 /** Takes back this editor's unaccepted AI blocks, text and suggestions. */
 export const discardOwnAI = (editor: PlateEditor) => {
   const writer = aiWriter(editor);
   // Only the stamp decides: another editor whose AI menu is closed strips the
   // `ai` mark from text it receives (Plate's normalizer), so the mark can be gone.
   const mine = (node: Descendant) => node.aiBy === writer.id;
+  let firstRemovedBlock = -1;
   editor.tf.withoutNormalizing(() => {
     const written = (node: Descendant): boolean =>
       "text" in node
@@ -72,6 +101,7 @@ export const discardOwnAI = (editor: PlateEditor) => {
     for (let index = editor.children.length - 1; index >= 0; index -= 1) {
       const block = editor.children[index]!;
       if (marked(block) && written(block)) {
+        firstRemovedBlock = index;
         editor.tf.removeNodes({ at: [index] });
       }
     }
@@ -102,4 +132,17 @@ export const discardOwnAI = (editor: PlateEditor) => {
     }
     writer.suggestions.clear();
   });
+  if (firstRemovedBlock >= 0 && editor.children.length > 0) {
+    const target = Math.min(firstRemovedBlock - 1, editor.children.length - 1);
+    for (let index = target; index >= 0; index -= 1) {
+      if (selectEditableEnd(editor, index)) return;
+    }
+    for (
+      let index = Math.max(target + 1, 0);
+      index < editor.children.length;
+      index += 1
+    ) {
+      if (selectEditableEnd(editor, index)) return;
+    }
+  }
 };
