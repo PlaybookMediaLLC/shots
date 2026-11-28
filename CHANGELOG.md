@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.57.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.56.1...v2.57.0) (2026-11-28)
+
+
+### Features
+
+* **agents:** unified Agents & API keys settings, OAuth revocation, and key introspection ([#683](https://github.com/PlaybookMediaLLC/shots/issues/683)) ([497a4d0](https://github.com/PlaybookMediaLLC/shots/commit/497a4d0d16a0f82254b3cd0193a624ce33da1e8c))
+* **billing:** redesign billing settings and enforce default X link stripping with paid add-on ([#681](https://github.com/PlaybookMediaLLC/shots/issues/681)) ([faf3824](https://github.com/PlaybookMediaLLC/shots/commit/faf38241fef0b42d2662895dc5f4ed797e2c9c4a))
+* **settings:** add queue schedule, publishing & email preferences, and session revocation ([fa19749](https://github.com/PlaybookMediaLLC/shots/commit/fa19749bdf5806203587559a899dc378f93132fc))
+* **settings:** add queue schedule, publishing & email preferences, and session revocation ([48adc38](https://github.com/PlaybookMediaLLC/shots/commit/48adc38fb1966a1cc70700b1be4cddd44fb6eea2))
+
+
+### Bug Fixes
+
+* **settings:** widen naturalOffsetSeconds check, fix SDK build, and update E2E expectations ([df1a7cd](https://github.com/PlaybookMediaLLC/shots/commit/df1a7cdd0de5905f50e28632c54d770555ac24fd))
+
 ## [2.56.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.56.0...v2.56.1) (2026-11-27)
 
 
