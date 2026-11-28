@@ -54,8 +54,8 @@ const VoiceSettings = dynamic(() =>
 const ChannelConnections = dynamic(() =>
   import('./ChannelConnections').then((m) => m.ChannelConnections)
 )
-const WorkspaceAgentSettings = dynamic(() =>
-  import('./WorkspaceAgentSettings').then((m) => m.WorkspaceAgentSettings)
+const AgentsAndApiKeysPage = dynamic(() =>
+  import('@/components/settings/agents/AgentsAndApiKeysPage').then((m) => m.AgentsAndApiKeysPage)
 )
 const WorkspaceAuditSettings = dynamic(() =>
   import('./WorkspaceAuditSettings').then((m) => m.WorkspaceAuditSettings)
@@ -211,8 +211,14 @@ const SETTINGS_CONTENT = {
       <WorkspaceIntegrations canManage={can('workspace:update')} />
     </>
   ),
-  agents: ({ can, mcpUrl }) => (
-    <WorkspaceAgentSettings canManage={can('brand:manage')} mcpUrl={mcpUrl} />
+  agents: ({ can, mcpUrl, organization }) => (
+    <AgentsAndApiKeysPage
+      canManageKeys={can('brand:manage')}
+      canManageWebhooks={can('workspace:update')}
+      key={organization.id}
+      mcpUrl={mcpUrl}
+      organizationId={organization.id}
+    />
   ),
   sso: ({ can, organization, role }) => (
     <WorkspaceIdentitySettings

@@ -253,3 +253,121 @@ func TestOutboundWebhookDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOperationalWebhookEmitters(t *testing.T) {
+	w := newTestWorkspace(t)
+	subscribe(t, w.ctx, w.repo, w.org, "pro")
+	pubRepo := publishing.NewRepository(w.db.Client)
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 11)
+	}
+	w.repo.WithWebhooks(key, publicResolver{})
+
+	created, err := w.repo.CreateWebhook(w.ctx, w.owner, WebhookInput{
+		Name:   "Ops",
+		URL:    "https://hooks.example.com/ops",
+		Events: []string{webhooks.PostCompleted, webhooks.ConnectionNeedsReconnect},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM outbox_event WHERE "organizationId"=$1`, w.org)
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM scheduled_post WHERE "organizationId"=$1`, w.org)
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM content_draft WHERE "organizationId"=$1`, w.org)
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM channel_connection WHERE "organizationId"=$1`, w.org)
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM social_tenant_binding WHERE "organizationId"=$1`, w.org)
+		_, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM social_set WHERE "organizationId"=$1`, w.org)
+		_ = w.repo.DeleteWebhook(w.ctx, w.owner, created.Webhook.ID)
+	})
+
+	sharedSet, err := w.repo.CreateSocialSet(w.ctx, w.owner, SocialSetInput{Name: "Shared", Visibility: "WORKSPACE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateSet, err := w.repo.CreateSocialSet(w.ctx, w.owner, SocialSetInput{Name: "Private", Visibility: "PRIVATE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sharedDraft, err := w.repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Shared draft", SocialSetID: sharedSet.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateDraft, err := w.repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Private draft", SocialSetID: privateSet.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sharedConn := "cc_shared_" + w.id
+	privConn := "cc_priv_" + w.id
+	goOrg := "go_org_" + w.id
+	secretRef := "SOCIAL_API_KEY_" + w.id
+	w.exec(t, `INSERT INTO social_tenant_binding ("organizationId","goOrganizationId","secretReference","createdAt") VALUES ($1,$2,$3,now())`,
+		w.org, goOrg, secretRef)
+	w.exec(t, `INSERT INTO channel_connection (id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId",platform,"displayName",handle,status,"socialSetId","providerSettings","createdAt","updatedAt")
+		VALUES ($1,$2,'social','ext_shared',$3,$4,'x','Shared X','@shared','ACTIVE',$5,'{}',now(),now()),
+		       ($6,$2,'social','ext_priv',$3,$4,'x','Priv X','@priv','ACTIVE',$7,'{}',now(),now())`,
+		sharedConn, w.org, secretRef, w.owner.UserID, sharedSet.ID, privConn, privateSet.ID)
+
+	sharedPost := "sp_shared_" + w.id
+	mixedPost := "sp_mixed_" + w.id
+	privateDraftPost := "sp_priv_draft_" + w.id
+	w.exec(t, `INSERT INTO scheduled_post (id,"organizationId","contentDraftId","channelConnectionId","socialSetId",caption,status,"scheduledFor","idempotencyKey","createdAt","updatedAt")
+		VALUES ($1,$2,$3,$4,$5,'secret caption never leak','PUBLISHED',now(),$1,now(),now()),
+		       ($6,$2,$3,$7,$5,'secret private conn caption','PUBLISHED',now(),$6,now(),now()),
+		       ($8,$2,$9,$4,NULL,'secret private draft caption','PUBLISHED',now(),$8,now(),now())`,
+		sharedPost, w.org, sharedDraft.ID, sharedConn, sharedSet.ID, mixedPost, privConn, privateDraftPost, privateDraft.ID)
+
+	// Emit post.completed for workspace-visible post, private-connection post, and private-draft post.
+	tx, err := w.db.Client.Tx(w.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publishing.EmitPostCompleted(w.ctx, tx, w.org, sharedPost, "published", "123456", ""); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := publishing.EmitPostCompleted(w.ctx, tx, w.org, mixedPost, "published", "999999", ""); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := publishing.EmitPostCompleted(w.ctx, tx, w.org, privateDraftPost, "published", "888888", ""); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Emit connection.needs_reconnect for shared (allowed) and private (suppressed) channels.
+	if err := pubRepo.EmitConnectionNeedsReconnect(w.ctx, goOrg, "ext_shared", "token_refresh_rejected"); err != nil {
+		t.Fatal(err)
+	}
+	if err := pubRepo.EmitConnectionNeedsReconnect(w.ctx, goOrg, "ext_priv", "token_refresh_rejected"); err != nil {
+		t.Fatal(err)
+	}
+
+	dispatcher := webhooks.NewDispatcher(w.db.SQL, key)
+	if _, err := dispatcher.Fanout(w.ctx); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := w.db.Client.WebhookDelivery.Query().
+		Where(webhookdelivery.SubscriptionID(created.Webhook.ID)).All(w.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deliveries) != 2 {
+		t.Fatalf("expected exactly 2 deliveries (1 post.completed + 1 connection.needs_reconnect, private suppressed), got %d", len(deliveries))
+	}
+	seen := map[string]bool{}
+	for _, d := range deliveries {
+		seen[d.EventType] = true
+		if strings.Contains(d.Body, "secret caption") || strings.Contains(d.Body, "@priv") {
+			t.Fatalf("private data or post copy leaked into webhook payload: %s", d.Body)
+		}
+	}
+	if !seen[webhooks.PostCompleted] || !seen[webhooks.ConnectionNeedsReconnect] {
+		t.Fatalf("missing expected operational events: %v", seen)
+	}
+}

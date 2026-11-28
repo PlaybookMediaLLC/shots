@@ -26,21 +26,21 @@ const mcpToolLines = MCP_TOOLS.map(
   (tool) => `| ${tool.name} | ${tool.scope} | ${tool.summary} |`,
 ).join("\n");
 
-const mcpClientSections = MCP_CLIENTS.map(
-  (client) =>
-    `#### ${client.name}\n\n${client.location}\n\n\`\`\`${client.language}\n${client.snippet(MCP_URL, API_KEY_PLACEHOLDER)}\n\`\`\`\n\n${client.steps.map((step) => `- ${step}`).join("\n")}`,
-).join("\n\n");
+const mcpClientSections = MCP_CLIENTS.map((client) => {
+  const fenceLang = client.language === 'prompt' ? 'text' : client.language
+  return `#### ${client.name}\n\n${client.location}\n\n\`\`\`${fenceLang}\n${client.snippet(MCP_URL, API_KEY_PLACEHOLDER)}\n\`\`\`\n\n${client.steps.map((step) => `- ${step}`).join("\n")}`
+}).join("\n\n");
 
 const agentQuickstart = `## Agent Quickstart
 
 Shots runs an MCP server for AI agents at ${MCP_URL}, served by the same backend as the REST API, with the same workspace permissions, plan checks, and quotas.
 
-1. In a signed-in workspace, open Settings → AI agents (/settings/ai-agents) and create an agent key with only the scopes the agent needs.
-2. Add the server to your agent with the key as a bearer token, using the configuration for your client at ${BASE_URL}/docs/agents.
-3. Claude.ai, Claude Desktop, and ChatGPT connect through OAuth instead and ask a workspace owner or admin to approve.
+1. In a signed-in workspace, open Settings → Agents & API keys (/settings/ai-agents) to connect an AI agent over OAuth or create a scoped API key for the REST API and scripts.
+2. Add the server to your agent using the configuration for your client at ${BASE_URL}/docs/agents (or fetch the Markdown guide directly at ${BASE_URL}/docs/agents/guide.md).
+3. Claude, ChatGPT, Codex, OpenCode, Cursor, Gemini, Grok, OpenClaw, Hermes, and any MCP client can sign in via OAuth; Meta Muse and REST scripts use a scoped workspace API key.
 4. Prefer HTTP? Every MCP tool mirrors an operation in ${BASE_URL}/openapi.json; send the same key in \`X-API-Key\`.
 
-Setup for Claude Code, Claude.ai, ChatGPT, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, and OpenCode: ${BASE_URL}/docs/agents. Agents can write, schedule, and publish posts to connected accounts, read releases, campaigns, the review queue, and the schedule, create drafts, upload assets, capture screenshots, and submit drafts for review. Posting needs the post:publish scope, which is off until someone ticks it. With post:schedule they schedule campaign posts a person approved. Only a person approves.`;
+Setup for Claude, ChatGPT, Codex, OpenCode, Grok, Grokbot, OpenClaw, Hermes, Cursor, Gemini, Muse, CLI / API, and any MCP client: ${BASE_URL}/docs/agents. Agents can write, schedule, and publish posts to connected accounts, read releases, campaigns, the review queue, and the schedule, create drafts, upload assets, capture screenshots, and submit drafts for review. Posting needs the post:publish scope, which is off until someone ticks it. With post:schedule they schedule campaign posts a person approved. Only a person approves.`;
 
 const comparisonRows = comparisons
   .map(
@@ -135,7 +135,7 @@ ${primaryToolLines}
 - Sitemap: ${BASE_URL}/sitemap.xml
 - robots.txt: ${BASE_URL}/robots.txt
 
-The editor utility endpoints under paths such as \`/api/screenshot\` require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`, and per-IP limits apply on top. Create a workspace API key in Settings → Developer API (/settings/developers). Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session. Every error is JSON with a stable \`code\`, a \`message\`, and a \`hint\`. Any page also serves Markdown when the request sends \`Accept: text/markdown\`.
+The editor utility endpoints under paths such as \`/api/screenshot\` require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`, and per-IP limits apply on top. Create a workspace API key in Settings → Agents & API keys (/settings/ai-agents). Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session. Every error is JSON with a stable \`code\`, a \`message\`, and a \`hint\`. Any page also serves Markdown when the request sends \`Accept: text/markdown\`.
 
 ${agentQuickstart}
 
@@ -384,7 +384,7 @@ Locale detection: URL path > cookie > Accept-Language header > default (English)
 
 ### Authentication
 
-The editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`; a request with neither returns 401 with code \`unauthorized\`. A workspace without an active paid plan gets 403 with code \`workspace_feature_not_entitled\`; there is no free plan. Create a workspace API key in Settings → Developer API (/settings/developers). Per-IP limits apply on top: \`POST /api/screenshot\` allows 20 requests per minute per IP and answers 429 with \`Retry-After\` and \`X-RateLimit-*\` headers. Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session, plus the declared permission, scope, feature, and quota checks.
+The editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`; a request with neither returns 401 with code \`unauthorized\`. A workspace without an active paid plan gets 403 with code \`workspace_feature_not_entitled\`; there is no free plan. Create a workspace API key in Settings → Agents & API keys (/settings/ai-agents). Per-IP limits apply on top: \`POST /api/screenshot\` allows 20 requests per minute per IP and answers 429 with \`Retry-After\` and \`X-RateLimit-*\` headers. Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session, plus the declared permission, scope, feature, and quota checks.
 
 ### Endpoints
 
@@ -439,7 +439,7 @@ No tool approves; a person does that in Shots. createPost writes and publishes n
 
 ${mcpClientSections}
 
-No official CLI tool is published yet.
+An open-source CLI lives in \`clients/integrations/cli\` in the repository (not yet published as an npm package); REST scripts can call \`/api/v1/*\` directly with \`X-API-Key\`.
 
 ## Technology Stack
 

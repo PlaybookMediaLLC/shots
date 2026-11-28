@@ -85,7 +85,8 @@ func main() {
 	}
 	tenantObjects := media.NewTenantObjects(objectStore)
 	// The social Ent projection and canonical scheduled_post share the worker DB pool.
-	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects)
+	provider := tenantpublishing.NewWithSQL(db.SQL, repository, tenantObjects).
+		WithReconnectNotifier(repository.EmitConnectionNeedsReconnect)
 	activities := temporalpublishing.NewActivities(repository, provider)
 	scheduler := temporalpublishing.NewScheduler(temporalClient, temporalpublishing.SchedulerConfig{
 		ActivityTaskQueue: cfg.ActivityTaskQueue, ActivityTimeout: cfg.ActivityTimeout,

@@ -281,6 +281,10 @@ const nextConfig: NextConfig = {
         destination: '/api/llms-full',
       },
       {
+        source: '/docs/agents/:agentId.md',
+        destination: '/api/md/docs/agents/:agentId.md',
+      },
+      {
         source: '/openapi.json',
         destination: '/api/openapi',
       },

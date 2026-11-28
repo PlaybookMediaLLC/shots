@@ -139,6 +139,7 @@ func (p *Publisher) RefreshSocialTokens(ctx context.Context) (int, error) {
 		case auth == nil:
 			p.clearRefreshFailure(channel.ID)
 			slog.Warn("social channel needs reconnecting", "provider", channel.ProviderIdentifier, "integration_id", channel.ID)
+			p.notifyReconnect(ctx, channel, "token_refresh_rejected")
 		default:
 			p.clearRefreshFailure(channel.ID)
 			renewed++

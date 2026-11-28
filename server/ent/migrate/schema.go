@@ -176,6 +176,7 @@ var (
 		{Name: "key", Type: field.TypeString},
 		{Name: "enabled", Type: field.TypeBool, Nullable: true},
 		{Name: "expiresAt", Type: field.TypeTime, Nullable: true},
+		{Name: "lastRequest", Type: field.TypeTime, Nullable: true},
 		{Name: "permissions", Type: field.TypeString, Nullable: true},
 		{Name: "metadata", Type: field.TypeString, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},

@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -104,7 +105,10 @@ func (c *Configuration) authorizeAgentConsent(ctx context.Context, actor Actor) 
 	if !actor.IsSession() {
 		return publishing.ErrForbidden
 	}
-	return c.Authorize(ctx, actor)
+	if err := c.Authorize(ctx, actor); err != nil {
+		return err
+	}
+	return requireNotDenied(ctx, c.client, actor, "brand:manage")
 }
 
 // DescribeAgentClient validates an authorization request before consent: the
@@ -298,6 +302,158 @@ func verifierMatches(challenge *string, verifier string) bool {
 	sum := sha256.Sum256([]byte(verifier))
 	computed := base64.RawURLEncoding.EncodeToString(sum[:])
 	return verifier != "" && subtle.ConstantTimeCompare([]byte(computed), []byte(*challenge)) == 1
+}
+
+// RevokeAgentClientInput selects one OAuth agent client group whose sessions
+// and pending consent codes should all be revoked in the caller's workspace.
+type RevokeAgentClientInput struct {
+	ClientID   string `json:"clientId"`
+	ClientName string `json:"clientName"`
+}
+
+// RevokeAgentClientResult reports how many OAuth agent sessions were revoked.
+type RevokeAgentClientResult struct {
+	RevokedCount  int      `json:"revokedCount"`
+	RevokedKeyIDs []string `json:"revokedKeyIds"`
+}
+
+// RevokeAgentClient atomically deletes every OAuth agent-issued workspace key
+// and invalidates any unexchanged OAuth authorization codes belonging to the
+// named client group in actor.OrganizationID, leaving manually created REST/CLI
+// API keys and unrelated agent client groups untouched.
+func (c *Configuration) RevokeAgentClient(ctx context.Context, actor Actor, input RevokeAgentClientInput) (*RevokeAgentClientResult, error) {
+	if err := c.authorizeAgentConsent(ctx, actor); err != nil {
+		return nil, err
+	}
+	clientID := strings.TrimSpace(input.ClientID)
+	clientName := strings.TrimSpace(input.ClientName)
+	if (clientID == "" && clientName == "") || len(clientID) > 200 || len(clientName) > 200 {
+		return nil, invalid("Specify the connected agent to revoke.")
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Delete unexchanged OAuth authorization codes BEFORE querying/deleting
+	// apikey rows so a concurrent ExchangeAgentCode either fails its conditional
+	// claim or commits its new key before our READ COMMITTED apikey snapshot.
+	var revokedPending int
+	if clientID != "" {
+		revokedPending, err = tx.AgentAuthorization.Delete().Where(
+			agentauthorization.OrganizationID(actor.OrganizationID),
+			agentauthorization.ExchangedAtIsNil(),
+			agentauthorization.ClientID(clientID),
+		).Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		pendingRows, qErr := tx.AgentAuthorization.Query().Where(
+			agentauthorization.OrganizationID(actor.OrganizationID),
+			agentauthorization.ExchangedAtIsNil(),
+			agentauthorization.ClientID(""),
+		).Select(agentauthorization.FieldID, agentauthorization.FieldClientName).All(ctx)
+		if qErr != nil {
+			return nil, qErr
+		}
+		pendingIDs := make([]string, 0, len(pendingRows))
+		for _, p := range pendingRows {
+			name := strings.TrimSpace(p.ClientName)
+			if name == "" {
+				name = "AI agent"
+			}
+			if strings.EqualFold(name, clientName) {
+				pendingIDs = append(pendingIDs, p.ID)
+			}
+		}
+		if len(pendingIDs) > 0 {
+			revokedPending, err = tx.AgentAuthorization.Delete().Where(
+				agentauthorization.IDIn(pendingIDs...),
+				agentauthorization.OrganizationID(actor.OrganizationID),
+				agentauthorization.ExchangedAtIsNil(),
+			).Exec(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	rows, err := tx.Apikey.Query().
+		Where(apikey.ReferenceID(actor.OrganizationID), apikey.MetadataNotNil()).
+		Select(apikey.FieldID, apikey.FieldMetadata).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	matched := []string{}
+	resolvedName := clientName
+	for _, row := range rows {
+		if row.Metadata == nil || *row.Metadata == "" {
+			continue
+		}
+		var meta agentKeyMetadata
+		if unmarshalErr := json.Unmarshal([]byte(*row.Metadata), &meta); unmarshalErr != nil || meta.Source != "agent" {
+			continue
+		}
+		metaClientID := strings.TrimSpace(meta.ClientID)
+		metaClientName := strings.TrimSpace(meta.ClientName)
+		normalizedName := metaClientName
+		if normalizedName == "" {
+			normalizedName = "AI agent"
+		}
+		var matches bool
+		if clientID != "" {
+			matches = metaClientID == clientID
+		} else {
+			matches = metaClientID == "" && strings.EqualFold(normalizedName, clientName)
+		}
+		if !matches {
+			continue
+		}
+		matched = append(matched, row.ID)
+		if resolvedName == "" {
+			resolvedName = normalizedName
+		}
+	}
+
+	deletedKeys := 0
+	if len(matched) > 0 {
+		n, delErr := tx.Apikey.Delete().
+			Where(apikey.IDIn(matched...), apikey.ReferenceID(actor.OrganizationID)).
+			Exec(ctx)
+		if delErr != nil {
+			return nil, delErr
+		}
+		deletedKeys = n
+	}
+
+	if deletedKeys == 0 && revokedPending == 0 {
+		return &RevokeAgentClientResult{RevokedCount: 0, RevokedKeyIDs: []string{}}, nil
+	}
+	entityID := clientID
+	if entityID == "" {
+		entityID = resolvedName
+	}
+	reportedKeys := matched
+	if deletedKeys == 0 {
+		reportedKeys = []string{}
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.agent_access_revoked", "agent_client", entityID,
+		map[string]any{
+			"clientId":       clientID,
+			"clientName":     resolvedName,
+			"revokedCount":   deletedKeys,
+			"revokedPending": revokedPending,
+			"revokedKeyIds":  reportedKeys,
+		}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &RevokeAgentClientResult{RevokedCount: deletedKeys, RevokedKeyIDs: reportedKeys}, nil
 }
 
 func truncateRunes(value string, limit int) string {

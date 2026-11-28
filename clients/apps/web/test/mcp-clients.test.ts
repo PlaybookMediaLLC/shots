@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { agentGuideMarkdownPath, buildAgentBriefMarkdown } from '@/lib/agents/agent-briefs'
 import {
   API_KEY_PLACEHOLDER,
   CLAUDE_PLUGIN_INSTALL,
@@ -13,43 +14,88 @@ import {
 import { openApiSpec } from '@/lib/api/openapi'
 
 const url = 'https://api.shots.test/mcp'
+const origin = 'https://shots.example.test'
 
-test('every client snippet is a valid configuration that points at the Go MCP server', () => {
+test('every client snippet is a valid configuration and follows its auth contract', () => {
   for (const client of MCP_CLIENTS) {
     for (const key of [API_KEY_PLACEHOLDER, 'ss_live_key']) {
-      const snippet = client.snippet(url, key)
-      assert.match(
-        snippet,
-        /https:\/\/api\.shots\.test\/mcp(-oauth-(claude|chatgpt|dynamic))?/,
-        client.id
-      )
+      const snippet = client.snippet(url, key, origin)
       if (client.language === 'json') assert.doesNotThrow(() => JSON.parse(snippet), client.id)
       if (client.auth === 'oauth') {
         assert.doesNotMatch(snippet, /ss_live_key/, `${client.id} must not embed a key`)
-        continue
-      }
-      if (key === API_KEY_PLACEHOLDER) {
-        assert.doesNotMatch(snippet, /ss_live_key/, client.id)
+      } else if (client.auth === 'api-key') {
+        if (key === API_KEY_PLACEHOLDER) {
+          assert.doesNotMatch(snippet, /ss_live_key/, client.id)
+        } else {
+          assert.match(snippet, /ss_live_key/, `${client.id} must inject the created API key`)
+        }
       } else {
-        assert.match(snippet, /Bearer ss_live_key/, `${client.id} must use the created key`)
+        // OAuth-first clients point at the MCP URL without embedding a key in primary config.
+        assert.match(snippet, /https:\/\/api\.shots\.test\/mcp/, client.id)
+        assert.doesNotMatch(snippet, /ss_live_key/, `${client.id} primary snippet is OAuth-first`)
       }
+      if (client.fallback) {
+        const fallbackSnippet = client.fallback.snippet(url, key, origin)
+        if (client.fallback.language === 'json') {
+          assert.doesNotThrow(() => JSON.parse(fallbackSnippet), `${client.id} fallback JSON`)
+        }
+        if (key === API_KEY_PLACEHOLDER) {
+          assert.doesNotMatch(fallbackSnippet, /ss_live_key/, `${client.id} fallback leak`)
+        } else if (client.id !== 'chatgpt') {
+          assert.match(fallbackSnippet, /ss_live_key/, `${client.id} fallback injects live key`)
+        }
+        assert.doesNotMatch(
+          fallbackSnippet,
+          /npx shots-cli/,
+          `${client.id} must not use unpublished npx shots-cli`
+        )
+      }
+      assert.doesNotMatch(
+        snippet,
+        /npx shots-cli/,
+        `${client.id} must not use unpublished npx shots-cli`
+      )
     }
     assert.ok(client.steps.length > 0, client.id)
+    assert.ok(client.briefDescription.length > 10, client.id)
   }
+  const cliApi = MCP_CLIENTS.find((c) => c.id === 'cli-api')!
+  assert.match(
+    cliApi.snippet(url, 'ss_live_key', origin),
+    /curl .*X-API-Key: ss_live_key.*\/api\/v1\/auth\/me/
+  )
   assert.deepEqual(
     MCP_CLIENTS.map((client) => client.id),
     [
-      'claude-code',
       'claude',
       'chatgpt',
-      'cursor',
-      'vscode',
-      'windsurf',
-      'gemini-cli',
       'codex',
       'opencode',
+      'grok',
+      'grokbot',
+      'openclaw',
+      'hermes',
+      'cursor',
+      'gemini',
+      'muse',
+      'cli-api',
+      'any-mcp',
     ]
   )
+})
+
+test('every agent Markdown brief includes all MCP tools and never leaks a live key', () => {
+  for (const id of ['guide', ...MCP_CLIENTS.map((client) => client.id)]) {
+    const markdown = buildAgentBriefMarkdown(id, { mcpUrl: url, origin })
+    assert.ok(markdown, `missing brief for ${id}`)
+    assert.match(markdown, /^# Shots Agent Guide/m, id)
+    for (const tool of MCP_TOOLS) {
+      assert.ok(markdown.includes(`\`${tool.name}\``), `${id} brief missing tool ${tool.name}`)
+    }
+    assert.doesNotMatch(markdown, /ss_live_key/, id)
+    assert.equal(agentGuideMarkdownPath(id), `/docs/agents/${id}.md`)
+  }
+  assert.equal(buildAgentBriefMarkdown('nonexistent-agent'), null)
 })
 
 test('the documented tools are the Go tool table, with the scopes the spec declares', () => {
@@ -126,12 +172,19 @@ test('the skill names only tools that exist, and leads with publishing', () => {
 
 test('the setup snippets match what each client documents', () => {
   const opencode = MCP_CLIENTS.find((client) => client.id === 'opencode')
-  const config = JSON.parse(opencode!.snippet(url, API_KEY_PLACEHOLDER)).mcp.shots
-  assert.equal(config.oauth, false, 'OpenCode tries OAuth on a key server unless told not to')
+  const fallbackConfig = JSON.parse(opencode!.fallback!.snippet(url, API_KEY_PLACEHOLDER)).mcp.shots
+  assert.equal(
+    fallbackConfig.oauth,
+    false,
+    'OpenCode tries OAuth on a key server unless told not to'
+  )
   // Not {env:…}: OpenCode's background service resolves that against its own
   // environment, so a key exported in a shell arrives empty and the server refuses it.
-  assert.equal(config.headers.Authorization, 'Bearer {file:~/.config/opencode/shots-key}')
+  assert.equal(fallbackConfig.headers.Authorization, 'Bearer {file:~/.config/opencode/shots-key}')
   const codex = MCP_CLIENTS.find((client) => client.id === 'codex')
-  assert.match(codex!.snippet(url, API_KEY_PLACEHOLDER), /bearer_token_env_var = "SHOTS_API_KEY"/)
+  assert.match(
+    codex!.fallback!.snippet(url, API_KEY_PLACEHOLDER),
+    /bearer_token_env_var = "SHOTS_API_KEY"/
+  )
   assert.ok(codex!.steps.some((step) => step.includes('codex mcp login shots')))
 })

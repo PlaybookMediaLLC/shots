@@ -14,6 +14,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"entgo.io/ent/dialect"
@@ -26,8 +27,20 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ids"
 )
 
+const (
+	maxRegisteredRedirectURIs   = 20
+	maxRegisteredRedirectURILen = 2000
+	pruneAbandonedInterval      = time.Hour
+	pruneAbandonedTimeout       = 5 * time.Second
+)
+
 // Registry implements product.AgentClients.
-type Registry struct{ client *social.Client }
+type Registry struct {
+	client     *social.Client
+	pruneMu    sync.Mutex
+	pruning    bool
+	lastPruned time.Time
+}
 
 // New reads clients through db, the shared PostgreSQL database.
 func New(db *sql.DB) *Registry {
@@ -140,10 +153,16 @@ func (r *Registry) RegisterAgentClient(ctx context.Context, request Registration
 	if len(request.RedirectURIs) == 0 {
 		return nil, &RegistrationError{Code: "invalid_client_metadata", Description: "redirect_uris is required"}
 	}
+	if len(request.RedirectURIs) > maxRegisteredRedirectURIs {
+		return nil, &RegistrationError{Code: "invalid_client_metadata", Description: fmt.Sprintf("At most %d redirect_uris are allowed", maxRegisteredRedirectURIs)}
+	}
 	verified := verifiedDomains()
 	redirectURIs := make([]string, 0, len(request.RedirectURIs))
 	for _, uri := range request.RedirectURIs {
 		uri = strings.TrimSpace(uri)
+		if len(uri) > maxRegisteredRedirectURILen {
+			return nil, &RegistrationError{Code: "invalid_redirect_uri", Description: "redirect_uri is too long"}
+		}
 		if err := checkRedirectURI(uri, verified); err != nil {
 			return nil, err
 		}
@@ -152,7 +171,7 @@ func (r *Registry) RegisterAgentClient(ctx context.Context, request Registration
 	if len(request.GrantTypes) > 0 && !slices.Contains(request.GrantTypes, "authorization_code") {
 		return nil, &RegistrationError{Code: "invalid_client_metadata", Description: "Only the authorization_code grant type is supported"}
 	}
-	go func() { _, _ = r.pruneAbandoned(context.WithoutCancel(ctx)) }()
+	r.maybePruneAbandoned(ctx)
 
 	method := "client_secret_post"
 	if request.TokenEndpointAuthMethod == "none" || request.TokenEndpointAuthMethod == "client_secret_basic" {
@@ -160,7 +179,7 @@ func (r *Registry) RegisterAgentClient(ctx context.Context, request Registration
 	}
 	out := &RegisteredClient{ClientID: "pcd_" + ids.Secure(32), ClientName: "MCP Client", RedirectURIs: redirectURIs,
 		TokenEndpointAuthMethod: method, GrantTypes: []string{"authorization_code"}, ResponseTypes: []string{"code"},
-		Scope: "mcp:read mcp:write"}
+		Scope: strings.Join(product.APIKeyScopes, " ")}
 	if request.ClientName != nil {
 		if name := []rune(strings.TrimSpace(*request.ClientName)); len(name) > 0 {
 			out.ClientName = string(name[:min(len(name), 100)])
@@ -186,6 +205,31 @@ func (r *Registry) RegisterAgentClient(ctx context.Context, request Registration
 	}
 	out.ClientIDIssuedAt = app.CreatedAt.Unix()
 	return out, nil
+}
+
+// maybePruneAbandoned runs pruneAbandoned at most once per hour, single-flight,
+// with a bounded timeout so public registration bursts cannot exhaust the DB pool.
+func (r *Registry) maybePruneAbandoned(ctx context.Context) {
+	now := time.Now()
+	r.pruneMu.Lock()
+	if r.pruning || (!r.lastPruned.IsZero() && now.Sub(r.lastPruned) < pruneAbandonedInterval) {
+		r.pruneMu.Unlock()
+		return
+	}
+	r.pruning = true
+	r.lastPruned = now
+	r.pruneMu.Unlock()
+
+	go func() {
+		defer func() {
+			r.pruneMu.Lock()
+			r.pruning = false
+			r.pruneMu.Unlock()
+		}()
+		pruneCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pruneAbandonedTimeout)
+		defer cancel()
+		_, _ = r.pruneAbandoned(pruneCtx)
+	}()
 }
 
 // pruneAbandoned deletes dynamic clients nobody authorized within 30 days:

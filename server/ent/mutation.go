@@ -5128,6 +5128,7 @@ type ApikeyMutation struct {
 	key           *string
 	enabled       *bool
 	expires_at    *time.Time
+	last_request  *time.Time
 	permissions   *string
 	metadata      *string
 	created_at    *time.Time
@@ -5595,6 +5596,55 @@ func (m *ApikeyMutation) ResetExpiresAt() {
 	delete(m.clearedFields, apikey.FieldExpiresAt)
 }
 
+// SetLastRequest sets the "last_request" field.
+func (m *ApikeyMutation) SetLastRequest(t time.Time) {
+	m.last_request = &t
+}
+
+// LastRequest returns the value of the "last_request" field in the mutation.
+func (m *ApikeyMutation) LastRequest() (r time.Time, exists bool) {
+	v := m.last_request
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastRequest returns the old "last_request" field's value of the Apikey entity.
+// If the Apikey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ApikeyMutation) OldLastRequest(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastRequest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastRequest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastRequest: %w", err)
+	}
+	return oldValue.LastRequest, nil
+}
+
+// ClearLastRequest clears the value of the "last_request" field.
+func (m *ApikeyMutation) ClearLastRequest() {
+	m.last_request = nil
+	m.clearedFields[apikey.FieldLastRequest] = struct{}{}
+}
+
+// LastRequestCleared returns if the "last_request" field was cleared in this mutation.
+func (m *ApikeyMutation) LastRequestCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldLastRequest]
+	return ok
+}
+
+// ResetLastRequest resets all changes to the "last_request" field.
+func (m *ApikeyMutation) ResetLastRequest() {
+	m.last_request = nil
+	delete(m.clearedFields, apikey.FieldLastRequest)
+}
+
 // SetPermissions sets the "permissions" field.
 func (m *ApikeyMutation) SetPermissions(s string) {
 	m.permissions = &s
@@ -5799,7 +5849,7 @@ func (m *ApikeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ApikeyMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.config_id != nil {
 		fields = append(fields, apikey.FieldConfigID)
 	}
@@ -5823,6 +5873,9 @@ func (m *ApikeyMutation) Fields() []string {
 	}
 	if m.expires_at != nil {
 		fields = append(fields, apikey.FieldExpiresAt)
+	}
+	if m.last_request != nil {
+		fields = append(fields, apikey.FieldLastRequest)
 	}
 	if m.permissions != nil {
 		fields = append(fields, apikey.FieldPermissions)
@@ -5860,6 +5913,8 @@ func (m *ApikeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Enabled()
 	case apikey.FieldExpiresAt:
 		return m.ExpiresAt()
+	case apikey.FieldLastRequest:
+		return m.LastRequest()
 	case apikey.FieldPermissions:
 		return m.Permissions()
 	case apikey.FieldMetadata:
@@ -5893,6 +5948,8 @@ func (m *ApikeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldEnabled(ctx)
 	case apikey.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
+	case apikey.FieldLastRequest:
+		return m.OldLastRequest(ctx)
 	case apikey.FieldPermissions:
 		return m.OldPermissions(ctx)
 	case apikey.FieldMetadata:
@@ -5965,6 +6022,13 @@ func (m *ApikeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetExpiresAt(v)
+		return nil
+	case apikey.FieldLastRequest:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastRequest(v)
 		return nil
 	case apikey.FieldPermissions:
 		v, ok := value.(string)
@@ -6039,6 +6103,9 @@ func (m *ApikeyMutation) ClearedFields() []string {
 	if m.FieldCleared(apikey.FieldExpiresAt) {
 		fields = append(fields, apikey.FieldExpiresAt)
 	}
+	if m.FieldCleared(apikey.FieldLastRequest) {
+		fields = append(fields, apikey.FieldLastRequest)
+	}
 	if m.FieldCleared(apikey.FieldPermissions) {
 		fields = append(fields, apikey.FieldPermissions)
 	}
@@ -6073,6 +6140,9 @@ func (m *ApikeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ClearExpiresAt()
+		return nil
+	case apikey.FieldLastRequest:
+		m.ClearLastRequest()
 		return nil
 	case apikey.FieldPermissions:
 		m.ClearPermissions()
@@ -6111,6 +6181,9 @@ func (m *ApikeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ResetExpiresAt()
+		return nil
+	case apikey.FieldLastRequest:
+		m.ResetLastRequest()
 		return nil
 	case apikey.FieldPermissions:
 		m.ResetPermissions()

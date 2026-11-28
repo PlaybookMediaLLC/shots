@@ -153,7 +153,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       purpose:
         'A plugin for Claude Code and Codex, and a skill for OpenCode, that write, schedule and publish posts over the Shots MCP server.',
       scopes: 'Those of the MCP connection.',
-      setup: `In Claude Code: ${CLAUDE_PLUGIN_INSTALL}. Codex and OpenCode: Settings → AI agents.`,
+      setup: `In Claude Code: ${CLAUDE_PLUGIN_INSTALL}. Codex and OpenCode: Settings → Agents & API keys.`,
       status: 'available',
     },
     {
