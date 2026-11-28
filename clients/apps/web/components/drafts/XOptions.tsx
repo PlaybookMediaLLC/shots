@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -17,6 +18,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
+import { hasXLinks } from '@/lib/content-drafts/x-links'
 
 /** One X post's follow-ups and poll, as the schedule request carries them. */
 export type XPostOptions = {
@@ -120,6 +122,15 @@ export function XOptions({
               placeholder="In case you missed it:"
               value={actions.quoteText ?? ''}
             />
+            {hasXLinks(actions.plugText ?? '') || hasXLinks(actions.quoteText ?? '') ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Links in X replies and quotes are removed by default unless{' '}
+                <Link className="underline underline-offset-4" href="/settings/billing#x-links">
+                  Links in X posts
+                </Link>{' '}
+                is turned on ($10/month).
+              </p>
+            ) : null}
             <div className="mt-1 flex items-center justify-between">
               <span className="text-foreground/80">Poll</span>
               {poll ? (

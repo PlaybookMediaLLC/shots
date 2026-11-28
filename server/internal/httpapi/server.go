@@ -146,6 +146,7 @@ type ConfigurationStore interface {
 	RemoveGitHubRepositories(context.Context, int64, []string) (int, error)
 	ReplayOutboxEvent(context.Context, string) error
 	SyncWorkspaceEntitlement(context.Context, product.EntitlementSyncInput) (*product.EntitlementSyncResult, error)
+	SyncWorkspaceAddon(context.Context, product.AddonSyncInput) (*product.AddonSyncResult, error)
 	GrantWorkspaceCredits(context.Context, product.CreditGrantInput) (*product.CreditGrantResult, error)
 	GetWorkspaceEntitlement(context.Context, product.Actor) (*product.WorkspaceEntitlementRecord, error)
 	ListAnnouncements(context.Context, product.Actor, int) ([]product.AnnouncementListItem, error)

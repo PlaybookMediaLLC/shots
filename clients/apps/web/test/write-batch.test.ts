@@ -73,6 +73,7 @@ const scheduledPost = (id: string, account: string, status: string, createdAt: s
   status,
   threadProgress: { posted: 0, total: 0 },
   url: null,
+  xLinksStrippedCount: 0,
 })
 
 const accounts = [

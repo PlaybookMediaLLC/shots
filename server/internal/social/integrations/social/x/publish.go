@@ -283,7 +283,7 @@ func (p *Provider) PostPending(ctx context.Context, _, accessToken string, posts
 		settings := decodeSettings(post.Settings)
 		article := i == 0 && str(settings.PostType) == "article"
 		message := post.Message
-		if !article {
+		if !article && !post.PlainText {
 			message = toTweetText(message)
 		}
 		if err := checkPublishingContent(caps, message, pendingSettings{TaggedUserIDs: settings.TaggedUserIDs, QuoteTweetID: settings.QuoteTweetID,
@@ -332,7 +332,7 @@ func (p *Provider) PostPending(ctx context.Context, _, accessToken string, posts
 	// Articles keep the HTML (converted to Draft.js in finalizePost), tweets
 	// are flattened to plain text.
 	message := first.Message
-	if !isArticle {
+	if !isArticle && !first.PlainText {
 		message = toTweetText(first.Message)
 	}
 	pending := pendingData{
@@ -679,7 +679,10 @@ func (p *Provider) Comment(ctx context.Context, _, postID, lastCommentID, access
 	c := newClient(accessToken)
 	commentPost := posts[0]
 	settings := decodeSettings(commentPost.Settings)
-	commentText := toTweetText(commentPost.Message)
+	commentText := commentPost.Message
+	if !commentPost.PlainText {
+		commentText = toTweetText(commentPost.Message)
+	}
 	poll, err := checkedPoll(commentPost.Poll, len(commentPost.Media), false)
 	if err != nil {
 		return nil, err

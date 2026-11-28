@@ -259,6 +259,10 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 		if errors.Is(err, socialapi.ErrUnsupported) {
 			return settle(ReceiptSkipped, "", "unsupported")
 		}
+		var apiErr *socialapi.Error
+		if errors.As(err, &apiErr) && !apiErr.UnknownDelivery && apiErr.Code == publishing.FailurePublisherUnavailable {
+			return AutomationResult{}, err
+		}
 		message = providerMessage(err)
 		return settle(ReceiptFailed, "", automationFailureCode(err))
 	}
@@ -271,12 +275,17 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 	return settle(ReceiptDone, result.RemoteID, "")
 }
 
-// automationFailureCode is a short code for a receipt: the provider's HTTP
-// status when it has one. Never the message, which may quote the post.
+// automationFailureCode is a short code for a receipt: structured platform
+// failure codes (e.g. X_LINK_QUOTA_EXCEEDED) take priority over HTTP status.
+// Never the message, which may quote the post.
 func automationFailureCode(err error) string {
 	var failure *temporal.ApplicationError
 	if errors.As(err, &failure) && failure.Type() == FailureUnknownDelivery {
 		return "UNKNOWN_DELIVERY"
+	}
+	var apiErr *socialapi.Error
+	if errors.As(err, &apiErr) && apiErr.Code != "" {
+		return apiErr.Code
 	}
 	var status interface{ HTTPStatus() int }
 	if errors.As(err, &status) && status.HTTPStatus() > 0 {

@@ -114,7 +114,10 @@ func main() {
 	}
 	// Live draft posts' engagement is read through the direct social publisher,
 	// which shares this database pool (RFC 013).
-	publisher := tenantpublishing.NewWithSQL(db.SQL, publishing.NewRepository(db.Client), media.NewTenantObjects(objects))
+	publishingRepo := publishing.NewRepository(db.Client)
+	publisher := tenantpublishing.NewWithSQL(db.SQL, publishingRepo, media.NewTenantObjects(objects)).
+		WithXLinkPolicy(xLinkPolicyAdapter{store: configuration}).
+		WithXLinkRecorder(publishingRepo)
 	configuration.WithPostMetrics(publisher).WithAccountStanding(publisher).WithAnalytics(publisher)
 	// Outbound webhooks (RFC 024): the key seals signing secrets.
 	webhookKey, err := config.WebhookEncryptionKey()

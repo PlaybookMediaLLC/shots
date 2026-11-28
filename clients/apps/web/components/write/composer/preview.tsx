@@ -28,6 +28,7 @@ import type { Publication } from '@/lib/write/publication'
 import { cn } from '@/lib/utils'
 import type { ComposerAccount } from './platforms'
 import { PdfCarousel } from './pdf-carousel'
+import { XLinksPreviewNotice } from './x-links-notice'
 
 const DescribeMediaContext = React.createContext<((media: SerializedMedia) => void) | undefined>(
   undefined
@@ -130,6 +131,11 @@ export function PreviewPanel({
           {degradation.message}
         </p>
       ))}
+      {item.account.channel === 'x' ? (
+        <XLinksPreviewNotice
+          captions={item.publication.serialized.posts.map((post) => post.caption)}
+        />
+      ) : null}
     </div>
   )
 }

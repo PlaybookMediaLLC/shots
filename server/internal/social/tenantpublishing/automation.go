@@ -48,10 +48,15 @@ func (p *Publisher) Automate(ctx context.Context, input socialapi.AutomationInpu
 		if !ok {
 			return socialapi.AutomationResult{}, socialapi.ErrUnsupported
 		}
+		prepared, err := p.prepareXText(ctx, input.Platform, input.OrganizationID, "", "first_comment", "auto:"+post+":first_comment", input.Text, false)
+		if err != nil {
+			return socialapi.AutomationResult{}, err
+		}
 		posted, err := commenter.Comment(ctx, account.InternalID, post, "", account.Token, []integrations.PostDetails{{
-			ID: post + "-first-comment", Message: input.Text, Settings: settings,
+			ID: post + "-first-comment", Message: prepared.text, PlainText: prepared.plainText, Settings: settings,
 		}}, account)
 		if err != nil {
+			refundXLinkOnDefiniteFailure(err, prepared.refund)
 			return socialapi.AutomationResult{}, err
 		}
 		if firstPostID(posted) == "" {
@@ -109,17 +114,29 @@ func (p *Publisher) Automate(ctx context.Context, input socialapi.AutomationInpu
 		if !ok {
 			return socialapi.AutomationResult{}, socialapi.ErrUnsupported
 		}
-		id, err := replies.ReplyTo(ctx, account, post, input.Text)
+		prepared, err := p.prepareXText(ctx, input.Platform, input.OrganizationID, "", "plug", "auto:"+post+":plug", input.Text, false)
+		if err != nil {
+			return socialapi.AutomationResult{}, err
+		}
+		id, err := replies.ReplyTo(ctx, account, post, prepared.text)
+		if err != nil {
+			refundXLinkOnDefiniteFailure(err, prepared.refund)
+		}
 		return socialapi.AutomationResult{Done: err == nil, RemoteID: id}, err
 	case "quote":
 		settings, err = nativeQuoteSettings(input.Platform, settings, post)
 		if err != nil {
 			return socialapi.AutomationResult{}, err
 		}
+		prepared, err := p.prepareXText(ctx, input.Platform, input.OrganizationID, "", "quote", "auto:"+post+":quote", strings.TrimSpace(input.Text), false)
+		if err != nil {
+			return socialapi.AutomationResult{}, err
+		}
 		posted, err := provider.Post(ctx, account.InternalID, account.Token, []integrations.PostDetails{{
-			ID: post + "-quote", Message: strings.TrimSpace(input.Text), Settings: settings,
+			ID: post + "-quote", Message: prepared.text, PlainText: prepared.plainText, Settings: settings,
 		}}, account)
 		if err != nil {
+			refundXLinkOnDefiniteFailure(err, prepared.refund)
 			return socialapi.AutomationResult{}, err
 		}
 		if firstPostID(posted) == "" {

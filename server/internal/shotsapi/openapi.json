@@ -6784,6 +6784,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -6889,6 +6895,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions",
                           "version",
                           "calendarVersion",
@@ -17241,6 +17248,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -17315,6 +17328,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions"
                         ],
                         "additionalProperties": false
@@ -18628,6 +18642,12 @@
                               "null"
                             ]
                           },
+                          "xLinksStrippedCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "deletions": {
                             "default": [],
                             "type": "array",
@@ -18702,6 +18722,7 @@
                           "failureCode",
                           "publishedAt",
                           "deletedAt",
+                          "xLinksStrippedCount",
                           "deletions"
                         ],
                         "additionalProperties": false
@@ -29498,6 +29519,12 @@
                     "null"
                   ]
                 },
+                "xLinksStrippedCount": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "deletions": {
                   "default": [],
                   "type": "array",
@@ -29572,6 +29599,7 @@
                 "failureCode",
                 "publishedAt",
                 "deletedAt",
+                "xLinksStrippedCount",
                 "deletions"
               ],
               "additionalProperties": false
@@ -40844,6 +40872,12 @@
                     "null"
                   ]
                 },
+                "xLinksStrippedCount": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "deletions": {
                   "default": [],
                   "type": "array",
@@ -40918,6 +40952,7 @@
                 "failureCode",
                 "publishedAt",
                 "deletedAt",
+                "xLinksStrippedCount",
                 "deletions"
               ],
               "additionalProperties": false

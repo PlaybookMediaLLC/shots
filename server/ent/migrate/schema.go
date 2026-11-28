@@ -3941,6 +3941,8 @@ var (
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
 		{Name: "providerMessage", Type: field.TypeString, Nullable: true},
 		{Name: "remoteUrl", Type: field.TypeString, Nullable: true},
+		{Name: "linksStrippedCount", Type: field.TypeInt, Default: 0},
+		{Name: "xLinkQuotaConsumed", Type: field.TypeBool, Default: false},
 		{Name: "scheduledPostId", Type: field.TypeString},
 	}
 	// PublicationAttemptTable holds the schema information for the "publication_attempt" table.
@@ -3951,7 +3953,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "publication_attempt_scheduled_post_attempts",
-				Columns:    []*schema.Column{PublicationAttemptColumns[10]},
+				Columns:    []*schema.Column{PublicationAttemptColumns[12]},
 				RefColumns: []*schema.Column{ScheduledPostColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3960,7 +3962,7 @@ var (
 			{
 				Name:    "publicationattempt_scheduledPostId_attemptNumber",
 				Unique:  true,
-				Columns: []*schema.Column{PublicationAttemptColumns[10], PublicationAttemptColumns[2]},
+				Columns: []*schema.Column{PublicationAttemptColumns[12], PublicationAttemptColumns[2]},
 			},
 			{
 				Name:    "publicationattempt_organizationId_startedAt",
@@ -4784,6 +4786,7 @@ var (
 		{Name: "scheduledByUserId", Type: field.TypeString, Nullable: true},
 		{Name: "approvedByUserId", Type: field.TypeString, Nullable: true},
 		{Name: "approvedVersion", Type: field.TypeInt, Nullable: true},
+		{Name: "xLinksStrippedCount", Type: field.TypeInt, Default: 0},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 		{Name: "channelConnectionId", Type: field.TypeString},
@@ -4796,7 +4799,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "scheduled_post_channel_connection_scheduled_posts",
-				Columns:    []*schema.Column{ScheduledPostColumns[34]},
+				Columns:    []*schema.Column{ScheduledPostColumns[35]},
 				RefColumns: []*schema.Column{ChannelConnectionColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4805,7 +4808,7 @@ var (
 			{
 				Name:    "scheduledpost_channelConnectionId_idempotencyKey",
 				Unique:  true,
-				Columns: []*schema.Column{ScheduledPostColumns[34], ScheduledPostColumns[20]},
+				Columns: []*schema.Column{ScheduledPostColumns[35], ScheduledPostColumns[20]},
 			},
 			{
 				Name:    "scheduledpost_organizationId_status_scheduledFor",
@@ -4815,7 +4818,7 @@ var (
 			{
 				Name:    "scheduledpost_status_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ScheduledPostColumns[18], ScheduledPostColumns[33]},
+				Columns: []*schema.Column{ScheduledPostColumns[18], ScheduledPostColumns[34]},
 			},
 			{
 				Name:    "scheduledpost_contentDraftId",
@@ -5595,6 +5598,42 @@ var (
 			},
 		},
 	}
+	// WorkspaceAddonColumns holds the columns for the "workspace_addon" table.
+	WorkspaceAddonColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "addonKey", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "canceled"},
+		{Name: "provider", Type: field.TypeString, Default: "stripe"},
+		{Name: "externalSubscriptionId", Type: field.TypeString, Nullable: true},
+		{Name: "quotaLimit", Type: field.TypeInt, Nullable: true},
+		{Name: "currentPeriodStart", Type: field.TypeTime, Nullable: true},
+		{Name: "currentPeriodEnd", Type: field.TypeTime, Nullable: true},
+		{Name: "cancelAtPeriodEnd", Type: field.TypeBool, Default: false},
+		{Name: "graceUntil", Type: field.TypeTime, Nullable: true},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "lastSyncedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// WorkspaceAddonTable holds the schema information for the "workspace_addon" table.
+	WorkspaceAddonTable = &schema.Table{
+		Name:       "workspace_addon",
+		Columns:    WorkspaceAddonColumns,
+		PrimaryKey: []*schema.Column{WorkspaceAddonColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workspaceaddon_organizationId_addonKey",
+				Unique:  true,
+				Columns: []*schema.Column{WorkspaceAddonColumns[1], WorkspaceAddonColumns[2]},
+			},
+			{
+				Name:    "workspaceaddon_externalSubscriptionId",
+				Unique:  false,
+				Columns: []*schema.Column{WorkspaceAddonColumns[5]},
+			},
+		},
+	}
 	// WorkspaceCreditGrantColumns holds the columns for the "workspace_credit_grant" table.
 	WorkspaceCreditGrantColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -5715,6 +5754,38 @@ var (
 		Name:       "workspace_settings",
 		Columns:    WorkspaceSettingsColumns,
 		PrimaryKey: []*schema.Column{WorkspaceSettingsColumns[0]},
+	}
+	// XLinkPostUsageColumns holds the columns for the "x_link_post_usage" table.
+	XLinkPostUsageColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "scheduledPostId", Type: field.TypeString, Nullable: true},
+		{Name: "partKey", Type: field.TypeString},
+		{Name: "idempotencyKey", Type: field.TypeString},
+		{Name: "linkCount", Type: field.TypeInt},
+		{Name: "consumedAt", Type: field.TypeTime},
+		{Name: "refundedAt", Type: field.TypeTime, Nullable: true},
+	}
+	// XLinkPostUsageTable holds the schema information for the "x_link_post_usage" table.
+	XLinkPostUsageTable = &schema.Table{
+		Name:       "x_link_post_usage",
+		Columns:    XLinkPostUsageColumns,
+		PrimaryKey: []*schema.Column{XLinkPostUsageColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "xlinkpostusage_organizationId_idempotencyKey",
+				Unique:  true,
+				Columns: []*schema.Column{XLinkPostUsageColumns[1], XLinkPostUsageColumns[4]},
+			},
+			{
+				Name:    "xlinkpostusage_organizationId_consumedAt",
+				Unique:  false,
+				Columns: []*schema.Column{XLinkPostUsageColumns[1], XLinkPostUsageColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "\"refundedAt\" IS NULL",
+				},
+			},
+		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
@@ -5895,11 +5966,13 @@ var (
 		WebhookDeliveryTable,
 		WebhookDeliveryAttemptTable,
 		WebhookSubscriptionTable,
+		WorkspaceAddonTable,
 		WorkspaceCreditGrantTable,
 		WorkspaceDeletionTable,
 		WorkspaceEntitlementTable,
 		WorkspaceGithubInstallationTable,
 		WorkspaceSettingsTable,
+		XLinkPostUsageTable,
 	}
 )
 
@@ -6439,6 +6512,9 @@ func init() {
 	WebhookSubscriptionTable.Annotation = &entsql.Annotation{
 		Table: "webhook_subscription",
 	}
+	WorkspaceAddonTable.Annotation = &entsql.Annotation{
+		Table: "workspace_addon",
+	}
 	WorkspaceCreditGrantTable.Annotation = &entsql.Annotation{
 		Table: "workspace_credit_grant",
 	}
@@ -6453,5 +6529,8 @@ func init() {
 	}
 	WorkspaceSettingsTable.Annotation = &entsql.Annotation{
 		Table: "workspace_settings",
+	}
+	XLinkPostUsageTable.Annotation = &entsql.Annotation{
+		Table: "x_link_post_usage",
 	}
 }

@@ -2133,6 +2133,18 @@ func (f WebhookSubscriptionFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WebhookSubscriptionMutation", m)
 }
 
+// The WorkspaceAddonFunc type is an adapter to allow the use of ordinary
+// function as WorkspaceAddon mutator.
+type WorkspaceAddonFunc func(context.Context, *ent.WorkspaceAddonMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkspaceAddonFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkspaceAddonMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceAddonMutation", m)
+}
+
 // The WorkspaceCreditGrantFunc type is an adapter to allow the use of ordinary
 // function as WorkspaceCreditGrant mutator.
 type WorkspaceCreditGrantFunc func(context.Context, *ent.WorkspaceCreditGrantMutation) (ent.Value, error)
@@ -2191,6 +2203,18 @@ func (f WorkspaceSettingsFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceSettingsMutation", m)
+}
+
+// The XLinkPostUsageFunc type is an adapter to allow the use of ordinary
+// function as XLinkPostUsage mutator.
+type XLinkPostUsageFunc func(context.Context, *ent.XLinkPostUsageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f XLinkPostUsageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.XLinkPostUsageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.XLinkPostUsageMutation", m)
 }
 
 // Condition is a hook condition function.

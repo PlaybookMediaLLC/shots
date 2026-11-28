@@ -69,7 +69,7 @@ func validEntitlementSync(input EntitlementSyncInput) bool {
 		input.OrganizationID != "" && len(input.OrganizationID) <= 128 &&
 		slices.Contains([]string{"free", "pro", "business", "enterprise"}, input.Plan) &&
 		input.Provider != "" && len(input.Provider) <= 80 &&
-		slices.Contains([]string{"active", "trialing", "past_due", "suspended", "cancelled"}, input.Status)
+		slices.Contains([]string{"active", "trialing", "past_due", "paused", "suspended", "cancelled"}, input.Status)
 }
 
 func entitlementReplay(ctx context.Context, client *ent.Client, input EntitlementSyncInput) (*EntitlementSyncResult, error) {

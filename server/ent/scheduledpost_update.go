@@ -224,6 +224,27 @@ func (_u *ScheduledPostUpdate) ClearFailureCode() *ScheduledPostUpdate {
 	return _u
 }
 
+// SetXLinksStrippedCount sets the "x_links_stripped_count" field.
+func (_u *ScheduledPostUpdate) SetXLinksStrippedCount(v int) *ScheduledPostUpdate {
+	_u.mutation.ResetXLinksStrippedCount()
+	_u.mutation.SetXLinksStrippedCount(v)
+	return _u
+}
+
+// SetNillableXLinksStrippedCount sets the "x_links_stripped_count" field if the given value is not nil.
+func (_u *ScheduledPostUpdate) SetNillableXLinksStrippedCount(v *int) *ScheduledPostUpdate {
+	if v != nil {
+		_u.SetXLinksStrippedCount(*v)
+	}
+	return _u
+}
+
+// AddXLinksStrippedCount adds value to the "x_links_stripped_count" field.
+func (_u *ScheduledPostUpdate) AddXLinksStrippedCount(v int) *ScheduledPostUpdate {
+	_u.mutation.AddXLinksStrippedCount(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ScheduledPostUpdate) SetUpdatedAt(v time.Time) *ScheduledPostUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -442,6 +463,12 @@ func (_u *ScheduledPostUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if _u.mutation.ApprovedVersionCleared() {
 		_spec.ClearField(scheduledpost.FieldApprovedVersion, field.TypeInt)
+	}
+	if value, ok := _u.mutation.XLinksStrippedCount(); ok {
+		_spec.SetField(scheduledpost.FieldXLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedXLinksStrippedCount(); ok {
+		_spec.AddField(scheduledpost.FieldXLinksStrippedCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldUpdatedAt, field.TypeTime, value)
@@ -705,6 +732,27 @@ func (_u *ScheduledPostUpdateOne) ClearFailureCode() *ScheduledPostUpdateOne {
 	return _u
 }
 
+// SetXLinksStrippedCount sets the "x_links_stripped_count" field.
+func (_u *ScheduledPostUpdateOne) SetXLinksStrippedCount(v int) *ScheduledPostUpdateOne {
+	_u.mutation.ResetXLinksStrippedCount()
+	_u.mutation.SetXLinksStrippedCount(v)
+	return _u
+}
+
+// SetNillableXLinksStrippedCount sets the "x_links_stripped_count" field if the given value is not nil.
+func (_u *ScheduledPostUpdateOne) SetNillableXLinksStrippedCount(v *int) *ScheduledPostUpdateOne {
+	if v != nil {
+		_u.SetXLinksStrippedCount(*v)
+	}
+	return _u
+}
+
+// AddXLinksStrippedCount adds value to the "x_links_stripped_count" field.
+func (_u *ScheduledPostUpdateOne) AddXLinksStrippedCount(v int) *ScheduledPostUpdateOne {
+	_u.mutation.AddXLinksStrippedCount(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ScheduledPostUpdateOne) SetUpdatedAt(v time.Time) *ScheduledPostUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -953,6 +1001,12 @@ func (_u *ScheduledPostUpdateOne) sqlSave(ctx context.Context) (_node *Scheduled
 	}
 	if _u.mutation.ApprovedVersionCleared() {
 		_spec.ClearField(scheduledpost.FieldApprovedVersion, field.TypeInt)
+	}
+	if value, ok := _u.mutation.XLinksStrippedCount(); ok {
+		_spec.SetField(scheduledpost.FieldXLinksStrippedCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedXLinksStrippedCount(); ok {
+		_spec.AddField(scheduledpost.FieldXLinksStrippedCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldUpdatedAt, field.TypeTime, value)

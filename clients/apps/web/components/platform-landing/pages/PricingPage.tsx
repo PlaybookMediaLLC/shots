@@ -87,7 +87,7 @@ export function PricingPage() {
               {
                 icon: Calendar03Icon,
                 title: 'Scheduled posts',
-                body: 'Each post scheduled to a social channel counts once. A schedule that fails to save does not count.',
+                body: 'Each post scheduled to a social channel counts once. Links are removed from X posts by default; turn on the Links in X posts add-on ($10/month for 40 link posts every 30 days) in Billing to keep them.',
               },
               {
                 icon: Mail01Icon,
