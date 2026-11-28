@@ -215,6 +215,270 @@ test('invalid codecs, resolution, fps/NaN, silent/uncaptioned video, placeholder
       /at least one passed/.test(e)
     )
   )
+
+  // Robotic formant synthesizers (including qualified/cased variants) are rejected.
+  for (const robotic of [
+    'espeak-ng',
+    'espeak-ng:en-us',
+    'ESPEAK_NG',
+    'espeak',
+    'festival/2.5',
+    'flite',
+    'pico2wave',
+  ]) {
+    const roboticManifest = makeValidRecordedManifest({
+      recordings: [{ ...makeValidRecordedManifest().recordings[0], ttsProvider: robotic }],
+    })
+    const roboticRes = validateManifest(roboticManifest, { headSha: VALID_SHA })
+    assert.equal(roboticRes.valid, false, `${robotic} must be rejected`)
+    assert.ok(roboticRes.errors.some((e) => /robotic formant synthesizer/.test(e)))
+  }
+
+  // Approved neural cloud TTS providers remain accepted.
+  const openaiManifest = makeValidRecordedManifest({
+    recordings: [
+      { ...makeValidRecordedManifest().recordings[0], ttsProvider: 'openai-tts:gpt-4o-mini-tts' },
+    ],
+  })
+  assert.equal(validateManifest(openaiManifest, { headSha: VALID_SHA }).valid, true)
+})
+
+test('tts.py speech normalization, sentence splitting, loudnorm parser, stem collision, and voice helpers handle edge cases safely', () => {
+  const pythonScript = `
+import json, math, os, sys, tempfile, wave
+from pathlib import Path
+
+sys.path.insert(0, ${JSON.stringify(join(REPO_ROOT, 'dev/pr-video-evidence'))})
+import tts
+
+spoken = {
+  "basic": tts.normalize_for_speech("Check PR commit SHA with HTTP 401 on 1920x1080."),
+  "sha256": tts.normalize_for_speech("Verify SHA-256 and SHA-1 digests without corrupting commit SHA hash."),
+  "cli": tts.normalize_for_speech("Run CLI command for tRPC OAuth JSON SQL API URL."),
+}
+
+sentences = {
+  "basic": tts.split_sentences("First sentence. Second sentence! Third one?"),
+  "abbrevs": tts.split_sentences("Use e.g. Kokoro or No. 677 vs. robotic speech. Next beat."),
+  "ordinal": tts.split_sentences("1. Open home. 2. Click editor."),
+  "punct": tts.split_sentences("Done. ... Next step."),
+}
+
+loudnorm = {
+  "valid": tts.parse_loudnorm_stats(
+    'noise\\n{"input_i":"-18.5","input_tp":"-2.1","input_lra":"5.4","input_thresh":"-29.0","target_offset":"0.4"}\\n'
+  ),
+  "lastBlock": tts.parse_loudnorm_stats(
+    '{"input_i":"-30.0","input_tp":"-5.0","input_lra":"4.0","input_thresh":"-40.0","target_offset":"0.1"}\\n'
+    '{"input_i":"-16.2","input_tp":"-1.8","input_lra":"6.1","input_thresh":"-26.5","target_offset":"0.2"}'
+  ),
+  "negInf": tts.parse_loudnorm_stats(
+    '{"input_i":"-inf","input_tp":"-inf","input_lra":"0.0","input_thresh":"-inf","target_offset":"inf"}'
+  ),
+  "nan": tts.parse_loudnorm_stats(
+    '{"input_i":"nan","input_tp":"-1.0","input_lra":"1.0","input_thresh":"-20.0","target_offset":"0.0"}'
+  ),
+  "outOfRange": tts.parse_loudnorm_stats(
+    '{"input_i":"12.0","input_tp":"-1.0","input_lra":"1.0","input_thresh":"-20.0","target_offset":"0.0"}'
+  ),
+}
+
+cues = tts.validate_cues([
+  {"id": "beat/1", "text": "First beat."},
+  {"id": "beat:1", "text": "Second beat."},
+  {"id": "beat_1-02", "text": "Third beat."},
+])
+stems = [stem for _, stem, _ in cues]
+
+langs = {
+  "us": tts.infer_kokoro_lang("af_heart"),
+  "gbSingle": tts.infer_kokoro_lang("bf_emma"),
+  "gbBlend": tts.infer_kokoro_lang("bf_emma:0.6+bm_george:0.4"),
+  "mixed": tts.infer_kokoro_lang("af_heart:0.5+bf_emma:0.5"),
+}
+
+blend_errors = []
+for bad_spec in ["", "af_heart:0+af_bella:1", "af_heart:-0.5+af_bella:1", "af_heart:nan+af_bella:1", ":0.5+af_bella:0.5"]:
+  try:
+    tts.resolve_kokoro_voice(object(), bad_spec)
+  except RuntimeError as err:
+    blend_errors.append(str(err))
+
+openai_err = ""
+saved_key = os.environ.pop("OPENAI_API_KEY", None)
+try:
+  tts.synthesize_openai([("b1", "b1", "Hello world.")], Path(tempfile.gettempdir()), "alloy", 0.98)
+except RuntimeError as err:
+  openai_err = str(err)
+finally:
+  if saved_key is not None:
+    os.environ["OPENAI_API_KEY"] = saved_key
+
+kokoro_err = ""
+orig_ensure = tts.ensure_kokoro_models
+def fail_models():
+  raise RuntimeError("offline")
+tts.ensure_kokoro_models = fail_models
+try:
+  tts.synthesize_kokoro([("b1", "b1", "Hello world.")], Path(tempfile.gettempdir()), "af_heart", 0.98)
+except RuntimeError as err:
+  kokoro_err = str(err)
+finally:
+  tts.ensure_kokoro_models = orig_ensure
+
+# Verify run_parallel_cues passes normalized speech to render_raw while preserving verbatim caption text.
+caption_text = "Inspect PR commit SHA on 1920x1080."
+captured_spoken = []
+short_duration = None
+ffmpeg_checked = False
+with tempfile.TemporaryDirectory() as td:
+  td_path = Path(td)
+  def write_short_wav(spoken_text, raw_path):
+    captured_spoken.append(spoken_text)
+    sr = 24000
+    n = int(sr * 0.25)
+    with wave.open(str(raw_path), "wb") as wf:
+      wf.setnchannels(1)
+      wf.setsampwidth(2)
+      wf.setframerate(sr)
+      frames = bytearray()
+      for i in range(n):
+        sample = int(12000 * math.sin(2.0 * math.pi * 440.0 * i / sr))
+        frames.extend(sample.to_bytes(2, "little", signed=True))
+      wf.writeframes(bytes(frames))
+
+  orig_norm = tts.normalize_to_wav
+  def fake_norm(src, dest):
+    dest.write_bytes(src.read_bytes())
+    return tts.measure_wav_duration(dest)
+  tts.normalize_to_wav = fake_norm
+  try:
+    segs = tts.run_parallel_cues([("b1", "b1", caption_text)], td_path, write_short_wav, max_workers=1)
+    returned_caption = segs[0]["text"]
+  finally:
+    tts.normalize_to_wav = orig_norm
+
+  import shutil
+  if shutil.which("ffmpeg") is not None:
+    raw_short = td_path / "short.raw.wav"
+    final_short = td_path / "short.wav"
+    write_short_wav("short", raw_short)
+    short_duration = tts.normalize_to_wav(raw_short, final_short)
+    ffmpeg_checked = True
+
+numpy_checked = False
+try:
+  import numpy as np
+  faded = tts.apply_edge_fade(np.ones(2400, dtype=np.float32), 24000, fade_ms=12)
+  assert float(faded[0]) == 0.0 and float(faded[-1]) == 0.0
+  assert float(faded[1200]) == 1.0
+  class FakeKokoro:
+    def get_voice_style(self, name):
+      return np.array([1.0, 0.0], dtype=np.float32) if name == "af_heart" else np.array([0.0, 1.0], dtype=np.float32)
+  blended = tts.resolve_kokoro_voice(FakeKokoro(), "af_heart:0.75+af_bella:0.25")
+  assert abs(float(blended[0]) - 0.75) < 1e-5 and abs(float(blended[1]) - 0.25) < 1e-5
+  numpy_checked = True
+except ModuleNotFoundError:
+  pass
+
+print(json.dumps({
+  "spoken": spoken,
+  "sentences": sentences,
+  "loudnorm": loudnorm,
+  "stems": stems,
+  "langs": langs,
+  "blendErrorCount": len(blend_errors),
+  "openaiErr": openai_err,
+  "kokoroErr": kokoro_err,
+  "capturedSpoken": captured_spoken,
+  "returnedCaption": returned_caption,
+  "ffmpegChecked": ffmpeg_checked,
+  "shortDuration": short_duration,
+  "numpyChecked": numpy_checked,
+}))
+`
+  const out = execFileSync('python3', ['-B', '-c', pythonScript], { encoding: 'utf8' })
+  const parsed = JSON.parse(out.trim()) as {
+    spoken: Record<string, string>
+    sentences: Record<string, string[]>
+    loudnorm: Record<string, Record<string, number> | null>
+    stems: string[]
+    langs: Record<string, string>
+    blendErrorCount: number
+    openaiErr: string
+    kokoroErr: string
+    capturedSpoken: string[]
+    returnedCaption: string
+    ffmpegChecked: boolean
+    shortDuration: number | null
+    numpyChecked: boolean
+  }
+
+  assert.equal(
+    parsed.spoken.basic,
+    'Check pull request commit hash with HTTP four oh one on 1080p.'
+  )
+  assert.equal(
+    parsed.spoken.sha256,
+    'Verify S H A 256 and S H A 1 digests without corrupting commit SHA hash.'
+  )
+  assert.equal(
+    parsed.spoken.cli,
+    'Run C L I command for T R P C oh-auth jay-son sequel A P I U R L.'
+  )
+
+  assert.deepEqual(parsed.sentences.basic, ['First sentence.', 'Second sentence!', 'Third one?'])
+  assert.deepEqual(parsed.sentences.abbrevs, [
+    'Use e.g. Kokoro or No. 677 vs. robotic speech.',
+    'Next beat.',
+  ])
+  assert.deepEqual(parsed.sentences.ordinal, ['1. Open home.', '2. Click editor.'])
+  assert.deepEqual(parsed.sentences.punct, ['Done. ...', 'Next step.'])
+
+  assert.equal(parsed.loudnorm.valid?.input_i, -18.5)
+  assert.equal(parsed.loudnorm.lastBlock?.input_i, -16.2)
+  assert.equal(parsed.loudnorm.negInf, null)
+  assert.equal(parsed.loudnorm.nan, null)
+  assert.equal(parsed.loudnorm.outOfRange, null)
+
+  assert.equal(new Set(parsed.stems).size, 3, 'All sanitized stems must be unique')
+
+  assert.equal(parsed.langs.us, 'en-us')
+  assert.equal(parsed.langs.gbSingle, 'en-gb')
+  assert.equal(parsed.langs.gbBlend, 'en-gb')
+  assert.equal(parsed.langs.mixed, 'en-us')
+  assert.equal(parsed.blendErrorCount, 5)
+
+  assert.match(parsed.openaiErr, /OPENAI_API_KEY is required/)
+  assert.match(parsed.kokoroErr, /setup-kokoro/)
+  assert.match(parsed.kokoroErr, /--tts openai/)
+
+  assert.equal(parsed.capturedSpoken[0], 'Inspect pull request commit hash on 1080p.')
+  assert.equal(parsed.returnedCaption, 'Inspect PR commit SHA on 1920x1080.')
+  if (parsed.ffmpegChecked) {
+    assert.ok(
+      parsed.shortDuration !== null && parsed.shortDuration >= 0.2 && parsed.shortDuration <= 0.35
+    )
+  }
+})
+
+test('cli.mjs record rejects robotic TTS providers and out-of-range --speed upfront with exit 2', () => {
+  const scenarioPath = join(REPO_ROOT, 'dev/pr-video-evidence/scenarios/shots-workspace-demo.mjs')
+  const badTts = spawnSync(
+    process.execPath,
+    [CLI_PATH, 'record', scenarioPath, '--tts', 'espeak-ng'],
+    { encoding: 'utf8' }
+  )
+  assert.equal(badTts.status, 2)
+  assert.match(badTts.stderr, /Invalid --tts provider/)
+
+  const badSpeed = spawnSync(
+    process.execPath,
+    [CLI_PATH, 'record', scenarioPath, '--speed', '9.5'],
+    { encoding: 'utf8' }
+  )
+  assert.equal(badSpeed.status, 2)
+  assert.match(badSpeed.stderr, /Invalid --speed/)
 })
 
 test('not_applicable is allowed for prose-only changes with equivalent artifacts, but strictly blocked for web UI', () => {

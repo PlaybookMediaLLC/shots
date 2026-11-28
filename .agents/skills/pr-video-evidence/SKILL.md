@@ -411,18 +411,30 @@ and Playwright traces (`raw/trace.zip`).
 
 ## 9. Spoken narration
 
-Every applicable demonstration must include clear, synchronized spoken
-narration:
+Every applicable demonstration must include natural, human-sounding, clearly
+intelligible spoken narration — never robotic or mechanical formant speech:
 
-- **Default local TTS provider**: Kokoro ONNX (`kokoro-onnx` via
+- **Default local neural TTS provider**: Kokoro-82M ONNX (`kokoro-onnx` via
   `dev/pr-video-evidence/tts.py`, set up once with
   `node dev/pr-video-evidence/cli.mjs setup-kokoro` into
-  `~/.cache/shots-pr-evidence/`).
-- **Optional cloud fallback**: OpenAI TTS (`--tts openai`, only when explicitly
-  requested and `OPENAI_API_KEY` is configured — never transmit secrets or
-  customer data).
-- **Local offline fallback**: `espeak-ng` (`--tts espeak-ng` or
-  `--allow-fallback`). Always record the exact `ttsProvider` actually used.
+  `~/.cache/shots-pr-evidence/`). Defaults to voice `af_heart` at a natural,
+  unhurried `0.98` speaking cadence (weighted blends like
+  `af_heart:0.75+af_bella:0.25` and other curated Kokoro voices like
+  `am_michael`, `af_bella`, `bf_emma`, `bm_george` are also supported).
+- **Optional cloud neural fallback**: OpenAI TTS (`--tts openai` with
+  `gpt-4o-mini-tts` and conversational senior-engineer tone instructions, only
+  when explicitly requested and `OPENAI_API_KEY` is configured — never transmit
+  secrets or customer data).
+- **No robotic formant synthesizers**: `espeak-ng`, `festival`, `flite`, and
+  similar formant synthesizers are disallowed for deliverable PR recordings and
+  rejected by `dev/pr-video-evidence/schema.mjs`. Never silently fall back to a
+  robotic voice if Kokoro is unavailable; fix Kokoro setup or report the
+  blocker.
+- **Studio-clean speech mastering**: `tts.py` synthesizes sentence-by-sentence
+  with natural `240 ms` inter-sentence breath pauses, normalizes awkward
+  technical tokens for speech without altering captions, and masters audio via
+  two-pass linear `loudnorm` (`-16 LUFS`, `75 Hz` high-pass, soft limiter) to
+  avoid dynamic gain pumping.
 
 Pre-synthesize narration as individual per-beat segments, measure exact audio
 duration, and synchronize beat timing before recording.
@@ -436,9 +448,12 @@ Narration must explain:
 - Which acceptance criteria are being demonstrated.
 - Relevant error states, edge cases, and limitations.
 
-Use direct, factual engineering prose. Never claim an operation succeeded unless
-verified. Do not add background music, promotional language, generic intros, or
-decorative transitions.
+Write for the ear, as if walking a teammate through a short engineering Loom:
+use short, natural sentences and everyday contractions (`we've`, `it's`,
+`doesn't`), avoid stiff boilerplate ("This completes verification of the
+pipeline"), never read raw file paths or URLs verbatim, and never use
+promotional language, exaggerated claims, or background music. Only state
+outcomes that were actually observed and verified.
 
 ## 10. Audio and video synchronization
 
@@ -617,8 +632,9 @@ Inspect and reuse Shots' verification and recording infrastructure:
 - `dev/pr-video-evidence/compose.mjs` — FFmpeg A/V sync, SRT/VTT captions,
   H.264/AAC encoding, FFprobe + `volumedetect` verification, and keyframe
   extraction.
-- `dev/pr-video-evidence/tts.py` — Kokoro ONNX local TTS (default) with optional
-  OpenAI cloud and `espeak-ng` fallbacks.
+- `dev/pr-video-evidence/tts.py` — Kokoro-82M ONNX local neural TTS (default,
+  two-pass linear `-16 LUFS` mastering) with optional OpenAI `gpt-4o-mini-tts`
+  neural cloud fallback.
 - `dev/pr-video-evidence/schema.mjs` & `dev/pr-video-evidence/markdown.mjs` —
   manifest validation, secret scanning, and PR markdown rendering.
 - `dev/native-stack` & `dev/studio` (`make up`, `make up-production`,

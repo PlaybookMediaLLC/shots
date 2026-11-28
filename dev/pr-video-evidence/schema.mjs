@@ -47,6 +47,13 @@ export const USER_FACING_UI_PATTERNS = [
 const VALID_VIDEO_CODECS = new Set(['h264', 'avc1'])
 const VALID_AUDIO_CODECS = new Set(['aac'])
 const VALID_ASSERTION_STATUSES = new Set(['passed', 'failed', 'skipped'])
+export const ROBOTIC_TTS_PROVIDERS = new Set([
+  'espeak',
+  'espeak-ng',
+  'festival',
+  'flite',
+  'pico2wave',
+])
 
 /**
  * Scan arbitrary text for sensitive credential patterns.
@@ -400,8 +407,22 @@ export function validateManifest(manifest, context = {}) {
         }
         if (typeof rec.ttsProvider !== 'string' || rec.ttsProvider.trim().length === 0) {
           errors.push(
-            `recordings[${i}].ttsProvider must name the TTS provider used (e.g. "kokoro-onnx").`
+            `recordings[${i}].ttsProvider must name the neural TTS provider used (e.g. "kokoro-onnx" or "openai-tts:gpt-4o-mini-tts").`
           )
+        } else {
+          const normalizedProvider = rec.ttsProvider.trim().toLowerCase()
+          const baseProvider = normalizedProvider.split(/[:/\s(]/, 1)[0] ?? ''
+          if (
+            ROBOTIC_TTS_PROVIDERS.has(normalizedProvider) ||
+            ROBOTIC_TTS_PROVIDERS.has(baseProvider) ||
+            /(?:^|[:/\s_-])(?:espeak(?:-?ng)?|festival|flite|pico2wave)(?:$|[:/\s_-])/i.test(
+              normalizedProvider
+            )
+          ) {
+            errors.push(
+              `recordings[${i}].ttsProvider "${rec.ttsProvider}" is a robotic formant synthesizer; deliverable PR video evidence requires a natural human-sounding neural TTS provider (e.g. "kokoro-onnx" or "openai-tts:gpt-4o-mini-tts").`
+            )
+          }
         }
       }
     }
