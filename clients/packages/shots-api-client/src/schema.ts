@@ -3226,6 +3226,8 @@ export interface components {
                 publishedAt: string | null;
                 /** @default null */
                 deletedAt: string | null;
+                /** @default 0 */
+                xLinksStrippedCount: number;
                 /** @default [] */
                 deletions: {
                     attempts: number;
@@ -5604,6 +5606,8 @@ export interface components {
                 publishedAt: string | null;
                 /** @default null */
                 deletedAt: string | null;
+                /** @default 0 */
+                xLinksStrippedCount: number;
                 /** @default [] */
                 deletions: {
                     attempts: number;
@@ -9403,6 +9407,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;
@@ -14579,6 +14585,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;
@@ -14899,6 +14907,8 @@ export interface operations {
                             publishedAt: string | null;
                             /** @default null */
                             deletedAt: string | null;
+                            /** @default 0 */
+                            xLinksStrippedCount: number;
                             /** @default [] */
                             deletions: {
                                 attempts: number;

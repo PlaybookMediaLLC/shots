@@ -729,7 +729,12 @@ export type BackendBootstrapSnapshot = {
   organizations: ListedWorkspace[]
   role: string
   settings: Pick<WorkspaceSettings, 'locale' | 'timeZone' | 'defaultPublishTime'> | null
-  entitlements: { features: Record<string, boolean>; plan: string; status: string }
+  entitlements: {
+    addons?: BackendWorkspaceAddonsSummary
+    features: Record<string, boolean>
+    plan: string
+    status: string
+  }
   capabilities: {
     /** Whether AI agent runs are allowed in this workspace (the kill switch). */
     aiAgent: boolean
@@ -1385,6 +1390,8 @@ export type BackendContentDraftPost = {
   /** Why it did not publish (a provider status or a code such as `MEDIA_UNAVAILABLE`), and when its provider confirmed it. */
   failureCode?: string | null
   publishedAt?: string | null
+  /** Total links stripped when publishing to X without the x_links add-on. */
+  xLinksStrippedCount?: number
 }
 
 /** One channel of a draft schedule and the caption serialized for it. */
@@ -1798,7 +1805,25 @@ export type BackendCreativeApproval = {
   variantId: string
 }
 
+export type BackendXLinksAddonSummary = {
+  cancelsAt: string | null
+  enabled: boolean
+  limit: number | null
+  nextSlotAt: string | null
+  priceMonthlyUsd: number
+  remaining: number | null
+  status: 'active' | 'canceling' | 'off' | 'past_due' | 'paused'
+  used: number
+  windowDays: number
+}
+
+export type BackendWorkspaceAddonsSummary = {
+  xLinks: BackendXLinksAddonSummary
+}
+
 export type BackendEntitlementSummary = {
+  /** Paid workspace add-ons (starting with Links in X posts). An older backend omits it. */
+  addons?: BackendWorkspaceAddonsSummary
   /** Each monthly quota the plan includes; 0 while the plan does not stand. An older backend omits it. */
   allowances?: Record<string, number>
   /** What is left of the workspace's purchased credit packs. */
@@ -2025,8 +2050,25 @@ export type BackendEntitlementSync = {
   organizationId: string
   plan: 'business' | 'enterprise' | 'free' | 'pro'
   provider: string
-  status: 'active' | 'cancelled' | 'past_due' | 'suspended' | 'trialing'
+  status: 'active' | 'cancelled' | 'past_due' | 'paused' | 'suspended' | 'trialing'
   validUntil?: Date | null
+}
+
+/** A billing provider event for a workspace add-on (such as x_links). */
+export type BackendAddonSync = {
+  addonKey: 'x_links'
+  cancelAtPeriodEnd: boolean
+  currentPeriodEnd?: Date | null
+  currentPeriodStart?: Date | null
+  eventId: string
+  eventType: string
+  expectedVersion: number
+  externalSubscriptionId?: string | null
+  graceUntil?: Date | null
+  organizationId: string
+  provider: string
+  quotaLimit?: number | null
+  status: 'active' | 'canceled' | 'past_due' | 'paused'
 }
 
 export type BackendWorkspaceEntitlement = {
@@ -5904,6 +5946,14 @@ export class ScreenshotStudioBackendSDK {
       'v1/internal/billing/entitlements',
       { body: input, method: 'POST' }
     )
+  }
+
+  /** Facade-only: applies a billing add-on event once, at the version it expects. */
+  async syncWorkspaceAddon(input: BackendAddonSync) {
+    return this.request<{ replayed: boolean; version: number }>('v1/internal/billing/addons', {
+      body: input,
+      method: 'POST',
+    })
   }
 
   /** Facade-only: adds a paid AI credit pack once per provider reference. */

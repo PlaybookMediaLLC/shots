@@ -116,7 +116,7 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   await expect(page.getByLabel('Claim a referral code')).toHaveCount(0)
 
   await app.open('/settings/founder-hub/billing')
-  await expect(page.getByText('Plan and credits')).toBeVisible()
+  await expect(page.getByText('Current Plan')).toBeVisible()
   await expect(page.locator('fieldset').last()).toBeEnabled()
 
   await app.open('/settings/founder-hub/developers')

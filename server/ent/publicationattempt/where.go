@@ -110,6 +110,16 @@ func RemoteURL(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldEQ(FieldRemoteURL, v))
 }
 
+// LinksStrippedCount applies equality check predicate on the "links_stripped_count" field. It's identical to LinksStrippedCountEQ.
+func LinksStrippedCount(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldLinksStrippedCount, v))
+}
+
+// XLinkQuotaConsumed applies equality check predicate on the "x_link_quota_consumed" field. It's identical to XLinkQuotaConsumedEQ.
+func XLinkQuotaConsumed(v bool) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldXLinkQuotaConsumed, v))
+}
+
 // OrganizationIDEQ applies the EQ predicate on the "organization_id" field.
 func OrganizationIDEQ(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldEQ(FieldOrganizationID, v))
@@ -698,6 +708,56 @@ func RemoteURLEqualFold(v string) predicate.PublicationAttempt {
 // RemoteURLContainsFold applies the ContainsFold predicate on the "remote_url" field.
 func RemoteURLContainsFold(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldContainsFold(FieldRemoteURL, v))
+}
+
+// LinksStrippedCountEQ applies the EQ predicate on the "links_stripped_count" field.
+func LinksStrippedCountEQ(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldLinksStrippedCount, v))
+}
+
+// LinksStrippedCountNEQ applies the NEQ predicate on the "links_stripped_count" field.
+func LinksStrippedCountNEQ(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNEQ(FieldLinksStrippedCount, v))
+}
+
+// LinksStrippedCountIn applies the In predicate on the "links_stripped_count" field.
+func LinksStrippedCountIn(vs ...int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldIn(FieldLinksStrippedCount, vs...))
+}
+
+// LinksStrippedCountNotIn applies the NotIn predicate on the "links_stripped_count" field.
+func LinksStrippedCountNotIn(vs ...int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNotIn(FieldLinksStrippedCount, vs...))
+}
+
+// LinksStrippedCountGT applies the GT predicate on the "links_stripped_count" field.
+func LinksStrippedCountGT(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGT(FieldLinksStrippedCount, v))
+}
+
+// LinksStrippedCountGTE applies the GTE predicate on the "links_stripped_count" field.
+func LinksStrippedCountGTE(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGTE(FieldLinksStrippedCount, v))
+}
+
+// LinksStrippedCountLT applies the LT predicate on the "links_stripped_count" field.
+func LinksStrippedCountLT(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLT(FieldLinksStrippedCount, v))
+}
+
+// LinksStrippedCountLTE applies the LTE predicate on the "links_stripped_count" field.
+func LinksStrippedCountLTE(v int) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLTE(FieldLinksStrippedCount, v))
+}
+
+// XLinkQuotaConsumedEQ applies the EQ predicate on the "x_link_quota_consumed" field.
+func XLinkQuotaConsumedEQ(v bool) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldXLinkQuotaConsumed, v))
+}
+
+// XLinkQuotaConsumedNEQ applies the NEQ predicate on the "x_link_quota_consumed" field.
+func XLinkQuotaConsumedNEQ(v bool) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNEQ(FieldXLinkQuotaConsumed, v))
 }
 
 // HasScheduledPost applies the HasEdge predicate on the "scheduled_post" edge.

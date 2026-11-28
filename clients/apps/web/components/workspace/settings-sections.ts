@@ -100,7 +100,7 @@ const SECTIONS = [
     title: 'General',
   },
   {
-    description: 'Your plan, billing status, and AI credits.',
+    description: 'Manage your subscription, payment methods, and billing information.',
     group: 'workspace',
     id: 'billing',
     slug: 'billing',

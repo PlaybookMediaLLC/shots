@@ -27,7 +27,7 @@ LEGACY_JOBS = {"social-migrate", "postiz-migrate"}
 # so a deploy before Stripe is wired keeps checkout on the contact page.
 STRIPE_SECRET_KEYS = ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
 STRIPE_PRICE_KEYS = ("STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_ANNUAL", "STRIPE_PRICE_BUSINESS_MONTHLY",
-                     "STRIPE_PRICE_BUSINESS_ANNUAL", "STRIPE_PRICE_EXTRA_LAUNCH")
+                     "STRIPE_PRICE_BUSINESS_ANNUAL", "STRIPE_PRICE_EXTRA_LAUNCH", "STRIPE_PRICE_X_LINKS_MONTHLY")
 # The composer's Google Drive import. The Picker keys reach the browser, so they
 # are plain settings that follow Infisical: removing them turns the import off.
 GOOGLE_PICKER_KEYS = ("GOOGLE_PICKER_API_KEY", "GOOGLE_PICKER_APP_ID", "GOOGLE_PICKER_CLIENT_ID")

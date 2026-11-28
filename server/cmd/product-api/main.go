@@ -116,6 +116,8 @@ func main() {
 	// which shares this database pool (RFC 013).
 	publishingRepo := publishing.NewRepository(db.Client)
 	publisher := tenantpublishing.NewWithSQL(db.SQL, publishingRepo, media.NewTenantObjects(objects)).
+		WithXLinkPolicy(xLinkPolicyAdapter{store: configuration}).
+		WithXLinkRecorder(publishingRepo).
 		WithReconnectNotifier(publishingRepo.EmitConnectionNeedsReconnect)
 	configuration.WithPostMetrics(publisher).WithAccountStanding(publisher).WithAnalytics(publisher)
 	// Outbound webhooks (RFC 024): the key seals signing secrets.

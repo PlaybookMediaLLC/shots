@@ -195,10 +195,12 @@ test(
       )
 
       await openWorkspaceSetting(writer, 'Billing')
-      await expect(writer.getByText('Only workspace owners can change the plan.')).toBeVisible()
-      await expect(writer.getByRole('button', { name: 'Manage subscription' })).toHaveCount(0)
+      await expect(
+        writer.getByText('Only workspace owners can change, pause, or cancel the subscription.')
+      ).toBeVisible()
+      await expect(writer.getByRole('button', { name: 'Request Refund' })).toHaveCount(0)
       await openWorkspaceSetting(page, 'Billing')
-      await expect(page.getByRole('button', { name: 'Manage subscription' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Request Refund' })).toBeVisible()
       // Rendering the owner control proves the positive UI path without opening Stripe.
       await testInfo.attach('owner-billing-authority', {
         body: await page.screenshot({

@@ -35,6 +35,10 @@ const (
 	FieldProviderMessage = "providerMessage"
 	// FieldRemoteURL holds the string denoting the remote_url field in the database.
 	FieldRemoteURL = "remoteUrl"
+	// FieldLinksStrippedCount holds the string denoting the links_stripped_count field in the database.
+	FieldLinksStrippedCount = "linksStrippedCount"
+	// FieldXLinkQuotaConsumed holds the string denoting the x_link_quota_consumed field in the database.
+	FieldXLinkQuotaConsumed = "xLinkQuotaConsumed"
 	// EdgeScheduledPost holds the string denoting the scheduled_post edge name in mutations.
 	EdgeScheduledPost = "scheduled_post"
 	// Table holds the table name of the publicationattempt in the database.
@@ -61,6 +65,8 @@ var Columns = []string{
 	FieldFailureCode,
 	FieldProviderMessage,
 	FieldRemoteURL,
+	FieldLinksStrippedCount,
+	FieldXLinkQuotaConsumed,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -78,6 +84,10 @@ var (
 	AttemptNumberValidator func(int) error
 	// DefaultStartedAt holds the default value on creation for the "started_at" field.
 	DefaultStartedAt func() time.Time
+	// DefaultLinksStrippedCount holds the default value on creation for the "links_stripped_count" field.
+	DefaultLinksStrippedCount int
+	// DefaultXLinkQuotaConsumed holds the default value on creation for the "x_link_quota_consumed" field.
+	DefaultXLinkQuotaConsumed bool
 )
 
 // Outcome defines the type for the "outcome" enum field.
@@ -159,6 +169,16 @@ func ByProviderMessage(opts ...sql.OrderTermOption) OrderOption {
 // ByRemoteURL orders the results by the remote_url field.
 func ByRemoteURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRemoteURL, opts...).ToFunc()
+}
+
+// ByLinksStrippedCount orders the results by the links_stripped_count field.
+func ByLinksStrippedCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLinksStrippedCount, opts...).ToFunc()
+}
+
+// ByXLinkQuotaConsumed orders the results by the x_link_quota_consumed field.
+func ByXLinkQuotaConsumed(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldXLinkQuotaConsumed, opts...).ToFunc()
 }
 
 // ByScheduledPostField orders the results by scheduled_post field.

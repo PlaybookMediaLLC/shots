@@ -137,6 +137,34 @@ func (_c *PublicationAttemptCreate) SetNillableRemoteURL(v *string) *Publication
 	return _c
 }
 
+// SetLinksStrippedCount sets the "links_stripped_count" field.
+func (_c *PublicationAttemptCreate) SetLinksStrippedCount(v int) *PublicationAttemptCreate {
+	_c.mutation.SetLinksStrippedCount(v)
+	return _c
+}
+
+// SetNillableLinksStrippedCount sets the "links_stripped_count" field if the given value is not nil.
+func (_c *PublicationAttemptCreate) SetNillableLinksStrippedCount(v *int) *PublicationAttemptCreate {
+	if v != nil {
+		_c.SetLinksStrippedCount(*v)
+	}
+	return _c
+}
+
+// SetXLinkQuotaConsumed sets the "x_link_quota_consumed" field.
+func (_c *PublicationAttemptCreate) SetXLinkQuotaConsumed(v bool) *PublicationAttemptCreate {
+	_c.mutation.SetXLinkQuotaConsumed(v)
+	return _c
+}
+
+// SetNillableXLinkQuotaConsumed sets the "x_link_quota_consumed" field if the given value is not nil.
+func (_c *PublicationAttemptCreate) SetNillableXLinkQuotaConsumed(v *bool) *PublicationAttemptCreate {
+	if v != nil {
+		_c.SetXLinkQuotaConsumed(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *PublicationAttemptCreate) SetID(v string) *PublicationAttemptCreate {
 	_c.mutation.SetID(v)
@@ -187,6 +215,14 @@ func (_c *PublicationAttemptCreate) defaults() {
 		v := publicationattempt.DefaultStartedAt()
 		_c.mutation.SetStartedAt(v)
 	}
+	if _, ok := _c.mutation.LinksStrippedCount(); !ok {
+		v := publicationattempt.DefaultLinksStrippedCount
+		_c.mutation.SetLinksStrippedCount(v)
+	}
+	if _, ok := _c.mutation.XLinkQuotaConsumed(); !ok {
+		v := publicationattempt.DefaultXLinkQuotaConsumed
+		_c.mutation.SetXLinkQuotaConsumed(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -212,6 +248,12 @@ func (_c *PublicationAttemptCreate) check() error {
 		if err := publicationattempt.OutcomeValidator(v); err != nil {
 			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "PublicationAttempt.outcome": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.LinksStrippedCount(); !ok {
+		return &ValidationError{Name: "links_stripped_count", err: errors.New(`ent: missing required field "PublicationAttempt.links_stripped_count"`)}
+	}
+	if _, ok := _c.mutation.XLinkQuotaConsumed(); !ok {
+		return &ValidationError{Name: "x_link_quota_consumed", err: errors.New(`ent: missing required field "PublicationAttempt.x_link_quota_consumed"`)}
 	}
 	if len(_c.mutation.ScheduledPostIDs()) == 0 {
 		return &ValidationError{Name: "scheduled_post", err: errors.New(`ent: missing required edge "PublicationAttempt.scheduled_post"`)}
@@ -286,6 +328,14 @@ func (_c *PublicationAttemptCreate) createSpec() (*PublicationAttempt, *sqlgraph
 	if value, ok := _c.mutation.RemoteURL(); ok {
 		_spec.SetField(publicationattempt.FieldRemoteURL, field.TypeString, value)
 		_node.RemoteURL = &value
+	}
+	if value, ok := _c.mutation.LinksStrippedCount(); ok {
+		_spec.SetField(publicationattempt.FieldLinksStrippedCount, field.TypeInt, value)
+		_node.LinksStrippedCount = value
+	}
+	if value, ok := _c.mutation.XLinkQuotaConsumed(); ok {
+		_spec.SetField(publicationattempt.FieldXLinkQuotaConsumed, field.TypeBool, value)
+		_node.XLinkQuotaConsumed = value
 	}
 	if nodes := _c.mutation.ScheduledPostIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

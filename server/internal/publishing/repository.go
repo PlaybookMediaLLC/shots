@@ -1237,3 +1237,28 @@ func (r *Repository) RecordAutomation(ctx context.Context, postID, key, status, 
 	changed, err := update.Save(ctx)
 	return changed > 0, err
 }
+
+// RecordXLinkOutcome records stripped-link counts on the scheduled post and
+// its open publication attempt, plus whether an X link add-on slot was used.
+func (r *Repository) RecordXLinkOutcome(ctx context.Context, scheduledPostID string, linksStripped int, quotaConsumed bool) error {
+	if scheduledPostID == "" || (linksStripped <= 0 && !quotaConsumed) {
+		return nil
+	}
+	if linksStripped > 0 {
+		if err := r.client.ScheduledPost.Update().
+			Where(scheduledpost.ID(scheduledPostID)).
+			AddXLinksStrippedCount(linksStripped).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+	attemptUpdate := r.client.PublicationAttempt.Update().
+		Where(publicationattempt.ScheduledPostID(scheduledPostID), publicationattempt.CompletedAtIsNil())
+	if linksStripped > 0 {
+		attemptUpdate.AddLinksStrippedCount(linksStripped)
+	}
+	if quotaConsumed {
+		attemptUpdate.SetXLinkQuotaConsumed(true)
+	}
+	return attemptUpdate.Exec(ctx)
+}

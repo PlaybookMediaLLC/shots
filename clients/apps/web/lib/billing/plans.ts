@@ -27,6 +27,25 @@ export const CREDIT_PACKS: Record<
   launch: { credits: 500, price: '$12' },
 }
 
+/** Paid recurring add-ons a workspace on a paid plan can toggle on or off. */
+export const workspaceAddonSchema = z.enum(['x_links'])
+export type WorkspaceAddonKey = z.infer<typeof workspaceAddonSchema>
+
+/**
+ * Mirrors `DefaultXLinksLimit`, `XLinksWindowDays`, and `XLinksMonthlyPriceUSD`
+ * in server/internal/product/x_links.go.
+ */
+export const WORKSPACE_ADDONS = {
+  x_links: {
+    limit: 40,
+    priceMonthlyUsd: 10,
+    windowDays: 30,
+  },
+} as const satisfies Record<
+  WorkspaceAddonKey,
+  { limit: number; priceMonthlyUsd: number; windowDays: number }
+>
+
 /**
  * Credits a launch uses on the default models: an estimate in
  * docs/rfcs/023-pricing-and-unit-economics.md until measured. Copy reads it here.

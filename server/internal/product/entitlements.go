@@ -10,6 +10,8 @@ import (
 )
 
 type EntitlementSummary struct {
+	// Addons is the workspace's paid add-ons (starting with Links in X posts).
+	Addons WorkspaceAddonsSummary `json:"addons"`
 	// Allowances is each monthly quota the plan includes, 0 while it does not
 	// stand: the one figure the web shows, so it never computes its own.
 	Allowances map[string]int `json:"allowances"`
@@ -80,7 +82,7 @@ func (c *Configuration) entitlementSummary(ctx context.Context, actor Actor) (*E
 	return &EntitlementSummary{Allowances: allowances, Features: features, Plan: plan, Status: status}, nil
 }
 
-// GetEntitlementSummary is the workspace's plan, standing, features, and
+// GetEntitlementSummary is the workspace's plan, standing, features, add-ons, and
 // purchased credit balance, for the Billing settings page.
 func (c *Configuration) GetEntitlementSummary(ctx context.Context, actor Actor) (*EntitlementSummary, error) {
 	summary, err := c.entitlementSummary(ctx, actor)
@@ -90,6 +92,11 @@ func (c *Configuration) GetEntitlementSummary(ctx context.Context, actor Actor) 
 	if summary.CreditBalance, err = c.creditBalance(ctx, actor.OrganizationID); err != nil {
 		return nil, err
 	}
+	xLinks, err := c.GetXLinksSummary(ctx, actor.OrganizationID, summary.Features["workspace:use"], time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	summary.Addons = WorkspaceAddonsSummary{XLinks: xLinks}
 	return summary, nil
 }
 
