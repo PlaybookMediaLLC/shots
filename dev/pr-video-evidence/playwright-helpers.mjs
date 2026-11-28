@@ -87,7 +87,7 @@ export function assertValidCues(cues) {
  * warnings from native runtimes).
  *
  * @param {Array<{ id: string, text: string }>} cues
- * @param {{ outDir: string, provider?: string, voice?: string, speed?: number, allowFallback?: boolean }} options
+ * @param {{ outDir: string, provider?: string, voice?: string, speed?: number }} options
  */
 export async function synthesizeNarration(cues, options) {
   assertValidCues(cues)
@@ -109,9 +109,8 @@ export async function synthesizeNarration(cues, options) {
     '--voice',
     options.voice || 'af_heart',
     '--speed',
-    String(options.speed ?? 1.05),
+    String(options.speed ?? 0.98),
   ]
-  if (options.allowFallback) args.push('--allow-fallback')
 
   await execFileAsync(pythonBin, args, {
     encoding: 'utf8',
@@ -397,7 +396,6 @@ export class EvidenceRecorder {
    *   ttsProvider?: string,
    *   ttsVoice?: string,
    *   ttsSpeed?: number,
-   *   allowTtsFallback?: boolean,
    *   width?: number,
    *   height?: number,
    * }} options
@@ -417,8 +415,7 @@ export class EvidenceRecorder {
     this.baseOrigin = parsedBaseUrl.origin
     this.ttsProvider = options.ttsProvider || 'kokoro'
     this.ttsVoice = options.ttsVoice || 'af_heart'
-    this.ttsSpeed = options.ttsSpeed ?? 1.05
-    this.allowTtsFallback = Boolean(options.allowTtsFallback)
+    this.ttsSpeed = options.ttsSpeed ?? 0.98
     this.width = options.width || 1920
     this.height = options.height || 1080
     this.browser = null
@@ -507,7 +504,6 @@ export class EvidenceRecorder {
         provider: this.ttsProvider,
         voice: this.ttsVoice,
         speed: this.ttsSpeed,
-        allowFallback: this.allowTtsFallback,
       }
     )
     return this.ttsResult

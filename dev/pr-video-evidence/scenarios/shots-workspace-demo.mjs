@@ -237,7 +237,7 @@ export async function createScenario({ recorder, page, baseUrl }) {
         criterionId: 'AC-1',
         route: '/home',
         narration:
-          'This recording verifies the narrated video evidence workflow against the live Shots application. After signing into the isolated local development workspace via session cookies, the home dashboard loads cleanly with no credentials exposed on screen.',
+          "Here's the new narrated video evidence workflow running against the live Shots app. We're signed into the isolated Playbook Dev workspace using session cookies, so the home dashboard loads right up without ever exposing a password on screen.",
         action: async ({ page: p, recorder: rec }) => {
           await p.goto(`${baseUrl}/home`, { waitUntil: 'domcontentloaded', timeout: 120_000 })
           const createCard = p.getByText('Create a visual', { exact: true }).first()
@@ -263,7 +263,7 @@ export async function createScenario({ recorder, page, baseUrl }) {
         criterionId: 'AC-2',
         route: '/editor',
         narration:
-          'Next, we open the live Screenshot Studio editor. Export stays disabled while the stage is empty. Loading a real screenshot onto the canvas renders the preview and enables the export control.',
+          "Next, let's jump into the Screenshot Studio editor. Notice that Export stays disabled while the canvas is empty. Once we drop in a real screenshot, the live preview renders and Export unlocks.",
         action: async ({ page: p, recorder: rec }) => {
           await rec.clearAnnotations()
           await p.goto(`${baseUrl}/editor`, { waitUntil: 'domcontentloaded', timeout: 120_000 })
@@ -308,7 +308,7 @@ export async function createScenario({ recorder, page, baseUrl }) {
         criterionId: 'AC-2',
         route: '/editor',
         narration:
-          'Clicking the now-enabled Export button with the visible cursor indicator opens the real export popover with PNG and format controls ready for download.',
+          'Now when we click Export, the popover opens right away with PNG and all the format options ready to go.',
         action: async ({ page: p, recorder: rec }) => {
           await rec.clearAnnotations()
           const exportBtn = p.getByRole('button', { name: 'Export', exact: true })
@@ -331,7 +331,7 @@ export async function createScenario({ recorder, page, baseUrl }) {
         criterionId: 'AC-3',
         route: 'API: GET /api/trpc/workspace.listMine',
         narration:
-          'For failure and authorization coverage, an unauthenticated request to workspace list mine fails closed with HTTP four zero one unauthorized, confirming tenant data is never exposed without a valid session.',
+          "We also checked the auth failure path. Sending an unauthenticated request to list workspaces fails closed with HTTP 401 unauthorized, so tenant data doesn't leak without a valid session.",
         action: async ({ recorder: rec }) => {
           await rec.clearAnnotations()
           await rec.renderTerminalView({
@@ -361,7 +361,7 @@ export async function createScenario({ recorder, page, baseUrl }) {
         criterionId: 'AC-4',
         route: 'CLI: dev/pr-video-evidence/cli.mjs validate',
         narration:
-          'Finally, the pull request evidence validator accepts a manifest matching the current commit SHA and rejects a stale commit SHA with a non-zero exit code. This completes verification of the narrated evidence pipeline.',
+          "Finally, here's the evidence check running live. It passes when the manifest matches the current commit SHA, and blocks with a non-zero exit code if the recording is stale.",
         action: async ({ recorder: rec }) => {
           await rec.clearAnnotations()
           await rec.renderTerminalView({

@@ -356,13 +356,18 @@ review. Do not wait for the reviewer to request a recording.
   (`1920 x 1080` @ `30 fps`, MP4 with H.264 `yuv420p` video and AAC audio,
   typically 30–120s per clip, no music, promotional copy, or decorative
   transitions). Never substitute mockups or simulated UIs.
-- **Visual annotations & narration:** include synchronized spoken narration
-  (Kokoro local TTS by default via `dev/pr-video-evidence/tts.py`, with
-  approved cloud TTS or `espeak-ng` fallback only when needed), visible
-  cursor movement, click indicators, element bounding boxes/highlights,
-  restrained zoom where needed, legible burned-in captions, real interactions,
-  relevant error states, and verified acceptance criteria. Describe only
-  observed, verified outcomes.
+- **Visual annotations & human-sounding narration:** include natural,
+  human-sounding neural spoken narration (Kokoro-82M ONNX via
+  `dev/pr-video-evidence/tts.py` at natural `0.98` cadence with two-pass linear
+  loudness mastering, or approved neural cloud TTS such as OpenAI
+  `gpt-4o-mini-tts`; robotic formant synthesizers like `espeak-ng` are
+  disallowed for deliverable PR recordings and rejected by `schema.mjs`).
+  Write conversational senior-engineer prose for the ear (short sentences,
+  natural phrasing, never reading raw paths or spelling out `SHA`/`URL`
+  awkwardly). Pair narration with visible cursor movement, click indicators,
+  element bounding boxes/highlights, restrained zoom where needed, legible
+  burned-in captions, real interactions, relevant error states, and verified
+  acceptance criteria. Describe only observed, verified outcomes.
 - **Backend and non-UI changes:** demonstrate observable behavior via terminal
   recordings, API requests/responses, database assertions, dashboards, or test
   execution (`EvidenceRecorder.renderTerminalView`). For genuinely

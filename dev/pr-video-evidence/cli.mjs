@@ -71,25 +71,29 @@ function parsePositiveInt(value, flagName) {
   return n
 }
 
-function parsePositiveFloat(value, flagName, fallback) {
+function parsePositiveFloat(value, flagName, fallback, min = 0.0001, max = Infinity) {
   if (value === undefined || value === null || value === '') return fallback
   const n = Number(value)
-  if (!Number.isFinite(n) || n <= 0) {
-    console.error(`Invalid ${flagName}: expected a positive number (got "${value}").`)
+  if (!Number.isFinite(n) || n < min || n > max) {
+    console.error(
+      `Invalid ${flagName}: expected a number between ${min} and ${max} (got "${value}").`
+    )
     process.exit(2)
   }
   return n
 }
 
+const VALID_NEURAL_TTS_PROVIDERS = new Set(['kokoro', 'openai'])
+
 function cmdCheckDeps() {
   const checks = []
-  for (const bin of ['ffmpeg', 'ffprobe', 'espeak-ng']) {
+  for (const bin of ['ffmpeg', 'ffprobe']) {
     const res = spawnSync('which', [bin], { encoding: 'utf8' })
     checks.push({
       tool: bin,
       available: res.status === 0,
       path: res.status === 0 ? res.stdout.trim() : null,
-      required: bin !== 'espeak-ng',
+      required: true,
     })
   }
 
@@ -106,10 +110,17 @@ function cmdCheckDeps() {
   const kokoroRes = spawnSync(py, ['-c', 'import kokoro_onnx, soundfile; print("ok")'], {
     encoding: 'utf8',
   })
+  const kokoroOk = kokoroRes.status === 0
+  const openaiKeyOk = Boolean((process.env.OPENAI_API_KEY || '').trim())
   checks.push({
     tool: 'kokoro-onnx',
-    available: kokoroRes.status === 0,
+    available: kokoroOk,
     python: py,
+    required: !openaiKeyOk,
+  })
+  checks.push({
+    tool: 'openai-tts',
+    available: openaiKeyOk,
     required: false,
   })
 
@@ -147,7 +158,6 @@ async function cmdRecord(argv) {
       tts: { type: 'string' },
       voice: { type: 'string' },
       speed: { type: 'string' },
-      'allow-fallback': { type: 'boolean', default: false },
       'video-url': { type: 'string' },
       'output-name': { type: 'string' },
       'commit-sha': { type: 'string' },
@@ -162,18 +172,26 @@ async function cmdRecord(argv) {
   const scenarioArg = positionals[0]
   if (!scenarioArg) {
     console.error(
-      'Usage: cli.mjs record <scenario.mjs> [--out <dir>] [--base-url <url>] [--tts kokoro|espeak-ng|openai] [--voice af_heart] [--speed 1.05] [--allow-fallback] [--video-url <https://...>] [--review-file <review.json>] [--pr <number>]'
+      'Usage: cli.mjs record <scenario.mjs> [--out <dir>] [--base-url <url>] [--tts kokoro|openai] [--voice af_heart] [--speed 0.98] [--video-url <https://...>] [--review-file <review.json>] [--pr <number>]'
     )
     process.exit(2)
   }
+
+  const ttsProvider = String(flags.tts || 'kokoro').trim()
+  if (!VALID_NEURAL_TTS_PROVIDERS.has(ttsProvider)) {
+    console.error(
+      `Invalid --tts provider "${ttsProvider}": deliverable PR evidence requires a human-sounding neural TTS provider ("kokoro" or "openai").`
+    )
+    process.exit(2)
+  }
+
+  const speed = parsePositiveFloat(flags.speed, '--speed', 0.98, 0.5, 2.0)
+  const prNumber = parsePositiveInt(flags.pr, '--pr')
 
   const scenarioPath = resolveInputPath(scenarioArg)
   if (!existsSync(scenarioPath)) {
     throw new Error(`Scenario file not found: ${scenarioPath}`)
   }
-
-  const speed = parsePositiveFloat(flags.speed, '--speed', 1.05)
-  const prNumber = parsePositiveInt(flags.pr, '--pr')
 
   const slug =
     String(
@@ -199,10 +217,9 @@ async function cmdRecord(argv) {
   const recorder = new EvidenceRecorder({
     outDir,
     baseUrl,
-    ttsProvider: String(flags.tts || 'kokoro'),
+    ttsProvider,
     ttsVoice: String(flags.voice || 'af_heart'),
     ttsSpeed: speed,
-    allowTtsFallback: Boolean(flags['allow-fallback']),
   })
 
   let scenarioDef
