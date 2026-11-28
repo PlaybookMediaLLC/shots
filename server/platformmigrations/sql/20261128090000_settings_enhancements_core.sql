@@ -11,6 +11,13 @@ UPDATE social_set
   SET "naturalPostingWindowMinutes" = 4
   WHERE "naturalPostingTimes" = true AND "naturalPostingWindowMinutes" = 10;
 
+-- Widen scheduled_post.naturalOffsetSeconds check from legacy ±4m (±240s) to ±15m (±900s).
+ALTER TABLE "scheduled_post"
+  DROP CONSTRAINT IF EXISTS "scheduled_post_naturalOffsetSeconds_check";
+ALTER TABLE "scheduled_post"
+  ADD CONSTRAINT "scheduled_post_naturalOffsetSeconds_check"
+  CHECK ("naturalOffsetSeconds" BETWEEN -900 AND 900);
+
 ALTER TABLE user_preference
   ADD COLUMN IF NOT EXISTS "automationEmails" BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS "postFailureAlerts" BOOLEAN NOT NULL DEFAULT true,
