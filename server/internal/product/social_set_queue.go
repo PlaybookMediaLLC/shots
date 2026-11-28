@@ -11,10 +11,11 @@ import (
 // SocialSetQueueUpdate changes future slot suggestions only. It cannot change
 // approval requirements, connected identities, or an existing publication time.
 type SocialSetQueueUpdate struct {
-	BaseVersion         int                 `json:"baseVersion"`
-	TimeZone            *string             `json:"timeZone,omitempty"`
-	PostingSlots        *[]schema.QueueSlot `json:"postingSlots,omitempty"`
-	NaturalPostingTimes *bool               `json:"naturalPostingTimes,omitempty"`
+	BaseVersion                 int                 `json:"baseVersion"`
+	TimeZone                    *string             `json:"timeZone,omitempty"`
+	PostingSlots                *[]schema.QueueSlot `json:"postingSlots,omitempty"`
+	NaturalPostingTimes         *bool               `json:"naturalPostingTimes,omitempty"`
+	NaturalPostingWindowMinutes *int                `json:"naturalPostingWindowMinutes,omitempty"`
 }
 
 func (c *Configuration) authorizeSocialSetQueue(ctx context.Context, actor Actor) error {
@@ -33,10 +34,16 @@ func (c *Configuration) authorizeSocialSetQueue(ctx context.Context, actor Actor
 // UpdateSocialSetQueue exposes the queue subset of the canonical settings save.
 // Keys need a separate opt-in scope; draft:write alone grants no queue authority.
 func (c *Configuration) UpdateSocialSetQueue(ctx context.Context, actor Actor, id string, input SocialSetQueueUpdate) (*SocialSetRecord, error) {
-	if input.TimeZone == nil && input.PostingSlots == nil && input.NaturalPostingTimes == nil {
+	if input.TimeZone == nil && input.PostingSlots == nil && input.NaturalPostingTimes == nil && input.NaturalPostingWindowMinutes == nil {
 		return nil, invalid("Choose at least one queue setting to change.")
 	}
-	return c.updateSocialSet(ctx, actor, id, SocialSetUpdate{BaseVersion: input.BaseVersion, TimeZone: input.TimeZone, PostingSlots: input.PostingSlots, NaturalPostingTimes: input.NaturalPostingTimes}, true)
+	return c.updateSocialSet(ctx, actor, id, SocialSetUpdate{
+		BaseVersion:                 input.BaseVersion,
+		TimeZone:                    input.TimeZone,
+		PostingSlots:                input.PostingSlots,
+		NaturalPostingTimes:         input.NaturalPostingTimes,
+		NaturalPostingWindowMinutes: input.NaturalPostingWindowMinutes,
+	}, true)
 }
 
 // lockSocialSetAuthority makes permission and visibility rechecks atomic with a

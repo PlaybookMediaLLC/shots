@@ -104,6 +104,7 @@ func (s *Store) AccountDeletions(ctx context.Context) (int, error) {
 				`DELETE FROM "twoFactor" WHERE "userId"=$1`,
 				`DELETE FROM social_oauth_start WHERE "userId"=$1`,
 				`DELETE FROM user_preference WHERE "userId"=$1`,
+				`DELETE FROM user_automation_email_log WHERE "userId"=$1`,
 				`DELETE FROM platform_founder_hub_settings WHERE "userId"=$1`,
 				`DELETE FROM platform_founder_hub_device_command WHERE "userId"=$1`,
 				`DELETE FROM platform_founder_hub_device WHERE "userId"=$1`,

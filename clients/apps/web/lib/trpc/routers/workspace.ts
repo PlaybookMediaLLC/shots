@@ -4,6 +4,7 @@ import { z } from 'zod'
 import {
   cancelWorkspaceDeletion,
   createWorkspace,
+  getWeeklyGoalProgress,
   getWorkspace,
   getWorkspaceReadiness,
   inviteWorkspaceMember,
@@ -20,6 +21,7 @@ import {
   updateWorkspace,
   updateWorkspaceAiSettings,
   updateWorkspaceMemberRole,
+  updateWorkspacePublishingSettings,
 } from '@/lib/workspace/service'
 import {
   workspaceAiSettingsUpdateSchema,
@@ -28,10 +30,12 @@ import {
   workspaceInvitationIdSchema,
   workspaceInviteSchema,
   workspaceMemberIdSchema,
+  workspacePublishingSettingsUpdateSchema,
   workspaceRoleChangeSchema,
   workspaceTransferOwnershipSchema,
   workspaceUpdateSchema,
 } from '@/lib/workspace/schemas'
+import { weekStartSchema } from '@/lib/api/contracts/settings-platform'
 import { router } from '../init'
 import {
   organizationProcedure,
@@ -93,6 +97,12 @@ export const workspaceRouter = router({
   updateAiSettings: organizationProcedure('workspace:update')
     .input(workspaceAiSettingsUpdateSchema)
     .mutation(async ({ ctx, input }) => updateWorkspaceAiSettings(ctx.access, input)),
+  updatePublishingSettings: organizationProcedure('workspace:update')
+    .input(workspacePublishingSettingsUpdateSchema)
+    .mutation(async ({ ctx, input }) => updateWorkspacePublishingSettings(ctx.access, input)),
+  weeklyGoalProgress: organizationProcedure('artifact:read')
+    .input(z.object({ weekStart: weekStartSchema.optional() }).optional())
+    .query(async ({ ctx, input }) => getWeeklyGoalProgress(ctx.access, input?.weekStart)),
   updateMemberRole: organizationProcedure('member:update_role')
     .input(workspaceRoleChangeSchema)
     .mutation(async ({ ctx, input }) =>

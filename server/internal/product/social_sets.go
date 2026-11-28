@@ -103,27 +103,28 @@ type WritingAssistantRecord struct {
 
 // SocialSetRecord is a set as the API returns it.
 type SocialSetRecord struct {
-	Accounts            []SocialAccount        `json:"accounts"`
-	Color               string                 `json:"color"`
-	CreatedAt           time.Time              `json:"createdAt"`
-	DefaultPlatforms    []string               `json:"defaultPlatforms"`
-	EngagementDefaults  schema.Engagement      `json:"engagementDefaults"`
-	ID                  string                 `json:"id"`
-	IsOwner             bool                   `json:"isOwner"`
-	Name                string                 `json:"name"`
-	NaturalPostingTimes bool                   `json:"naturalPostingTimes"`
-	NeedsAttention      bool                   `json:"needsAttention"`
-	OwnerUserID         *string                `json:"ownerUserId"`
-	PostingSlots        []schema.QueueSlot     `json:"postingSlots"`
-	PrimaryPlatform     *string                `json:"primaryPlatform"`
-	PublicProfile       bool                   `json:"publicProfile"`
-	PublicSlug          string                 `json:"publicSlug"`
-	TimeZone            string                 `json:"timeZone"`
-	UpdatedAt           time.Time              `json:"updatedAt"`
-	Version             int                    `json:"version"`
-	Visibility          string                 `json:"visibility"`
-	WeeklySlotCount     int                    `json:"weeklySlotCount"`
-	WritingAssistant    WritingAssistantRecord `json:"writingAssistant"`
+	Accounts                    []SocialAccount        `json:"accounts"`
+	Color                       string                 `json:"color"`
+	CreatedAt                   time.Time              `json:"createdAt"`
+	DefaultPlatforms            []string               `json:"defaultPlatforms"`
+	EngagementDefaults          schema.Engagement      `json:"engagementDefaults"`
+	ID                          string                 `json:"id"`
+	IsOwner                     bool                   `json:"isOwner"`
+	Name                        string                 `json:"name"`
+	NaturalPostingTimes         bool                   `json:"naturalPostingTimes"`
+	NaturalPostingWindowMinutes int                    `json:"naturalPostingWindowMinutes"`
+	NeedsAttention              bool                   `json:"needsAttention"`
+	OwnerUserID                 *string                `json:"ownerUserId"`
+	PostingSlots                []schema.QueueSlot     `json:"postingSlots"`
+	PrimaryPlatform             *string                `json:"primaryPlatform"`
+	PublicProfile               bool                   `json:"publicProfile"`
+	PublicSlug                  string                 `json:"publicSlug"`
+	TimeZone                    string                 `json:"timeZone"`
+	UpdatedAt                   time.Time              `json:"updatedAt"`
+	Version                     int                    `json:"version"`
+	Visibility                  string                 `json:"visibility"`
+	WeeklySlotCount             int                    `json:"weeklySlotCount"`
+	WritingAssistant            WritingAssistantRecord `json:"writingAssistant"`
 }
 
 // SocialSetList is the actor's sets, the workspace's accounts in no set, and
@@ -151,13 +152,14 @@ type SocialSetInput struct {
 
 // SocialSetUpdate changes the fields it sets, based on BaseVersion.
 type SocialSetUpdate struct {
-	BaseVersion         int                 `json:"baseVersion"`
-	Color               *string             `json:"color"`
-	DefaultPlatforms    *[]string           `json:"defaultPlatforms"`
-	EngagementDefaults  *schema.Engagement  `json:"engagementDefaults"`
-	Name                *string             `json:"name"`
-	NaturalPostingTimes *bool               `json:"naturalPostingTimes"`
-	PostingSlots        *[]schema.QueueSlot `json:"postingSlots"`
+	BaseVersion                 int                 `json:"baseVersion"`
+	Color                       *string             `json:"color"`
+	DefaultPlatforms            *[]string           `json:"defaultPlatforms"`
+	EngagementDefaults          *schema.Engagement  `json:"engagementDefaults"`
+	Name                        *string             `json:"name"`
+	NaturalPostingTimes         *bool               `json:"naturalPostingTimes"`
+	NaturalPostingWindowMinutes *int                `json:"naturalPostingWindowMinutes"`
+	PostingSlots                *[]schema.QueueSlot `json:"postingSlots"`
 	// PrimaryPlatform is one of the default platforms; empty clears it.
 	PrimaryPlatform *string `json:"primaryPlatform"`
 	PublicProfile   *bool   `json:"publicProfile"`
@@ -573,10 +575,14 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 		for _, account := range setAccounts {
 			attention = attention || account.Health != AccountConnected
 		}
+		windowMinutes := set.NaturalPostingWindowMinutes
+		if windowMinutes < 1 || windowMinutes > 15 {
+			windowMinutes = defaultNaturalPostingWindowMinutes
+		}
 		records = append(records, SocialSetRecord{Accounts: setAccounts, Color: set.Color, CreatedAt: set.CreatedAt,
 			DefaultPlatforms: nonNilStrings(set.DefaultPlatforms), EngagementDefaults: set.EngagementDefaults, ID: set.ID,
 			IsOwner: set.OwnerUserID != nil && actor.IsSession() && *set.OwnerUserID == actor.UserID, Name: set.Name,
-			NaturalPostingTimes: set.NaturalPostingTimes, NeedsAttention: attention, OwnerUserID: set.OwnerUserID,
+			NaturalPostingTimes: set.NaturalPostingTimes, NaturalPostingWindowMinutes: windowMinutes, NeedsAttention: attention, OwnerUserID: set.OwnerUserID,
 			PostingSlots: nonNilSlots(set.PostingSlots), PrimaryPlatform: set.PrimaryPlatform, PublicProfile: set.PublicProfile,
 			PublicSlug: set.PublicSlug, TimeZone: set.TimeZone, UpdatedAt: set.UpdatedAt, Version: set.Version,
 			Visibility: string(set.Visibility), WeeklySlotCount: len(set.PostingSlots),
@@ -911,7 +917,7 @@ func (c *Configuration) updateSocialSet(ctx context.Context, actor Actor, id str
 		update.SetTimeZone(*input.TimeZone)
 		changed = append(changed, "timeZone")
 	}
-	if input.PostingSlots != nil || (input.NaturalPostingTimes != nil && *input.NaturalPostingTimes) || input.EngagementDefaults != nil {
+	if input.PostingSlots != nil || (input.NaturalPostingTimes != nil && *input.NaturalPostingTimes) || input.NaturalPostingWindowMinutes != nil || input.EngagementDefaults != nil {
 		if err := c.requireWorkspaceFeature(ctx, actor.OrganizationID, advancedSchedulingFeature); err != nil {
 			return nil, err
 		}
@@ -927,6 +933,14 @@ func (c *Configuration) updateSocialSet(ctx context.Context, actor Actor, id str
 	if input.NaturalPostingTimes != nil {
 		update.SetNaturalPostingTimes(*input.NaturalPostingTimes)
 		changed = append(changed, "naturalPostingTimes")
+	}
+	if input.NaturalPostingWindowMinutes != nil {
+		window := *input.NaturalPostingWindowMinutes
+		if window < 1 || window > 15 {
+			return nil, invalid("Randomization window must be between 1 and 15 minutes.")
+		}
+		update.SetNaturalPostingWindowMinutes(window)
+		changed = append(changed, "naturalPostingWindowMinutes")
 	}
 	defaults := set.DefaultPlatforms
 	if input.DefaultPlatforms != nil {
@@ -1102,6 +1116,7 @@ func cancelQueued(ctx context.Context, tx *ent.Tx, actor Actor, match predicate.
 		return nil, err
 	}
 	cancelled := make([]string, 0, len(queued))
+	groupSamplePost := map[string]string{}
 	for _, post := range queued {
 		update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
 			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED)
@@ -1119,7 +1134,22 @@ func cancelQueued(ctx context.Context, tx *ent.Tx, actor Actor, match predicate.
 			map[string]any{"reason": reason}); err != nil {
 			return nil, err
 		}
+		if post.PublishGroupID != nil && *post.PublishGroupID != "" {
+			if _, ok := groupSamplePost[*post.PublishGroupID]; !ok {
+				groupSamplePost[*post.PublishGroupID] = post.ID
+			}
+		}
 		cancelled = append(cancelled, post.ID)
+	}
+	groupIDs := make([]string, 0, len(groupSamplePost))
+	for groupID := range groupSamplePost {
+		groupIDs = append(groupIDs, groupID)
+	}
+	slices.Sort(groupIDs)
+	for _, groupID := range groupIDs {
+		if err := publishing.EmitPublishGroupSummary(ctx, tx, actor.OrganizationID, groupSamplePost[groupID]); err != nil {
+			return nil, err
+		}
 	}
 	return cancelled, nil
 }
@@ -1487,7 +1517,8 @@ func (c *Configuration) CopySocialSet(ctx context.Context, actor Actor, sourceWo
 	created, err := tx.SocialSet.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).SetName(source.Name).
 		SetColor(source.Color).SetVisibility(socialset.VisibilityPRIVATE).SetOwnerUserID(actor.UserID).
 		SetCreatedByUserID(actor.UserID).SetTimeZone(source.TimeZone).SetPostingSlots(nonNilSlots(source.PostingSlots)).
-		SetNaturalPostingTimes(source.NaturalPostingTimes).SetEngagementDefaults(source.EngagementDefaults).
+		SetNaturalPostingTimes(source.NaturalPostingTimes).SetNaturalPostingWindowMinutes(source.NaturalPostingWindowMinutes).
+		SetEngagementDefaults(source.EngagementDefaults).
 		SetWritingAssistant(assistant).SetPublicSlug(randomSlug()).Save(ctx)
 	if err != nil {
 		return nil, err

@@ -51,6 +51,8 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("GET /v1/workspace", s.authenticateProduct(http.HandlerFunc(s.getWorkspace)))
 	mux.Handle("PATCH /v1/workspace", s.authenticateProduct(http.HandlerFunc(s.updateWorkspace)))
 	mux.Handle("PUT /v1/workspace/ai-settings", s.authenticateProduct(http.HandlerFunc(s.updateWorkspaceAISettings)))
+	mux.Handle("PUT /v1/workspace/publishing-settings", s.authenticateProduct(http.HandlerFunc(s.updateWorkspacePublishingSettings)))
+	mux.Handle("GET /v1/workspace/weekly-goal-progress", s.authenticateProduct(http.HandlerFunc(s.getWeeklyGoalProgress)))
 	mux.Handle("GET /v1/workspace/ai-provider-key", s.authenticateProduct(http.HandlerFunc(s.getWorkspaceAIProviderKey)))
 	mux.Handle("GET /v1/workspace/members", s.authenticateProduct(http.HandlerFunc(s.listWorkspaceMembers)))
 	mux.Handle("GET /v1/workspace/invitations", s.authenticateProduct(http.HandlerFunc(s.listWorkspaceInvitations)))
@@ -593,6 +595,30 @@ func (s *Server) updateWorkspaceAISettings(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, workspaceMutationResponse(workspace))
 }
 
+func (s *Server) updateWorkspacePublishingSettings(w http.ResponseWriter, r *http.Request) {
+	actor, ok := s.configurationActor(w, r)
+	if !ok {
+		return
+	}
+	var input product.UpdateWorkspacePublishingSettingsInput
+	if decodeJSON(r, &input) != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	workspace, err := s.configuration.UpdateWorkspacePublishingSettings(r.Context(), actor, input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, workspaceMutationResponse(workspace))
+}
+
+func (s *Server) getWeeklyGoalProgress(w http.ResponseWriter, r *http.Request) {
+	weekStart := r.URL.Query().Get("weekStart")
+	progress, err := s.configuration.GetWeeklyGoalProgress(r.Context(), workspaceActor(r), weekStart)
+	respond(w, http.StatusOK, progress, err)
+}
+
 func (s *Server) getWorkspaceAIProviderKey(w http.ResponseWriter, r *http.Request) {
 	apiKey, err := s.configuration.GetWorkspaceAIProviderKey(r.Context(), workspaceActor(r))
 	if err != nil {
@@ -651,6 +677,9 @@ func workspaceMutationResponse(workspace *product.Workspace) map[string]any {
 		delete(settings, "aiInstructions")
 		delete(settings, "hasAiProviderKey")
 		delete(settings, "aiProviderKeyHint")
+		delete(settings, "weeklyPostingGoal")
+		delete(settings, "processVideosOnServer")
+		delete(settings, "videoProcessingAvailable")
 		var metadata json.RawMessage
 		if workspace.Metadata != nil {
 			metadata = json.RawMessage(*workspace.Metadata)
@@ -670,12 +699,15 @@ func workspaceSettingsResponse(settings *ent.WorkspaceSettings) map[string]any {
 		"organizationId": settings.ID, "description": settings.Description,
 		"locale": settings.Locale, "timeZone": settings.TimeZone,
 		"defaultPublishTime": settings.DefaultPublishTime, "aiAgentEnabled": settings.AiAgentEnabled,
-		"aiModelDefaults":         settings.AiModelDefaults,
-		"aiInstructions":          settings.AiInstructions,
-		"hasAiProviderKey":        hasAIKey,
-		"aiProviderKeyHint":       settings.AiProviderKeyHint,
-		"releaseReadinessEnabled": settings.ReleaseReadinessEnabled,
-		"createdAt":               settings.CreatedAt, "updatedAt": settings.UpdatedAt,
+		"aiModelDefaults":          settings.AiModelDefaults,
+		"aiInstructions":           settings.AiInstructions,
+		"hasAiProviderKey":         hasAIKey,
+		"aiProviderKeyHint":        settings.AiProviderKeyHint,
+		"releaseReadinessEnabled":  settings.ReleaseReadinessEnabled,
+		"weeklyPostingGoal":        settings.WeeklyPostingGoal,
+		"processVideosOnServer":    settings.ProcessVideosOnServer,
+		"videoProcessingAvailable": product.VideoProcessingAvailable(),
+		"createdAt":                settings.CreatedAt, "updatedAt": settings.UpdatedAt,
 	}
 }
 

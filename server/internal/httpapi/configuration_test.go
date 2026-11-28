@@ -30,6 +30,8 @@ type fakeConfiguration struct {
 	founderHubActor     *product.Actor
 	aiProviderKey       *string
 	aiSettingsError     error
+	weeklyGoalWeekStart string
+	unsubscribeToken    string
 }
 
 func TestWorkspaceCreationPreservesSettingsContract(t *testing.T) {
@@ -104,6 +106,27 @@ func (f *fakeConfiguration) GetWorkspace(context.Context, string) (*product.Work
 }
 func (f *fakeConfiguration) UpdateWorkspace(_ context.Context, _ product.Actor, input product.UpdateWorkspaceInput) (*product.Workspace, error) {
 	return &product.Workspace{ID: "workspace-1", Name: input.Name, Slug: input.Slug}, nil
+}
+func (f *fakeConfiguration) UpdateWorkspacePublishingSettings(_ context.Context, _ product.Actor, input product.UpdateWorkspacePublishingSettingsInput) (*product.Workspace, error) {
+	settings := &ent.WorkspaceSettings{ID: "workspace-1", ProcessVideosOnServer: true}
+	if input.WeeklyPostingGoal.Set {
+		settings.WeeklyPostingGoal = input.WeeklyPostingGoal.Value
+	}
+	if input.ProcessVideosOnServer != nil {
+		settings.ProcessVideosOnServer = *input.ProcessVideosOnServer
+	}
+	return &product.Workspace{ID: "workspace-1", Name: "Workspace", Slug: "workspace", WorkspaceSettings: settings}, nil
+}
+func (f *fakeConfiguration) GetWeeklyGoalProgress(_ context.Context, _ product.Actor, weekStart string) (*product.WeeklyGoalProgress, error) {
+	f.weeklyGoalWeekStart = weekStart
+	return &product.WeeklyGoalProgress{TimeZone: "UTC"}, nil
+}
+func (f *fakeConfiguration) RevokeAllSessions(_ context.Context, _ product.Actor) (*product.RevokeAllSessionsResult, error) {
+	return &product.RevokeAllSessionsResult{RevokedSessions: 1}, nil
+}
+func (f *fakeConfiguration) UnsubscribeAutomationEmails(_ context.Context, token string) error {
+	f.unsubscribeToken = token
+	return nil
 }
 func (f *fakeConfiguration) UpdateWorkspaceAISettings(_ context.Context, _ product.Actor, input product.UpdateWorkspaceAISettingsInput) (*product.Workspace, error) {
 	if f.aiSettingsError != nil {

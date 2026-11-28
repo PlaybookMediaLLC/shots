@@ -22,6 +22,7 @@ import { StartPostAction } from '@/components/platform-hub/StartPostAction'
 import { QueueNudge } from '@/components/platform-hub/QueueNudge'
 import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
+import { getWeeklyGoalProgress } from '@/lib/workspace/service'
 
 export const metadata = { title: 'Home' }
 export default async function HomePage({
@@ -279,19 +280,36 @@ export default async function HomePage({
  */
 async function UpcomingQueue({ tenant }: { tenant: OrganizationAccess }) {
   const now = new Date()
-  const posts = await listContentDraftPostsBetween(
-    tenant,
-    now,
-    new Date(now.getTime() + 7 * 86_400_000)
-  ).catch((error: unknown) => {
-    console.error('Home could not read the queue for its nudge', error)
-    return null
-  })
-  if (!posts) return null
-  const queued = new Set(
-    posts
-      .filter((post) => post.status === 'SCHEDULED' || post.status === 'PROCESSING')
-      .map((post) => post.draftId)
-  ).size
-  return queued < 3 ? <QueueNudge queued={queued} /> : null
+  const [posts, progress] = await Promise.all([
+    listContentDraftPostsBetween(
+      tenant,
+      now,
+      new Date(now.getTime() + 7 * 86_400_000)
+    ).catch((error: unknown) => {
+      console.error('Home could not read the queue for its nudge', error)
+      return null
+    }),
+    getWeeklyGoalProgress(tenant).catch((error: unknown) => {
+      console.error('Home could not read weekly goal progress', error)
+      return null
+    }),
+  ])
+  const queued = posts
+    ? new Set(
+        posts
+          .filter((post) => post.status === 'SCHEDULED' || post.status === 'PROCESSING')
+          .map((post) => post.draftId)
+      ).size
+    : 3
+  const weeklyGoal =
+    progress && progress.goal !== null
+      ? {
+          goal: progress.goal,
+          publishedCount: progress.publishedCount,
+          scheduledCount: progress.scheduledCount,
+          totalCount: progress.totalCount,
+        }
+      : null
+  if (queued >= 3 && !weeklyGoal) return null
+  return <QueueNudge queued={queued} weeklyGoal={weeklyGoal} />
 }

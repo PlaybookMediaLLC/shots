@@ -109,6 +109,16 @@ func ReleaseReadinessEnabled(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldReleaseReadinessEnabled, v))
 }
 
+// WeeklyPostingGoal applies equality check predicate on the "weekly_posting_goal" field. It's identical to WeeklyPostingGoalEQ.
+func WeeklyPostingGoal(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldWeeklyPostingGoal, v))
+}
+
+// ProcessVideosOnServer applies equality check predicate on the "process_videos_on_server" field. It's identical to ProcessVideosOnServerEQ.
+func ProcessVideosOnServer(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldEQ(FieldCreatedAt, v))
@@ -642,6 +652,66 @@ func ReleaseReadinessEnabledEQ(v bool) predicate.WorkspaceSettings {
 // ReleaseReadinessEnabledNEQ applies the NEQ predicate on the "release_readiness_enabled" field.
 func ReleaseReadinessEnabledNEQ(v bool) predicate.WorkspaceSettings {
 	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldReleaseReadinessEnabled, v))
+}
+
+// WeeklyPostingGoalEQ applies the EQ predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalEQ(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalNEQ applies the NEQ predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalNEQ(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalIn applies the In predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalIn(vs ...int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIn(FieldWeeklyPostingGoal, vs...))
+}
+
+// WeeklyPostingGoalNotIn applies the NotIn predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalNotIn(vs ...int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotIn(FieldWeeklyPostingGoal, vs...))
+}
+
+// WeeklyPostingGoalGT applies the GT predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalGT(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGT(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalGTE applies the GTE predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalGTE(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldGTE(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalLT applies the LT predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalLT(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLT(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalLTE applies the LTE predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalLTE(v int) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldLTE(FieldWeeklyPostingGoal, v))
+}
+
+// WeeklyPostingGoalIsNil applies the IsNil predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalIsNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldIsNull(FieldWeeklyPostingGoal))
+}
+
+// WeeklyPostingGoalNotNil applies the NotNil predicate on the "weekly_posting_goal" field.
+func WeeklyPostingGoalNotNil() predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNotNull(FieldWeeklyPostingGoal))
+}
+
+// ProcessVideosOnServerEQ applies the EQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerEQ(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldEQ(FieldProcessVideosOnServer, v))
+}
+
+// ProcessVideosOnServerNEQ applies the NEQ predicate on the "process_videos_on_server" field.
+func ProcessVideosOnServerNEQ(v bool) predicate.WorkspaceSettings {
+	return predicate.WorkspaceSettings(sql.FieldNEQ(FieldProcessVideosOnServer, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

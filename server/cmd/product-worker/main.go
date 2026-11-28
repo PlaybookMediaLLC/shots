@@ -351,7 +351,7 @@ func main() {
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),
 			Webhooks:   webhooks.NewDispatcher(db.SQL, cfg.WebhookEncryptionKey),
-			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, PostalAddress: cfg.CompanyPostalAddress},
+			Mail:       &maintenance.Mailer{APIKey: cfg.ResendAPIKey, From: cfg.EmailFrom, BaseURL: cfg.AuthBaseURL, SigningSecret: cfg.AuthSecret, AutomationSigningSecret: config.EmailUnsubscribeSecret(), PostalAddress: cfg.CompanyPostalAddress},
 		}
 		maintenanceWorker := worker.New(temporalClient, temporalmaintenance.TaskQueue, worker.Options{
 			BackgroundActivityContext:          ctx,

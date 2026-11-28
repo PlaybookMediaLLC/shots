@@ -96,7 +96,20 @@ export const workspaceAiSettingsUpdateSchema = z.object({
   aiProviderApiKey: aiProviderApiKeySchema,
 })
 
+export const workspacePublishingSettingsUpdateSchema = z
+  .object({
+    processVideosOnServer: z.boolean().optional(),
+    weeklyPostingGoal: z.number().int().min(1).max(1000).nullable().optional(),
+  })
+  .refine(
+    (value) => value.weeklyPostingGoal !== undefined || value.processVideosOnServer !== undefined,
+    'Choose a publishing setting to update.'
+  )
+
 export type WorkspaceAiSettingsUpdateInput = z.infer<typeof workspaceAiSettingsUpdateSchema>
+export type WorkspacePublishingSettingsUpdateInput = z.infer<
+  typeof workspacePublishingSettingsUpdateSchema
+>
 
 export type WorkspaceCreateInput = z.infer<typeof workspaceCreateSchema>
 export type WorkspaceInviteInput = z.infer<typeof workspaceInviteSchema>

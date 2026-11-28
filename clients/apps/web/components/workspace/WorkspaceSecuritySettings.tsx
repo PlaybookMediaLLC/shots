@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { Group, Pill, Row } from '@/components/platform-ui'
+import { Group, Pill, Row, Section } from '@/components/platform-ui'
+import { SessionControls } from '@/components/settings/SessionControls'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,9 +87,11 @@ export function WorkspaceSecuritySettings({ twoFactorEnabled }: WorkspaceSecurit
     }
   }
 
-  if (accounts.isPending) return <p role="status">Checking sign-in methods…</p>
-  if (accounts.isError)
-    return (
+  let twoFactorContent: React.ReactNode
+  if (accounts.isPending) {
+    twoFactorContent = <p role="status">Checking sign-in methods…</p>
+  } else if (accounts.isError) {
+    twoFactorContent = (
       <div className="grid gap-2">
         <p role="alert">Could not check your sign-in methods.</p>
         <Button onClick={() => void accounts.refetch()} type="button" variant="outline">
@@ -96,8 +99,8 @@ export function WorkspaceSecuritySettings({ twoFactorEnabled }: WorkspaceSecurit
         </Button>
       </div>
     )
-  if (!accounts.data?.some((account) => account.providerId === 'credential')) {
-    return (
+  } else if (!accounts.data?.some((account) => account.providerId === 'credential')) {
+    twoFactorContent = (
       <Group>
         <Row
           label="Two-factor authentication"
@@ -114,14 +117,12 @@ export function WorkspaceSecuritySettings({ twoFactorEnabled }: WorkspaceSecurit
         </Row>
       </Group>
     )
-  }
-
-  if (twoFactorEnabled)
-    return (
+  } else if (twoFactorEnabled) {
+    twoFactorContent = (
       <EnabledSecurityForm error={error} isSubmitting={isSubmitting} onSubmit={disableTwoFactor} />
     )
-  if (setup)
-    return (
+  } else if (setup) {
+    twoFactorContent = (
       <VerifySecurityForm
         error={error}
         isSubmitting={isSubmitting}
@@ -129,7 +130,31 @@ export function WorkspaceSecuritySettings({ twoFactorEnabled }: WorkspaceSecurit
         setup={setup}
       />
     )
-  return <EnableSecurityForm error={error} isSubmitting={isSubmitting} onSubmit={enableTwoFactor} />
+  } else {
+    twoFactorContent = (
+      <EnableSecurityForm error={error} isSubmitting={isSubmitting} onSubmit={enableTwoFactor} />
+    )
+  }
+
+  return (
+    <div className="grid gap-8">
+      <Section
+        description="Manage active devices and revoke all browser sessions and OAuth tokens immediately."
+        title="Sessions"
+      >
+        <Group>
+          <SessionControls reauthenticateCallback="/settings/security" showSignOutCurrent={false} />
+        </Group>
+      </Section>
+
+      <Section
+        description="Protect sensitive account and workspace actions with a time-based authenticator."
+        title="Two-factor authentication"
+      >
+        {twoFactorContent}
+      </Section>
+    </div>
+  )
 }
 
 function EnableSecurityForm({

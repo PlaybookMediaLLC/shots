@@ -405,6 +405,9 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 		if err := reopenCancelledDraft(ctx, tx, post); err != nil {
 			return nil, err
 		}
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -804,6 +807,9 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	}); err != nil {
 		return err
 	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -876,6 +882,9 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"providerPostId": providerPostID},
 	}); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
 		return err
 	}
 	if inApp {
@@ -952,6 +961,11 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 	if err != nil {
 		return err
 	}
+	if !retry {
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -979,6 +993,9 @@ func (r *Repository) CancelIneligible(ctx context.Context, post *ent.ScheduledPo
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"reason": reason},
 	}); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1009,6 +1026,9 @@ func (r *Repository) FailUnsent(ctx context.Context, post *ent.ScheduledPost, co
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": code, "sent": false},
 	}); err != nil {
+		return err
+	}
+	if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1081,12 +1101,16 @@ func (r *Repository) ReleaseStalled(ctx context.Context, postID, runID string) (
 	}
 	// Only a post that may be live needs a person; a requeue is audit only.
 	if open != nil {
-		err = recordPostActivity(ctx, tx, action, audit)
+		if err := recordPostActivity(ctx, tx, action, audit); err != nil {
+			return "", err
+		}
+		if err := emitPublishGroupSummary(ctx, tx, post.OrganizationID, post.ID); err != nil {
+			return "", err
+		}
 	} else {
-		err = AppendAudit(ctx, tx, audit)
-	}
-	if err != nil {
-		return "", err
+		if err := AppendAudit(ctx, tx, audit); err != nil {
+			return "", err
+		}
 	}
 	return outcome, tx.Commit()
 }

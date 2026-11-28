@@ -8,10 +8,12 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ProfileForm } from '@/components/auth/ProfileForm'
-import { Group, Pill, Row } from '@/components/platform-ui'
+import { LocalTime } from '@/components/drafts/local-time'
+import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
+import { SessionControls } from '@/components/settings/SessionControls'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,19 +43,24 @@ function SignInEmail({ email }: { email: string }) {
   const valid = parsed.success && parsed.data !== email.toLowerCase()
 
   const change = async () => {
-    if (!parsed.success) return
+    if (!valid || sending || !parsed.success) return
     setSending(true)
-    const { error } = await authClient.changeEmail({
-      callbackURL: '/settings/account',
-      newEmail: parsed.data,
-    })
-    setSending(false)
-    if (error) {
-      toast.error(error.message ?? 'The email change could not start.')
-      return
+    try {
+      const { error } = await authClient.changeEmail({
+        callbackURL: '/settings/account',
+        newEmail: parsed.data,
+      })
+      if (error) {
+        toast.error(error.message ?? 'The email change could not start.')
+        return
+      }
+      setSent(true)
+      setNext('')
+    } catch (error) {
+      toast.error(settingsErrorMessage(error))
+    } finally {
+      setSending(false)
     }
-    setSent(true)
-    setNext('')
   }
 
   return (
@@ -198,167 +205,6 @@ function PasswordSettings() {
   )
 }
 
-function deviceName(userAgent: string | null | undefined): string {
-  if (!userAgent) return 'Unknown device'
-  const browser = /Edg\//.test(userAgent)
-    ? 'Edge'
-    : /Chrome\//.test(userAgent)
-      ? 'Chrome'
-      : /Firefox\//.test(userAgent)
-        ? 'Firefox'
-        : /Safari\//.test(userAgent)
-          ? 'Safari'
-          : 'Browser'
-  const system = /iPhone|iPad/.test(userAgent)
-    ? 'iOS'
-    : /Android/.test(userAgent)
-      ? 'Android'
-      : /Mac OS X/.test(userAgent)
-        ? 'macOS'
-        : /Windows/.test(userAgent)
-          ? 'Windows'
-          : /Linux/.test(userAgent)
-            ? 'Linux'
-            : ''
-  return system ? `${browser} on ${system}` : browser
-}
-
-function Sessions() {
-  const [requested, setRequested] = useState(false)
-  const queryClient = useQueryClient()
-  const { data: current } = useHydratedSession()
-  const sessions = useQuery({
-    queryFn: async () => {
-      const { data, error } = await authClient.listSessions()
-      if (error)
-        throw Object.assign(new Error(error.message ?? 'Sessions could not be loaded.'), {
-          code: error.code,
-        })
-      return data
-    },
-    queryKey: ['auth', 'sessions'],
-    enabled: requested,
-    retry: false,
-  })
-
-  const revoke = async (token: string) => {
-    const { error } = await authClient.revokeSession({ token })
-    if (error) {
-      toast.error(error.message ?? 'The session could not be signed out.')
-      return
-    }
-    toast.success('That device is signed out.')
-    await queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] })
-  }
-
-  return (
-    <>
-      <Row description="Devices signed in to your account." label="Sessions" layout="stacked">
-        {!requested ? (
-          <Button variant="outline" onClick={() => setRequested(true)}>
-            View signed-in devices
-          </Button>
-        ) : null}
-        {requested && sessions.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading sessions…</p>
-        ) : null}
-        {sessions.isError ? (
-          <div className="grid gap-2">
-            <p
-              className={
-                'code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH'
-                  ? 'text-sm text-muted-foreground'
-                  : 'text-sm text-red-700 dark:text-red-300'
-              }
-              role="status"
-            >
-              {'code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH'
-                ? 'Confirm your sign-in to view and manage your sessions.'
-                : settingsErrorMessage(sessions.error)}
-            </p>
-            <div className="flex gap-2">
-              <Button asChild variant="outline">
-                <Link href="/sign-in?reauthenticate=1&callbackURL=%2Fsettings%2Faccount">
-                  Verify identity
-                </Link>
-              </Button>
-              {!('code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH') ? (
-                <Button
-                  disabled={sessions.isFetching}
-                  onClick={() => void sessions.refetch()}
-                  type="button"
-                  variant="outline"
-                >
-                  Retry
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <ul className="grid gap-2">
-          {sessions.data?.map((session) => {
-            const isCurrent = session.id === current?.session.id
-            return (
-              <li
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                key={session.id}
-              >
-                <span>
-                  <span className="font-medium text-foreground">
-                    {deviceName(session.userAgent)}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Signed in {new Date(session.createdAt).toLocaleString()}
-                    {isCurrent ? ' · This device' : ''}
-                  </span>
-                </span>
-                {isCurrent ? null : (
-                  <Button
-                    onClick={() => void revoke(session.token)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Sign out
-                  </Button>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </Row>
-      <Row description="Sign out of this device, or of every device at once." label="Log out">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={async () => {
-              await authClient.signOut()
-              window.location.assign('/sign-in')
-            }}
-            type="button"
-            variant="outline"
-          >
-            Log out
-          </Button>
-          <ConfirmDialog
-            confirmLabel="Log out everywhere"
-            description="Every device signed in to your account, including this one, is signed out. You will sign in again here."
-            onConfirm={async () => {
-              const others = await authClient.revokeOtherSessions()
-              if (others.error)
-                return others.error.message ?? 'The other sessions could not be signed out.'
-              await authClient.signOut()
-              window.location.assign('/sign-in?signedOut=everywhere')
-              return null
-            }}
-            title="Log out of every session?"
-            triggerLabel="Log out all sessions"
-          />
-        </div>
-      </Row>
-    </>
-  )
-}
-
 function HelpTips() {
   const { preferences, save, status } = usePreferences()
   const [state, run] = useSaveState()
@@ -389,6 +235,8 @@ function HelpTips() {
 
 function AccountDeletion({ email }: { email: string }) {
   const queryClient = useQueryClient()
+  const [reauthAction, setReauthAction] = useState<'reauth' | 'two-factor' | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
   const status = useQuery({
     queryFn: () => settingsRequest('/api/v1/me/account-deletion', accountDeletionStatusSchema),
     queryKey: ['me', 'account-deletion'],
@@ -397,6 +245,7 @@ function AccountDeletion({ email }: { email: string }) {
   const blockers = status.data?.blockers ?? []
 
   const ask = async (confirmation: string) => {
+    setReauthAction(null)
     try {
       const next = await settingsRequest(
         '/api/v1/me/account-deletion',
@@ -409,10 +258,18 @@ function AccountDeletion({ email }: { email: string }) {
       queryClient.setQueryData(['me', 'account-deletion'], next)
       return null
     } catch (error) {
-      return settingsErrorMessage(error)
+      const message = settingsErrorMessage(error)
+      if (/two-factor|2fa/i.test(message)) {
+        setReauthAction('two-factor')
+      } else if (/fresh|reauthenticate|sign in again/i.test(message)) {
+        setReauthAction('reauth')
+      }
+      return message
     }
   }
   const cancel = async () => {
+    if (cancelBusy) return
+    setCancelBusy(true)
     try {
       const next = await settingsRequest(
         '/api/v1/me/account-deletion',
@@ -423,25 +280,46 @@ function AccountDeletion({ email }: { email: string }) {
       toast.success('Your account will not be deleted.')
     } catch (error) {
       toast.error(settingsErrorMessage(error))
+    } finally {
+      setCancelBusy(false)
     }
   }
 
   return (
     <Row
       description={
-        request?.status === 'PROCESSING'
-          ? 'Account deletion has started. Your encrypted Founder Hub data and attachments are being removed. This can no longer be cancelled.'
-          : request
-            ? `Your account is scheduled for deletion on ${new Date(request.executeAfter).toLocaleDateString()}. Until then you can cancel. After that, you are signed out everywhere, your sign-in methods and memberships are removed, and your name and email are erased; workspaces keep their content and audit history.`
-            : 'Deleting your account signs you out everywhere, removes your sign-in methods and memberships, and erases your name and email after a 14-day grace period. Workspaces you belong to keep their content.'
+        request?.status === 'PROCESSING' ? (
+          'Account deletion has started. Your encrypted Founder Hub data and attachments are being removed. This can no longer be cancelled.'
+        ) : request ? (
+          <>
+            Your account is scheduled for deletion on{' '}
+            <LocalTime options={{ dateStyle: 'medium' }} value={request.executeAfter} />. Until then
+            you can cancel. After that, you are signed out everywhere, your sign-in methods and
+            memberships are removed, and your name and email are erased; workspaces keep their
+            content and audit history.
+          </>
+        ) : (
+          'Deleting your account signs you out everywhere, removes your sign-in methods and memberships, and erases your name and email after a 14-day grace period. Workspaces you belong to keep their content.'
+        )
       }
       label="Delete account"
       layout="stacked"
     >
       {status.isError ? (
-        <p className="text-sm text-red-700 dark:text-red-300" role="alert">
-          {settingsErrorMessage(status.error)}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+            {settingsErrorMessage(status.error)}
+          </p>
+          <Button
+            disabled={status.isFetching}
+            onClick={() => void status.refetch()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Retry
+          </Button>
+        </div>
       ) : null}
       {blockers.length > 0 ? (
         <ul className="grid gap-1 text-sm text-amber-700 dark:text-amber-300">
@@ -450,50 +328,71 @@ function AccountDeletion({ email }: { email: string }) {
           ))}
         </ul>
       ) : null}
-      <div>
-        {request ? (
-          <Button
-            disabled={request.status !== 'REQUESTED'}
-            onClick={() => void cancel()}
-            type="button"
-            variant="outline"
-          >
-            Cancel deletion
-          </Button>
-        ) : (
-          <ConfirmDialog
-            confirmLabel="Request deletion"
-            confirmText={email}
-            description={
-              <>
-                <p>Your account will be deleted in 14 days unless you cancel.</p>
-                <p>
-                  This needs a sign-in in the last 15 minutes with two-factor authentication on. If
-                  it is refused, sign in again and retry.
-                </p>
-              </>
-            }
-            destructive
-            disabled={status.isPending || blockers.length > 0}
-            onConfirm={ask}
-            title="Delete your account?"
-            triggerLabel="Request account deletion"
-          />
-        )}
+      <div className="flex flex-wrap items-center gap-2">
+        {(() => {
+          const recoveryButton =
+            reauthAction === 'reauth' ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/sign-in?reauthenticate=1&callbackURL=%2Fsettings%2Faccount">
+                  Verify identity
+                </Link>
+              </Button>
+            ) : reauthAction === 'two-factor' ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/settings/security">Enable two-factor authentication</Link>
+              </Button>
+            ) : null
+          return (
+            <>
+              {request ? (
+                <Button
+                  disabled={request.status !== 'REQUESTED' || cancelBusy}
+                  onClick={() => void cancel()}
+                  type="button"
+                  variant="outline"
+                >
+                  {cancelBusy ? 'Cancelling…' : 'Cancel deletion'}
+                </Button>
+              ) : (
+                <ConfirmDialog
+                  confirmLabel="Request deletion"
+                  confirmText={email}
+                  description={
+                    <>
+                      <p>Your account will be deleted in 14 days unless you cancel.</p>
+                      <p>
+                        This needs a sign-in in the last 15 minutes with two-factor authentication on.
+                        If it is refused, verify your identity and retry.
+                      </p>
+                    </>
+                  }
+                  destructive
+                  disabled={status.isPending || status.isError || blockers.length > 0}
+                  onConfirm={ask}
+                  title="Delete your account?"
+                  triggerLabel="Delete account"
+                >
+                  {recoveryButton ? <div>{recoveryButton}</div> : null}
+                </ConfirmDialog>
+              )}
+              {recoveryButton}
+            </>
+          )
+        })()}
       </div>
     </Row>
   )
 }
 
 /**
- * Your account (RFC 024): profile, sign-in email, display time zone, how you
- * sign in, where you are signed in, help tips and account deletion. All of it
- * is yours alone and follows you to every workspace.
+ * Your account (RFC 024): profile, sign-in email, how you sign in, where you
+ * are signed in, help tips, legal links, and account deletion. All of it is
+ * yours alone and follows you to every workspace.
  */
 export function AccountSettings({ email, name }: { email: string; name: string }) {
   const { data: session } = useHydratedSession()
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-8">
       <div className="flex items-center gap-3">
         <Avatar image={session?.user.image} name={name || email} />
         <div>
@@ -509,12 +408,35 @@ export function AccountSettings({ email, name }: { email: string; name: string }
         <SignInMethods />
       </Group>
       <Group>
-        <Sessions />
+        <SessionControls reauthenticateCallback="/settings/account" />
       </Group>
       <Group>
         <HelpTips />
-        <AccountDeletion email={email} />
       </Group>
+      <Section
+        description="Legal policies and permanent account deletion controls."
+        title="Privacy & account"
+      >
+        <Group>
+          <Row
+            description="How Shots collects, processes, and protects your data."
+            label="Privacy policy"
+          >
+            <Button asChild size="sm" variant="outline">
+              <Link href="/privacy-policy">View privacy policy</Link>
+            </Button>
+          </Row>
+          <Row
+            description="The terms governing your use of Shots and your workspaces."
+            label="Terms of service"
+          >
+            <Button asChild size="sm" variant="outline">
+              <Link href="/terms">View terms of service</Link>
+            </Button>
+          </Row>
+          <AccountDeletion email={email} />
+        </Group>
+      </Section>
     </div>
   )
 }

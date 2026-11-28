@@ -1391,6 +1391,7 @@ var (
 		{Name: "timing", Type: field.TypeJSON},
 		{Name: "grid", Type: field.TypeJSON, Nullable: true},
 		{Name: "draftId", Type: field.TypeString, Nullable: true},
+		{Name: "processVideosOnServer", Type: field.TypeBool, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -1472,6 +1473,7 @@ var (
 		{Name: "socialSetId", Type: field.TypeString, Nullable: true},
 		{Name: "primaryPlatform", Type: field.TypeString, Nullable: true},
 		{Name: "naturalPostingTime", Type: field.TypeBool, Default: false},
+		{Name: "processVideosOnServer", Type: field.TypeBool, Nullable: true},
 		{Name: "engagement", Type: field.TypeJSON},
 		{Name: "plannedFor", Type: field.TypeTime, Nullable: true},
 		{Name: "kind", Type: field.TypeEnum, Enums: []string{"standard", "reply", "quote", "repurpose", "article"}, Default: "standard"},
@@ -1504,17 +1506,17 @@ var (
 			{
 				Name:    "contentdraft_organizationId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[42]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[43]},
 			},
 			{
 				Name:    "contentdraft_socialSetId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[42]},
+				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[43]},
 			},
 			{
 				Name:    "contentdraft_organizationId_campaignId",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[34]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[35]},
 			},
 		},
 	}
@@ -4780,6 +4782,7 @@ var (
 		{Name: "naturalOffsetSeconds", Type: field.TypeInt, Nullable: true},
 		{Name: "scheduleTimeZone", Type: field.TypeString, Nullable: true},
 		{Name: "scheduleIntent", Type: field.TypeString, Nullable: true},
+		{Name: "publishGroupId", Type: field.TypeString, Nullable: true},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
 		{Name: "scheduledByUserId", Type: field.TypeString, Nullable: true},
 		{Name: "approvedByUserId", Type: field.TypeString, Nullable: true},
@@ -4796,7 +4799,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "scheduled_post_channel_connection_scheduled_posts",
-				Columns:    []*schema.Column{ScheduledPostColumns[34]},
+				Columns:    []*schema.Column{ScheduledPostColumns[35]},
 				RefColumns: []*schema.Column{ChannelConnectionColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4805,7 +4808,7 @@ var (
 			{
 				Name:    "scheduledpost_channelConnectionId_idempotencyKey",
 				Unique:  true,
-				Columns: []*schema.Column{ScheduledPostColumns[34], ScheduledPostColumns[20]},
+				Columns: []*schema.Column{ScheduledPostColumns[35], ScheduledPostColumns[20]},
 			},
 			{
 				Name:    "scheduledpost_organizationId_status_scheduledFor",
@@ -4815,7 +4818,7 @@ var (
 			{
 				Name:    "scheduledpost_status_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ScheduledPostColumns[18], ScheduledPostColumns[33]},
+				Columns: []*schema.Column{ScheduledPostColumns[18], ScheduledPostColumns[34]},
 			},
 			{
 				Name:    "scheduledpost_contentDraftId",
@@ -4958,6 +4961,7 @@ var (
 		{Name: "timeZone", Type: field.TypeString, Default: "UTC"},
 		{Name: "postingSlots", Type: field.TypeJSON},
 		{Name: "naturalPostingTimes", Type: field.TypeBool, Default: false},
+		{Name: "naturalPostingWindowMinutes", Type: field.TypeInt, Default: 10},
 		{Name: "defaultPlatforms", Type: field.TypeJSON},
 		{Name: "primaryPlatform", Type: field.TypeString, Nullable: true},
 		{Name: "engagementDefaults", Type: field.TypeJSON},
@@ -4979,12 +4983,12 @@ var (
 			{
 				Name:    "socialset_publicSlug",
 				Unique:  true,
-				Columns: []*schema.Column{SocialSetColumns[13]},
+				Columns: []*schema.Column{SocialSetColumns[14]},
 			},
 			{
 				Name:    "socialset_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{SocialSetColumns[1], SocialSetColumns[17]},
+				Columns: []*schema.Column{SocialSetColumns[1], SocialSetColumns[18]},
 			},
 		},
 	}
@@ -5295,6 +5299,35 @@ var (
 			},
 		},
 	}
+	// UserAutomationEmailLogColumns holds the columns for the "user_automation_email_log" table.
+	UserAutomationEmailLogColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "windowKey", Type: field.TypeString},
+		{Name: "providerReceipt", Type: field.TypeString, Default: ""},
+		{Name: "status", Type: field.TypeString, Default: "SENT"},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// UserAutomationEmailLogTable holds the schema information for the "user_automation_email_log" table.
+	UserAutomationEmailLogTable = &schema.Table{
+		Name:       "user_automation_email_log",
+		Columns:    UserAutomationEmailLogColumns,
+		PrimaryKey: []*schema.Column{UserAutomationEmailLogColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userautomationemaillog_userId_organizationId_kind_windowKey",
+				Unique:  true,
+				Columns: []*schema.Column{UserAutomationEmailLogColumns[1], UserAutomationEmailLogColumns[2], UserAutomationEmailLogColumns[3], UserAutomationEmailLogColumns[4]},
+			},
+			{
+				Name:    "userautomationemaillog_userId_kind_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{UserAutomationEmailLogColumns[1], UserAutomationEmailLogColumns[3], UserAutomationEmailLogColumns[7]},
+			},
+		},
+	}
 	// UserPreferenceColumns holds the columns for the "user_preference" table.
 	UserPreferenceColumns = []*schema.Column{
 		{Name: "userId", Type: field.TypeString},
@@ -5308,6 +5341,10 @@ var (
 		{Name: "showScrollbars", Type: field.TypeBool, Default: true},
 		{Name: "developerMode", Type: field.TypeBool, Default: false},
 		{Name: "emailNotifications", Type: field.TypeBool, Default: true},
+		{Name: "automationEmails", Type: field.TypeBool, Default: true},
+		{Name: "postFailureAlerts", Type: field.TypeBool, Default: true},
+		{Name: "postSummaryEmails", Type: field.TypeBool, Default: false},
+		{Name: "useFilenameAsCaption", Type: field.TypeBool, Default: false},
 		{Name: "dismissedTips", Type: field.TypeJSON},
 		{Name: "experiments", Type: field.TypeJSON},
 		{Name: "version", Type: field.TypeInt, Default: 1},
@@ -5318,6 +5355,40 @@ var (
 		Name:       "user_preference",
 		Columns:    UserPreferenceColumns,
 		PrimaryKey: []*schema.Column{UserPreferenceColumns[0]},
+	}
+	// VideoTranscodeJobColumns holds the columns for the "video_transcode_job" table.
+	VideoTranscodeJobColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceAssetId", Type: field.TypeString},
+		{Name: "profileHash", Type: field.TypeString},
+		{Name: "profileName", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "PROCESSING", "COMPLETED", "FAILED"}, Default: "PENDING"},
+		{Name: "outputAssetId", Type: field.TypeString, Nullable: true},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "failureMessage", Type: field.TypeString, Nullable: true},
+		{Name: "durationMs", Type: field.TypeInt, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+		{Name: "completedAt", Type: field.TypeTime, Nullable: true},
+	}
+	// VideoTranscodeJobTable holds the schema information for the "video_transcode_job" table.
+	VideoTranscodeJobTable = &schema.Table{
+		Name:       "video_transcode_job",
+		Columns:    VideoTranscodeJobColumns,
+		PrimaryKey: []*schema.Column{VideoTranscodeJobColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "videotranscodejob_organizationId_sourceAssetId_profileHash",
+				Unique:  false,
+				Columns: []*schema.Column{VideoTranscodeJobColumns[1], VideoTranscodeJobColumns[2], VideoTranscodeJobColumns[3]},
+			},
+			{
+				Name:    "videotranscodejob_organizationId_status_updatedAt",
+				Unique:  false,
+				Columns: []*schema.Column{VideoTranscodeJobColumns[1], VideoTranscodeJobColumns[5], VideoTranscodeJobColumns[11]},
+			},
+		},
 	}
 	// VoiceAudioRunColumns holds the columns for the "voice_audio_run" table.
 	VoiceAudioRunColumns = []*schema.Column{
@@ -5706,6 +5777,8 @@ var (
 		{Name: "aiProviderKeyEncrypted", Type: field.TypeString, Nullable: true, Size: 2147483647},
 		{Name: "aiProviderKeyHint", Type: field.TypeString, Nullable: true},
 		{Name: "releaseReadinessEnabled", Type: field.TypeBool, Default: false},
+		{Name: "weeklyPostingGoal", Type: field.TypeInt, Nullable: true},
+		{Name: "processVideosOnServer", Type: field.TypeBool, Default: true},
 		{Name: "disabledExperiments", Type: field.TypeJSON},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -5885,7 +5958,9 @@ var (
 		SupportAccessGrantTable,
 		SurfaceCaptureTable,
 		UserTable,
+		UserAutomationEmailLogTable,
 		UserPreferenceTable,
+		VideoTranscodeJobTable,
 		VoiceAudioRunTable,
 		VoiceCommandTable,
 		VoiceMemberSettingsTable,
@@ -6409,8 +6484,14 @@ func init() {
 	UserTable.Annotation = &entsql.Annotation{
 		Table: "user",
 	}
+	UserAutomationEmailLogTable.Annotation = &entsql.Annotation{
+		Table: "user_automation_email_log",
+	}
 	UserPreferenceTable.Annotation = &entsql.Annotation{
 		Table: "user_preference",
+	}
+	VideoTranscodeJobTable.Annotation = &entsql.Annotation{
+		Table: "video_transcode_job",
 	}
 	VoiceAudioRunTable.Annotation = &entsql.Annotation{
 		Table: "voice_audio_run",

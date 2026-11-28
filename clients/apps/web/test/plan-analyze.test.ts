@@ -475,10 +475,27 @@ test('P19/P22 a brand slot sits on its own day, with the instant it names across
   assert.deepEqual(slots, [{ at: '2026-10-25T10:30:00.000Z', time: '00:30' }])
 })
 
-test('natural posting times can move a free slot four minutes either way', () => {
-  const { from, to } = naturalWindow(new Date('2026-04-01T13:15:00.000Z'))
-  assert.equal(from.toISOString(), '2026-04-01T13:11:00.000Z')
-  assert.equal(to.toISOString(), '2026-04-01T13:19:00.000Z')
+test('natural posting times default to ±10 minutes and respect configured window minutes', () => {
+  const slot = new Date('2026-04-01T13:15:00.000Z')
+  const defaultWin = naturalWindow(slot)
+  assert.equal(defaultWin.from.toISOString(), '2026-04-01T13:05:00.000Z')
+  assert.equal(defaultWin.to.toISOString(), '2026-04-01T13:25:00.000Z')
+
+  const legacyWin = naturalWindow(slot, 4)
+  assert.equal(legacyWin.from.toISOString(), '2026-04-01T13:11:00.000Z')
+  assert.equal(legacyWin.to.toISOString(), '2026-04-01T13:19:00.000Z')
+
+  const clampedWin = naturalWindow(slot, 99)
+  assert.equal(clampedWin.from.toISOString(), '2026-04-01T13:00:00.000Z')
+  assert.equal(clampedWin.to.toISOString(), '2026-04-01T13:30:00.000Z')
+
+  const minClamped = naturalWindow(slot, 0)
+  assert.equal(minClamped.from.toISOString(), '2026-04-01T13:14:00.000Z')
+  assert.equal(minClamped.to.toISOString(), '2026-04-01T13:16:00.000Z')
+
+  const nanFallback = naturalWindow(slot, Number.NaN)
+  assert.equal(nanFallback.from.toISOString(), '2026-04-01T13:05:00.000Z')
+  assert.equal(nanFallback.to.toISOString(), '2026-04-01T13:25:00.000Z')
 })
 
 test('A17 missing null and invalid series fail locally while valid zero metrics survive', () => {

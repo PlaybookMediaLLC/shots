@@ -37,7 +37,7 @@ const (
 var Jobs = []string{
 	"frontend-deployments", "tenant-outbox", "audit-drains", "communications",
 	"workspace-cleanup", "audit-retention", "scheduled-posts", "notifications",
-	"notifications-maintain", "account-deletions", "webhooks", "social-analytics",
+	"notifications-maintain", "account-deletions", "automation-reminders", "webhooks", "social-analytics",
 	"social-token-refresh", "asset-cleanup", "outbox-retention", "voice-cleanup",
 	"voice-commands", "notification-retention",
 }
@@ -47,7 +47,7 @@ var Jobs = []string{
 // maintenance.Scheduler inside product-worker so idle polling incurs no
 // Temporal Cloud Schedule actions.
 var ScheduledJobs = []string{
-	"workspace-cleanup", "account-deletions", "asset-cleanup", "voice-cleanup",
+	"workspace-cleanup", "account-deletions", "automation-reminders", "asset-cleanup", "voice-cleanup",
 	"audit-retention", "outbox-retention", "notification-retention",
 }
 
@@ -174,6 +174,9 @@ func ScheduleOptions(job string) client.ScheduleOptions {
 		catchup = 24 * time.Hour
 	case "notification-retention":
 		spec = client.ScheduleSpec{CronExpressions: []string{"5 4 * * *"}, TimeZoneName: "UTC"}
+		catchup = 24 * time.Hour
+	case "automation-reminders":
+		spec = client.ScheduleSpec{CronExpressions: []string{"0 14 * * *"}, TimeZoneName: "UTC"}
 		catchup = 24 * time.Hour
 	}
 	return client.ScheduleOptions{

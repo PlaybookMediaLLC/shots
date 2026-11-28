@@ -135,6 +135,26 @@ func (_u *ContentBatchItemUpdate) ClearDraftID() *ContentBatchItemUpdate {
 	return _u
 }
 
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *ContentBatchItemUpdate) SetProcessVideosOnServer(v bool) *ContentBatchItemUpdate {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *ContentBatchItemUpdate) SetNillableProcessVideosOnServer(v *bool) *ContentBatchItemUpdate {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
+// ClearProcessVideosOnServer clears the value of the "process_videos_on_server" field.
+func (_u *ContentBatchItemUpdate) ClearProcessVideosOnServer() *ContentBatchItemUpdate {
+	_u.mutation.ClearProcessVideosOnServer()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ContentBatchItemUpdate) SetUpdatedAt(v time.Time) *ContentBatchItemUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -230,6 +250,12 @@ func (_u *ContentBatchItemUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if _u.mutation.DraftIDCleared() {
 		_spec.ClearField(contentbatchitem.FieldDraftID, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentbatchitem.FieldProcessVideosOnServer, field.TypeBool, value)
+	}
+	if _u.mutation.ProcessVideosOnServerCleared() {
+		_spec.ClearField(contentbatchitem.FieldProcessVideosOnServer, field.TypeBool)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentbatchitem.FieldUpdatedAt, field.TypeTime, value)
@@ -359,6 +385,26 @@ func (_u *ContentBatchItemUpdateOne) ClearDraftID() *ContentBatchItemUpdateOne {
 	return _u
 }
 
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *ContentBatchItemUpdateOne) SetProcessVideosOnServer(v bool) *ContentBatchItemUpdateOne {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *ContentBatchItemUpdateOne) SetNillableProcessVideosOnServer(v *bool) *ContentBatchItemUpdateOne {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
+// ClearProcessVideosOnServer clears the value of the "process_videos_on_server" field.
+func (_u *ContentBatchItemUpdateOne) ClearProcessVideosOnServer() *ContentBatchItemUpdateOne {
+	_u.mutation.ClearProcessVideosOnServer()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ContentBatchItemUpdateOne) SetUpdatedAt(v time.Time) *ContentBatchItemUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -484,6 +530,12 @@ func (_u *ContentBatchItemUpdateOne) sqlSave(ctx context.Context) (_node *Conten
 	}
 	if _u.mutation.DraftIDCleared() {
 		_spec.ClearField(contentbatchitem.FieldDraftID, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentbatchitem.FieldProcessVideosOnServer, field.TypeBool, value)
+	}
+	if _u.mutation.ProcessVideosOnServerCleared() {
+		_spec.ClearField(contentbatchitem.FieldProcessVideosOnServer, field.TypeBool)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentbatchitem.FieldUpdatedAt, field.TypeTime, value)

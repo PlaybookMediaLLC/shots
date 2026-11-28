@@ -191,6 +191,47 @@ func (_u *WorkspaceSettingsUpdate) SetNillableReleaseReadinessEnabled(v *bool) *
 	return _u
 }
 
+// SetWeeklyPostingGoal sets the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdate) SetWeeklyPostingGoal(v int) *WorkspaceSettingsUpdate {
+	_u.mutation.ResetWeeklyPostingGoal()
+	_u.mutation.SetWeeklyPostingGoal(v)
+	return _u
+}
+
+// SetNillableWeeklyPostingGoal sets the "weekly_posting_goal" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableWeeklyPostingGoal(v *int) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetWeeklyPostingGoal(*v)
+	}
+	return _u
+}
+
+// AddWeeklyPostingGoal adds value to the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdate) AddWeeklyPostingGoal(v int) *WorkspaceSettingsUpdate {
+	_u.mutation.AddWeeklyPostingGoal(v)
+	return _u
+}
+
+// ClearWeeklyPostingGoal clears the value of the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdate) ClearWeeklyPostingGoal() *WorkspaceSettingsUpdate {
+	_u.mutation.ClearWeeklyPostingGoal()
+	return _u
+}
+
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *WorkspaceSettingsUpdate) SetProcessVideosOnServer(v bool) *WorkspaceSettingsUpdate {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdate) SetNillableProcessVideosOnServer(v *bool) *WorkspaceSettingsUpdate {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
 // SetDisabledExperiments sets the "disabled_experiments" field.
 func (_u *WorkspaceSettingsUpdate) SetDisabledExperiments(v []string) *WorkspaceSettingsUpdate {
 	_u.mutation.SetDisabledExperiments(v)
@@ -303,6 +344,18 @@ func (_u *WorkspaceSettingsUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.WeeklyPostingGoal(); ok {
+		_spec.SetField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyPostingGoal(); ok {
+		_spec.AddField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt, value)
+	}
+	if _u.mutation.WeeklyPostingGoalCleared() {
+		_spec.ClearField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(workspacesettings.FieldProcessVideosOnServer, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)
@@ -497,6 +550,47 @@ func (_u *WorkspaceSettingsUpdateOne) SetNillableReleaseReadinessEnabled(v *bool
 	return _u
 }
 
+// SetWeeklyPostingGoal sets the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdateOne) SetWeeklyPostingGoal(v int) *WorkspaceSettingsUpdateOne {
+	_u.mutation.ResetWeeklyPostingGoal()
+	_u.mutation.SetWeeklyPostingGoal(v)
+	return _u
+}
+
+// SetNillableWeeklyPostingGoal sets the "weekly_posting_goal" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableWeeklyPostingGoal(v *int) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetWeeklyPostingGoal(*v)
+	}
+	return _u
+}
+
+// AddWeeklyPostingGoal adds value to the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdateOne) AddWeeklyPostingGoal(v int) *WorkspaceSettingsUpdateOne {
+	_u.mutation.AddWeeklyPostingGoal(v)
+	return _u
+}
+
+// ClearWeeklyPostingGoal clears the value of the "weekly_posting_goal" field.
+func (_u *WorkspaceSettingsUpdateOne) ClearWeeklyPostingGoal() *WorkspaceSettingsUpdateOne {
+	_u.mutation.ClearWeeklyPostingGoal()
+	return _u
+}
+
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_u *WorkspaceSettingsUpdateOne) SetProcessVideosOnServer(v bool) *WorkspaceSettingsUpdateOne {
+	_u.mutation.SetProcessVideosOnServer(v)
+	return _u
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_u *WorkspaceSettingsUpdateOne) SetNillableProcessVideosOnServer(v *bool) *WorkspaceSettingsUpdateOne {
+	if v != nil {
+		_u.SetProcessVideosOnServer(*v)
+	}
+	return _u
+}
+
 // SetDisabledExperiments sets the "disabled_experiments" field.
 func (_u *WorkspaceSettingsUpdateOne) SetDisabledExperiments(v []string) *WorkspaceSettingsUpdateOne {
 	_u.mutation.SetDisabledExperiments(v)
@@ -639,6 +733,18 @@ func (_u *WorkspaceSettingsUpdateOne) sqlSave(ctx context.Context) (_node *Works
 	}
 	if value, ok := _u.mutation.ReleaseReadinessEnabled(); ok {
 		_spec.SetField(workspacesettings.FieldReleaseReadinessEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.WeeklyPostingGoal(); ok {
+		_spec.SetField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyPostingGoal(); ok {
+		_spec.AddField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt, value)
+	}
+	if _u.mutation.WeeklyPostingGoalCleared() {
+		_spec.ClearField(workspacesettings.FieldWeeklyPostingGoal, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(workspacesettings.FieldProcessVideosOnServer, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DisabledExperiments(); ok {
 		_spec.SetField(workspacesettings.FieldDisabledExperiments, field.TypeJSON, value)

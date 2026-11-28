@@ -428,6 +428,9 @@ func (_u *ScheduledPostUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.ScheduleIntentCleared() {
 		_spec.ClearField(scheduledpost.FieldScheduleIntent, field.TypeString)
 	}
+	if _u.mutation.PublishGroupIDCleared() {
+		_spec.ClearField(scheduledpost.FieldPublishGroupID, field.TypeString)
+	}
 	if value, ok := _u.mutation.FailureCode(); ok {
 		_spec.SetField(scheduledpost.FieldFailureCode, field.TypeString, value)
 	}
@@ -938,6 +941,9 @@ func (_u *ScheduledPostUpdateOne) sqlSave(ctx context.Context) (_node *Scheduled
 	}
 	if _u.mutation.ScheduleIntentCleared() {
 		_spec.ClearField(scheduledpost.FieldScheduleIntent, field.TypeString)
+	}
+	if _u.mutation.PublishGroupIDCleared() {
+		_spec.ClearField(scheduledpost.FieldPublishGroupID, field.TypeString)
 	}
 	if value, ok := _u.mutation.FailureCode(); ok {
 		_spec.SetField(scheduledpost.FieldFailureCode, field.TypeString, value)

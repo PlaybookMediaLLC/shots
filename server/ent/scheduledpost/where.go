@@ -160,6 +160,11 @@ func ScheduleIntent(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldScheduleIntent, v))
 }
 
+// PublishGroupID applies equality check predicate on the "publish_group_id" field. It's identical to PublishGroupIDEQ.
+func PublishGroupID(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldPublishGroupID, v))
+}
+
 // FailureCode applies equality check predicate on the "failure_code" field. It's identical to FailureCodeEQ.
 func FailureCode(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldFailureCode, v))
@@ -1533,6 +1538,81 @@ func ScheduleIntentEqualFold(v string) predicate.ScheduledPost {
 // ScheduleIntentContainsFold applies the ContainsFold predicate on the "schedule_intent" field.
 func ScheduleIntentContainsFold(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldContainsFold(FieldScheduleIntent, v))
+}
+
+// PublishGroupIDEQ applies the EQ predicate on the "publish_group_id" field.
+func PublishGroupIDEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDNEQ applies the NEQ predicate on the "publish_group_id" field.
+func PublishGroupIDNEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDIn applies the In predicate on the "publish_group_id" field.
+func PublishGroupIDIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldPublishGroupID, vs...))
+}
+
+// PublishGroupIDNotIn applies the NotIn predicate on the "publish_group_id" field.
+func PublishGroupIDNotIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldPublishGroupID, vs...))
+}
+
+// PublishGroupIDGT applies the GT predicate on the "publish_group_id" field.
+func PublishGroupIDGT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDGTE applies the GTE predicate on the "publish_group_id" field.
+func PublishGroupIDGTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDLT applies the LT predicate on the "publish_group_id" field.
+func PublishGroupIDLT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDLTE applies the LTE predicate on the "publish_group_id" field.
+func PublishGroupIDLTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDContains applies the Contains predicate on the "publish_group_id" field.
+func PublishGroupIDContains(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContains(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDHasPrefix applies the HasPrefix predicate on the "publish_group_id" field.
+func PublishGroupIDHasPrefix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasPrefix(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDHasSuffix applies the HasSuffix predicate on the "publish_group_id" field.
+func PublishGroupIDHasSuffix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasSuffix(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDIsNil applies the IsNil predicate on the "publish_group_id" field.
+func PublishGroupIDIsNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIsNull(FieldPublishGroupID))
+}
+
+// PublishGroupIDNotNil applies the NotNil predicate on the "publish_group_id" field.
+func PublishGroupIDNotNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotNull(FieldPublishGroupID))
+}
+
+// PublishGroupIDEqualFold applies the EqualFold predicate on the "publish_group_id" field.
+func PublishGroupIDEqualFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEqualFold(FieldPublishGroupID, v))
+}
+
+// PublishGroupIDContainsFold applies the ContainsFold predicate on the "publish_group_id" field.
+func PublishGroupIDContainsFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContainsFold(FieldPublishGroupID, v))
 }
 
 // FailureCodeEQ applies the EQ predicate on the "failure_code" field.

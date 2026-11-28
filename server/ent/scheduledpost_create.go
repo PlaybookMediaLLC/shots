@@ -352,6 +352,20 @@ func (_c *ScheduledPostCreate) SetNillableScheduleIntent(v *string) *ScheduledPo
 	return _c
 }
 
+// SetPublishGroupID sets the "publish_group_id" field.
+func (_c *ScheduledPostCreate) SetPublishGroupID(v string) *ScheduledPostCreate {
+	_c.mutation.SetPublishGroupID(v)
+	return _c
+}
+
+// SetNillablePublishGroupID sets the "publish_group_id" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillablePublishGroupID(v *string) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetPublishGroupID(*v)
+	}
+	return _c
+}
+
 // SetFailureCode sets the "failure_code" field.
 func (_c *ScheduledPostCreate) SetFailureCode(v string) *ScheduledPostCreate {
 	_c.mutation.SetFailureCode(v)
@@ -697,6 +711,10 @@ func (_c *ScheduledPostCreate) createSpec() (*ScheduledPost, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.ScheduleIntent(); ok {
 		_spec.SetField(scheduledpost.FieldScheduleIntent, field.TypeString, value)
 		_node.ScheduleIntent = &value
+	}
+	if value, ok := _c.mutation.PublishGroupID(); ok {
+		_spec.SetField(scheduledpost.FieldPublishGroupID, field.TypeString, value)
+		_node.PublishGroupID = &value
 	}
 	if value, ok := _c.mutation.FailureCode(); ok {
 		_spec.SetField(scheduledpost.FieldFailureCode, field.TypeString, value)

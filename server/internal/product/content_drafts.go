@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
@@ -757,9 +758,18 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if err = recordDiscussionActivity(ctx, tx, actor, &ent.ContentDraft{ID: draftID, Discussions: map[string]any{}}, discussions); err != nil {
 		return nil, err
 	}
+	processVideos := true
+	ws, wsErr := tx.WorkspaceSettings.Query().Where(workspacesettings.ID(actor.OrganizationID)).Only(ctx)
+	if wsErr != nil && !ent.IsNotFound(wsErr) {
+		return nil, wsErr
+	}
+	if ws != nil {
+		processVideos = ws.ProcessVideosOnServer
+	}
 	create := tx.ContentDraft.Create().SetID(draftID).SetOrganizationID(actor.OrganizationID).SetTitle(title).
 		SetBody(body).SetPlainText(text).SetAssetIds(assets).SetChannelConnectionIds(channels).SetDiscussions(discussions).SetChannelText(channelText).
 		SetSocialSetID(set.ID).SetPrimaryPlatform(primary).SetNaturalPostingTime(set.NaturalPostingTimes).
+		SetProcessVideosOnServer(processVideos).
 		SetEngagement(set.EngagementDefaults).
 		SetKind(contentdraft.Kind(kind)).SetPlatformVersions(versions).SetScratchpad(scratchpad).SetTagIds(tags).
 		SetNillableCreatedByUserID(projectActor(actor)).SetNillableUpdatedByUserID(projectActor(actor))

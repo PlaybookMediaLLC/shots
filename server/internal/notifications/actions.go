@@ -16,7 +16,7 @@ type ChannelDecision struct {
 	Reason  string `json:"reason"`
 }
 
-func effectiveSettings(p Policy, pref Preferences, emailAvailable bool, connections []SlackConnection, personalSlack ...*SlackConnection) map[string]map[string]ChannelDecision {
+func effectiveSettings(p Policy, pref Preferences, emailAvailable bool, emailPrefs UserEmailPreferences, connections []SlackConnection, personalSlack ...*SlackConnection) map[string]map[string]ChannelDecision {
 	result := map[string]map[string]ChannelDecision{}
 	connected := false
 	for _, c := range connections {
@@ -36,6 +36,12 @@ func effectiveSettings(p Policy, pref Preferences, emailAvailable bool, connecti
 				reason = "This activity is private to its recipients."
 			case ch == "in_app" && !pol.InApp || ch == "email" && !pol.Email || ch == "slack" && !pol.Slack:
 				reason = "Disabled by workspace policy."
+			case ch == "email" && !emailPrefs.EmailNotifications:
+				reason = "Email notifications are turned off in your preferences."
+			case ch == "email" && d.MandatoryFailure && !emailPrefs.PostFailureAlerts:
+				reason = "Post failure alerts are turned off in your email preferences."
+			case ch == "email" && d.ID == "post.publish_summary" && !emailPrefs.PostSummaryEmails:
+				reason = "Post summary emails are turned off in your email preferences."
 			case !d.MandatoryFailure && (ch == "in_app" && !personal.InApp || ch == "email" && !personal.Email):
 				reason = "Disabled in your preferences."
 			case ch == "email" && !emailAvailable:

@@ -40,7 +40,10 @@ export function LibraryAssetPicker({
   channel?: DraftChannel
   onClose: () => void
   /** The picked assets, in the order they were picked. */
-  onInsert: (nodes: ReturnType<typeof draftAssetNode>[]) => void
+  onInsert: (
+    nodes: ReturnType<typeof draftAssetNode>[],
+    picked?: readonly { fileName?: string | null; mediaType: string }[]
+  ) => void
 }) {
   const trpc = useTRPC()
   const client = useTRPCClient()
@@ -87,7 +90,7 @@ export function LibraryAssetPicker({
           throw failure
         }
       }
-      onInsert(picked.map(draftAssetNode))
+      onInsert(picked.map(draftAssetNode), picked)
       onClose()
     } catch (failure) {
       setError(

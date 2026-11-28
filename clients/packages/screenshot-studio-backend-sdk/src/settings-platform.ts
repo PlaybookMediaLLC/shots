@@ -5,11 +5,14 @@ import { z } from 'zod'
 export type UserPreferences = {
   /** Empty uses the standard palette. */
   accentColor: string
+  automationEmails: boolean
   developerMode: boolean
   dismissedTips: string[]
   emailNotifications: boolean
   experiments: Record<string, boolean>
   navigation: 'compact' | 'dynamic' | 'expanded'
+  postFailureAlerts: boolean
+  postSummaryEmails: boolean
   showScrollbars: boolean
   textDirection: 'ltr' | 'rtl'
   theme: 'light' | 'dark' | 'system'
@@ -18,6 +21,7 @@ export type UserPreferences = {
   /** The display time zone; null follows the browser. */
   timeZone: string | null
   updatedAt: string | null
+  useFilenameAsCaption: boolean
   version: number
   weekStart: 'monday' | 'sunday'
 }
@@ -25,12 +29,15 @@ export type UserPreferences = {
 /** Changes the fields set; `baseVersion` refuses a stale save with 409. */
 export type UserPreferencesUpdate = {
   accentColor?: string
+  automationEmails?: boolean
   baseVersion?: number
   developerMode?: boolean
   dismissTip?: string
   emailNotifications?: boolean
   experiments?: Record<string, boolean>
   navigation?: UserPreferences['navigation']
+  postFailureAlerts?: boolean
+  postSummaryEmails?: boolean
   resetTips?: boolean
   showScrollbars?: boolean
   textDirection?: UserPreferences['textDirection']
@@ -38,7 +45,31 @@ export type UserPreferencesUpdate = {
   timeFormat?: UserPreferences['timeFormat']
   /** An empty string follows the browser. */
   timeZone?: string
+  useFilenameAsCaption?: boolean
   weekStart?: UserPreferences['weekStart']
+}
+
+/** Result of signing out of all browser sessions and OAuth tokens atomically. */
+export type RevokeAllSessionsResult = {
+  revokedSessions: number
+  revokedOAuthTokens: number
+}
+
+/** Current-week publishing progress against the workspace weekly posting goal. */
+export type WeeklyGoalProgress = {
+  goal: number | null
+  publishedCount: number
+  scheduledCount: number
+  totalCount: number
+  weekStart: string
+  weekEnd: string
+  timeZone: string
+}
+
+/** Partial workspace publishing settings update (weekly goal and server video processing). */
+export type UpdateWorkspacePublishingSettingsInput = {
+  weeklyPostingGoal?: number | null
+  processVideosOnServer?: boolean
 }
 
 /** One experiment as a person sees it in a workspace. */
@@ -167,6 +198,7 @@ export type SocialSet = {
   isOwner: boolean
   name: string
   naturalPostingTimes: boolean
+  naturalPostingWindowMinutes: number
   needsAttention: boolean
   ownerUserId: string | null
   postingSlots: QueueSlot[]
@@ -204,6 +236,7 @@ export type SocialSetUpdate = {
   engagementDefaults?: Engagement
   name?: string
   naturalPostingTimes?: boolean
+  naturalPostingWindowMinutes?: number
   postingSlots?: QueueSlot[]
   /** An empty string clears it. */
   primaryPlatform?: string

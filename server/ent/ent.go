@@ -180,7 +180,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/supportaccessgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userautomationemaillog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/videotranscodejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
@@ -422,7 +424,9 @@ func checkColumn(t, c string) error {
 			supportaccessgrant.Table:              supportaccessgrant.ValidColumn,
 			surfacecapture.Table:                  surfacecapture.ValidColumn,
 			user.Table:                            user.ValidColumn,
+			userautomationemaillog.Table:          userautomationemaillog.ValidColumn,
 			userpreference.Table:                  userpreference.ValidColumn,
+			videotranscodejob.Table:               videotranscodejob.ValidColumn,
 			voiceaudiorun.Table:                   voiceaudiorun.ValidColumn,
 			voicecommand.Table:                    voicecommand.ValidColumn,
 			voicemembersettings.Table:             voicemembersettings.ValidColumn,

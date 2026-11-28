@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { z } from 'zod'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -63,6 +64,9 @@ export function BulkScheduleDialog({
   const set = data.activeSet
   const [timeValid, setTimeValid] = useState(true)
   const [mode, setMode] = useState<'queue' | 'spread'>(initialMode)
+  const [naturalPostingTime, setNaturalPostingTime] = useState(
+    Boolean(set?.naturalPostingTimes && data.advancedScheduling)
+  )
   // A run started from the composer continues where the last post left off,
   // at the gap this session has been using; otherwise tomorrow morning. The
   // dialog only ever opens in the browser, so reading the session here is safe.
@@ -143,7 +147,7 @@ export function BulkScheduleDialog({
           row.input = {
             channelConnectionIds: draft.channelConnectionIds,
             version: draft.version,
-            naturalPostingTime: false,
+            naturalPostingTime,
             ...(mode === 'queue'
               ? { queue: true, expectedQueueSlot: row.at }
               : { scheduledFor: row.at }),
@@ -305,6 +309,18 @@ export function BulkScheduleDialog({
                 </Label>
               </div>
             )}
+            {data.advancedScheduling ? (
+              <Label className="flex items-center gap-2 text-sm font-normal">
+                <Checkbox
+                  checked={naturalPostingTime}
+                  disabled={busy}
+                  onCheckedChange={(checked) => setNaturalPostingTime(checked === true)}
+                />
+                <span>
+                  Randomize posting time (±{set?.naturalPostingWindowMinutes ?? 10} min)
+                </span>
+              </Label>
+            ) : null}
             <Button
               disabled={busy || (mode === 'spread' && !timeValid) || selected.length > 50}
               onClick={() => void preview()}
@@ -322,7 +338,7 @@ export function BulkScheduleDialog({
                     {index + 1}. {row.title}
                   </strong>
                   <p>
-                    {new Date(row.at).toLocaleString(undefined, { timeZone: set?.timeZone })} ·{' '}
+                    <LocalTime options={WHEN_STYLE} value={row.at} zone={set?.timeZone} /> ·{' '}
                     {row.status}
                   </p>
                   {row.destinations.length > 0 ? (

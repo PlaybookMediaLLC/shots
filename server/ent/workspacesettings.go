@@ -38,6 +38,10 @@ type WorkspaceSettings struct {
 	AiProviderKeyHint *string `json:"ai_provider_key_hint,omitempty"`
 	// ReleaseReadinessEnabled holds the value of the "release_readiness_enabled" field.
 	ReleaseReadinessEnabled bool `json:"release_readiness_enabled,omitempty"`
+	// WeeklyPostingGoal holds the value of the "weekly_posting_goal" field.
+	WeeklyPostingGoal *int `json:"weekly_posting_goal,omitempty"`
+	// ProcessVideosOnServer holds the value of the "process_videos_on_server" field.
+	ProcessVideosOnServer bool `json:"process_videos_on_server,omitempty"`
 	// DisabledExperiments holds the value of the "disabled_experiments" field.
 	DisabledExperiments []string `json:"disabled_experiments,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -54,8 +58,10 @@ func (*WorkspaceSettings) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workspacesettings.FieldAiModelDefaults, workspacesettings.FieldDisabledExperiments:
 			values[i] = new([]byte)
-		case workspacesettings.FieldAiAgentEnabled, workspacesettings.FieldReleaseReadinessEnabled:
+		case workspacesettings.FieldAiAgentEnabled, workspacesettings.FieldReleaseReadinessEnabled, workspacesettings.FieldProcessVideosOnServer:
 			values[i] = new(sql.NullBool)
+		case workspacesettings.FieldWeeklyPostingGoal:
+			values[i] = new(sql.NullInt64)
 		case workspacesettings.FieldID, workspacesettings.FieldDescription, workspacesettings.FieldLocale, workspacesettings.FieldTimeZone, workspacesettings.FieldDefaultPublishTime, workspacesettings.FieldAiInstructions, workspacesettings.FieldAiProviderKeyEncrypted, workspacesettings.FieldAiProviderKeyHint:
 			values[i] = new(sql.NullString)
 		case workspacesettings.FieldCreatedAt, workspacesettings.FieldUpdatedAt:
@@ -147,6 +153,19 @@ func (_m *WorkspaceSettings) assignValues(columns []string, values []any) error 
 			} else if value.Valid {
 				_m.ReleaseReadinessEnabled = value.Bool
 			}
+		case workspacesettings.FieldWeeklyPostingGoal:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_posting_goal", values[i])
+			} else if value.Valid {
+				_m.WeeklyPostingGoal = new(int)
+				*_m.WeeklyPostingGoal = int(value.Int64)
+			}
+		case workspacesettings.FieldProcessVideosOnServer:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field process_videos_on_server", values[i])
+			} else if value.Valid {
+				_m.ProcessVideosOnServer = value.Bool
+			}
 		case workspacesettings.FieldDisabledExperiments:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field disabled_experiments", values[i])
@@ -237,6 +256,14 @@ func (_m *WorkspaceSettings) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("release_readiness_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseReadinessEnabled))
+	builder.WriteString(", ")
+	if v := _m.WeeklyPostingGoal; v != nil {
+		builder.WriteString("weekly_posting_goal=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("process_videos_on_server=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ProcessVideosOnServer))
 	builder.WriteString(", ")
 	builder.WriteString("disabled_experiments=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DisabledExperiments))

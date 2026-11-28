@@ -1,6 +1,7 @@
 'use client'
 
 import { Group, PlanRequired, Row } from '@/components/platform-ui'
+import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { useSocialSets } from '@/components/settings/social-sets/api'
 import { NotificationPreferenceTable } from '@/components/settings/NotificationPreferenceTable'
@@ -11,10 +12,9 @@ import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { SettingsRequestError, settingsErrorMessage } from '@/lib/settings/client'
 
 /**
- * The email master switch (RFC 024). It is a personal preference, so it holds
- * in every workspace; off, no activity email reaches you, while sign-in,
- * invitation and security messages still do. It saves with the page's other
- * preferences.
+ * Promoted Email Preferences card:
+ * - Master email switch (saves with the notification preferences bar below)
+ * - Automation emails, Post failure alerts, and Post summary emails (save immediately)
  */
 export function EmailSwitch({
   checked,
@@ -25,7 +25,12 @@ export function EmailSwitch({
   disabled?: boolean
   onCheckedChange: (checked: boolean) => void
 }) {
-  const { status } = usePreferences()
+  const { preferences, save, status } = usePreferences()
+  const [automationState, runAutomation] = useSaveState()
+  const [failureState, runFailure] = useSaveState()
+  const [summaryState, runSummary] = useSaveState()
+  const ready = status === 'ready' && preferences !== null
+
   return (
     <Group>
       <Row
@@ -39,9 +44,66 @@ export function EmailSwitch({
           onCheckedChange={onCheckedChange}
         />
       </Row>
+      <Row
+        description="Receive helpful reminders about quiet queues, unscheduled drafts, and workspace automations. Includes a one-click unsubscribe link in every message."
+        label={
+          <span className="flex items-center gap-2">
+            Automation emails <SaveStatus state={automationState} />
+          </span>
+        }
+      >
+        <Switch
+          aria-label="Automation emails"
+          checked={preferences?.automationEmails ?? true}
+          disabled={!ready}
+          onCheckedChange={(automationEmails) =>
+            void runAutomation(() => save({ automationEmails }))
+          }
+        />
+      </Row>
+      <Row
+        description="Receive an email alert whenever a scheduled post fails to publish or needs attention. In-app alerts always remain on."
+        label={
+          <span className="flex items-center gap-2">
+            Post failure alerts <SaveStatus state={failureState} />
+          </span>
+        }
+      >
+        <Switch
+          aria-label="Post failure alerts"
+          checked={preferences?.postFailureAlerts ?? true}
+          disabled={!ready}
+          onCheckedChange={(postFailureAlerts) =>
+            void runFailure(() => save({ postFailureAlerts }))
+          }
+        />
+      </Row>
+      <Row
+        description="Receive a single combined email summarizing published and failed platforms once all destinations for a post finish settling."
+        label={
+          <span className="flex items-center gap-2">
+            Post summary emails <SaveStatus state={summaryState} />
+          </span>
+        }
+      >
+        <Switch
+          aria-label="Post summary emails"
+          checked={preferences?.postSummaryEmails ?? false}
+          disabled={!ready}
+          onCheckedChange={(postSummaryEmails) =>
+            void runSummary(() => save({ postSummaryEmails }))
+          }
+        />
+      </Row>
+      {!checked ? (
+        <p className="px-5 pb-4 text-xs text-muted-foreground" role="status">
+          Master email notifications are turned off, so activity emails (including post failure
+          alerts and post summaries) are paused until you turn them back on.
+        </p>
+      ) : null}
       {status === 'error' ? (
         <p className="px-5 pb-4 text-sm text-red-700 dark:text-red-300" role="alert">
-          Your email setting could not be loaded. Reload the page to try again.
+          Your email settings could not be loaded. Reload the page to try again.
         </p>
       ) : null}
     </Group>

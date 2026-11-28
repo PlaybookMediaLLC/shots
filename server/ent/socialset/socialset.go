@@ -31,6 +31,8 @@ const (
 	FieldPostingSlots = "postingSlots"
 	// FieldNaturalPostingTimes holds the string denoting the natural_posting_times field in the database.
 	FieldNaturalPostingTimes = "naturalPostingTimes"
+	// FieldNaturalPostingWindowMinutes holds the string denoting the natural_posting_window_minutes field in the database.
+	FieldNaturalPostingWindowMinutes = "naturalPostingWindowMinutes"
 	// FieldDefaultPlatforms holds the string denoting the default_platforms field in the database.
 	FieldDefaultPlatforms = "defaultPlatforms"
 	// FieldPrimaryPlatform holds the string denoting the primary_platform field in the database.
@@ -68,6 +70,7 @@ var Columns = []string{
 	FieldTimeZone,
 	FieldPostingSlots,
 	FieldNaturalPostingTimes,
+	FieldNaturalPostingWindowMinutes,
 	FieldDefaultPlatforms,
 	FieldPrimaryPlatform,
 	FieldEngagementDefaults,
@@ -100,6 +103,10 @@ var (
 	DefaultPostingSlots []schema.QueueSlot
 	// DefaultNaturalPostingTimes holds the default value on creation for the "natural_posting_times" field.
 	DefaultNaturalPostingTimes bool
+	// DefaultNaturalPostingWindowMinutes holds the default value on creation for the "natural_posting_window_minutes" field.
+	DefaultNaturalPostingWindowMinutes int
+	// NaturalPostingWindowMinutesValidator is a validator for the "natural_posting_window_minutes" field. It is called by the builders before save.
+	NaturalPostingWindowMinutesValidator func(int) error
 	// DefaultDefaultPlatforms holds the default value on creation for the "default_platforms" field.
 	DefaultDefaultPlatforms []string
 	// DefaultEngagementDefaults holds the default value on creation for the "engagement_defaults" field.
@@ -185,6 +192,11 @@ func ByTimeZone(opts ...sql.OrderTermOption) OrderOption {
 // ByNaturalPostingTimes orders the results by the natural_posting_times field.
 func ByNaturalPostingTimes(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNaturalPostingTimes, opts...).ToFunc()
+}
+
+// ByNaturalPostingWindowMinutes orders the results by the natural_posting_window_minutes field.
+func ByNaturalPostingWindowMinutes(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNaturalPostingWindowMinutes, opts...).ToFunc()
 }
 
 // ByPrimaryPlatform orders the results by the primary_platform field.

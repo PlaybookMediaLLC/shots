@@ -117,6 +117,20 @@ func (_c *ContentBatchItemCreate) SetNillableDraftID(v *string) *ContentBatchIte
 	return _c
 }
 
+// SetProcessVideosOnServer sets the "process_videos_on_server" field.
+func (_c *ContentBatchItemCreate) SetProcessVideosOnServer(v bool) *ContentBatchItemCreate {
+	_c.mutation.SetProcessVideosOnServer(v)
+	return _c
+}
+
+// SetNillableProcessVideosOnServer sets the "process_videos_on_server" field if the given value is not nil.
+func (_c *ContentBatchItemCreate) SetNillableProcessVideosOnServer(v *bool) *ContentBatchItemCreate {
+	if v != nil {
+		_c.SetProcessVideosOnServer(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ContentBatchItemCreate) SetCreatedAt(v time.Time) *ContentBatchItemCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -324,6 +338,10 @@ func (_c *ContentBatchItemCreate) createSpec() (*ContentBatchItem, *sqlgraph.Cre
 	if value, ok := _c.mutation.DraftID(); ok {
 		_spec.SetField(contentbatchitem.FieldDraftID, field.TypeString, value)
 		_node.DraftID = &value
+	}
+	if value, ok := _c.mutation.ProcessVideosOnServer(); ok {
+		_spec.SetField(contentbatchitem.FieldProcessVideosOnServer, field.TypeBool, value)
+		_node.ProcessVideosOnServer = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(contentbatchitem.FieldCreatedAt, field.TypeTime, value)

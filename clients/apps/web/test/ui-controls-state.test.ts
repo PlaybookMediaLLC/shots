@@ -411,17 +411,21 @@ test('queued preferences retain later intent when the first save fails', async (
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   const initial: import('@/components/settings/PreferencesProvider').Preferences = {
     accentColor: '#123456',
+    automationEmails: true,
     developerMode: false,
     dismissedTips: [],
     emailNotifications: true,
     experiments: {},
     navigation: 'expanded',
+    postFailureAlerts: true,
+    postSummaryEmails: false,
     showScrollbars: false,
     textDirection: 'ltr',
     theme: 'system',
     timeFormat: 'auto',
     timeZone: null,
     updatedAt: null,
+    useFilenameAsCaption: false,
     version: 1,
     weekStart: 'monday',
   }

@@ -41,12 +41,14 @@ import {
 import { Editor, EditorContainer, EditorStatic, Toolbar, ToolbarButton } from '@shots/platejs-editor/ui'
 import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
 import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
+import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { useKeys } from '@/components/write/shortcuts'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
 import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
 import { socialMentionMarkdownRules } from '@/lib/editor/services'
 import { cn } from '@/lib/utils'
+import { filenameCaptionIfEligible } from '@/lib/write/filename-caption'
 import { POST_COLUMN } from './layout'
 import { OverLimitPlugin } from './over-limit'
 import {
@@ -446,6 +448,7 @@ function DraftToolbar({
   extras?: DraftEditorProps['toolbarExtras']
 }) {
   const keys = useKeys()
+  const useFilenameAsCaption = usePreferences().preferences?.useFilenameAsCaption ?? false
   const importDocument = async (file: File) => {
     try {
       // DOCX support (mammoth, the Word writer) loads on first use.
@@ -513,6 +516,16 @@ function DraftToolbar({
         label="Insert media"
         tooltip={`Image or video (${keys.label({ key: 'i', mod: true, shift: true })})`}
         onFile={(file) => {
+          const derived = filenameCaptionIfEligible({
+            currentCaption: editor.api.string([]),
+            enabled: useFilenameAsCaption,
+            fileName: file.name,
+            mimeType: file.type,
+          })
+          if (derived) {
+            if (!editor.selection) editor.tf.select(editor.api.start([]))
+            editor.tf.insertText(derived)
+          }
           // The media plugin takes a FileList, as from a drop or a picker.
           if (!editor.selection) editor.tf.select(editor.api.end([]))
           const files = new DataTransfer()
@@ -595,6 +608,7 @@ function DraftEditorSession({
 }: DraftEditorProps & { onRetry: () => void; takeIssued: () => DraftCollaboration['issued'] }) {
   // Read once: later saves must not re-seed the plugin and reset its state.
   const [initialDiscussions] = React.useState(storedDiscussions)
+  const useFilenameAsCaption = usePreferences().preferences?.useFilenameAsCaption ?? false
   const withAI = Boolean(services.ai) && !readOnly
   const plugins = React.useMemo(() => {
     const live = collaboration
@@ -926,6 +940,22 @@ function DraftEditorSession({
                     event.stopPropagation()
                     const range = editor.api.findEventRange(event)
                     if (range) editor.tf.select(range)
+                    if (useFilenameAsCaption) {
+                      const currentCaption = editor.api.string([])
+                      for (const dropped of Array.from(event.dataTransfer.files)) {
+                        const derived = filenameCaptionIfEligible({
+                          currentCaption,
+                          enabled: useFilenameAsCaption,
+                          fileName: dropped.name,
+                          mimeType: dropped.type,
+                        })
+                        if (derived) {
+                          if (!editor.selection) editor.tf.select(editor.api.start([]))
+                          editor.tf.insertText(derived)
+                          break
+                        }
+                      }
+                    }
                     editor.getTransforms(PlaceholderPlugin).insert.media(event.dataTransfer.files)
                   }}
                   aria-label="Draft body"

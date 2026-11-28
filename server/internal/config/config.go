@@ -57,6 +57,19 @@ type Orchestrator struct {
 	WorkerConcurrencyDivider int
 }
 
+// EmailUnsubscribeSecret returns the HMAC signing secret for automation email
+// one-click unsubscribe links. Both product-worker (signer) and product-api
+// (verifier) share this single lookup so keys never diverge; it never falls
+// back to internal service bearer tokens.
+func EmailUnsubscribeSecret() string {
+	for _, key := range []string{"EMAIL_UNSUBSCRIBE_SECRET", "BETTER_AUTH_SECRET"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func LoadBackend() (Backend, error) {
 	common, err := loadCommon(8080)
 	if err != nil {
@@ -152,7 +165,8 @@ func LoadOrchestrator() (Orchestrator, error) {
 	return cfg, nil
 }
 
-func loadTemporal() (Temporal, error) {
+// LoadTemporal reads Temporal connection settings from the environment with strict boolean parsing.
+func LoadTemporal() (Temporal, error) {
 	tlsEnabled, err := envBool("TEMPORAL_TLS", false)
 	if err != nil {
 		return Temporal{}, err
@@ -165,6 +179,10 @@ func loadTemporal() (Temporal, error) {
 		TLS:               tlsEnabled,
 		WorkflowTaskQueue: envString("TEMPORAL_TASK_QUEUE", "main"),
 	}, nil
+}
+
+func loadTemporal() (Temporal, error) {
+	return LoadTemporal()
 }
 
 func envBool(name string, fallback bool) (bool, error) {

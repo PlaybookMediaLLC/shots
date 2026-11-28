@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1.7
+# Isolated container image for server-side video normalization (cmd/video-worker).
+# Keeps FFmpeg/C libraries completely separated from the product API, database
+# credentials, and social provider tokens.
+FROM golang:1.26-alpine AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/video-worker ./cmd/video-worker
+
+FROM alpine:3.21
+RUN apk add --no-cache ffmpeg ca-certificates tzdata && \
+    adduser -D -u 65532 -H nonroot
+COPY --from=build /out/video-worker /video-worker
+USER nonroot:nonroot
+ENV TZ=UTC FFMPEG_PATH=/usr/bin/ffmpeg
+ENTRYPOINT ["/video-worker"]

@@ -8725,6 +8725,7 @@ export interface operations {
                             isOwner: boolean;
                             name: string;
                             naturalPostingTimes: boolean;
+                            naturalPostingWindowMinutes: number;
                             needsAttention: boolean;
                             ownerUserId: string | null;
                             postingSlots: {
@@ -8856,6 +8857,7 @@ export interface operations {
                     }[];
                     timeZone?: string;
                     naturalPostingTimes?: boolean;
+                    naturalPostingWindowMinutes?: number;
                 };
             };
         };
@@ -8918,6 +8920,7 @@ export interface operations {
                         isOwner: boolean;
                         name: string;
                         naturalPostingTimes: boolean;
+                        naturalPostingWindowMinutes: number;
                         needsAttention: boolean;
                         ownerUserId: string | null;
                         postingSlots: {
@@ -9150,6 +9153,7 @@ export interface operations {
                         isOwner: boolean;
                         name: string;
                         naturalPostingTimes: boolean;
+                        naturalPostingWindowMinutes: number;
                         needsAttention: boolean;
                         ownerUserId: string | null;
                         postingSlots: {

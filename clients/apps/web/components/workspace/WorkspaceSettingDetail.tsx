@@ -31,6 +31,14 @@ const IntegrationCatalog = dynamic(() =>
 const NewTeamSettings = dynamic(() =>
   import('@/components/settings/NewTeamSettings').then((m) => m.NewTeamSettings)
 )
+const PublishingPreferencesSettings = dynamic(() =>
+  import('@/components/settings/PublishingPreferencesSettings').then(
+    (m) => m.PublishingPreferencesSettings
+  )
+)
+const QueueScheduleSettings = dynamic(() =>
+  import('@/components/settings/QueueScheduleSettings').then((m) => m.QueueScheduleSettings)
+)
 const SocialSetList = dynamic(() =>
   import('@/components/settings/social-sets/SocialSetList').then((m) => m.SocialSetList)
 )
@@ -180,6 +188,19 @@ const SETTINGS_CONTENT = {
     </>
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
+  'queue-schedule': ({ can, organization }) => (
+    <QueueScheduleSettings
+      canManage={can('workspace:update') && can('connection:manage')}
+      weeklyPostingGoal={organization.workspaceSettings?.weeklyPostingGoal ?? null}
+    />
+  ),
+  'publishing-preferences': ({ can, organization }) => (
+    <PublishingPreferencesSettings
+      canManage={can('workspace:update')}
+      key={organization.id}
+      organization={organization}
+    />
+  ),
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
   'social-sets': ({ can, draftsEnabled, role, socialSet }) =>
     socialSet ? (
