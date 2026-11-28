@@ -5216,7 +5216,12 @@ export class ScreenshotStudioBackendSDK {
     )
     if (response.headers.get('content-type')?.includes('application/json')) {
       const payload = (await response.json()) as { base64?: string }
-      return Buffer.from(payload.base64 ?? '', 'base64')
+      const binary = atob(payload.base64 ?? '')
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      return bytes
     }
     return new Uint8Array(await response.arrayBuffer())
   }

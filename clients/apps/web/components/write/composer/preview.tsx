@@ -96,45 +96,49 @@ export function PreviewPanel({
     return <p className="p-4 text-sm text-muted-foreground">Turn on a platform to preview it.</p>
   }
   return (
-    <div className="flex flex-col gap-3 p-4" data-testid="preview-panel">
-      <p className="rounded-md border border-dashed border-input px-2 py-1 text-center text-[11px] text-muted-foreground">
-        Preview — not published
-      </p>
-      <PreviewToolbar
-        accounts={items.map((entry) => entry.account)}
-        active={item.account.channel}
-        onSelect={onSelect}
-        selection={selection}
-      />
-      <DescribeMediaContext.Provider value={onDescribe}>
-        <ScaledPreview width={size?.width ?? 600} height={size?.height}>
-          <div data-testid={`preview-${item.account.channel}`} key={item.account.id}>
-            <PlatformPost item={item} target={target} />
-          </div>
-        </ScaledPreview>
-      </DescribeMediaContext.Provider>
-      <p className="text-[11px] text-muted-foreground">
-        Cutoffs vary by app and device.
-      </p>
-      <PreviewLengths item={item} />
-      {item.publication.problems.length > 0 ? (
-        <ul className="grid gap-0.5" role="alert">
-          {item.publication.problems.map((problem) => (
-            <li className="text-xs text-red-700 dark:text-red-300" key={problem}>
-              {problem}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {item.publication.serialized.degradations.map((degradation) => (
-        <p className="text-xs text-amber-700 dark:text-amber-300" key={degradation.kind}>
-          {degradation.message}
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-3 p-4" data-testid="preview-panel">
+        <p className="rounded-md border border-dashed border-input px-2 py-1 text-center text-[11px] text-muted-foreground">
+          Preview — not published
         </p>
-      ))}
-      {item.account.channel === 'x' ? (
-        <XLinksPreviewNotice
-          captions={item.publication.serialized.posts.map((post) => post.caption)}
+        <PreviewToolbar
+          accounts={items.map((entry) => entry.account)}
+          active={item.account.channel}
+          onSelect={onSelect}
+          selection={selection}
         />
+        <DescribeMediaContext.Provider value={onDescribe}>
+          <ScaledPreview width={size?.width ?? 600} height={size?.height}>
+            <div data-testid={`preview-${item.account.channel}`} key={item.account.id}>
+              <PlatformPost item={item} target={target} />
+            </div>
+          </ScaledPreview>
+        </DescribeMediaContext.Provider>
+        <p className="text-[11px] text-muted-foreground">
+          Cutoffs vary by app and device.
+        </p>
+        <PreviewLengths item={item} />
+        {item.publication.problems.length > 0 ? (
+          <ul className="grid gap-0.5" role="alert">
+            {item.publication.problems.map((problem) => (
+              <li className="text-xs text-red-700 dark:text-red-300" key={problem}>
+                {problem}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {item.publication.serialized.degradations.map((degradation) => (
+          <p className="text-xs text-amber-700 dark:text-amber-300" key={degradation.kind}>
+            {degradation.message}
+          </p>
+        ))}
+      </div>
+      {item.account.channel === 'x' ? (
+        <div className="px-4 pb-4 empty:hidden">
+          <XLinksPreviewNotice
+            captions={item.publication.serialized.posts.map((post) => post.caption)}
+          />
+        </div>
       ) : null}
     </div>
   )
